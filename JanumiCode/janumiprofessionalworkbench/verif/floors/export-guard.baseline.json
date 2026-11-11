@@ -45,6 +45,10 @@
 				"prepareModelInvocation",
 				"resolveInvocationSubject",
 				"resolvePwuTypeFacts",
+				"resolveUndertakingStatement",
+				"UNDERTAKING_SECTION_HEADING",
+				"undertakingSection",
+				"withUndertakingSection",
 				"WORK_UNIT_MARKERS"
 			],
 			"guardedExports": [
@@ -52,6 +56,10 @@
 				"prepareModelInvocation",
 				"resolveInvocationSubject",
 				"resolvePwuTypeFacts",
+				"resolveUndertakingStatement",
+				"UNDERTAKING_SECTION_HEADING",
+				"undertakingSection",
+				"withUndertakingSection",
 				"WORK_UNIT_MARKERS"
 			],
 			"unattributedMutants": 2

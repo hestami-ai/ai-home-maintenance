@@ -1412,3 +1412,71 @@ describe('⭐⭐ package L6 — D59: a work product the check cannot read as JSO
 		expect([rerun.advanced, rerun.data?.error], 'arrangement: the re-run’s JSON work product completed it').toEqual(['work-rerun', undefined]);
 	});
 });
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1); `REG-F-510`, remedy 2; `REG-F-623`) — THROUGH THE PAGE'S OWN
+// ACTIONS: the route reads the Undertaking the unit belongs to, by parsing the stored object, and every invocation states it —
+// Begin & Execute's, a person's re-run of the work, and the producing prompt a re-review rebuilds from the record.
+describe('⭐⭐ package L7 — D61: every unit’s instruction states its Undertaking, through the page’s own actions', () => {
+	/**
+	 * The section, for an Undertaking created through the page's form with a name alone: the action's own defaults stand for its
+	 * objective ("Deliver <name>") and its intended product (the name). ⭑ Spelled here, never imported, as `SCOPE` is.
+	 */
+	const sectionOf = (name: string): string =>
+		'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:\n' +
+		`Intended product: ${name}\nObjective:\nDeliver ${name}`;
+	/** `modelWorkUnit`'s template, rendered for its unit, then the section for its Undertaking, "Execution Demo". */
+	const INSTRUCTION = `Assess Route Assessment.\n\n${sectionOf('Execution Demo')}`;
+
+	it('⛔ THE PREDICTED RED — Begin & Execute’s first turn is the type’s rendered text, a blank line, then the Undertaking’s statement; the work product’s review is shown it', async () => {
+		// THE RED (design D61): at HEAD the turn was the type's rendered text alone, whatever its Undertaking said.
+		const pwuId = await modelWorkUnit();
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		expect(seam.turns[0], 'the model was not told its Undertaking’s intended product and objective').toBe(INSTRUCTION);
+		expect(seam.prompts.find(isWorkProductReview), 'the work product’s review was not shown the statement').toContain(INSTRUCTION);
+	});
+
+	it('⛔ a person’s re-run of the work opens its fresh session with the same instruction, the statement in it', async () => {
+		// THE RED (design D61): at HEAD the re-run's first turn opened with the type's rendered text alone.
+		const MARKDOWN = '# Requirements\n\n- R1. Count words.\n';
+		let fixed = false;
+		seam.script = (turn) => ({ acts: [], account: `Attempt ${turn}.`, workProduct: fixed ? { document: MARKDOWN } : MARKDOWN });
+		const pwuId = await modelWorkUnit();
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the unit stopped on the check').toMatch(/WORK_PRODUCT_NOT_PARSEABLE/);
+		const before = seam.turns.length;
+		fixed = true;
+		const rerun = (await actions.rerunWork(
+			actionEvent('rerunWork', { pwuId, rationale: 'The work product could not be read as JSON; run the work again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+		expect([rerun.advanced, rerun.data?.error], 'arrangement: the re-run of the work').toEqual(['work-rerun', undefined]);
+		expect(
+			seam.turns[before]?.startsWith(`${INSTRUCTION}\n\n`),
+			'the re-run’s first turn does not open with the instruction, the statement in it'
+		).toBe(true);
+	});
+
+	it('⛔ a re-review is shown the producing prompt rebuilt from the record, the statement in it', async () => {
+		// THE RED (design D61): at HEAD the producing prompt was re-rendered with no statement (`stopped-unit-recovery.ts`), so
+		// a re-review judged the work against an instruction its producer was not given.
+		const pwuId = await modelWorkUnit();
+		seam.script = () => ({
+			acts: [write('src/report.md', '# The report\n'), run(['cat', 'src/report.md'], '# The report\n')],
+			account: 'Wrote the report.'
+		});
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		const refused = await beginExecute(pwuId);
+		expect(refused.data?.error, 'arrangement: the work product’s review did not conclude').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		down = false;
+		seam.prompts.length = 0;
+		const rerun = (await actions.rerunReview(
+			actionEvent('rerunReview', { pwuId, rationale: 'The reviewer failed at the transport; review it again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+		expect(rerun.data?.error, 'arrangement: the re-review did not complete').toBeUndefined();
+		const reReview = seam.prompts.find(isWorkProductReview);
+		expect(reReview, 'arrangement: the work product was not re-reviewed').toBeDefined();
+		expect(reReview, 'the re-review was not shown the statement in the producing prompt').toContain(INSTRUCTION);
+	});
+});

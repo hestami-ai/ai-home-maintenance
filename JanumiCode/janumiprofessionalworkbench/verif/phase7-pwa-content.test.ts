@@ -11,7 +11,8 @@
 //     and the brief short of its last LF all fail;
 //   · ⭐ every phase's instruction carries that brief verbatim — ⛔ a prompt carrying round 1's does not;
 //   · ⭐ each instruction is the ENGINE's — `renderedPrompt` equals `prepareModelInvocation`'s own `prompt` for the type as
-//     the designer stores it and the unit as instantiation builds it — ⛔ a rendering that drops the output contract
+//     the designer stores it and the unit as instantiation builds it ⭐ (package L7, D61: and the lane's Undertaking as the
+//     form stores it, its statement between the work and the contract) — ⛔ a rendering that drops the output contract
 //     differs, and so does a declaration the designer would trim. ⚠ BOTH ARE BUILT HERE BY HAND (`storedTemplate`,
 //     `unitSubject`), so this limb cannot see a route that builds either otherwise (round 1's verifier, 2026-10-09):
 //     what the route itself sends is held in the gate, where each phase's try records `renderedPrompt`'s bytes as its
@@ -48,6 +49,8 @@ import type { PromptTemplate } from '@janumipwb/rph-contracts';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { REASONING_REVIEW_BUDGET } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+// ⭐⭐ Package L7 — D61 — the lane's Undertaking, whose statement every phase's instruction now carries.
+import { PHASE7_UNDERTAKING } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import {
 	PHASE7_E2E,
 	PHASE7_INSTRUCTION_BUDGET,
@@ -58,7 +61,8 @@ import {
 	PRODUCT_BRIEF,
 	promptMarkers,
 	renderedPrompt,
-	type Phase7TypeDeclaration
+	type Phase7TypeDeclaration,
+	type Phase7Undertaking
 } from '../scripts/phase7/pwa-content.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -95,9 +99,13 @@ function briefFaults(text: string): string[] {
 	];
 }
 
-/** The model types whose instruction does not carry the canonical brief verbatim, by name. */
+/**
+ * The model types whose instruction does not carry the canonical brief verbatim, by name. ⭐ Package L7 (D61): read in the
+ * type's OWN rendering, with no Undertaking (`undefined`), as before — the lane's Undertaking states the brief too, and this
+ * limb is about the PWA's own prompts (round 1's BLOCKER).
+ */
 const withoutTheBrief = (types: readonly Phase7TypeDeclaration[]): string[] =>
-	types.filter((t) => !renderedPrompt(t).includes(PRODUCT_BRIEF)).map((t) => t.name);
+	types.filter((t) => !renderedPrompt(t, undefined).includes(PRODUCT_BRIEF)).map((t) => t.name);
 
 /** The type as the designer stores it (`routes/pwa/[id]/+page.server.ts`): text trimmed, its markers read from it. */
 function storedTemplate(t: Phase7TypeDeclaration): PromptTemplate {
@@ -128,22 +136,32 @@ function unitSubject(t: Phase7TypeDeclaration): InvocationSubject {
  * type and the unit as built above, by hand: the route's own is held in the gate (`phase7-five-unit.e2e.ts`, section 6).
  */
 function engineInstruction(t: Phase7TypeDeclaration): string {
-	const plan = prepareModelInvocation(unitSubject(t), 'pwutype_phase7', storedTemplate(t), {
-		policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
-		alsoAssembles: []
-	});
+	// ⭐⭐ Package L7 — D61 — for the lane's Undertaking, whose statement every phase's instruction now carries.
+	return engineInstructionFor(t, PHASE7_UNDERTAKING);
+}
+
+/** ⭐⭐ Package L7 — D61 — the engine's instruction for the unit of an Undertaking as the form's action stores it, or of none. */
+function engineInstructionFor(t: Phase7TypeDeclaration, undertaking: Phase7Undertaking | undefined): string {
+	const plan = prepareModelInvocation(
+		unitSubject(t),
+		'pwutype_phase7',
+		storedTemplate(t),
+		{ policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] },
+		// The action trims each value before it stores it (`routes/undertakings/+page.server.ts`).
+		undertaking && { intendedOutputProduct: undertaking.product.trim(), objective: undertaking.objective.trim() }
+	);
 	return plan.ready ? plan.prompt : `REFUSED: ${plan.reason}`;
 }
 
 /** The model types whose instruction, as this module renders it, is not the engine's, by name. */
 const notTheEngines = (types: readonly Phase7TypeDeclaration[]): string[] =>
-	types.filter((t) => renderedPrompt(t) !== engineInstruction(t)).map((t) => t.name);
+	types.filter((t) => renderedPrompt(t, PHASE7_UNDERTAKING) !== engineInstruction(t)).map((t) => t.name);
 
 /** The model types whose instruction is not UNDER the budget, each with its length. */
 const pastTheBudget = (types: readonly Phase7TypeDeclaration[]): string[] =>
 	types
-		.filter((t) => renderedPrompt(t).length >= PHASE7_INSTRUCTION_BUDGET)
-		.map((t) => `${t.name}: ${renderedPrompt(t).length}`);
+		.filter((t) => renderedPrompt(t, PHASE7_UNDERTAKING).length >= PHASE7_INSTRUCTION_BUDGET)
+		.map((t) => `${t.name}: ${renderedPrompt(t, PHASE7_UNDERTAKING).length}`);
 
 /**
  * The markers each type's prompt uses that no work unit fills — read by the ENGINE's own reading of the text
@@ -154,7 +172,7 @@ const markerFaults = (types: readonly Phase7TypeDeclaration[]): string[] =>
 		...markersIn(t.prompt ?? '')
 			.filter((m) => !PHASE7_MARKERS.includes(m))
 			.map((m) => `${t.name}: {${m}} is filled by no work unit`),
-		...(/[{}]/.test(renderedPrompt(t))
+		...(/[{}]/.test(renderedPrompt(t, PHASE7_UNDERTAKING))
 			? [`${t.name}: its rendered instruction still holds a brace`]
 			: [])
 	]);
@@ -239,12 +257,42 @@ describe('JAN-EXEC Phase 7 — each phase’s instruction is the engine’s, and
 	it('⛔ CONTROL — a rendering that drops the output contract, and a declaration the designer would trim, are named', () => {
 		// The module's rendering held against the engine's for a type it renders without the contract.
 		const dropped = MODEL_TYPES.filter(
-			(t) => renderedPrompt({ ...t, outputContract: undefined }) !== engineInstruction(t)
+			(t) => renderedPrompt({ ...t, outputContract: undefined }, PHASE7_UNDERTAKING) !== engineInstruction(t)
 		);
 		expect(dropped.map((t) => t.name)).toEqual(MODEL_TYPES.map((t) => t.name));
 		// A purpose with a trailing space: the designer stores it trimmed, so the engine renders another text.
 		const untrimmed: Phase7TypeDeclaration = { ...PHASE7_E2E, purpose: `${PHASE7_E2E.purpose} ` };
 		expect(notTheEngines([untrimmed])).toEqual([PHASE7_E2E.name]);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)): the restatement renders the Undertaking's section as the
+	// engine does — after the type's rendered text, before its output contract, each value trimmed and an empty one's line left
+	// out. ⛔ PREDICTED RED, the first two: at HEAD neither `renderedPrompt` nor the engine stated the Undertaking.
+	it('⭐⭐ L7 (D61) — the instruction states the lane’s Undertaking between the work and the contract, as the engine renders it', () => {
+		const section =
+			'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:\n' +
+			`Intended product: ${PHASE7_UNDERTAKING.product}\nObjective:\n${PHASE7_UNDERTAKING.objective.trim()}`;
+		for (const t of MODEL_TYPES)
+			expect(engineInstruction(t), t.name).toContain(`\n\n${section}\n\nThe output this work requires:\n${t.outputContract}`);
+		expect(notTheEngines(MODEL_TYPES)).toEqual([]);
+	});
+
+	it('⛔ CONTROL (D61) — a rendering that drops the Undertaking’s section is named, for every phase', () => {
+		expect(MODEL_TYPES.filter((t) => renderedPrompt(t, undefined) !== engineInstruction(t)).map((t) => t.name)).toEqual(
+			MODEL_TYPES.map((t) => t.name)
+		);
+	});
+
+	it('⭑ L7 (D61) — for an Undertaking with an empty value, or none, the restatement renders as the engine does', () => {
+		const shapes: readonly (Phase7Undertaking | undefined)[] = [
+			undefined,
+			{ objective: '', product: '' },
+			{ objective: ' \n', product: 'wordfreq' },
+			{ objective: 'Build wordfreq.\n- It reads UTF-8 text.\n', product: ' ' },
+			{ objective: '  Build wordfreq.  ', product: ' wordfreq\n' }
+		];
+		for (const u of shapes)
+			expect(renderedPrompt(PHASE7_E2E, u), JSON.stringify(u)).toBe(engineInstructionFor(PHASE7_E2E, u));
 	});
 
 	it('⭐ each instruction renders UNDER 4,000 characters — the reasoning review’s own USER_INTENT_MAX', () => {
@@ -253,19 +301,19 @@ describe('JAN-EXEC Phase 7 — each phase’s instruction is the engine’s, and
 	});
 
 	it('⛔ CONTROL — an instruction of 4,000 characters exactly is refused, one of 3,999 is not, and the output contract counts', () => {
-		const room = PHASE7_INSTRUCTION_BUDGET - renderedPrompt(PHASE7_E2E).length;
+		const room = PHASE7_INSTRUCTION_BUDGET - renderedPrompt(PHASE7_E2E, PHASE7_UNDERTAKING).length;
 		expect(room, 'arrangement: the end-to-end instruction has room to pad').toBeGreaterThan(1);
 		const padded = (n: number): Phase7TypeDeclaration => ({
 			...PHASE7_E2E,
 			prompt: `${PHASE7_E2E.prompt}${'x'.repeat(n)}`
 		});
-		expect(renderedPrompt(padded(room))).toHaveLength(PHASE7_INSTRUCTION_BUDGET);
+		expect(renderedPrompt(padded(room), PHASE7_UNDERTAKING)).toHaveLength(PHASE7_INSTRUCTION_BUDGET);
 		expect(pastTheBudget([padded(room)])).toEqual([
 			`${PHASE7_E2E.name}: ${PHASE7_INSTRUCTION_BUDGET}`
 		]);
 		expect(pastTheBudget([padded(room - 1)])).toEqual([]);
 		// The template alone is under the budget: the contract the engine appends is what reaches it.
-		expect(renderedPrompt({ ...padded(room), outputContract: undefined }).length).toBeLessThan(
+		expect(renderedPrompt({ ...padded(room), outputContract: undefined }, PHASE7_UNDERTAKING).length).toBeLessThan(
 			PHASE7_INSTRUCTION_BUDGET
 		);
 	});

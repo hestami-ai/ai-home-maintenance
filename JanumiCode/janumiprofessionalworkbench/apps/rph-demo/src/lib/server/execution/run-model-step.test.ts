@@ -72,6 +72,8 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		providerId: 'test-provider',
 		// ⭑ CP-04 — the deployment's own policy. Required, so no call site can skip the consultation.
 		contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
+		// ⭐⭐ Package L7 — D61 — no Undertaking, SAID: the field is required, so a caller cannot skip it by omission.
+		undertaking: undefined,
 		// ⛔ SAID, NOT OMITTED. `binding` is required with an explicit NONE so that skipping the capability
 		// check cannot be expressed by leaving a field out — the dodge shape `REG-F-364` records.
 		binding: { kind: 'NONE' as const },
@@ -106,6 +108,27 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 			SUBJECT.id
 		);
 		expect(dispatched[0]!.subjectObjectType).toBe('PROFESSIONAL_WORK_UNIT');
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1); `REG-F-510`): the step hands the Undertaking's statement it
+	// is given to the instruction, so the model is sent it and the reviewers judge against the same text (`prompt`). ⛔ PREDICTED
+	// RED: at HEAD the step's input had no such field, and the instruction stated nothing of the Undertaking.
+	it('⭐⭐ L7 (D61) — the step hands its Undertaking’s statement to the instruction: the model is sent it, and the reviewers’ prompt carries it', async () => {
+		let seen = '';
+		const { input } = harness({
+			session: oneShotSession(async (p: string) => {
+				seen = p;
+				return ANSWER;
+			}),
+			undertaking: { intendedOutputProduct: 'wordfreq', objective: 'Build wordfreq, a Node.js command-line tool.' }
+		});
+		const out = await runModelInvocationStep(input);
+		const instruction =
+			'Assess Route Assessment. Deliver Decide whether the route is viable.\n\n' +
+			'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:\n' +
+			'Intended product: wordfreq\nObjective:\nBuild wordfreq, a Node.js command-line tool.';
+		expect(seen, 'the model was not sent the Undertaking’s statement').toBe(instruction);
+		expect(out.ran && out.prompt, 'the reviewers’ instruction does not carry it').toBe(instruction);
 	});
 
 	it('⭑ the recorded fingerprint RESOLVES to the template that produced the prompt', async () => {

@@ -42,6 +42,8 @@ import {
 	type NegativeControlResult
 } from '../scripts/phase7/negative-control.js';
 import { PHASE7_E2E, PRODUCT_BRIEF, renderedPrompt } from '../scripts/phase7/pwa-content.js';
+// ⭐⭐ Package L7 — D61 — the run's Undertaking, whose statement the end-to-end phase's instruction now carries.
+import { PHASE7_UNDERTAKING } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import { NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
 import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
@@ -115,7 +117,13 @@ describe('JAN-EXEC P7-4e — the negative control’s case', () => {
 		// renders it, the canonical brief verbatim and the output contract appended (`scripts/phase7/pwa-content.ts`). It
 		// asks for the end-to-end tests the run never ran — and fits the instruction slice whole, so no cut can hide that
 		// request from the reviewer (`REASONING_REVIEW_BUDGET.USER_INTENT_MAX`; design §3.2's 4,000 characters).
-		expect(c.input.producingPrompt).toBe(renderedPrompt(PHASE7_E2E));
+		// ⛔ MOVED 2026-11-11 (`JAN-EXEC` Phase 7, package L7 — design D61; `REG-D-151` (1)): ~~`renderedPrompt(PHASE7_E2E)`~~ the
+		// run's unit is given its Undertaking's statement too, so the run's own instruction is rendered for the run's Undertaking.
+		// ⛔ PREDICTED RED, the second line: at HEAD the control's instruction stated nothing of the Undertaking.
+		expect(c.input.producingPrompt).toBe(renderedPrompt(PHASE7_E2E, PHASE7_UNDERTAKING));
+		expect(c.input.producingPrompt, 'the control’s instruction does not state the run’s Undertaking').toContain(
+			`\nIntended product: wordfreq\nObjective:\n${PRODUCT_BRIEF.trim()}\n\nThe output this work requires:\n`
+		);
 		expect(c.input.producingPrompt).toContain(PRODUCT_BRIEF);
 		expect(c.input.producingPrompt).toContain('Write end-to-end tests in test/e2e/ that start the real tool');
 		expect(c.input.producingPrompt).toContain('Run the whole suite with node --test');

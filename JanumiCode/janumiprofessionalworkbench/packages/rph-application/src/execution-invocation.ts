@@ -13,10 +13,11 @@
 import type {
 	ContextSourceRule,
 	ContextSpecification,
-	PromptTemplate
+	PromptTemplate,
+	Undertaking
 } from '@janumipwb/rph-contracts';
 // ⭑ RUNTIME schemas, not types — `R30` parses a projection rather than asserting its shape.
-import { ProfessionalWorkUnitSchema, PwuTypeSchema } from '@janumipwb/rph-contracts';
+import { ProfessionalWorkUnitSchema, PwuTypeSchema, UndertakingSchema } from '@janumipwb/rph-contracts';
 import { permits, type ContextAssemblyPolicyContent } from './context-assembly.js';
 import { promptTemplateFingerprint, renderPromptTemplate } from './prompt-render.js';
 
@@ -142,6 +143,72 @@ export function resolvePwuTypeFacts(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1); `REG-F-510`, remedy 2; `REG-F-623`) — WHAT AN UNDERTAKING
+ * STATES OF ITS WORK: its intended product and its objective, the contract's own two fields (`objects.ts`, `UNDERTAKING`), which
+ * every unit's instruction now states. ⛔ `REG-F-510`: nothing carried them past the Undertaking's page — a unit's subject is its
+ * id, title and description, copied from its type — so two Undertakings of one PWA rendered the same instruction for one type,
+ * and P6 again's third run's requirements unit, told neither the product's platform nor its brief, wrote a Python
+ * specification for a Node.js product (`REG-F-623`).
+ */
+export type UndertakingStatement = Pick<Undertaking, 'intendedOutputProduct' | 'objective'>;
+
+/** ⭐⭐ Package L7 — D61 — the section's heading line, spelled ONCE, here. */
+export const UNDERTAKING_SECTION_HEADING =
+	'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:';
+
+/**
+ * ⭐⭐ Package L7 — D61 — THE SECTION THAT STATES AN UNDERTAKING: the heading line; `Intended product: ` and the product; `Objective:`
+ * and the objective on the lines after it. Each value trimmed. ⚠ ABSENT MEANS ABSENT, as `withOutputContract` holds of a contract:
+ * an empty value's line is left out, and with both empty — or no statement at all — there is no section (`undefined`), since a
+ * heading over nothing would tell the producer the Undertaking said something and then show it nothing.
+ */
+export function undertakingSection(statement: UndertakingStatement | undefined): string | undefined {
+	const product = statement?.intendedOutputProduct.trim() ?? '';
+	const objective = statement?.objective.trim() ?? '';
+	if (product === '' && objective === '') return undefined;
+	return [
+		UNDERTAKING_SECTION_HEADING,
+		...(product === '' ? [] : [`Intended product: ${product}`]),
+		...(objective === '' ? [] : ['Objective:', objective])
+	].join('\n');
+}
+
+/**
+ * ⭐⭐ Package L7 — D61 — `text`, a blank line, then the Undertaking's section; `text` alone where there is none. ONE COMPOSITION FOR
+ * BOTH ITS USES: the engine's, after a type's rendered text and before its output contract (`prepareModelInvocation`); and the
+ * route's, after a unit's purpose, where a declared review in the `UNIT_PURPOSE` framing is given that purpose as its instruction.
+ */
+export function withUndertakingSection(text: string, statement: UndertakingStatement | undefined): string {
+	const section = undertakingSection(statement);
+	return section === undefined ? text : `${text}\n\n${section}`;
+}
+
+/**
+ * ⭐⭐ Package L7 — D61 — THE STATEMENT OF THE UNDERTAKING `undertakingId` NAMES, BY **PARSING** THE STORED OBJECT (`R30`, as
+ * `resolveInvocationSubject` reads a work unit), never by asserting it: its two fields, and nothing else. ⛔ Refused when it does
+ * not resolve, or does not parse as an UNDERTAKING — anything the engine persisted parses (`handlers/kit.ts`), so a refusal means
+ * a row written past the command path, which is exactly when a caller should stop rather than instruct a model without it.
+ */
+export function resolveUndertakingStatement(
+	find: (objectId: string) => unknown,
+	undertakingId: string
+): UndertakingStatement {
+	const raw = find(undertakingId);
+	if (raw === undefined || raw === null)
+		throw new Error(
+			`Undertaking '${undertakingId}' does not resolve, so there is no statement of its intended product and objective ` +
+				'to put in front of a producer. Refusing rather than instructing a model without it.'
+		);
+	const parsed = UndertakingSchema.safeParse(raw);
+	if (!parsed.success)
+		throw new Error(
+			`Undertaking '${undertakingId}' resolved to an object that does not parse as an UNDERTAKING: ` +
+				`${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+		);
+	return { intendedOutputProduct: parsed.data.intendedOutputProduct, objective: parsed.data.objective };
+}
+
+/**
  * What this step will put in front of the producer, and what the deployment PERMITS it to.
  *
  * ⭑⭑ REQUIRED, NOT OPTIONAL, AND THAT IS THE POINT OF `CP-04`. The roadmap's predicted red is *"resolve the
@@ -259,7 +326,13 @@ export function prepareModelInvocation(
 	subject: InvocationSubject,
 	pwuTypeId: string,
 	template: PromptTemplate | undefined,
-	assembly: ContextAssembly
+	assembly: ContextAssembly,
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)) — the Undertaking's statement, which the instruction
+	 * states after the type's rendered text and before its output contract. ⛔ REQUIRED, `undefined` where there is none, for
+	 * CP-04's reason: an optional one would let a caller skip it by omission, and the type-checker would name no caller.
+	 */
+	undertaking: UndertakingStatement | undefined
 ): InvocationPlan {
 	// ⛔ NO DEFAULT PROMPT. A type without a template declares no agent behaviour — TRUE of every type that
 	// existed before REG-D-058 — and inventing one would be the seeded-policy-as-projection defect this
@@ -358,7 +431,11 @@ export function prepareModelInvocation(
 
 	return {
 		ready: true,
-		prompt: withOutputContract(rendered.text, template.outputContract),
+		// ⭐⭐ Package L7 — D61 — the work, what it is part of, then the shape to return: the Undertaking's section after the
+		// type's rendered text, and the output contract LAST, as before. ⚠ Still the RENDERED_INSTRUCTION at THIS_TRY, as the
+		// contract is (the lead's reading, named in D61): `ctx-default`'s THIS_UNDERTAKING, permitted for nothing, concerns
+		// material from another work unit, which still crosses nowhere, so no policy needs widening.
+		prompt: withOutputContract(withUndertakingSection(rendered.text, undertaking), template.outputContract),
 		fingerprint: promptTemplateFingerprint(pwuTypeId, template)
 	};
 }

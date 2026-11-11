@@ -2028,7 +2028,10 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 	it('⭐ the markdown carries the matrix, every cell’s value, and the two gaps a "Yes" always states', () => {
 		const md = renderMarkdown(reportOf(aRun({ design: { review: [] } })).report);
 		expect(md).toContain('| 8 The record | as intended | broke (REG-F-525) | as intended | as intended |');
-		expect(md).toContain('REG-F-510: the PWA had to name its product');
+		// ⛔ MOVED 2026-11-11 (`JAN-EXEC` Phase 7, package L7 — design D62; `REG-D-151` (2)): ~~`'REG-F-510: the PWA had to name its
+		// product'`~~ — D61 states the Undertaking in every unit's instruction, and the list gains REG-F-521's line.
+		expect(md).toContain("REG-F-510: each unit's instruction states the Undertaking's intended product and objective (D61)");
+		expect(md).toContain("REG-F-521: the executor's commands run unconfined");
 		// ⭐ E2 (design B8) — THE OPENING CAVEAT LOSES ITS `REG-F-523` LINE: the declared policies judge now.
 		expect(md).not.toContain('REG-F-523: the declared policies were signed off with no criterion checked.');
 	});
@@ -2042,6 +2045,15 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		'UNIT_PURPOSE framing: the declared reviews of a unit composed of others (root: 2) were made in it — the unit’s own ' +
 		'purpose, judged over the work it and every unit below it produced (REG-D-111 (2)) — and no reviewer-qualification case ' +
 		'measures it: every declared case is in the PRODUCING_PROMPT framing.';
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D62 (`REG-D-151` (2); `REG-F-521`; `REG-F-624`): ⛔ PREDICTED RED: at HEAD the list
+	// held one line, REG-F-510's, saying the PWA had to name its product because an Undertaking could not tell its phases.
+	it('⭐⭐ L7 (D62) — the list a “Yes” always states holds REG-F-510’s restated line and REG-F-521’s new one, verbatim (REG-D-151 (2))', () => {
+		expect(ALWAYS_STATED).toEqual([
+			"REG-F-510: each unit's instruction states the Undertaking's intended product and objective (D61); whether the PWA's own prompts name the product stays the candidate checks' record (namesProduct).",
+			"REG-F-521: the executor's commands run unconfined: each runs as the server's user and can read or change what that account can; the paid runs accept it (REG-D-102 (3), REG-D-151 (2))."
+		]);
+	});
 
 	it('⛔ E12F F10 — the REG-F-523 caveat is KEPT for a run whose declared verdicts carry no criterion result (a pre-E2 archive), and counted for one that mixes them', () => {
 		// ⛔ PREDICTED RED, read from the code: E2 dropped the line for EVERY run, so a report over a pre-E2 archive — its 14

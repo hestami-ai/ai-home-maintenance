@@ -74,6 +74,8 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		modelId: 'test-model',
 		providerId: 'test-provider',
 		contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
+		// ⭐⭐ Package L7 — D61 — no Undertaking, SAID: the field is required.
+		undertaking: undefined,
 		binding: { kind: 'NONE' as const },
 		...over
 	};

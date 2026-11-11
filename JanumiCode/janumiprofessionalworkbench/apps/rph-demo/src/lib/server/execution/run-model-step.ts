@@ -13,7 +13,8 @@
 import {
 	prepareModelInvocation,
 	type ContextAssemblyPolicyContent,
-	type InvocationSubject
+	type InvocationSubject,
+	type UndertakingStatement
 } from '@janumipwb/rph-application';
 import type {
 	ContextSourceRule,
@@ -47,6 +48,13 @@ export interface RunModelStepInput {
 	readonly subjectSemanticVersion: number;
 	readonly pwuTypeId: string;
 	readonly template: PromptTemplate | undefined;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1); `REG-F-510`, remedy 2) — THE UNDERTAKING'S STATEMENT, which
+	 * the instruction states after the type's rendered text and before its output contract (`prepareModelInvocation`), so the
+	 * model is sent it and every review of the step reads it in `prompt`. ⛔ REQUIRED, `undefined` SAID where there is none: an
+	 * optional field would let a caller skip it by omission, the dodge `contextPolicy` and `binding` refuse.
+	 */
+	readonly undertaking: UndertakingStatement | undefined;
 	/**
 	 * The producer's SESSION, held across the work unit's tries (`JAN-EXECSESS`).
 	 *
@@ -301,11 +309,18 @@ export async function runModelInvocationStep(
 		if (refusal) return { ran: false, refusedBecause: refusal };
 	}
 
-	const plan = prepareModelInvocation(input.subject, input.pwuTypeId, input.template, {
-		policy: input.contextPolicy,
-		alsoAssembles: turnAssembles(input),
-		...(input.contextSpecification ? { specification: input.contextSpecification } : {})
-	});
+	// ⭐⭐ Package L7 — D61 — and the Undertaking's statement, which the instruction states before its output contract.
+	const plan = prepareModelInvocation(
+		input.subject,
+		input.pwuTypeId,
+		input.template,
+		{
+			policy: input.contextPolicy,
+			alsoAssembles: turnAssembles(input),
+			...(input.contextSpecification ? { specification: input.contextSpecification } : {})
+		},
+		input.undertaking
+	);
 	if (!plan.ready) return { ran: false, refusedBecause: plan.reason };
 
 	// ⭑⭑ A REPAIR IS A FOLLOW-UP TURN, NOT A RE-RENDERED INSTRUCTION. The first version of this loop appended

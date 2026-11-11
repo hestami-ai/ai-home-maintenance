@@ -66,6 +66,7 @@ import {
 	laneVerdict,
 	openLane,
 	overlayOf,
+	PHASE7_UNDERTAKING,
 	producerOfStream,
 	runTheLane,
 	typeUnreadableOf,
@@ -82,7 +83,8 @@ import {
 import {
 	candidateChecks,
 	CHECK_REGISTER_IDS,
-	governanceOf
+	governanceOf,
+	type CandidateChecks
 } from '../scripts/phase7/candidate-checks.js';
 import {
 	AUTHORING_FLOOR_POLICIES,
@@ -97,7 +99,13 @@ import {
 	TURN_SETTLED,
 	unitsInTreeOrder
 } from '../scripts/phase7/half-b.js';
-import { PHASE7_INSTRUCTION_BUDGET, PHASE7_PWA, PRODUCT_BRIEF } from '../scripts/phase7/pwa-content.js';
+import {
+	PHASE7_INSTRUCTION_BUDGET,
+	PHASE7_PWA,
+	PRODUCT_BRIEF,
+	renderedPrompt,
+	type Phase7TypeDeclaration
+} from '../scripts/phase7/pwa-content.js';
 import { archiveAuthoring, AUTHORING_ARCHIVE, CONTENT_STORE_SUFFIX, journalHeaderOf } from '../scripts/phase7/run-archive.js';
 import {
 	buildRunReport,
@@ -979,7 +987,7 @@ function halfBLaneRows(
 				accept: { envelopeType: 'success', acceptedHash: o.acceptedHash === undefined ? CANDIDATE_HASH : o.acceptedHash },
 				authorModel: o.author ?? { configured: model, resolved: model },
 				checks: {
-					findings: o.findings ?? candidateChecks(o.types ?? AGENT_TYPES, AGENT_POLICIES).findings,
+					findings: o.findings ?? candidateChecks(o.types ?? AGENT_TYPES, AGENT_POLICIES, undefined).findings,
 					refused: false
 				}
 			}
@@ -1978,7 +1986,7 @@ describe('⭐ C1 — the floor’s dispositions, as the record holds them', () =
 
 describe('⭐⭐ C4 — the candidate checks: each trap found, and nothing refused (REG-D-110 (4))', () => {
 	it('⭐ on the agent’s PWA: the UNDECLARED leaf, the unsupplied marker, and the policy of another kind — each with its register ids; the clean type and the root none', () => {
-		const checks = candidateChecks(AGENT_TYPES, AGENT_POLICIES);
+		const checks = candidateChecks(AGENT_TYPES, AGENT_POLICIES, undefined);
 		expect(checks.refused).toBe(false);
 		expect(checks.findings).toEqual([
 			{
@@ -2018,7 +2026,7 @@ describe('⭐⭐ C4 — the candidate checks: each trap found, and nothing refus
 	it('⛔ a MODEL leaf whose prompt is DRAFT, and a prompt past the 4,000 characters the reviewer is shown, are each found', () => {
 		const draft = { id: 't_d', state: { ...AGENT_TYPES[1]!.state, promptTemplate: prompt('Write {subject}.', 'DRAFT') } };
 		const long = { id: 't_l', state: { ...AGENT_TYPES[1]!.state, promptTemplate: prompt(`Write {subject}. ${'x'.repeat(PHASE7_INSTRUCTION_BUDGET)}`) } };
-		const found = candidateChecks([draft, long], AGENT_POLICIES).findings.map((f) => [f.typeId, f.check]);
+		const found = candidateChecks([draft, long], AGENT_POLICIES, undefined).findings.map((f) => [f.typeId, f.check]);
 		expect(found).toEqual([
 			['t_d', 'model-leaf'],
 			['t_l', 'prompt-length']
@@ -2040,7 +2048,7 @@ describe('⭐⭐ C4 — the candidate checks: each trap found, and nothing refus
 		);
 		// ⭑ REG-F-524's own case: only when EVERY declared policy fails to govern is the unit unassurable, and the finding says so.
 		const mixed = { id: 't_m', state: { ...AGENT_TYPES[2]!.state, requiredAssurancePolicyIds: ['pol_requirement_coverage', 'pol_intent_preservation'] } };
-		expect(candidateChecks([mixed], AGENT_POLICIES).findings.find((f) => f.check === 'policy-governs')?.detail).toBe(
+		expect(candidateChecks([mixed], AGENT_POLICIES, undefined).findings.find((f) => f.check === 'policy-governs')?.detail).toBe(
 			'it declares pol_requirement_coverage, which does not govern its kind, PRODUCT_IMPLEMENTATION'
 		);
 	});
@@ -3250,7 +3258,7 @@ describe('⛔ REG-D-112 (E3’s re-review, 1) — a composite is a unit the tree
 	});
 
 	it('⭐ C4 records model-leaf for it: the plan gives it no child — and gives one to the root alone', () => {
-		const checks = candidateChecks(CONDITIONAL_TYPES, AGENT_POLICIES);
+		const checks = candidateChecks(CONDITIONAL_TYPES, AGENT_POLICIES, undefined);
 		expect(checks.findings.map((f) => [f.check, f.typeName, f.registerIds])).toEqual([
 			['model-leaf', 'Build wordfreq', ['REG-F-505', 'REG-F-507']]
 		]);
@@ -3283,7 +3291,7 @@ describe('⛔ REG-D-112 (E3’s re-review, 1) — a composite is a unit the tree
 			'broke',
 			['REG-F-505']
 		]);
-		expect(candidateChecks(types, AGENT_POLICIES).findings.map((f) => [f.check, f.typeName])).toEqual([['model-leaf', 'wordfreq Realization']]);
+		expect(candidateChecks(types, AGENT_POLICIES, undefined).findings.map((f) => [f.check, f.typeName])).toEqual([['model-leaf', 'wordfreq Realization']]);
 	});
 
 	it('⭐ CONTROL — a composite whose children were built reads as intended, and its basis NAMES the children it has', () => {
@@ -4475,5 +4483,83 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 		const md = renderMarkdown(r);
 		expect(md).toContain('- **The authoring floor, as the lane recorded it (lane/run.json):** none recorded.');
 		expect(md).not.toContain('Its reasoning review, by type, as the lane recorded it');
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D62 (`REG-F-503`'s marker of 2026-10-25; `REG-F-623`) — THE REG-F-503 CAVEAT, printed
+// in the authoring cell and in half B's section, says what the review in parts shows (`PWA_TYPE_SUBJECT`,
+// `reasoning-review-validator.ts`). ⛔ PREDICTED RED: at HEAD it said the reviewer was not shown the prompts' text or output
+// contracts — stale since the review in parts, and it misled the lead's first draft of REG-F-623.
+describe('⭐⭐ L7 (D62) — the REG-F-503 caveat says what the review in parts shows', () => {
+	it('⭐⭐ L7 (D62) — verbatim: each type whole, its prompt’s text and output contract among its fields, judged against the request', () => {
+		expect(HALF_B_CAVEATS[0]).toBe(
+			'REG-F-503: the authoring floor’s reviewer is shown each type whole, its prompt’s text and output contract among the fields its author declared, judged against the request the PWA was authored from.'
+		);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — the lead's decision of 2026-11-11 on the builder's §8.1 (`l7-facts.md` §9; to be recorded with
+// design D61): THE CANDIDATE CHECKS' PROMPT-LENGTH MEASURES EACH TYPE'S INSTRUCTION AS ITS UNIT IS GIVEN IT IN THE RUN — the
+// Undertaking's statement in it, for the Undertaking the lane creates after the checks (`PHASE7_UNDERTAKING`). ⛔ PREDICTED RED, (a)
+// and (c): the checks measured the type's own text and contract alone, so a type within 4,000 alone and past it with the lane's
+// statement gave no finding, while its unit's instruction passed what its reviewer is shown, and the report would print none.
+describe('⭐⭐ L7 (§9) — PROMPT-LENGTH counts the run’s Undertaking', () => {
+	/** A stored type's declaration, as the checks render it (`candidate-checks.ts`, `declarationOf`). */
+	const declOf = (t: ObjectRow): Phase7TypeDeclaration => {
+		const p = t.state.promptTemplate as { readonly templateText: string; readonly outputContract?: string };
+		return {
+			name: String(t.state.name),
+			purpose: String(t.state.purpose),
+			prompt: p.templateText,
+			outputContract: p.outputContract,
+			pwuKind: '',
+			workDischarge: 'MODEL',
+			policyIds: []
+		};
+	};
+	/** `Specify wordfreq`, its prompt padded by `n` characters. */
+	const specify = AGENT_TYPES[1]!;
+	const padded = (n: number): ObjectRow => ({
+		...specify,
+		state: { ...specify.state, promptTemplate: prompt(`Write {subject} for wordfreq: {purpose} ${'x'.repeat(n)}`) }
+	});
+	/** The padding that brings its own instruction to 3,000 characters: within 4,000 alone. */
+	const TO_3000 = 3_000 - renderedPrompt(declOf(padded(0)), undefined).length;
+	const WITHIN = padded(TO_3000);
+	/** Its instruction as its unit is given it in the run: the lane's statement in it. */
+	const GIVEN = renderedPrompt(declOf(WITHIN), PHASE7_UNDERTAKING).length;
+	const counted = (n: number): string =>
+		`its unit's instruction, its Undertaking's statement in it, is ${n} characters, past the ${PHASE7_INSTRUCTION_BUDGET} the reviewer is shown`;
+	const lengthFindings = (c: CandidateChecks) => c.findings.filter((f) => f.check === 'prompt-length');
+
+	it('⛔ (a) a type within 4,000 alone and past it with the lane’s statement is found, its detail naming the statement', () => {
+		expect(
+			[renderedPrompt(declOf(WITHIN), undefined).length, GIVEN > PHASE7_INSTRUCTION_BUDGET],
+			'arrangement: within 4,000 alone, past it with the statement'
+		).toEqual([3_000, true]);
+		const checks = candidateChecks([WITHIN], AGENT_POLICIES, PHASE7_UNDERTAKING);
+		expect(checks.types[0]!.renderedLength, 'the length measured is not the instruction its unit is given').toBe(GIVEN);
+		expect(lengthFindings(checks).map((f) => [f.typeName, f.detail])).toEqual([['Specify wordfreq', counted(GIVEN)]]);
+	});
+
+	it('⭑ (b) CONTROL — the same type with no Undertaking is not found, the statement is what tips it; and one past 4,000 alone keeps today’s words', () => {
+		const none = candidateChecks([WITHIN], AGENT_POLICIES, undefined);
+		expect([none.types[0]!.renderedLength, lengthFindings(none)]).toEqual([3_000, []]);
+		const over = padded(TO_3000 + 1_200);
+		expect(lengthFindings(candidateChecks([over], AGENT_POLICIES, undefined)).map((f) => f.detail)).toEqual([
+			`its rendered prompt is 4200 characters, past the ${PHASE7_INSTRUCTION_BUDGET} the reviewer is shown`
+		]);
+	});
+
+	it('⛔ (c) the lane measures with the Undertaking it creates after the checks, PHASE7_UNDERTAKING: its record finds the type', async () => {
+		const types = AGENT_TYPES.map((t) => (t.id === WITHIN.id ? WITHIN : t));
+		const record = await halfBLane({ paid: true, types }).run();
+		const checks = record.authoring?.checks;
+		expect(checks, 'arrangement: the run reached C4 and recorded its checks').toBeTruthy();
+		expect(
+			checks!.types.find((t) => t.typeId === WITHIN.id)?.renderedLength,
+			'the lane measured without its Undertaking'
+		).toBe(GIVEN);
+		expect(lengthFindings(checks!).map((f) => [f.typeName, f.detail])).toEqual([['Specify wordfreq', counted(GIVEN)]]);
 	});
 });

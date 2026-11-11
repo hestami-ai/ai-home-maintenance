@@ -32,8 +32,9 @@
 // (`packages/rph-application/src/execution-invocation.ts`, `assembleStepContext`). `{statement}` is in that map and never
 // filled, and any other marker refuses the step at render, after its step has started (`REG-F-507`, `REG-F-508`). So no
 // prompt here holds a brace except around those four, and every type carries a non-empty purpose for `{purpose}`.
-// ⚠ AND THE PROMPTS NAME THE PRODUCT, because an Undertaking cannot tell its units what to build (`REG-F-510`): the
-// design records that departure (§3.3) and a "Yes" states it.
+// ⚠ AND THE PROMPTS NAME THE PRODUCT, ~~because an Undertaking cannot tell its units what to build (`REG-F-510`): the
+// design records that departure (§3.3) and a "Yes" states it.~~ ⭐⭐ as §3.3 records; and since package L7 (design D61;
+// `REG-D-151` (1)) every unit's instruction states its Undertaking's intended product and objective too (`renderedPrompt`).
 
 /**
  * ⭐ THE PRODUCT BRIEF (§3.1), VERBATIM: `product-brief.md`, one element to a line, each line ended LF as the file ends it.
@@ -232,6 +233,30 @@ export const PHASE7_PWA: Phase7PwaDeclaration = {
 	types: [...PHASE7_PHASES, PHASE7_ROOT]
 };
 
+/** ⭐⭐ Package L7 — D61 — an Undertaking as the form takes it (`e2e/support/phase7-pwa.ts`): its objective and intended product. */
+export interface Phase7Undertaking {
+	readonly objective: string;
+	readonly product: string;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)) — THE UNDERTAKING'S SECTION, RESTATED AS A LITERAL: the engine's
+ * (`packages/rph-application/src/execution-invocation.ts`, `undertakingSection`) — its heading line, `Intended product: ` and the
+ * product, `Objective:` and the objective on the lines after it, each value trimmed, an empty value's line left out, and none at
+ * all when both are empty. ⚠ RESTATED, never imported: this module loads no module (its limb in
+ * `verif/phase7-pwa-content.test.ts`), which holds the two equal for the lane's Undertaking and for each empty shape.
+ */
+function undertakingSectionOf(u: Phase7Undertaking | undefined): string | undefined {
+	const product = u?.product.trim() ?? '';
+	const objective = u?.objective.trim() ?? '';
+	if (product === '' && objective === '') return undefined;
+	return [
+		'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:',
+		...(product === '' ? [] : [`Intended product: ${product}`]),
+		...(objective === '' ? [] : ['Objective:', objective])
+	].join('\n');
+}
+
 /**
  * ⭐ THE INSTRUCTION A TYPE'S UNIT IS GIVEN — what the executing model receives and what the reviewer is shown as its
  * intent, the run's command reviews included (`producingPrompt: outcome.prompt`, `undertakings/[id]/+page.server.ts`).
@@ -242,18 +267,23 @@ export const PHASE7_PWA: Phase7PwaDeclaration = {
  * `prepareModelInvocation`'s own `prompt` for the type as the designer stores it and the unit as instantiation builds it,
  * both built there by hand. ⭐ The gate's rehearsal holds it to what the ROUTE sends: each phase's try records these
  * bytes as its input (`apps/rph-demo/e2e/phase7-five-unit.e2e.ts`, section 6; round 1's verifier, 2026-10-09).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)): and between the work and the contract, the section that
+ * states the Undertaking the unit belongs to (`undertakingSectionOf`), as the form's action stores it; `undefined`, none.
  */
-export function renderedPrompt(t: Phase7TypeDeclaration): string {
+export function renderedPrompt(t: Phase7TypeDeclaration, undertaking: Phase7Undertaking | undefined): string {
 	const values: Readonly<Record<string, string>> = {
 		subject: t.name,
 		title: t.name,
 		description: t.purpose,
 		purpose: t.purpose
 	};
-	const rendered = (t.prompt ?? '').replace(
+	const work = (t.prompt ?? '').replace(
 		/\{([A-Za-z]\w*)\}/g,
 		(marker, name: string) => values[name] ?? marker
 	);
+	// ⭐⭐ Package L7 — D61 — then the Undertaking's section, after the work and before the contract.
+	const section = undertakingSectionOf(undertaking);
+	const rendered = section === undefined ? work : `${work}\n\n${section}`;
 	const contract = t.outputContract?.trim();
 	return contract ? `${rendered}\n\nThe output this work requires:\n${contract}` : rendered;
 }

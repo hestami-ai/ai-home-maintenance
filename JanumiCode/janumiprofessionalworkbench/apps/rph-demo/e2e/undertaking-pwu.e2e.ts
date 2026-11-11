@@ -1,5 +1,7 @@
 import { expect } from '@playwright/test';
 import { test, resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
+// ⭐⭐ Package L7 — D61 — the product brief, the lane's Undertaking's objective: several lines, typed as they are.
+import { PRODUCT_BRIEF } from '../../../scripts/phase7/pwa-content';
 
 // Slice 2 — Undertaking creation + PWU instantiation (RPH-DOC-010 §14/§25/§28). Closes "there isn't a way to
 // select PWUs because there aren't any": a new Undertaking is instantiated from a PUBLISHED PWA (establishing +
@@ -70,5 +72,29 @@ test.describe('Undertaking Workbench — create an Undertaking and instantiate a
 
 		// VISUAL: capture the workbench with its first instantiated PWU.
 		await page.screenshot({ path: 'e2e-results/undertaking-pwu.png', fullPage: true });
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)): the lane's Undertaking states the product brief as its
+	// objective, which every unit's instruction states, so the form keeps an objective of several lines whole; its action still
+	// trims it. ⛔ PREDICTED RED: the objective was an <input>, whose value the browser strips of its line breaks, so the brief's
+	// lines were stored run together.
+	test('⭐⭐ L7 (D61) — an objective of several lines, typed into the form, is stored whole, its ends trimmed', async ({
+		page,
+		request
+	}) => {
+		await gotoHydrated(page, '/undertakings');
+		await page.getByRole('button', { name: '+ New Undertaking' }).click();
+		await page.getByPlaceholder(/Undertaking name/i).fill('Brief Delivery Program');
+		await page.getByPlaceholder(/Objective/i).fill(PRODUCT_BRIEF);
+		await page.getByPlaceholder(/Intended product/i).fill('wordfreq');
+		await page.getByRole('combobox', { name: 'Instantiate from published PWA' }).selectOption({ index: 1 });
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
+		await page.getByRole('button', { name: 'Create Undertaking' }).click();
+		await expect(page.getByRole('link', { name: /Brief Delivery Program/ })).toBeVisible();
+
+		const stored = (await introspect(request)).undertakings.find((u) => u.state.name === 'Brief Delivery Program');
+		expect(stored, 'arrangement: the Undertaking was not created').toBeTruthy();
+		expect(stored!.state.objective, 'the brief was not stored whole').toBe(PRODUCT_BRIEF.trim());
+		expect(stored!.state.intendedOutputProduct).toBe('wordfreq');
 	});
 });

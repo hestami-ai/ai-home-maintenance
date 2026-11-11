@@ -46,12 +46,17 @@ export {
 	prepareModelInvocation,
 	resolveInvocationSubject,
 	resolvePwuTypeFacts,
+	resolveUndertakingStatement,
+	UNDERTAKING_SECTION_HEADING,
+	undertakingSection,
+	withUndertakingSection,
 	WORK_UNIT_MARKERS
 } from './execution-invocation.js';
 export type {
 	ContextAssembly,
 	InvocationPlan,
 	InvocationSubject,
+	UndertakingStatement,
 	WorkUnitFields
 } from './execution-invocation.js';
 export * from './context-assembly.js';

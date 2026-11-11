@@ -180,7 +180,13 @@ import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer'
 // residue survived in the host-configured fallback identity below. Lint is what reports a relapse.
 // ⭐ `JAN-SELRES` RS-1 (D4): and `resolveExecutorModel`/`resolveExecutorToolId` are gone too — the fallback identity
 // comes from the executor SELECTION, the one read that also opened the executor.
-import { resolveInvocationSubject, resolvePwuTypeFacts } from '@janumipwb/rph-application';
+import {
+	resolveInvocationSubject,
+	resolvePwuTypeFacts,
+	resolveUndertakingStatement,
+	withUndertakingSection,
+	type UndertakingStatement
+} from '@janumipwb/rph-application';
 // ⭐ `PromptTemplate` IS NO LONGER IMPORTED HERE, and its absence is the check. Its only use in this route was
 // the assertion `pwuType?.promptTemplate as PromptTemplate | undefined`; `resolvePwuTypeFacts` PARSES that
 // object now, so the route has no reason to name the type at all. Lint reports a relapse.
@@ -1175,6 +1181,21 @@ function unitTypeOf(pwuId: string) {
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1); `REG-F-510`, remedy 2) — THE STATEMENT OF THE UNDERTAKING THE
+ * UNIT BELONGS TO: its intended product and its objective, read off the unit as its workspace is (`R8`, `undertakingId`), by
+ * PARSING the stored object (`R30`, `resolveUndertakingStatement`), never by asserting it. Every instruction the unit's work is
+ * given or judged against states it: the step's (`runModelUnit`), the producing prompt a re-review and a declared review rebuild
+ * (`rebuildProducingTurn`), and the unit's purpose where that is a declared review's instruction (`UNIT_PURPOSE`).
+ */
+function undertakingStatementOf(pwuId: string): UndertakingStatement {
+	const pwu = getObjectOfType(getEngine(), 'PROFESSIONAL_WORK_UNIT', pwuId);
+	return resolveUndertakingStatement(
+		(id) => getObjectOfType(getEngine(), 'UNDERTAKING', id),
+		String((pwu?.undertakingId ?? '') as string)
+	);
+}
+
+/**
  * ⭐ P7-6R RD7 — EVERYTHING A RE-REVIEW'S FLOORS NEED, REBUILT FROM THE RECORD: the producing turn (prompt, rationale,
  * producer, exchange — `rebuildProducingTurn`) and the run of each refused command (`rebuildProcessRun`). ⛔ The first
  * part that cannot be rebuilt refuses the whole, so nothing is dispatched and the unit keeps waiting.
@@ -1203,6 +1224,8 @@ async function rebuildForReview(
 		attemptKey: s.attemptKey,
 		pwuTypeId,
 		template: typeFacts.promptTemplate,
+		// ⭐⭐ Package L7 — D61 — the Undertaking's statement, which the producing prompt rebuilt states, as its producer was given it.
+		undertaking: undertakingStatementOf(s.pwuId),
 		...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {}),
 		...(pwuType?.contextSpecification
 			? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
@@ -1370,11 +1393,21 @@ async function unitWorkOf(
 	const { pwu, pwuType, pwuTypeId, typeFacts } = unitTypeOf(pwuId);
 	const title = String((pwu?.title ?? pwuId) as string);
 	const purpose = typeFacts.purpose ?? String((pwu?.description ?? '') as string);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)) — the Undertaking's statement: after the purpose where the
+	// purpose is a declared review's instruction (`UNIT_PURPOSE`), and in the producing prompt rebuilt from the record.
+	const undertaking = undertakingStatementOf(pwuId);
 	const completion = lastCompletionOf(pwuId);
 	if (!completion)
 		return {
 			ok: true,
-			work: { title, instruction: purpose, instructionIs: 'UNIT_PURPOSE', purpose, commands: [], heldNoCompletion: true }
+			work: {
+				title,
+				instruction: withUndertakingSection(purpose, undertaking),
+				instructionIs: 'UNIT_PURPOSE',
+				purpose,
+				commands: [],
+				heldNoCompletion: true
+			}
 		};
 	const p = completion.payload;
 	const provenance = p.executionProvenance as
@@ -1400,7 +1433,15 @@ async function unitWorkOf(
 	if (outputs.length === 0)
 		return {
 			ok: true,
-			work: { title, instruction: purpose, instructionIs: 'UNIT_PURPOSE', purpose, commands, ...(executedBy ? { executedBy } : {}), ...view }
+			work: {
+				title,
+				instruction: withUndertakingSection(purpose, undertaking),
+				instructionIs: 'UNIT_PURPOSE',
+				purpose,
+				commands,
+				...(executedBy ? { executedBy } : {}),
+				...view
+			}
 		};
 	const stepId = String((p.executionStepId ?? '') as string);
 	const turn = await rebuildProducingTurn(uiSession(), getArtifactStore(), {
@@ -1410,6 +1451,8 @@ async function unitWorkOf(
 		attemptKey: reused ?? attemptKeyOf(getEngine(), completion.planId, stepId),
 		pwuTypeId,
 		template: typeFacts.promptTemplate,
+		// ⭐⭐ Package L7 — D61 — the Undertaking's statement, which its producing prompt states.
+		undertaking,
 		...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {}),
 		...(pwuType?.contextSpecification
 			? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
@@ -1554,7 +1597,9 @@ async function declaredReviewWorkOf(
 	// many units', each made under its own unit's instruction (~~`own.work.instruction`~~, which for a unit that ran a prompt of
 	// its own would have been shown as the instruction the units below it were given).
 	const work: DeclaredReviewWork = {
-		instruction: own.work.purpose,
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)) — its purpose, a blank line, then its Undertaking's
+		// statement (`withUndertakingSection`, the engine's own section): the standard and what the work is part of.
+		instruction: withUndertakingSection(own.work.purpose, undertakingStatementOf(pwuId)),
 		instructionIs: 'UNIT_PURPOSE',
 		workProducts,
 		commands,
@@ -2000,9 +2045,14 @@ async function runModelUnit(u: ModelUnitRun) {
 	// that cannot be read then fails the step here, as an unreadable baseline does, with nothing to release. ⛔ A unit's first step
 	// takes none: its baseline is its start, so its views carry no mark and read as before.
 	let stepStart: Awaited<ReturnType<typeof takeManifest>> | undefined;
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1); `REG-F-510`, remedy 2) — THE UNDERTAKING'S STATEMENT, read
+	// once, beside its workspace, by parsing the stored object: every try's instruction states it, and a person's re-run of
+	// the work reads it here too. ⛔ One that cannot be read fails the step here, as a refused sandbox does.
+	let undertaking: UndertakingStatement;
 	try {
 		const current = binding ? currentBinding(bindingId) : undefined;
 		sandbox = resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string));
+		undertaking = undertakingStatementOf(pwuId);
 		baseline = await unitBaselineOf(getArtifactStore(), EXECUTION_TENANT_PREFIX, { pwuId, stepId, attemptKey }, sandbox.workspace);
 		if (baseline.takenBy !== stepId) {
 			try {
@@ -2103,6 +2153,8 @@ async function runModelUnit(u: ModelUnitRun) {
 				subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
 				pwuTypeId,
 				template,
+				// ⭐⭐ Package L7 — D61 — the Undertaking's statement, which the instruction states before its output contract.
+				undertaking,
 				store: getArtifactStore(),
 				tenantPrefix: EXECUTION_TENANT_PREFIX,
 				dispatchExchange: (payload, aggregateId) =>

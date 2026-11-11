@@ -44,7 +44,8 @@ import {
 	prepareModelInvocation,
 	readAnswerSpan,
 	resolveInvocationSubject,
-	type ResolvableExchange
+	type ResolvableExchange,
+	type UndertakingStatement
 } from '@janumipwb/rph-application';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import type {
@@ -755,6 +756,13 @@ export async function rebuildProducingTurn(
 		readonly template: PromptTemplate | undefined;
 		readonly purpose?: string;
 		readonly contextSpecification?: ContextSpecification;
+		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)) — the Undertaking's statement, which the producing
+		 * prompt states as Begin & Execute rendered it. ⛔ REQUIRED, `undefined` where there is none: the fingerprint checked
+		 * below is the TEMPLATE's alone, so a rebuild that left the statement out would pass it and show a review a prompt its
+		 * producer was not given.
+		 */
+		readonly undertaking: UndertakingStatement | undefined;
 	}
 ): Promise<Rebuilt<RebuiltProducingTurn>> {
 	const refuse = (why: string): Rebuilt<RebuiltProducingTurn> => ({
@@ -875,6 +883,8 @@ function rerenderedInstruction(
 		readonly template: PromptTemplate | undefined;
 		readonly purpose?: string;
 		readonly contextSpecification?: ContextSpecification;
+		/** ⭐⭐ Package L7 — D61 — the Undertaking's statement (`rebuildProducingTurn`). */
+		readonly undertaking: UndertakingStatement | undefined;
 	}
 ): Rebuilt<{ readonly prompt: string; readonly fingerprint: string }> {
 	let policy;
@@ -893,11 +903,19 @@ function rerenderedInstruction(
 		),
 		...(args.purpose ? { purpose: args.purpose } : {})
 	};
-	const plan = prepareModelInvocation(subject, args.pwuTypeId, args.template, {
-		policy,
-		alsoAssembles: [],
-		...(args.contextSpecification ? { specification: args.contextSpecification } : {})
-	});
+	// ⭐⭐ Package L7 — D61 — with the Undertaking's statement, as Begin & Execute rendered it, so the prompt a review is shown is
+	// the one its producer was given.
+	const plan = prepareModelInvocation(
+		subject,
+		args.pwuTypeId,
+		args.template,
+		{
+			policy,
+			alsoAssembles: [],
+			...(args.contextSpecification ? { specification: args.contextSpecification } : {})
+		},
+		args.undertaking
+	);
 	if (!plan.ready)
 		return {
 			ok: false,

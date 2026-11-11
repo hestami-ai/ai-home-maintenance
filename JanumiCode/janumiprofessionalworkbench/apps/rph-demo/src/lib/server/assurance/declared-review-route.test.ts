@@ -1209,3 +1209,39 @@ describe('⛔ REG-F-569 — a leaf whose work holds nothing is refused its decla
 		expect(axesOf(pwuId)).toEqual(['EXECUTING', 'UNASSESSED']);
 	});
 });
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1); `REG-F-510`, remedy 2) — A DECLARED REVIEW IS SHOWN THE
+// UNDERTAKING'S STATEMENT: in the PRODUCING_PROMPT framing, inside the producing prompt rebuilt from the record; in the UNIT_PURPOSE
+// framing, after the unit's purpose and a blank line. ⛔ PREDICTED RED, both: at HEAD neither stated it.
+describe('⭐⭐ package L7 — D61: a declared review is shown the Undertaking’s statement', () => {
+	/** The section for an Undertaking created through the page's form with a name alone (the action's own defaults). */
+	const sectionOf = (name: string): string =>
+		'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:\n' +
+		`Intended product: ${name}\nObjective:\nDeliver ${name}`;
+
+	it('⛔ in the PRODUCING_PROMPT framing: the producing prompt, rebuilt from the record, carries it', async () => {
+		const pwuId = await declaringModelUnit();
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		seam.declared.length = 0;
+		await recordAssurance(pwuId);
+		expect(seam.declared, 'arrangement: one declared review').toHaveLength(1);
+		expect(seam.declared[0]).toContain(DECLARED_PRODUCING_PROMPT_INTENT);
+		expect(seam.declared[0], 'the producing prompt it was shown does not state the Undertaking').toContain(
+			`Write the requirements of Requirements.\n\n${sectionOf('Declared Demo')}`
+		);
+	});
+
+	it('⛔ in the UNIT_PURPOSE framing: the unit’s purpose, a blank line, then the same section', async () => {
+		const { root, child } = await rootOverAChild();
+		expect((await beginExecute(child)).data?.error, 'arrangement: the child’s Begin & Execute').toBeUndefined();
+		await accepted(child, 'the child');
+		expect((await beginExecute(root)).data?.error, 'arrangement: the root’s Begin & Execute').toBeUndefined();
+		seam.declared.length = 0;
+		await recordAssurance(root);
+		expect(seam.declared, 'arrangement: one declared review of the root').toHaveLength(1);
+		expect(seam.declared[0]).toContain(DECLARED_UNIT_PURPOSE_INTENT);
+		expect(seam.declared[0], 'the root’s purpose is not followed by its Undertaking’s statement').toContain(
+			`${ROOT_PURPOSE}\n\n${sectionOf('Composed Demo')}`
+		);
+	});
+});

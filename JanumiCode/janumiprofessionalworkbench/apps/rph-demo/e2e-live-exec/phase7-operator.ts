@@ -43,7 +43,12 @@ import {
 	type Response
 } from '@playwright/test';
 import type { EngineSnapshot, ObjectRow } from '../e2e/support/harness.js';
-import { PHASE7_PWA, promptMarkers, type Phase7TypeDeclaration } from '../../../scripts/phase7/pwa-content.js';
+import {
+	PHASE7_PWA,
+	PRODUCT_BRIEF,
+	promptMarkers,
+	type Phase7TypeDeclaration
+} from '../../../scripts/phase7/pwa-content.js';
 // ⭐ E3 — half B's request, the order its units are read in, the floor's dispositions, and the candidate checks (C1-C4).
 import { candidateChecks, type CandidateChecks } from '../../../scripts/phase7/candidate-checks.js';
 import {
@@ -107,10 +112,15 @@ export const READINESS_CALL_MS = 120_000;
 /** One read of the server's dump, which carries the whole event log — ⭐ `P76F-C` C8: `lane-config.ts`'s, by reference. */
 export const INTROSPECT_MS = PHASE7_INTROSPECT_MS;
 
-/** The Undertaking of §3.2's PWA, as the gate's rehearsal creates it. Its objective reaches no prompt (`REG-F-510`). */
+/**
+ * The Undertaking of §3.2's PWA, as the lane creates it for both halves, and the gate's half-B rehearsal too
+ * (`e2e/phase7-half-b.e2e.ts`). ~~Its objective reaches no prompt (`REG-F-510`).~~ ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design
+ * D61 (`REG-D-151` (1)): its objective is the product brief, verbatim (`PRODUCT_BRIEF`), which every unit's instruction now
+ * states with its intended product, `wordfreq`. ⚠ Half A's units, whose prompts carry the brief already, read it twice (D61).
+ */
 export const PHASE7_UNDERTAKING = {
 	name: 'wordfreq realization',
-	objective: 'Build wordfreq, a Node.js command-line tool that prints the N most frequent words.',
+	objective: PRODUCT_BRIEF,
 	product: 'wordfreq'
 } as const;
 
@@ -2124,7 +2134,10 @@ export async function authorThePwa(r: {
 	authoring.typesAsAccepted = typesAsAccepted(acceptedStore, pwaId);
 	authoring.checks = candidateChecks(
 		acceptedStore.pwuTypes.filter((t) => t.state.pwaId === pwaId),
-		acceptedStore.assurancePolicies
+		acceptedStore.assurancePolicies,
+		// ⭐⭐ Package L7 — the lead's decision of 2026-11-11 (to be recorded with D61): the Undertaking the lane creates after these
+		// checks, so each instruction is measured as its unit is given it.
+		PHASE7_UNDERTAKING
 	);
 	save();
 	for (const act of DESIGNER_ACTS) {

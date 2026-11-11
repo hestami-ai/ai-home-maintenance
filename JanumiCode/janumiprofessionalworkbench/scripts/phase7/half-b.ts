@@ -46,9 +46,10 @@ const PRODUCT_PHRASE = 'a small command-line product';
  * (`product-brief.md`, `PRODUCT_BRIEF`, verbatim) after it, so the acceptance suite P7-4 runs tests what the agent was
  * asked for (round 1's BLOCKER: one product told, another tested). ⛔ STILL NOTHING OF THE PWA'S SHAPE: the brief is the
  * PRODUCT's — its usage, options, exit codes and files — and names no type, kind, policy, discharge or marker; the traps
- * an author meets there are MEASURED, never steered round (`REG-D-110` (4); design §4 C4). ⚠ An Undertaking still cannot
- * tell its units what to build (`REG-F-510`): whether the agent writes the product into its prompts is its own call, and
- * the candidate checks record it (`candidate-checks.ts`, `namesProduct`).
+ * an author meets there are MEASURED, never steered round (`REG-D-110` (4); design §4 C4). ~~⚠ An Undertaking still cannot
+ * tell its units what to build (`REG-F-510`):~~ ⭐⭐ Package L7 (design D61; `REG-D-151` (1)): every unit's instruction states its
+ * Undertaking's intended product and objective, the lane's Undertaking the brief; whether the agent writes the product into
+ * its prompts is still its own call, and the candidate checks record it (`candidate-checks.ts`, `namesProduct`).
  */
 export const PHASE7_HALF_B_REQUEST = `${PHASE7_RUN_PLAN_REQUEST.replace(
 	PRODUCT_PHRASE,

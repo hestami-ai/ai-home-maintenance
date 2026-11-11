@@ -100,7 +100,7 @@ import {
 	type StartOffer,
 	type UnitState
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
-import { PHASE7_PWA, promptMarkers } from '../scripts/phase7/pwa-content.js';
+import { PHASE7_PWA, PRODUCT_BRIEF, promptMarkers } from '../scripts/phase7/pwa-content.js';
 import { PHASE7_ARCHIVE_UNITS } from '../scripts/phase7/run-archive.js';
 import { withheldOf } from '../scripts/phase7/run-report-core.js';
 import { readinessUnitOf, startReadiness } from '@janumipwb/rph-projections';
@@ -3713,5 +3713,14 @@ describe('⭐ the arrangement — the PWA as the designer stored it, read back b
 		expect(faithful.typed).toEqual(faithful.expected);
 		const dropped = typesAsTyped(storedTypes('Design'), 'pwa_1', PHASE7_PWA.types);
 		expect(dropped.typed).not.toEqual(dropped.expected);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)): the fourth run's Undertaking states the product brief, which
+// every unit's instruction now states with its intended product. ⛔ PREDICTED RED: at HEAD its objective was one line of its own.
+describe('⭐⭐ L7 (D61) — the lane’s Undertaking states the product brief, its intended product still wordfreq', () => {
+	it('⛔ its objective is PRODUCT_BRIEF, verbatim — what every unit’s instruction states; its name and intended product unchanged', () => {
+		expect(PHASE7_UNDERTAKING.objective, 'the lane’s objective is not the brief').toBe(PRODUCT_BRIEF);
+		expect([PHASE7_UNDERTAKING.name, PHASE7_UNDERTAKING.product]).toEqual(['wordfreq realization', 'wordfreq']);
 	});
 });

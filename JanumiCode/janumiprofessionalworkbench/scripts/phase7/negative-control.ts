@@ -14,7 +14,8 @@
 // before the paid run relies on it: one crafted process result —
 //   · THE INSTRUCTION: ~~the end-to-end verification phase's, with the product brief (`product-brief.md`)~~ ⭐ THE RUN'S OWN
 //     (2026-10-09): the end-to-end verification phase's prompt as its unit renders it, the brief verbatim and the output
-//     contract appended (`pwa-content.ts`, `renderedPrompt(PHASE7_E2E)`) — so the reviewer is shown exactly what a
+//     contract appended (`pwa-content.ts`, `renderedPrompt(PHASE7_E2E)`) ⭐⭐ (package L7, D61: and, between them, the run's
+//     Undertaking's statement, `RUN_UNDERTAKING`) — so the reviewer is shown exactly what a
 //     command of that phase is reviewed against (`producingPrompt: outcome.prompt`). ⚠ That the route SENDS the phase this
 //     text is held in the gate (`apps/rph-demo/e2e/phase7-five-unit.e2e.ts`, section 6); that it hands a review the same
 //     text is read from code. It asks for end-to-end tests that
@@ -52,7 +53,7 @@ import type { EvaluationCall } from '../reviewer-qual/runner.js';
 import type { CandidateSpec, Transport } from '../reviewer-qual/transports.js';
 import { parseFlags, reportPathProblem, writeNewReport } from './cli.js';
 // ⭐ Pure, with no import of its own, so D11 and D12 still run before anything else loads.
-import { PHASE7_E2E, renderedPrompt } from './pwa-content.js';
+import { PHASE7_E2E, PRODUCT_BRIEF, renderedPrompt } from './pwa-content.js';
 
 export const NEGATIVE_CONTROL_CASE_ID = 'P7-NEG-UNIT-TESTS-ONLY';
 /** The repetitions the design asks for, and the reviewer calls the sponsor's limit allows them (`REG-D-102` item 4). */
@@ -69,6 +70,14 @@ export const EXPECTED = {
 		'RR-09-no-completeness-from-existence'
 	]
 } as const;
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)) — THE RUN'S UNDERTAKING, whose statement its end-to-end unit's
+ * instruction now carries: the lane's (`PHASE7_UNDERTAKING`, `apps/rph-demo/e2e-live-exec/phase7-operator.ts`), RESTATED, since
+ * that module loads Playwright and this one loads only pure modules before D11 and D12 run. `verif/phase7-negative-control.test.ts`
+ * holds the instruction to the lane's.
+ */
+const RUN_UNDERTAKING = { objective: PRODUCT_BRIEF, product: 'wordfreq' } as const;
 
 /** Production-shaped (`evd_` and a ULID, as `evidence-join.ts` mints one), fixed, with no three letters together. */
 const EVIDENCE_ID = 'evd_01M9P7X4K8W2N6Q3R5T7V9Y1Z0';
@@ -123,8 +132,9 @@ export function negativeControlCase(): ProcessResultCase {
 			}
 		},
 		input: {
-			// ⭐ The run's own instruction for its end-to-end phase, never one of this control's (the header's section).
-			producingPrompt: renderedPrompt(PHASE7_E2E),
+			// ⭐ The run's own instruction for its end-to-end phase, never one of this control's (the header's section). ⭐⭐ Package
+			// L7 — D61: ~~`renderedPrompt(PHASE7_E2E)`~~ for the run's Undertaking, whose statement the run's unit is given.
+			producingPrompt: renderedPrompt(PHASE7_E2E, RUN_UNDERTAKING),
 			run: literal.run,
 			rationale: ACCOUNT,
 			observedToolCalls: OBSERVED

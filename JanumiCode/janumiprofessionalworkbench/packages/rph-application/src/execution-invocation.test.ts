@@ -1,8 +1,16 @@
 // JAN-EXECRUN XR-01 — what a model would be told, and when it is told nothing.
 import { describe, expect, it } from 'vitest';
 import type { ContextSpecification, PromptTemplate } from '@janumipwb/rph-contracts';
-import { ConstraintDispositionSchema } from '@janumipwb/rph-contracts';
-import { assembleStepContext, prepareModelInvocation } from './execution-invocation.js';
+import { ConstraintDispositionSchema, UndertakingSchema } from '@janumipwb/rph-contracts';
+import {
+	assembleStepContext,
+	prepareModelInvocation,
+	resolveUndertakingStatement,
+	UNDERTAKING_SECTION_HEADING,
+	undertakingSection,
+	withUndertakingSection,
+	type UndertakingStatement
+} from './execution-invocation.js';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from './context-assembly.js';
 import type { ContextAssemblyPolicyContent } from './context-assembly.js';
 
@@ -29,7 +37,7 @@ const ASSEMBLY = { policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] } 
 
 describe('JAN-EXECRUN — preparing a model invocation', () => {
 	it('renders the prompt and resolves the fingerprint to something a reader can look up', () => {
-		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY, undefined);
 		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 		// PER-9: a fingerprint "identifies that record; it never substitutes for it". Before REG-D-058 this
 		// field named a template with no home.
@@ -41,14 +49,14 @@ describe('JAN-EXECRUN — preparing a model invocation', () => {
 		// demo would then appear to execute every work unit, and every one of them would be executed against an
 		// instruction nobody authored, reviewed or published. That is the seeded-policy-as-projection defect
 		// this repository already records — an object standing in for a decision nobody made.
-		const plan = prepareModelInvocation(PWU, 'pwut_9', undefined, ASSEMBLY);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', undefined, ASSEMBLY, undefined);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason, 'the refusal must name the type').toMatch(/pwut_9/);
 		expect(!plan.ready && plan.reason).toMatch(/declares no agent behaviour/);
 	});
 
 	it('⛔ REFUSES a DRAFT template — authoring is not arming', () => {
-		const plan = prepareModelInvocation(PWU, 'pwut_9', { ...ACTIVE, status: 'DRAFT' }, ASSEMBLY);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', { ...ACTIVE, status: 'DRAFT' }, ASSEMBLY, undefined);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/DRAFT/);
 	});
@@ -62,7 +70,7 @@ describe('JAN-EXECRUN — preparing a model invocation', () => {
 			templateText: 'Assess {subject} against {criteria}.',
 			declaredPlaceholders: ['subject', 'criteria']
 		};
-		const plan = prepareModelInvocation(PWU, 'pwut_9', needsMore, ASSEMBLY);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', needsMore, ASSEMBLY, undefined);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason, 'the refusal must name the missing marker').toMatch(
 			/\{criteria\}/
@@ -105,7 +113,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
 			alsoAssembles: REPAIR
-		});
+		}, undefined);
 		expect(plan.ready).toBe(true);
 	});
 
@@ -119,7 +127,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			policy: instructionOnly,
 			alsoAssembles: REPAIR
-		});
+		}, undefined);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/ctx-narrow/);
 		expect(
@@ -137,7 +145,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			policy: nothing,
 			alsoAssembles: []
-		});
+		}, undefined);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/RENDERED_INSTRUCTION at THIS_TRY/);
 	});
@@ -149,7 +157,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
 			alsoAssembles: [{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }]
-		});
+		}, undefined);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/THIS_UNDERTAKING/);
 	});
@@ -167,7 +175,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', needsMore, {
 			policy: { policyId: 'ctx-empty', permittedSources: [] },
 			alsoAssembles: []
-		});
+		}, undefined);
 		expect(!plan.ready && plan.reason, 'the POLICY refusal, not the render refusal').toMatch(
 			/does not permit/
 		);
@@ -201,7 +209,7 @@ describe('CP-04b CORRECTED — a required element that is MISSING simply REFUSES
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			...ASSEMBLY,
 			specification: requires(['criteria'])
-		});
+		}, undefined);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/criteria/);
 		expect(!plan.ready && plan.reason, 'the rule it enforces, quotable').toMatch(/DEC-4/);
@@ -220,7 +228,7 @@ describe('CP-04b CORRECTED — a required element that is MISSING simply REFUSES
 						{ constraintId: 'criteria', fate, rationale: 'a thorough-looking rationale' }
 					]
 				}
-			});
+			}, undefined);
 			expect(plan.ready, `fate ${fate} must not excuse a missing required element`).toBe(false);
 		}
 	});
@@ -234,7 +242,7 @@ describe('CP-04b CORRECTED — a required element that is MISSING simply REFUSES
 				requiredElements: ['criteria'],
 				constraintDispositions: [{ constraintId: 'criteria', fate: 'WAIVED_THROUGH_AUTHORITY' }]
 			}
-		});
+		}, undefined);
 		expect(!plan.ready && plan.reason).toMatch(/CONSTRAINT and not a context ELEMENT/);
 	});
 
@@ -244,14 +252,14 @@ describe('CP-04b CORRECTED — a required element that is MISSING simply REFUSES
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			...ASSEMBLY,
 			specification: requires(['subject'])
-		});
+		}, undefined);
 		expect(plan.ready).toBe(true);
 	});
 
 	it('⭑ CONTROL — a type declaring NO required elements is unaffected', () => {
 		// The path must stay dormant for every type that declares no contextSpecification, which is all of them
 		// in the seeded workbench today.
-		expect(prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY).ready).toBe(true);
+		expect(prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY, undefined).ready).toBe(true);
 	});
 });
 
@@ -269,7 +277,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 	it('⭑⭑ the contract is APPENDED to the instruction', () => {
 		// THE MUTANT: render the template and drop the contract — i.e. today's behaviour. The harness's own
 		// promise then goes unkept for every type whose author did not repeat the contract inside templateText.
-		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY, undefined);
 		expect(plan.ready && plan.prompt).toContain('Assess Route Assessment');
 		expect(plan.ready && plan.prompt).toContain('{"finding": string, "basis": string[]}');
 	});
@@ -278,7 +286,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 		// ⛔ WITHOUT THIS, "appends the contract" cannot be told apart from "appends a section always". An empty
 		// trailer would announce a contract and then show the producer nothing, which is worse than silence —
 		// and it would change every existing prompt fingerprint's rendered text for no reason.
-		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY, undefined);
 		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 	});
 
@@ -289,7 +297,8 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 			PWU,
 			'pwut_9',
 			{ ...ACTIVE, outputContract: '   ' },
-			ASSEMBLY
+			ASSEMBLY,
+			undefined
 		);
 		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 	});
@@ -297,7 +306,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 	it('⭑ the contract follows the rendered work, never precedes it', () => {
 		// The instruction reads as "do this work / and return it in this shape". Inverting the order makes the
 		// producer meet the output shape before it has been told what the work is.
-		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY, undefined);
 		const text = plan.ready ? plan.prompt : '';
 		expect(text.indexOf('Assess Route Assessment')).toBeLessThan(text.indexOf('{"finding"'));
 	});
@@ -314,7 +323,148 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, {
 			policy: instructionOnly,
 			alsoAssembles: []
-		});
+		}, undefined);
 		expect(plan.ready).toBe(true);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1); `REG-F-510`, remedy 2; `REG-F-623`) ───────────────────
+//
+// Every unit's instruction states its Undertaking's intended product and objective: after the type's rendered text and
+// before its output contract, which stays last. ⛔ PREDICTED RED, each limb but its controls: at HEAD the instruction carried
+// nothing of its Undertaking (`REG-F-510`), so two Undertakings of one PWA rendered the same instruction for one type — and P6
+// again's third run's requirements unit, told neither the product's platform nor its brief, specified a Python tool for a
+// Node.js product (`REG-F-623`).
+describe('⭐⭐ L7 (D61) — every unit’s instruction states its Undertaking’s intended product and objective', () => {
+	const WITH_CONTRACT: PromptTemplate = {
+		...ACTIVE,
+		outputContract: 'A single JSON object: {"finding": string, "basis": string[]}.'
+	};
+	const WORDFREQ: UndertakingStatement = {
+		intendedOutputProduct: 'wordfreq',
+		objective: 'Build wordfreq, a Node.js command-line tool.'
+	};
+	const LINECOUNT: UndertakingStatement = {
+		intendedOutputProduct: 'linecount',
+		objective: 'Build linecount, a Python command-line tool.'
+	};
+	const WORK = 'Assess Route Assessment. Deliver Decide whether the route is viable.';
+	const promptOf = (statement: UndertakingStatement | undefined, template: PromptTemplate = WITH_CONTRACT): string => {
+		const plan = prepareModelInvocation(PWU, 'pwut_9', template, ASSEMBLY, statement);
+		return plan.ready ? plan.prompt : `REFUSED: ${plan.reason}`;
+	};
+
+	it('⛔ REG-F-510’s predicted red — two Undertakings of one PWA, with different objectives, render different instructions for one type', () => {
+		expect(promptOf(WORDFREQ), 'two Undertakings, one instruction').not.toBe(promptOf(LINECOUNT));
+	});
+
+	it('⛔ the section sits between the work and the contract: its heading, the intended product, then the objective on the lines after its label', () => {
+		expect(promptOf(WORDFREQ)).toBe(
+			`${WORK}\n\n` +
+				'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:\n' +
+				'Intended product: wordfreq\n' +
+				'Objective:\n' +
+				'Build wordfreq, a Node.js command-line tool.\n\n' +
+				'The output this work requires:\n' +
+				'A single JSON object: {"finding": string, "basis": string[]}.'
+		);
+	});
+
+	it('⛔ with no output contract the section ends the instruction, an objective of several lines stated whole and each value trimmed', () => {
+		const brief = '  wordfreq prints the N most frequent words.\n- It reads UTF-8 text.\n- Exit 2 on a usage error.\n\n';
+		expect(promptOf({ intendedOutputProduct: '  wordfreq \n', objective: brief }, ACTIVE)).toBe(
+			`${WORK}\n\n` +
+				'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:\n' +
+				'Intended product: wordfreq\n' +
+				'Objective:\n' +
+				'wordfreq prints the N most frequent words.\n- It reads UTF-8 text.\n- Exit 2 on a usage error.'
+		);
+	});
+
+	it('⛔ an empty value’s line is left out: no product, the objective alone; no objective, the product alone', () => {
+		expect(promptOf({ intendedOutputProduct: ' ', objective: 'Build wordfreq.' }, ACTIVE)).toBe(
+			`${WORK}\n\n` +
+				'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:\n' +
+				'Objective:\n' +
+				'Build wordfreq.'
+		);
+		expect(promptOf({ intendedOutputProduct: 'wordfreq', objective: '' }, ACTIVE)).toBe(
+			`${WORK}\n\n` +
+				'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:\n' +
+				'Intended product: wordfreq'
+		);
+	});
+
+	it('⭑ CONTROL — both values empty, or no statement at all: no section, the instruction exactly as before', () => {
+		expect(promptOf({ intendedOutputProduct: '', objective: '  \n' }, ACTIVE)).toBe(WORK);
+		expect(promptOf(undefined, ACTIVE)).toBe(WORK);
+		expect(promptOf(undefined)).toBe(
+			`${WORK}\n\nThe output this work requires:\nA single JSON object: {"finding": string, "basis": string[]}.`
+		);
+	});
+
+	it('⭑ CONTROL — it is still the RENDERED_INSTRUCTION at THIS_TRY: an instruction-only policy admits it, and no Undertaking source is assembled', () => {
+		// The lead's reading (design D61): `ctx-default`'s THIS_UNDERTAKING, permitted for nothing, concerns material from another
+		// work unit, which still crosses nowhere. THE MUTANT: assemble the statement as a source of its own — this policy refuses it.
+		const instructionOnly: ContextAssemblyPolicyContent = {
+			policyId: 'ctx-instruction-only',
+			permittedSources: [{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' }]
+		};
+		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, { policy: instructionOnly, alsoAssembles: [] }, WORDFREQ);
+		expect(plan.ready, plan.ready ? '' : plan.reason).toBe(true);
+	});
+
+	it('⛔ the section is spelled once and exported: its heading, the section, and its composition after a text, which the route uses for a unit’s purpose', () => {
+		expect(UNDERTAKING_SECTION_HEADING).toBe(
+			'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:'
+		);
+		const section = `${UNDERTAKING_SECTION_HEADING}\nIntended product: wordfreq\nObjective:\nBuild wordfreq, a Node.js command-line tool.`;
+		expect(undertakingSection(WORDFREQ)).toBe(section);
+		expect(undertakingSection(undefined)).toBeUndefined();
+		expect(undertakingSection({ intendedOutputProduct: ' ', objective: '' })).toBeUndefined();
+		expect(withUndertakingSection('Decide whether the route is viable.', WORDFREQ)).toBe(
+			`Decide whether the route is viable.\n\n${section}`
+		);
+		expect(withUndertakingSection('Decide whether the route is viable.', undefined)).toBe('Decide whether the route is viable.');
+		expect(promptOf(WORDFREQ), 'the prompt is not the exported section between the work and the contract').toContain(
+			`${WORK}\n\n${section}\n\nThe output this work requires:\n`
+		);
+	});
+
+	it('⛔ R30 — the statement is read by PARSING the stored Undertaking: its two fields; refused when it does not resolve, or does not parse', () => {
+		// Composed from `objectEnvelopeShape` field by field (`number-integrity.test.ts`'s way): a fixture that fails to parse
+		// for the WRONG reason would make the refusal below pass vacuously, so the CONTROL first.
+		const ACTOR = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
+		const stored = {
+			id: 'und_01ARZ3NDEKTSV4RRFFQ69J8003',
+			objectType: 'UNDERTAKING' as const,
+			schemaVersion: 1,
+			semanticVersion: 1,
+			revision: 0,
+			lifecycleStatus: 'ACTIVE',
+			createdAt: '2026-11-11T00:00:00Z',
+			createdBy: ACTOR,
+			updatedAt: '2026-11-11T00:00:00Z',
+			updatedBy: ACTOR,
+			provenance: { originType: 'HUMAN_DECISION', sourceObjectIds: [], sourceEventIds: [] },
+			tags: [],
+			extensions: [],
+			name: 'wordfreq realization',
+			description: 'Build wordfreq.',
+			pwaId: 'pwa_01ARZ3NDEKTSV4RRFFQ69J8004',
+			pwaVersion: '0.1.0',
+			instantiationProfile: 'Standard',
+			objective: 'Build wordfreq, a Node.js command-line tool.',
+			intendedOutputProduct: 'wordfreq',
+			status: 'ACTIVE'
+		};
+		expect(UndertakingSchema.safeParse(stored).success, 'CONTROL: the stored fixture is an UNDERTAKING').toBe(true);
+		const find = (id: string): unknown => (id === stored.id ? stored : undefined);
+		expect(resolveUndertakingStatement(find, stored.id)).toEqual(WORDFREQ);
+		expect(() => resolveUndertakingStatement(find, 'und_missing')).toThrow(/Undertaking 'und_missing' does not resolve/);
+		expect(() => resolveUndertakingStatement(() => null, 'und_null')).toThrow(/Undertaking 'und_null' does not resolve/);
+		expect(() => resolveUndertakingStatement(() => ({ ...stored, objective: 7 }), stored.id)).toThrow(
+			/does not parse as an UNDERTAKING: objective: /
+		);
 	});
 });

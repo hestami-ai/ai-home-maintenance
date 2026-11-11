@@ -24,7 +24,10 @@
 {#if showForm}
 	<form method="POST" action="?/create" use:enhance class="createform">
 		<input name="name" placeholder="Undertaking name (e.g. Pilot Delivery Program)" required />
-		<input name="objective" placeholder="Objective" />
+		<!-- ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)): a TEXTAREA, same name and placeholder, so an
+		     objective of several lines — the product brief the run's Undertaking states — is typed and stored whole: an <input>
+		     turned each line break into a space. Every unit's instruction states the objective; the action still trims it. -->
+		<textarea name="objective" placeholder="Objective" rows="3"></textarea>
 		<input name="product" placeholder="Intended product" />
 		<select name="pwaId" aria-label="Instantiate from published PWA" required>
 			<option value="" disabled selected>Instantiate from published PWA…</option>
@@ -122,6 +125,7 @@
 		align-items: center;
 	}
 	.createform input,
+	.createform textarea,
 	.createform select {
 		background: var(--sc-highest);
 		border: 1px solid var(--outline-faint);

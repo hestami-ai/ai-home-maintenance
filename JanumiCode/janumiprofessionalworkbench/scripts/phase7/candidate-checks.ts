@@ -15,11 +15,17 @@
 //   · SUPPLIED-MARKERS (`REG-F-508`) — a prompt uses only the four markers a work unit fills, `{subject}`, `{title}`,
 //     `{description}` and `{purpose}` (`pwa-content.ts`, `PHASE7_MARKERS`); any other refuses the step at render;
 //   · PROMPT-LENGTH (design §3.2) — each rendered instruction fits the 4,000 characters the reviewer is shown
-//     (`PHASE7_INSTRUCTION_BUDGET`), rendered as the engine renders it (`renderedPrompt`);
+//     (`PHASE7_INSTRUCTION_BUDGET`), rendered as the engine renders it (`renderedPrompt`) ⭐⭐ (package L7, D61: ~~the type's
+//     OWN text and contract, with no Undertaking — the candidate is checked before any Undertaking of it exists — so a unit's
+//     instruction is longer than what is measured here by its Undertaking's statement, which it carries between them~~ ⭐⭐ the
+//     lead's decision of 2026-11-11, to be recorded with D61: AS ITS UNIT IS GIVEN IT IN THE RUN, its Undertaking's statement in
+//     it, for the Undertaking the lane creates after these checks, `PHASE7_UNDERTAKING` — so its finding names what was
+//     measured; `undefined`, the type's own text and contract, in today's words);
 //   · POLICY-GOVERNS (`REG-F-524`) — each declared policy governs the type's kind. One that does not is left out of the
 //     sign-off's plan, and a unit whose declared policies ALL fail to govern it can never be assured.
-// ⭑ And one FACT, no check: whether the prompt names the product (`REG-F-510`: an Undertaking cannot tell its units what
-// to build, so a PWA's prompts carry the product or nothing does).
+// ⭑ And one FACT, no check: whether the prompt names the product (`REG-F-510`: ~~an Undertaking cannot tell its units what
+// to build, so a PWA's prompts carry the product or nothing does~~ ⭐⭐ package L7, D61: every unit's instruction states its
+// Undertaking's intended product and objective; whether the PWA's own prompts name the product stays this record).
 //
 // ⭐ POLICY-GOVERNS ASKS THE KERNEL ITSELF: `policyApplicability` (`packages/rph-domain/src/governance.ts`), the rule
 // `policyGovernance` asks (`packages/rph-application/src/handlers/policy-governs.ts`), over the unit a type instantiates
@@ -32,7 +38,8 @@ import {
 	PHASE7_INSTRUCTION_BUDGET,
 	PHASE7_MARKERS,
 	promptMarkers,
-	renderedPrompt
+	renderedPrompt,
+	type Phase7Undertaking
 } from './pwa-content.js';
 import { typesGivenChildren, type Row } from './half-b.js';
 
@@ -124,11 +131,22 @@ function declarationOf(t: Row) {
 	};
 }
 
-/** What the checks read of one type; `composites`, the types the plan gives a child. */
-function factsOf(t: Row, composites: ReadonlySet<string>, policies: ReadonlyMap<string, Row>): CandidateTypeFacts {
+/**
+ * What the checks read of one type; `composites`, the types the plan gives a child; ⭐⭐ (package L7, the lead's decision of
+ * 2026-11-11) `undertaking`, the one its unit's instruction will state.
+ */
+function factsOf(
+	t: Row,
+	composites: ReadonlySet<string>,
+	policies: ReadonlyMap<string, Row>,
+	undertaking: Phase7Undertaking | undefined
+): CandidateTypeFacts {
 	const prompt = t.state.promptTemplate === undefined ? null : rec(t.state.promptTemplate);
 	const declared = declarationOf(t);
-	const rendered = prompt === null ? '' : renderedPrompt({ ...declared, pwuKind: '', workDischarge: 'MODEL', policyIds: [] });
+	// ⭐⭐ Package L7 — D61 — ~~no Undertaking (`undefined`): the PWA's own instruction~~ ⭐⭐ the lead's decision of 2026-11-11: the
+	// instruction as its unit is given it, its Undertaking's statement in it (the header's PROMPT-LENGTH).
+	const rendered =
+		prompt === null ? '' : renderedPrompt({ ...declared, pwuKind: '', workDischarge: 'MODEL', policyIds: [] }, undertaking);
 	const pwuKind = str(t.state.pwuKind);
 	return {
 		typeId: t.id,
@@ -148,8 +166,11 @@ function factsOf(t: Row, composites: ReadonlySet<string>, policies: ReadonlyMap<
 	};
 }
 
-/** What the four checks find on one type's facts. */
-function findingsOf(f: CandidateTypeFacts): CandidateFinding[] {
+/**
+ * What the four checks find on one type's facts. ⭐⭐ (package L7, the lead's decision of 2026-11-11) `counted`: its length counts an
+ * Undertaking's statement, which its PROMPT-LENGTH finding then names.
+ */
+function findingsOf(f: CandidateTypeFacts, counted: boolean): CandidateFinding[] {
 	const finding = (check: CandidateCheck, detail: string): CandidateFinding => ({
 		check,
 		typeId: f.typeId,
@@ -179,7 +200,11 @@ function findingsOf(f: CandidateTypeFacts): CandidateFinding[] {
 		found.push(
 			finding(
 				'prompt-length',
-				`its rendered prompt is ${f.renderedLength} characters, past the ${PHASE7_INSTRUCTION_BUDGET} the reviewer is shown`
+				// ⭐⭐ Package L7 — the lead's decision of 2026-11-11 — what was measured, named: with an Undertaking, its unit's
+				// instruction; with none, today's words, byte for byte.
+				counted
+					? `its unit's instruction, its Undertaking's statement in it, is ${f.renderedLength} characters, past the ${PHASE7_INSTRUCTION_BUDGET} the reviewer is shown`
+					: `its rendered prompt is ${f.renderedLength} characters, past the ${PHASE7_INSTRUCTION_BUDGET} the reviewer is shown`
 			)
 		);
 	for (const p of f.policies)
@@ -201,9 +226,19 @@ function findingsOf(f: CandidateTypeFacts): CandidateFinding[] {
  * (`policies`): every type's facts and every finding, in the types' order. ⛔ NEVER A REFUSAL (`REG-D-110` (4)): a caller
  * writes this down and goes on.
  */
-export function candidateChecks(types: readonly Row[], policies: readonly Row[]): CandidateChecks {
+export function candidateChecks(
+	types: readonly Row[],
+	policies: readonly Row[],
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — the lead's decision of 2026-11-11 (to be recorded with design D61) — THE UNDERTAKING THE
+	 * LANE CREATES AFTER THESE CHECKS, whose statement every unit's instruction carries (`renderedPrompt`): each type's
+	 * instruction is measured as its unit is given it. ⛔ REQUIRED, `undefined` where there is none — the type's own text and
+	 * contract, in today's words — as D61's parameters are, so the type-checker names every caller.
+	 */
+	undertaking: Phase7Undertaking | undefined
+): CandidateChecks {
 	const composites = typesGivenChildren(types);
 	const byId = new Map(policies.map((p) => [p.id, p]));
-	const facts = types.map((t) => factsOf(t, composites, byId));
-	return { types: facts, findings: facts.flatMap(findingsOf), refused: false };
+	const facts = types.map((t) => factsOf(t, composites, byId, undertaking));
+	return { types: facts, findings: facts.flatMap((f) => findingsOf(f, undertaking !== undefined)), refused: false };
 }

@@ -50,7 +50,8 @@ describe('⭐ REG-F-507 — the designer form’s prompt example and its marker 
 				declaredPlaceholders: markersIn(example),
 				status: 'ACTIVE'
 			},
-			{ policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] }
+			{ policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] },
+			undefined
 		);
 		expect(plan.ready ? 'renders' : plan.reason, 'the form’s example, rendered against a work unit').toBe('renders');
 		expect(markersIn(example).length, 'an example with no marker shows none').toBeGreaterThan(0);

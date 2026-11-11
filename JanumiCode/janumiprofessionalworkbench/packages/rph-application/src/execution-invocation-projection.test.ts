@@ -171,7 +171,8 @@ describe('⭐ AS-02 — the invocation subject is built from a REAL stored work 
 				declaredPlaceholders: ['subject', 'expectedOutputs'],
 				status: 'ACTIVE'
 			},
-			{ policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] }
+			{ policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] },
+			undefined
 		);
 		expect(plan.ready, 'a template declaring an unsuppliable placeholder must REFUSE').toBe(false);
 		expect(!plan.ready && plan.reason, 'the refusal must name the marker it could not fill').toMatch(

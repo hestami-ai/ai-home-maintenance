@@ -422,9 +422,17 @@ export type CellValue = (typeof CELL_VALUES)[number];
  * criterion (`REG-D-110` (3)), and stage 5b says, per run, whether they were; a run whose verdicts carry no criterion result
  * (a pre-E2 archive) still opens with it.
  * ~~'REG-F-523: the declared policies were signed off with no criterion checked.'~~
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D62 (`REG-D-151` (2)): REG-F-510's line restated to what holds after D61, and
+ * REG-F-521's added — what every run of the executor's commands accepts.
  */
 export const ALWAYS_STATED = [
-	'REG-F-510: the PWA had to name its product, because an Undertaking cannot tell its phases what to build (§3.3).'
+	// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L7 — design D62; `REG-D-151` (2)): ~~'REG-F-510: the PWA had to name
+	// its product, because an Undertaking cannot tell its phases what to build (§3.3).'~~ — every unit's instruction states the
+	// Undertaking's intended product and objective now (D61).
+	"REG-F-510: each unit's instruction states the Undertaking's intended product and objective (D61); whether the PWA's own prompts name the product stays the candidate checks' record (namesProduct).",
+	// ⭐⭐ Package L7 — D62 (`REG-D-151` (2); `REG-F-521`; `REG-F-624`) — the executor's commands run unconfined, as the paid runs
+	// accept.
+	"REG-F-521: the executor's commands run unconfined: each runs as the server's user and can read or change what that account can; the paid runs accept it (REG-D-102 (3), REG-D-151 (2))."
 ] as const;
 
 /**
@@ -3868,9 +3876,13 @@ function phaseCells(v: UnitView, ix: Index): MatrixCell[] {
  * they are, and disclosed"*).
  */
 export const HALF_B_CAVEATS = [
-	'REG-F-503: the authoring floor’s reviewer is not shown the PWA’s declared policies, its prompts’ text or output ' +
-		'contracts, its child cardinalities or its types’ purposes, so its SATISFIED says nothing of them; the fix needs a ' +
-		'new graph case set and its conferral.',
+	// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L7 — design D62; `REG-F-503`'s marker of 2026-10-25): ~~'REG-F-503: the
+	// authoring floor’s reviewer is not shown the PWA’s declared policies, its prompts’ text or output contracts, its child
+	// cardinalities or its types’ purposes, so its SATISFIED says nothing of them; the fix needs a new graph case set and its
+	// conferral.'~~ — stale since the review in parts, which shows each type whole (`PWA_TYPE_SUBJECT`,
+	// `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts`); it misled the lead's first draft of REG-F-623.
+	'REG-F-503: the authoring floor’s reviewer is shown each type whole, its prompt’s text and output contract among the ' +
+		'fields its author declared, judged against the request the PWA was authored from.',
 	'REG-F-504: a person’s acceptance of the candidate leaves no record in the store: the accepted hash here is the lane’s ' +
 		'own record of the action’s answer, and nothing names who accepted.',
 	'REG-F-516: conditional children are never instantiated: a C1 or C+ child the agent declared is offered to no one.'

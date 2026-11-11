@@ -141,7 +141,11 @@ const HUMAN_POLICY = 'pol_fitness_for_purpose';
 const STANDIN_VALIDATOR = 'standin.reasoning-review';
 const REASONING_REVIEW = 'floor.reasoning-review';
 
-/** The Undertaking of §3.2's PWA. Its objective reaches no unit's prompt (`REG-F-510`); the prompts name the product. */
+/**
+ * The Undertaking of §3.2's PWA. ~~Its objective reaches no unit's prompt (`REG-F-510`); the prompts name the product.~~
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)): every unit's instruction states its intended product and
+ * objective, after the type's rendered text and before its output contract; the prompts name the product too.
+ */
 const UNDERTAKING = {
 	name: 'wordfreq realization',
 	objective: 'Build wordfreq, a Node.js command-line tool that prints the N most frequent words.',
@@ -482,7 +486,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 				`${t.name}'s prompt uses a marker no work unit fills, which refuses its step at render (REG-F-507)`
 			).toEqual([]);
 			expect(
-				renderedPrompt(t).length,
+				renderedPrompt(t, UNDERTAKING).length,
 				`${t.name}'s prompt renders past what the reviewer is shown (§3.2)`
 			).toBeLessThan(PHASE7_INSTRUCTION_BUDGET);
 		}
@@ -670,7 +674,13 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			// (`undertakings/[id]/+page.server.ts`); or a first try's turn carries a line before the instruction
 			// (`run-model-step.ts`). Each reddens here, at the first phase, and the other test stays green; without this
 			// pin this file stayed green under all three, and so does `verif/phase7-pwa-content.test.ts`.
-			const instruction = renderedPrompt(t);
+			// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D61 (`REG-D-151` (1)): ~~`renderedPrompt(t)`~~ the instruction states the
+			// Undertaking's intended product and objective, after the type's rendered text and before its output contract.
+			// ⛔ PREDICTED RED: at HEAD neither the route nor `renderedPrompt` stated it.
+			const instruction = renderedPrompt(t, UNDERTAKING);
+			expect(instruction, `${t.name}'s instruction does not state its Undertaking`).toContain(
+				`\nIntended product: ${UNDERTAKING.product}\nObjective:\n${UNDERTAKING.objective}\n\nThe output this work requires:\n`
+			);
 			const sent = exchanges[0]!.state.materializedInputRef as
 				{ status?: string; contentHash?: string; byteSize?: number } | undefined;
 			expect(
