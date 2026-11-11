@@ -2046,13 +2046,27 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		'purpose, judged over the work it and every unit below it produced (REG-D-111 (2)) — and no reviewer-qualification case ' +
 		'measures it: every declared case is in the PRODUCING_PROMPT framing.';
 
+	/** ⭐⭐ Package L8 — design D63 (`REG-D-152`; the lead's addition) — the line, verbatim. */
+	const REG_D_152_LINE =
+		"REG-D-152: the decision model's client also accepts Ollama 0.40.16, which the sponsor accepted without re-measurement; the reviewer was measured with indications served by Ollama 0.40.15, and REG-F-608 measured scores moving between two earlier server versions.";
+
 	// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D62 (`REG-D-151` (2); `REG-F-521`; `REG-F-624`): ⛔ PREDICTED RED: at HEAD the list
 	// held one line, REG-F-510's, saying the PWA had to name its product because an Undertaking could not tell its phases.
 	it('⭐⭐ L7 (D62) — the list a “Yes” always states holds REG-F-510’s restated line and REG-F-521’s new one, verbatim (REG-D-151 (2))', () => {
 		expect(ALWAYS_STATED).toEqual([
 			"REG-F-510: each unit's instruction states the Undertaking's intended product and objective (D61); whether the PWA's own prompts name the product stays the candidate checks' record (namesProduct).",
-			"REG-F-521: the executor's commands run unconfined: each runs as the server's user and can read or change what that account can; the paid runs accept it (REG-D-102 (3), REG-D-151 (2))."
+			"REG-F-521: the executor's commands run unconfined: each runs as the server's user and can read or change what that account can; the paid runs accept it (REG-D-102 (3), REG-D-151 (2)).",
+			// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L8 — design D63; `REG-D-152`): the list gains REG-D-152's line after
+			// REG-F-521's — the decision model's client accepts Ollama 0.40.16, unmeasured (the L8 row below).
+			REG_D_152_LINE
 		]);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L8 — design D63 (`REG-D-152`; the lead's addition): ⛔ PREDICTED RED: at HEAD the list ends on
+	// REG-F-521's line, and says nothing of a server version the decision model's client accepts unmeasured.
+	it('⭐⭐ L8 (D63) — the list a “Yes” always states ends on REG-D-152’s line, verbatim, after REG-F-521’s; the markdown states it', () => {
+		expect([...ALWAYS_STATED].slice(-2)).toEqual([expect.stringMatching(/^REG-F-521: /), REG_D_152_LINE]);
+		expect(renderMarkdown(reportOf(aRun()).report)).toContain(`  - ${REG_D_152_LINE}`);
 	});
 
 	it('⛔ E12F F10 — the REG-F-523 caveat is KEPT for a run whose declared verdicts carry no criterion result (a pre-E2 archive), and counted for one that mixes them', () => {

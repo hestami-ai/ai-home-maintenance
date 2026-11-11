@@ -424,6 +424,8 @@ export type CellValue = (typeof CELL_VALUES)[number];
  * ~~'REG-F-523: the declared policies were signed off with no criterion checked.'~~
  * ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D62 (`REG-D-151` (2)): REG-F-510's line restated to what holds after D61, and
  * REG-F-521's added — what every run of the executor's commands accepts.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L8 — design D63 (`REG-D-152`; the lead's addition): and REG-D-152's — the decision model's client
+ * accepts a server version the reviewer was not measured with.
  */
 export const ALWAYS_STATED = [
 	// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L7 — design D62; `REG-D-151` (2)): ~~'REG-F-510: the PWA had to name
@@ -432,7 +434,9 @@ export const ALWAYS_STATED = [
 	"REG-F-510: each unit's instruction states the Undertaking's intended product and objective (D61); whether the PWA's own prompts name the product stays the candidate checks' record (namesProduct).",
 	// ⭐⭐ Package L7 — D62 (`REG-D-151` (2); `REG-F-521`; `REG-F-624`) — the executor's commands run unconfined, as the paid runs
 	// accept.
-	"REG-F-521: the executor's commands run unconfined: each runs as the server's user and can read or change what that account can; the paid runs accept it (REG-D-102 (3), REG-D-151 (2))."
+	"REG-F-521: the executor's commands run unconfined: each runs as the server's user and can read or change what that account can; the paid runs accept it (REG-D-102 (3), REG-D-151 (2)).",
+	// ⭐⭐ Package L8 — D63 (`REG-D-152`; the lead's addition) — the decision model's client accepts 0.40.16, unmeasured.
+	"REG-D-152: the decision model's client also accepts Ollama 0.40.16, which the sponsor accepted without re-measurement; the reviewer was measured with indications served by Ollama 0.40.15, and REG-F-608 measured scores moving between two earlier server versions."
 ] as const;
 
 /**

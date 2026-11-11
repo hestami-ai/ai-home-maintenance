@@ -30,6 +30,16 @@ import { createDecisionModelClient } from './decision-model-client.js';
 import { DECISION_MODEL_RECORDS_IDENTITY } from './decision-model-identity.js';
 import type { IndicationsSource } from './reasoning-review-validator.js';
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L8 — D63 (`REG-D-152`) — THE SERVER VERSIONS THE PRODUCT'S REVIEWS ACCEPT BESIDE THE RECORDS'
+ * (`DECISION_MODEL_RECORDS_IDENTITY.serverVersion`, 0.40.15), each accepted by the sponsor WITHOUT RE-MEASUREMENT: listed once, here,
+ * beside the records' identity and not in it — the records, their identity and the scores the reviewer was measured with stay
+ * 0.40.15's (`REG-F-608` measured scores moving between two earlier server versions). ⭑ The product's review path passes it
+ * (`createFloorRegistry`, `index.ts`); D53's re-derivation passes none (`scripts/reviewer-qual/run.ts`): the re-measurement, on a
+ * version nobody measured, refuses rather than re-derives on it (L8, the lead's decision (A)).
+ */
+export const DECISION_MODEL_ALSO_ACCEPTED: readonly string[] = Object.freeze(['0.40.16']);
+
 /** ⭐ ~~The four settings~~ The two settings (Z2b), by what each configures. */
 export const DECISION_MODEL_VARIABLES = Object.freeze({
 	server: 'JPWB_DECISION_MODEL_SERVER',
@@ -40,8 +50,12 @@ export const DECISION_MODEL_VARIABLES = Object.freeze({
 const listed = (names: readonly string[]): string =>
 	names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`;
 
-/** The decision model a real review asks, as configured: the client, a refusal naming what is missing, or none at all. */
-export function configuredIndications(): IndicationsSource | undefined {
+/**
+ * The decision model a real review asks, as configured: the client, a refusal naming what is missing, or none at all.
+ * ⭐⭐ Package L8 — D63 (`REG-D-152`) — `alsoAccepted`, REQUIRED: the server versions the client accepts beside the records' own, so
+ * each caller says which — the product's review path `DECISION_MODEL_ALSO_ACCEPTED`, D53's re-derivation `[]`.
+ */
+export function configuredIndications(alsoAccepted: readonly string[]): IndicationsSource | undefined {
 	const read = (name: string): string | undefined => process.env[name]?.trim() || undefined;
 	const server = read(DECISION_MODEL_VARIABLES.server);
 	const model = read(DECISION_MODEL_VARIABLES.model);
@@ -59,5 +73,5 @@ export function configuredIndications(): IndicationsSource | undefined {
 		const refusal = `the configured decision model is ${model}, not ${recorded.model}, the model D54’s records were made with (D51; REG-D-052)`;
 		return async () => ({ refusal });
 	}
-	return createDecisionModelClient({ server, model, identity: { digest: recorded.digest, serverVersion: recorded.serverVersion } });
+	return createDecisionModelClient({ server, model, identity: { digest: recorded.digest, serverVersion: recorded.serverVersion, alsoAccepted } });
 }

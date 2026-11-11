@@ -87,7 +87,8 @@ const clientOf = (server: string, o: Partial<DecisionModelClientOptions> = {}): 
 	createDecisionModelClient({
 		server,
 		model: STUB_MODEL,
-		identity: { digest: '733585a9ebb6', serverVersion: STUB_VERSION },
+		// ⭑ Package L8 (D63; REG-D-152) — no version accepted beside the configured one, as before L8; the L8 block lists some.
+		identity: { digest: '733585a9ebb6', serverVersion: STUB_VERSION, alsoAccepted: [] },
 		// ⭑ The model's leaving held to 2 s: no stub here keeps it listed past a few reads unless a test means it to.
 		bounds: { pollMs: 1, unloadMs: 2_000, ...o.bounds },
 		clock: () => '2026-11-06T00:00:00.000Z',
@@ -372,5 +373,55 @@ describe('⛔ PREDICTED RED 6 (Z2; D51) — every request a try of its own on th
 			)
 		).rejects.toThrow(/request c00 had no answer within 0\.05 s/);
 		expect(sink.drain().map((r) => [r.disposition, r.rawOutputBeforeCoercionRef.status])).toEqual([['no-response', 'PENDING_CONTENT_PLANE']]);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L8 — design D63 (`REG-D-152`; `REG-F-608`) — A SERVER VERSION ACCEPTED BESIDE THE IDENTITY'S, WITHOUT
+// RE-MEASUREMENT: the client holds a server to its identity's version or to one its `alsoAccepted` lists, and the version a server
+// answered is the one recorded. ⛔ PREDICTED RED, written first: at HEAD the client holds the identity's version alone — a listed
+// version is refused, and no refusal names one. ⭑ The CONTROLS hold at HEAD and after: the identity's own version accepted with a
+// list given, and, with none listed, today's refusal byte for byte.
+describe('⭐⭐ L8 (D63; REG-D-152) — a version accepted beside the identity’s, without re-measurement', () => {
+	/** The client's options with `alsoAccepted` listed beside the identity's version. */
+	const listing = (...alsoAccepted: string[]): Partial<DecisionModelClientOptions> => ({
+		identity: { digest: '733585a9ebb6', serverVersion: STUB_VERSION, alsoAccepted }
+	});
+
+	it('⭐ a version listed is accepted: every question asked and scored, and the version recorded as the server answered it', async () => {
+		const s = await stub({ version: '0.40.16' });
+		const result = await clientOf(s.url, listing('0.40.16'))(REQUESTS, MATERIAL);
+		expect(refusalOf(result), 'the client refused a version listed beside the identity’s').toBe(false);
+		expect(Object.keys('scores' in result ? result.scores : {})).toEqual(REQUESTS.map((r) => r.key));
+		expect(questionPosts(s)).toHaveLength(REQUESTS.length);
+		expect(result.exchanges?.map((e) => e.served.serverVersion), 'the version recorded as the server answered it').toEqual(
+			REQUESTS.map(() => '0.40.16')
+		);
+	});
+
+	it('⭑ CONTROL — with a version listed, the identity’s own is still accepted', async () => {
+		const s = await stub();
+		const result = await clientOf(s.url, listing('0.40.16'))(REQUESTS, MATERIAL);
+		expect(refusalOf(result), 'the identity’s own version refused once another is listed').toBe(false);
+		expect(questionPosts(s)).toHaveLength(REQUESTS.length);
+	});
+
+	it('⛔ a version neither the identity’s nor listed is refused before any question, the refusal naming both and citing REG-D-152', async () => {
+		const s = await stub({ version: '0.40.17' });
+		const result = await clientOf(s.url, listing('0.40.16'))(REQUESTS, MATERIAL);
+		expect(refusalOf(result)).toBe('the server is Ollama 0.40.17, not 0.40.15 or 0.40.16 (D51; REG-F-608; REG-D-152)');
+		expect(questionPosts(s), 'no question asked').toEqual([]);
+	});
+
+	it('⛔ several listed: the refusal names every version accepted — the identity’s first, then the list in its order', async () => {
+		const s = await stub({ version: '0.40.17' });
+		const result = await clientOf(s.url, listing('0.40.16', '0.40.18'))(REQUESTS, MATERIAL);
+		expect(refusalOf(result)).toBe('the server is Ollama 0.40.17, not 0.40.15, 0.40.16 or 0.40.18 (D51; REG-F-608; REG-D-152)');
+	});
+
+	it('⭑ CONTROL — none listed (`alsoAccepted: []`): a server answering 0.40.16 is refused in today’s words, byte for byte', async () => {
+		const s = await stub({ version: '0.40.16' });
+		const result = await clientOf(s.url)(REQUESTS, MATERIAL);
+		expect(refusalOf(result)).toBe('the server is Ollama 0.40.16, not 0.40.15 (D51; REG-F-608)');
+		expect(questionPosts(s), 'no question asked').toEqual([]);
 	});
 });

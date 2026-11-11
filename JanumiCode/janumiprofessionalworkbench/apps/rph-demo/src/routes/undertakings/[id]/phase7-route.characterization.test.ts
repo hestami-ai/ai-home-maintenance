@@ -143,9 +143,10 @@ import { actions, load } from './+page.server.js';
 // as the reviewer's program is. ~~⛔ Production configures none until package Z2, and refuses the review.~~ ⛔ MOVED 2026-11-07
 // (`JAN-EXEC` Phase 7, package Z2b): production configures the client from its settings since package Z2a — the server and the
 // model (`decision-model.ts`), held to D54's records' identity — and, unconfigured, refuses the review.
-vi.mock('../../../lib/server/assurance/decision-model.js', async () => {
+vi.mock('../../../lib/server/assurance/decision-model.js', async (importOriginal) => {
 	const { TEST_INDICATIONS } = await import('../../../lib/server/assurance/indications.testing.js');
-	return { configuredIndications: () => TEST_INDICATIONS };
+	// ⭑ Package L8 (D63): the module's own exports kept — the floor registry reads DECISION_MODEL_ALSO_ACCEPTED from it — and the client alone stood in for.
+	return { ...(await importOriginal<typeof import('../../../lib/server/assurance/decision-model.js')>()), configuredIndications: () => TEST_INDICATIONS };
 });
 
 /** D8's live-backend variables — each case sets only what it names. */

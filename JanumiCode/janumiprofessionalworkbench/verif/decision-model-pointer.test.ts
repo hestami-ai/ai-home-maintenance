@@ -5,6 +5,7 @@
 // (`P6X-Z2B-*`), and the controls below show each part the text carries as data moves it.
 // ⛔ No model and no socket: the cold path is driven against a server held in memory.
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { DECISION_MODEL_TEXT } from '../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
 import { REVIEW_SECTION_TEXT } from '../apps/rph-demo/src/lib/server/assurance/review-section.js';
@@ -78,5 +79,19 @@ describe('⛔ PREDICTED RED 8 (Z2; D54) — the fingerprint’s pointer componen
 		const moved: number[] = [];
 		for (const [i, parts] of edits.entries()) if (sha256(await decisionModelPointer(parts)) !== today) moved.push(i);
 		expect(moved).toEqual(edits.map((_, i) => i));
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L8 — design D63 (`REG-D-152`) — the pointer's client accepts no version beside its identity's
+// (`alsoAccepted: []`), though the product's now accepts 0.40.16 beside 0.40.15. ⭑ A SOURCE CHECK, NAMED AS SUCH: the pointer's server,
+// held in memory, answers its identity's own version, so no behaviour can show a version accepted beside it — the component, and so
+// the fingerprint, stay as they are. Its source is read instead: the one client it builds lists none.
+describe('⭐⭐ L8 (D63; REG-D-152) — the pointer’s client accepts no version beside its identity’s', () => {
+	it('⭑ SOURCE CHECK — the one client the pointer builds is given `alsoAccepted: []`, and no list of the product’s', () => {
+		const source = readFileSync(new URL('../scripts/reviewer-qual/decision-model-pointer.ts', import.meta.url), 'utf8');
+		const calls = source.split('createDecisionModelClient(').slice(1);
+		expect(calls, 'one client built').toHaveLength(1);
+		expect(calls[0]!.slice(0, calls[0]!.indexOf(');'))).toContain('alsoAccepted: []');
+		expect(source).not.toContain('DECISION_MODEL_ALSO_ACCEPTED');
 	});
 });

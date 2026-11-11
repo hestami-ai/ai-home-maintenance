@@ -294,7 +294,9 @@ async function d53Prechecks(
 	say(`D53 — D54’s records hold ${cases.length} of the ${cases.length} current cases, none refused (${onFile.files.map((f) => `${f.name} sha256 ${f.sha256}`).join(', ')})`);
 	// D53 — the decision model, for the live re-derivation.
 	const { configuredIndications } = await import('../../apps/rph-demo/src/lib/server/assurance/decision-model.js');
-	const live = configuredIndications();
+	// ⭐⭐ Package L8 — D63 (`REG-D-152`; the lead's decision (A)): held to the records' version alone, `[]` — though the product's
+	// reviews accept 0.40.16 — since D53 is the re-measurement: on a version nobody measured it refuses, and never re-derives on it.
+	const live = configuredIndications([]);
 	if (live === undefined)
 		return 'REFUSED (D53): the live re-derivation asks the decision model, and it is not configured (JPWB_DECISION_MODEL_SERVER and JPWB_DECISION_MODEL). Nothing was run.';
 	return {

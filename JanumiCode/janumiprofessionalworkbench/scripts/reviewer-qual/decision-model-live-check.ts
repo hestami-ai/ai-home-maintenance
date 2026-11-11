@@ -167,7 +167,8 @@ export async function main(argv: readonly string[]): Promise<number> {
 	if (!at.digest.startsWith(digest)) return (console.error(`STOPPED: ${model} is served with digest ${at.digest.slice(0, 12)}, not ${digest}`), 1);
 	if (at.others.length > 0) return (console.error(`STOPPED: another model is loaded (${at.others.join(', ')}): the check is made with none`), 1);
 	console.log(`${model} ${at.digest.slice(0, 12)} on Ollama ${at.serverVersion}`);
-	const client = createDecisionModelClient({ server, model, identity: { digest, serverVersion: at.serverVersion } });
+	// ⭐⭐ Package L8 — D63 (`REG-D-152`): held to the version the server answered when the check began, and none beside it.
+	const client = createDecisionModelClient({ server, model, identity: { digest, serverVersion: at.serverVersion, alsoAccepted: [] } });
 	const same = async (when: string): Promise<boolean> => {
 		const now = await servedNow(server, model);
 		if (now.digest === at.digest && now.serverVersion === at.serverVersion) return true;

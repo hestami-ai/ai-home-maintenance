@@ -35,7 +35,7 @@ import {
 	type DeclaredStipulationLookup
 } from './declared-policy-review.js';
 import { judgeModel } from './agy-cli.js';
-import { configuredIndications } from './decision-model.js';
+import { configuredIndications, DECISION_MODEL_ALSO_ACCEPTED } from './decision-model.js';
 import { assuranceModel, devinPrint, type DevinExec } from '../tools/devin-reviewer.js';
 import { refusalMessage, selectReviewer, type ReviewerSelection } from './reviewer-selection.js';
 import { productCallBoundFor, replayRunFor } from '../replay/replay-run.js';
@@ -133,7 +133,8 @@ export function createFloorRegistry(opts: {
 				...(opts.clock ? { clock: opts.clock } : {}),
 				// ⭐ Package Z1 — the decision model: one handed in wins, as an injected `print` does; else the one configured
 				// (`decision-model.ts`), which is none until package Z2 — and every review is then refused before a call.
-				...decisionModelOf(opts.indications ?? configuredIndications()),
+				// ⭐⭐ Package L8 — D63 (`REG-D-152`): the one configured accepts the versions the sponsor accepted beside the records'.
+				...decisionModelOf(opts.indications ?? configuredIndications(DECISION_MODEL_ALSO_ACCEPTED)),
 				// ⚠ AN EXPLICITLY INJECTED `print` STILL WINS over the configured tool. It is the seam the gate uses to
 				// exercise this wiring without spawning anything, and a tool selection that overrode it would make the
 				// retention assertions untestable — the reason `AgyPrint` was made injectable at all.

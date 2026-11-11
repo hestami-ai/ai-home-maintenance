@@ -47,9 +47,10 @@ import { clearAuthoringTurns } from './authoring-turn.js';
 // as the reviewer's program is. ~~⛔ Production configures none until package Z2, and refuses the review.~~ ⛔ MOVED 2026-11-07
 // (`JAN-EXEC` Phase 7, package Z2b): production configures the client from its settings since package Z2a — the server and the
 // model (`decision-model.ts`), held to D54's records' identity — and, unconfigured, refuses the review.
-vi.mock('./assurance/decision-model.js', async () => {
+vi.mock('./assurance/decision-model.js', async (importOriginal) => {
 	const { TEST_INDICATIONS } = await import('./assurance/indications.testing.js');
-	return { configuredIndications: () => TEST_INDICATIONS };
+	// ⭑ Package L8 (D63): the module's own exports kept — the floor registry reads DECISION_MODEL_ALSO_ACCEPTED from it — and the client alone stood in for.
+	return { ...(await importOriginal<typeof import('./assurance/decision-model.js')>()), configuredIndications: () => TEST_INDICATIONS };
 });
 
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Q00';

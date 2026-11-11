@@ -149,7 +149,8 @@ export async function decisionModelPointer(parts: PointerParts = PRODUCT_POINTER
 	const client = createDecisionModelClient({
 		server: 'http://decision-model.invalid',
 		model: identity.model,
-		identity: { digest: identity.digest, serverVersion: identity.serverVersion },
+		// ⭐⭐ Package L8 — D63 (`REG-D-152`): the identity's version, and none beside it.
+		identity: { digest: identity.digest, serverVersion: identity.serverVersion, alsoAccepted: [] },
 		bounds: { pollMs: 0 },
 		clock: () => '1970-01-01T00:00:00.000Z',
 		text,

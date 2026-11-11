@@ -238,3 +238,21 @@ describe('⛔ PREDICTED RED (Z2b phase 1b; D54 restated) — a request the serve
 		);
 	});
 });
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L8 — design D63 (`REG-D-152`) — THE RECORDS ARE MADE ON ONE VERSION, AND THEIR CLIENT ACCEPTS NONE
+// BESIDE IT (`alsoAccepted: []`), though the product's now accepts 0.40.16 beside 0.40.15. ⭑ Seen in behaviour: the run reads the
+// server's identity itself before each entry and stops on a change, but the server can be updated between that read and the client's
+// own — and then the client is what refuses it. ⭑ A GUARD, green at HEAD and after: a client accepting 0.40.16 would score the entry on
+// it, and the file would hold it under its 0.40.15.
+describe('⭐⭐ L8 (D63; REG-D-152) — the records are made on one version: their client accepts none beside it', () => {
+	it('⛔ the server updated between the run’s read before an entry and the client’s: the client refuses it, and nothing of the entry is written', async () => {
+		let versionReads = 0;
+		// ⭑ read at the start and by the run before A, as 0.40.15; then the server is updated, before the client reads it for A.
+		const s = await stub({ version: () => ((versionReads += 1) > 2 ? '0.40.16' : STUB_VERSION) });
+		const r = runOf(s.url);
+		const out = await r.go();
+		expect(out.stopped).toBe('STOPPED: A: the client refused its review: the server is Ollama 0.40.16, not 0.40.15 (D51; REG-F-608)');
+		expect(linesOf(r.file).map((l) => l.kind)).toEqual(['IDENTITY']);
+		expect(posts(s), 'no question asked').toEqual([]);
+	});
+});

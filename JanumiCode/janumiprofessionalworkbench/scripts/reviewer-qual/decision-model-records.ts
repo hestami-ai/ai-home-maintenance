@@ -143,7 +143,8 @@ async function ask(
 	const client = createDecisionModelClient({
 		server: run.server,
 		model: run.model,
-		identity: { digest: identity.digest, serverVersion: identity.serverVersion },
+		// ⭐⭐ Package L8 — D63 (`REG-D-152`): the version the file is made on, and none beside it.
+		identity: { digest: identity.digest, serverVersion: identity.serverVersion, alsoAccepted: [] },
 		...(run.bounds ? { bounds: run.bounds } : {})
 	});
 	let kinds = new Map<string, 'check' | 'statement'>();

@@ -5,7 +5,8 @@
 // For a review's requests (`IndicationsSource`), in step 1's order:
 //   1. THE IDENTITY, before the first request — the model's digest from `/api/tags`, then the server's version from
 //      `/api/version` — each held to the configured identity (in Z2b, D54's records'): another digest or another version
-//      refuses the review (`REG-F-608`: Ollama's own update moved the cold scores).
+//      refuses the review (`REG-F-608`: Ollama's own update moved the cold scores). ⭐⭐ Package L8 (D63; `REG-D-152`): a version
+//      the identity accepts beside its own (`alsoAccepted`) is asked, unmeasured, and recorded as the server answered it.
 //   2. THE MODEL FOUND LOADED IS UNLOADED by step 1's own unload request (`unloadBody`; `step1_single.py` 104-105).
 //   3. BEFORE EVERY REQUEST, `/api/ps` read until the model is absent — step 1's `wait_gone` — refusing past 120 s, and the
 //      other models the server holds read once more, as step 1 recorded them; another model loaded refuses nothing (the sponsor
@@ -45,6 +46,14 @@ export const DECISION_MODEL_BOUNDS: DecisionModelBounds = Object.freeze({
 export interface DecisionModelIdentity {
 	readonly digest: string;
 	readonly serverVersion: string;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L8 — D63 (`REG-D-152`) — THE SERVER VERSIONS ACCEPTED BESIDE `serverVersion`, the one measured,
+	 * WITHOUT RE-MEASUREMENT. REQUIRED, so every caller says which: the product's review path lists the sponsor's
+	 * (`decision-model.ts`, `DECISION_MODEL_ALSO_ACCEPTED`); D53's re-derivation and the qualification's own tools list none. Empty, a
+	 * server of another version is refused in the words it always was; listed, the refusal names every version accepted and cites
+	 * REG-D-152. The version a server answers is recorded as it answered (`served.serverVersion`).
+	 */
+	readonly alsoAccepted: readonly string[];
 }
 
 export interface DecisionModelClientOptions {
@@ -138,6 +147,17 @@ function scoreOf(key: string, posted: Extract<Posted, { kind: 'ANSWERED' }>): In
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L8 — D63 (`REG-D-152`) — THE CLIENT'S WORDS FOR A SERVER OF ANOTHER VERSION: with none accepted
+ * beside the identity's, the words it always had, byte for byte (D51; `REG-F-608`); with some, every version accepted — the
+ * identity's first, then the list in its order — and REG-D-152 cited.
+ */
+function versionRefusal(version: string, identity: DecisionModelIdentity): string {
+	if (identity.alsoAccepted.length === 0) return `the server is Ollama ${version}, not ${identity.serverVersion} (D51; REG-F-608)`;
+	const accepted = [identity.serverVersion, ...identity.alsoAccepted];
+	return `the server is Ollama ${version}, not ${accepted.slice(0, -1).join(', ')} or ${accepted.at(-1)!} (D51; REG-F-608; REG-D-152)`;
+}
+
+/**
  * ⭐⭐ THE CLIENT: the product's source of a review's potential indications, against `server`, for `model`, held to `identity`.
  * ⚠ It keeps no state between reviews: each review's identity is read again, before its first request.
  */
@@ -197,8 +217,10 @@ export function createDecisionModelClient(o: DecisionModelClientOptions): Indica
 		const digest = typeof entry.digest === 'string' ? entry.digest : '';
 		if (!digest.startsWith(o.identity.digest))
 			throw new Refused(`the server serves ${o.model} with digest ${digest.slice(0, 12)}, not ${o.identity.digest} (D51; REG-F-608)`);
-		if (version !== o.identity.serverVersion)
-			throw new Refused(`the server is Ollama ${version}, not ${o.identity.serverVersion} (D51; REG-F-608)`);
+		// ⭐⭐ Package L8 — D63 (`REG-D-152`): ~~`version !== o.identity.serverVersion`~~ — the identity's version, or one accepted
+		// beside it without re-measurement; the words `versionRefusal`'s, today's where none is.
+		if (version !== o.identity.serverVersion && !o.identity.alsoAccepted.includes(version))
+			throw new Refused(versionRefusal(version, o.identity));
 		return { model: o.model, digest, serverVersion: version };
 	};
 
