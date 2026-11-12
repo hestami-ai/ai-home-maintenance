@@ -84,6 +84,7 @@ import { outputLimitDetail, OutputLimitReached } from '../apps/rph-demo/src/lib/
 import { declaredPolicyReviewInput } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import {
 	ALWAYS_STATED,
+	ANSWER_UNLISTED_SENTENCE,
 	buildRunReport,
 	CELL_VALUES,
 	contentVerdict,
@@ -131,6 +132,8 @@ import {
 	type StoreRows
 } from '../scripts/phase7/run-report-core.js';
 import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
+// ⭐⭐ Package L9 — D64 — the variant sentence and today's, named from the design.
+import { BLOCK_SAYS, BLOCK_SAYS_ANSWER_UNLISTED } from '../apps/rph-demo/src/lib/server/assurance/review-section.testing.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const RUN_REPORT = join(ROOT, 'scripts', 'phase7', 'run-report.ts');
@@ -2049,6 +2052,9 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 	/** ⭐⭐ Package L8 — design D63 (`REG-D-152`; the lead's addition) — the line, verbatim. */
 	const REG_D_152_LINE =
 		"REG-D-152: the decision model's client also accepts Ollama 0.40.16, which the sponsor accepted without re-measurement; the reviewer was measured with indications served by Ollama 0.40.15, and REG-F-608 measured scores moving between two earlier server versions.";
+	/** ⭐⭐ Package L9 — design D64 (`REG-D-153`) — the line, verbatim (`l9-facts.md` §1, item 3). */
+	const REG_D_153_LINE =
+		"REG-D-153: a work product's review whose prompt, listing every statement, would pass a bound lists none of the answer's statements and asks the decision model none of them; the reviewer reads the answer itself, its indications covering the checks and the producer's account; the sponsor accepted this without re-measurement.";
 
 	// ⭐⭐ `JAN-EXEC` Phase 7, package L7 — design D62 (`REG-D-151` (2); `REG-F-521`; `REG-F-624`): ⛔ PREDICTED RED: at HEAD the list
 	// held one line, REG-F-510's, saying the PWA had to name its product because an Undertaking could not tell its phases.
@@ -2058,15 +2064,29 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			"REG-F-521: the executor's commands run unconfined: each runs as the server's user and can read or change what that account can; the paid runs accept it (REG-D-102 (3), REG-D-151 (2)).",
 			// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L8 — design D63; `REG-D-152`): the list gains REG-D-152's line after
 			// REG-F-521's — the decision model's client accepts Ollama 0.40.16, unmeasured (the L8 row below).
-			REG_D_152_LINE
+			REG_D_152_LINE,
+			// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L9 — design D64; `REG-D-153`): and REG-D-153's after it — a review whose
+			// answer's statements do not fit lists none of them, accepted unmeasured (the L9 row below).
+			REG_D_153_LINE
 		]);
 	});
 
 	// ⭐⭐ `JAN-EXEC` Phase 7, package L8 — design D63 (`REG-D-152`; the lead's addition): ⛔ PREDICTED RED: at HEAD the list ends on
 	// REG-F-521's line, and says nothing of a server version the decision model's client accepts unmeasured.
-	it('⭐⭐ L8 (D63) — the list a “Yes” always states ends on REG-D-152’s line, verbatim, after REG-F-521’s; the markdown states it', () => {
-		expect([...ALWAYS_STATED].slice(-2)).toEqual([expect.stringMatching(/^REG-F-521: /), REG_D_152_LINE]);
+	// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L9 — design D64; `REG-D-153`): ~~`[...ALWAYS_STATED].slice(-2)`, the list
+	// ending on REG-D-152's line~~ — REG-D-153's line follows it now (the L9 row below); REG-D-152's stays, verbatim, right after
+	// REG-F-521's.
+	it('⭐⭐ L8 (D63) — the list a “Yes” always states ~~ends on~~ holds REG-D-152’s line, verbatim, right after REG-F-521’s; the markdown states it', () => {
+		const at = ALWAYS_STATED.indexOf(REG_D_152_LINE);
+		expect([...ALWAYS_STATED].slice(at - 1, at + 1)).toEqual([expect.stringMatching(/^REG-F-521: /), REG_D_152_LINE]);
 		expect(renderMarkdown(reportOf(aRun()).report)).toContain(`  - ${REG_D_152_LINE}`);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L9 — design D64 (`REG-D-153`): ⛔ PREDICTED RED: at 62cd8341 the list ends on REG-D-152's line,
+	// and says nothing of a review that lists none of its answer's statements.
+	it('⭐⭐ L9 (D64) — the list a “Yes” always states ends on REG-D-153’s line, verbatim, after REG-D-152’s; the markdown states it', () => {
+		expect([...ALWAYS_STATED].slice(-2)).toEqual([REG_D_152_LINE, REG_D_153_LINE]);
+		expect(renderMarkdown(reportOf(aRun()).report)).toContain(`  - ${REG_D_153_LINE}`);
 	});
 
 	it('⛔ E12F F10 — the REG-F-523 caveat is KEPT for a run whose declared verdicts carry no criterion result (a pre-E2 archive), and counted for one that mixes them', () => {
@@ -5110,7 +5130,8 @@ describe('⭐⭐ package L5 — D57 — the run report says what was not sent, a
 		expect(line, `arrangement: ${id} (${n}) in the register`).toBeDefined();
 		return line!.slice(`  ${n}. `.length);
 	};
-	type Sized = Call & { readonly chars?: number | 'unretained' | 'mismatched' };
+	/** ⭐⭐ Package L9 — D64 — and `unlisted`: its prompt's bytes, as the reader read them, hold the variant sentence's second sentence. */
+	type Sized = Call & { readonly chars?: number | 'unretained' | 'mismatched'; readonly unlisted?: true };
 	/**
 	 * A run whose phases' reviews made `calls`, each prompt `chars` characters long as the reader measured it — or not retained
 	 * (`PENDING_CONTENT_PLANE`), or its bytes not holding what its record claims.
@@ -5119,14 +5140,17 @@ describe('⭐⭐ package L5 — D57 — the run report says what was not sent, a
 		const run = aRun(
 			Object.fromEntries(Object.entries(calls).map(([slug, review]) => [slug, { review }])) as Partial<Record<Slug, PhaseKnobs>>
 		);
-		const sizeOf = (key: string): Sized['chars'] => {
+		const callOf = (key: string): Sized | undefined => {
 			const m = /^k_in_mex_art_(.+)_(\d+)$/.exec(key);
-			return m ? calls[m[1] as Slug]?.[Number(m[2])]?.chars : undefined;
+			return m ? calls[m[1] as Slug]?.[Number(m[2])] : undefined;
 		};
+		const sizeOf = (key: string): Sized['chars'] => callOf(key)?.chars;
 		const content = (run.store.content ?? []).map((c) => {
 			const chars = sizeOf(c.storageKey);
-			if (chars === 'mismatched') return { ...c, actualHash: `sha256:${sha('other bytes')}` };
-			return typeof chars === 'number' ? { ...c, actualChars: chars } : c;
+			// ⭐⭐ Package L9 — D64 — and the reader's reading of the variant sentence, where the call says so.
+			const unlisted = callOf(c.storageKey)?.unlisted === true ? { holdsAnswerUnlisted: true } : {};
+			if (chars === 'mismatched') return { ...c, actualHash: `sha256:${sha('other bytes')}`, ...unlisted };
+			return typeof chars === 'number' ? { ...c, actualChars: chars, ...unlisted } : { ...c, ...unlisted };
 		});
 		const objects = run.store.objects.map((o) => {
 			const key = String((o.state.materializedInputRef as { readonly storageKey?: unknown } | undefined)?.storageKey ?? '');
@@ -5213,6 +5237,86 @@ describe('⭐⭐ package L5 — D57 — the run report says what was not sent, a
 			expect(r.code, r.out).toBe(0);
 			const report = JSON.parse(readFileSync(join(run, 'lane', 'report', 'report.json'), 'utf8')) as RunReport;
 			expect(report.reviewerCalls.untestedSizes).toEqual({ measured: 31_867, initial: 4, read: 2, over: 1, longest: 31_868 });
+		},
+		120_000
+	);
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L9 — design D64 (`REG-D-153`; the lead's addition, `l9-facts.md` §2 (e)) ──────────────────
+	// ⛔ PREDICTED RED at 62cd8341: the report counts no prompt that lists none of its answer's statements (`answerUnlistedPrompts` is
+	// undefined), its reader reads no such sentence, and report.md says nothing of them.
+	/** The count's line, as the lead wrote it: `N of the M initial reviewer calls whose prompt the record holds.` */
+	const unlistedLine = (n: number, m: string) =>
+		`- **Prompts that list none of their answer's statements (D64; REG-D-153):** ${n} of the ${m} whose prompt the record holds.`;
+
+	it('⭐⭐ L9 (D64) — beside the 31,867 line, the initial reviewer calls whose prompt lists none of its answer’s statements are counted, of the same calls, on the line after it and the lines under it', () => {
+		const { report } = reportOf(
+			sizedRun({
+				// held, and listing none of its answer's statements: counted
+				requirements: [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, chars: 30_000, unlisted: true }],
+				// an initial call that got no answer is counted too; its retry, which lists none either, is no initial call
+				design: [
+					{ role: 'INITIAL', disposition: 'NO_RESPONSE', ordinal: 1, chars: 31_868, unlisted: true },
+					{ role: 'RETRY', disposition: 'ACCEPTED', ordinal: 2, chars: 31_868, unlisted: true }
+				],
+				// the decision model's request is no reviewer call; an initial call that lists every statement is not counted
+				implementation: [
+					{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, provider: 'ollama', chars: 5_000, unlisted: true },
+					{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 2, chars: 20_000 }
+				],
+				// a prompt the record does not hold is not read, whatever its bytes
+				'end-to-end': [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, chars: 'unretained', unlisted: true }]
+			})
+		);
+		expect(report.reviewerCalls.answerUnlistedPrompts, 'the two initial calls whose held prompt lists none').toBe(2);
+		expect(report.reviewerCalls.untestedSizes.read, 'of the three the 31,867 line counts').toBe(3);
+		const md = renderMarkdown(report).split('\n');
+		const at = md.indexOf(`  - REG-D-149 (2), verbatim: *"${registerItem('REG-D-149', 2)}"*`);
+		expect(at, 'arrangement: the 31,867 line’s last line').toBeGreaterThan(0);
+		expect(md[at + 1], 'after the 31,867 line and the lines under it').toBe(unlistedLine(2, '3 initial reviewer calls'));
+	});
+
+	it('⛔ L9 (D64) — a prompt whose bytes do not hold what its record claims is not counted; with no content store none is, and the line says so', () => {
+		const some = reportOf(
+			sizedRun({
+				requirements: [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, chars: 'mismatched', unlisted: true }],
+				design: [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, chars: 25_000, unlisted: true }]
+			})
+		).report;
+		expect([some.reviewerCalls.answerUnlistedPrompts, some.reviewerCalls.untestedSizes.read]).toEqual([1, 3]);
+		const none = reportOf(aRun({}, { contentStore: false })).report;
+		expect(none.reviewerCalls.answerUnlistedPrompts).toBe(0);
+		expect(renderMarkdown(none)).toContain(unlistedLine(0, '0 initial reviewer calls'));
+	});
+
+	it(
+		'⭐⭐ L9 (D64) — the command line reads each stored prompt for the variant sentence’s second sentence, read off the product’s own text: a prompt holding it is counted, one holding today’s sentence is not',
+		() => {
+			expect(ANSWER_UNLISTED_SENTENCE, 'the variant sentence’s second sentence, the design’s words').toBe(
+				"The statements of the producer's answer were not asked about and are not listed, since listing them would make this prompt too long; the answer itself is shown above."
+			);
+			const unlisted = `THE REVIEW\nPOTENTIAL INDICATIONS FROM A DECISION MODEL\n${BLOCK_SAYS_ANSWER_UNLISTED}\n`;
+			const listed = `THE REVIEW\nPOTENTIAL INDICATIONS FROM A DECISION MODEL\n${BLOCK_SAYS}\n`;
+			const asStored = (key: string, text: string) => ({
+				status: 'STORED',
+				storageKey: key,
+				contentHash: `sha256:${sha(text)}`,
+				byteSize: Buffer.byteLength(text, 'utf8')
+			});
+			const run0 = aRun({});
+			const objects = run0.store.objects.map((o) => {
+				if (o.id === 'mex_art_design_0') return { ...o, state: { ...o.state, materializedInputRef: asStored('k_unlisted', unlisted) } };
+				if (o.id === 'mex_art_requirements_0') return { ...o, state: { ...o.state, materializedInputRef: asStored('k_listed', listed) } };
+				return o;
+			});
+			const run = runFolder({ ...run0.store, objects, content: null });
+			writeContentStore(join(run, 'lane', 'archive', '06-final', 'demo.sqlite.content.sqlite'), [
+				{ storageKey: 'k_unlisted', bytes: unlisted },
+				{ storageKey: 'k_listed', bytes: listed }
+			]);
+			const r = cli([run]);
+			expect(r.code, r.out).toBe(0);
+			const report = JSON.parse(readFileSync(join(run, 'lane', 'report', 'report.json'), 'utf8')) as RunReport;
+			expect([report.reviewerCalls.answerUnlistedPrompts, report.reviewerCalls.untestedSizes.read]).toEqual([1, 2]);
 		},
 		120_000
 	);

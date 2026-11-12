@@ -4195,7 +4195,13 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
 // component moves, and the probes component with the three whole-bound refusal probes' statements, which name the bound
 // (each still refused); no case prompt moves (v13's are at most 31,755). The record's RESCORED lines re-stamp D53's
 // evaluations under it and its ACKNOWLEDGED line names it, its reason quoting the ruling: 31,868 to 35,500 untested.
-const REVIEWER_FINGERPRINT_TODAY = '3edfd8d0319e19b4ffbd05a772c85ed62a250318eb3a65825aab08679e8c565a';
+// ⛔ MOVED 2026-11-11 (`JAN-EXEC` Phase 7, package L9 — D64; `REG-D-153`) —
+// ~~'3edfd8d0319e19b4ffbd05a772c85ed62a250318eb3a65825aab08679e8c565a'~~: a review whose answer's statements do not fit lists none
+// of them. The probes component moves, by the pointer component alone — the section's text gains the variant sentence, and the
+// component a witness of D64's branch rendered against its server held in memory, no new record — and no probe's own prompt and no
+// case prompt moves (every prompt within both bounds is sent as before). The record's RESCORED lines re-stamp D53's evaluations
+// under it and its ACKNOWLEDGED line names it, its reason quoting the ruling: such a prompt is unmeasured.
+const REVIEWER_FINGERPRINT_TODAY = 'aba310bd65d5f1263eacdf2c6fc0ac6938044e75525cf2fc1141ae187da6f1a9';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's

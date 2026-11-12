@@ -6,10 +6,19 @@
 // ⛔ No model and no socket: the cold path is driven against a server held in memory.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import type { ReasoningReviewInput } from '@janumipwb/rph-assurance';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { DECISION_MODEL_TEXT } from '../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
+import {
+	REASONING_REVIEW_BUDGET,
+	reviewPrompt,
+	type IndicationRequest,
+	type IndicationsSource
+} from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { REVIEW_SECTION_TEXT } from '../apps/rph-demo/src/lib/server/assurance/review-section.js';
 import { decisionModelPointer, PRODUCT_POINTER_PARTS } from '../scripts/reviewer-qual/decision-model-pointer.js';
+// ⭐⭐ Package L9 — D64 — read through the module, so a red names what is missing.
+import * as POINTER_MODULE from '../scripts/reviewer-qual/decision-model-pointer.js';
 import { NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
 
 // ⭑ The fingerprint's probes, rendered by the row below, ask the decision model: through the history's source
@@ -31,7 +40,10 @@ afterAll(() => {
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 
 /** ⭐ The component as the product makes it today. ⚠ Restated with any change to a part it covers. */
-const POINTER_TODAY = 'ff350eefcd3df28dde7e8b7daed4a6cb2d1a8247cc34e97b8d772ac475bb0fac';
+// ⛔ MOVED 2026-11-11 (`JAN-EXEC` Phase 7, package L9 — D64; `REG-D-153`; the lead's decision (d)) —
+// ~~'ff350eefcd3df28dde7e8b7daed4a6cb2d1a8247cc34e97b8d772ac475bb0fac'~~: the section's text gains the variant sentence, and the
+// component the witness of D64's branch (`answerUnlisted`); its other five parts unchanged.
+const POINTER_TODAY = 'bb333e2be5da4a8d07b633eff357d1f6d717621236f6c609937e9d4adf38cf49';
 
 describe('⛔ PREDICTED RED 8 (Z2; D54) — the fingerprint’s pointer component: every part the indications rest on but the scores', () => {
 	it('⭐ the reviewer fingerprint hashes it beside the probes: one part changed moves `probes`, and no other component', async () => {
@@ -52,7 +64,9 @@ describe('⛔ PREDICTED RED 8 (Z2; D54) — the fingerprint’s pointer componen
 
 	it('⭐ it carries each part: the bodies, both cuts, the block, the section’s text, the cold path and the identity', async () => {
 		const c = JSON.parse(await decisionModelPointer()) as Record<string, unknown>;
-		expect(Object.keys(c)).toEqual(['bodies', 'cuts', 'block', 'sectionText', 'cold', 'identity']);
+		// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L9 — D64; `REG-D-153`; the lead's decision (d)): ~~six parts~~ — and the
+		// witness of D64's branch, its prompt hashed (`answerUnlisted`), the L9 rows below.
+		expect(Object.keys(c)).toEqual(['bodies', 'cuts', 'block', 'sectionText', 'cold', 'identity', 'answerUnlisted']);
 		const cold = c.cold as { requests: string[]; result: { scores?: Record<string, number> } };
 		expect(cold.requests.slice(0, 4), 'the identity, then the model found loaded, unloaded by step 1’s own request').toEqual([
 			'GET /api/tags',
@@ -93,5 +107,58 @@ describe('⭐⭐ L8 (D63; REG-D-152) — the pointer’s client accepts no versi
 		expect(calls, 'one client built').toHaveLength(1);
 		expect(calls[0]!.slice(0, calls[0]!.indexOf(');'))).toContain('alsoAccepted: []');
 		expect(source).not.toContain('DECISION_MODEL_ALSO_ACCEPTED');
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L9 — design D64 (`REG-D-153`; the lead's decision (d)) — THE COMPONENT HOLDS A WITNESS OF D64'S
+// BRANCH: a work product whose answer, shown whole, has statements that pass the growth bound when listed, its account small,
+// rendered by the product's `reviewPrompt` through the pointer's own client against its server held in memory — no new record of the
+// decision model (`REG-D-152`) — its prompt's sha256 the component's last part. ⛔ PREDICTED RED at 62cd8341: the component holds no
+// such part, and the module no such witness.
+describe('⭐⭐ L9 (D64; REG-D-153) — the component holds a witness of D64’s branch, its prompt hashed', () => {
+	const zeros: IndicationsSource = async (requests) => ({ scores: Object.fromEntries(requests.map((r) => [r.key, 0])) });
+	const witness = (POINTER_MODULE as unknown as { readonly WITNESS_ANSWER_UNLISTED?: ReasoningReviewInput }).WITNESS_ANSWER_UNLISTED;
+
+	it('⭐ the witness’s review is SENT through the pointer’s own client: its prompt’s sha256 is the component’s last part', async () => {
+		const c = JSON.parse(await decisionModelPointer()) as Record<string, unknown>;
+		expect(c.answerUnlisted, 'sent, its prompt hashed').toEqual({ prompt: expect.stringMatching(/^[0-9a-f]{64}$/) });
+	});
+
+	it('⭐ the witness is the fourth run’s review in shape: its answer’s statements, listed, pass the growth bound; its prompt lists the account’s statements alone, under the variant sentence, and the decision model is asked those alone', async () => {
+		expect(witness?.framing, 'a work product’s review').toBe('WORK_PRODUCT');
+		const asked: (readonly IndicationRequest[])[] = [];
+		const prompt = await reviewPrompt(witness!, async (requests, material) => {
+			asked.push(requests);
+			return zeros(requests, material);
+		});
+		const lines = prompt.split('\n');
+		expect(lines[lines.indexOf(REVIEW_SECTION_TEXT.INDICATIONS_HEADING) + 1], 'the variant sentence').toBe(REVIEW_SECTION_TEXT.INDICATIONS_SAYS_ANSWER_UNLISTED);
+		expect(asked.map((requests) => requests.flatMap((r) => (r.kind === 'statement' ? [r.statement] : []))), 'the account’s statements alone').toEqual([
+			['The requirements are written in one document.', 'Each is numbered.', 'The input is UTF-8.']
+		]);
+		expect(asked[0]!.filter((r) => r.kind === 'check'), 'and every check').toHaveLength(9);
+		// ⭑ The full list, read with the variant sentence padded past every bound: refused for its growth, past 9,500.
+		const padded = {
+			...REVIEW_SECTION_TEXT,
+			INDICATIONS_SAYS_ANSWER_UNLISTED: `${REVIEW_SECTION_TEXT.INDICATIONS_SAYS_ANSWER_UNLISTED}${'x'.repeat(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX)}`
+		};
+		const full = await reviewPrompt(witness!, zeros, padded).then(
+			() => '',
+			(e: unknown) => (e as Error).message
+		);
+		const growth = /^This review was not sent: its growth beyond today’s prompt would be (\d+) characters/.exec(full);
+		expect(Number(growth?.[1]), 'the answer’s statements, listed, pass the growth bound').toBeGreaterThan(REASONING_REVIEW_BUDGET.SECTION_GROWTH_MAX);
+	});
+
+	it('⭑ CONTROL — one character of the variant sentence moves the witness’s part, not only the section’s text the component holds', async () => {
+		const today = JSON.parse(await decisionModelPointer()) as Record<string, unknown>;
+		const edited = JSON.parse(
+			await decisionModelPointer({
+				...PRODUCT_POINTER_PARTS,
+				sectionText: { ...REVIEW_SECTION_TEXT, INDICATIONS_SAYS_ANSWER_UNLISTED: `${REVIEW_SECTION_TEXT.INDICATIONS_SAYS_ANSWER_UNLISTED} ` }
+			})
+		) as Record<string, unknown>;
+		expect(today.answerUnlisted, 'arrangement: a witness today').toBeDefined();
+		expect(edited.answerUnlisted, 'the witness’s prompt moves').not.toEqual(today.answerUnlisted);
 	});
 });

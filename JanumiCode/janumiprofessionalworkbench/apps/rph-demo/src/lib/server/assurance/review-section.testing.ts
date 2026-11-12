@@ -11,6 +11,12 @@ export const FENCE = '<<<UNTRUSTED-00>>>';
 export const BLOCK_HEAD = 'POTENTIAL INDICATIONS FROM A DECISION MODEL';
 export const BLOCK_SAYS =
 	"Before this review, a decision model was asked about this work one question at a time: each check below on its own, and each statement from the producer's answer and account on its own. Each number is the model's probability, from 0 to 1. These are potential indications to consider as you judge every check and every claim against the evidence.";
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L9 — D64 (`REG-D-153`; design §12.18; the lead's words) — THE VARIANT SENTENCE, named from the
+ * design: the block's second line in a prompt that lists none of the answer's statements.
+ */
+export const BLOCK_SAYS_ANSWER_UNLISTED =
+	"Before this review, a decision model was asked about this work one question at a time: each check below on its own, and each statement from the producer's account on its own. The statements of the producer's answer were not asked about and are not listed, since listing them would make this prompt too long; the answer itself is shown above. Each number is the model's probability, from 0 to 1. These are potential indications to consider as you judge every check and every claim against the evidence.";
 export const BLOCK_CHECKS = 'Checks, from most to least likely to be unmet (the probability that the check is not met):';
 export const BLOCK_STATEMENTS =
 	'Statements, from most to least likely to be contradicted (the probability that the evidence contradicts the statement):';

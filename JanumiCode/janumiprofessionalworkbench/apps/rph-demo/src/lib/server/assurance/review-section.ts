@@ -25,13 +25,21 @@ import { excerptHead, quoted } from './review-fence.js';
  * `SAYS`, `CHECKS`, `STATEMENTS`; V7), and the method, the tests, `DECIDING`, the claims line and the claims shape
  * (`make_hundred.py` 36-143; V3). ⚠ Frozen and passed whole: the section is built from this object and nothing else of
  * its own, so `measuredSection` called with another copy is the same section with that text (the acceptance's control,
- * `verif/review-indications-screen.test.ts`).
+ * `verif/review-indications-screen.test.ts`). ⭐⭐ Package L9 — D64 (`REG-D-153`) — and the variant sentence, the block's
+ * second line where the answer's statements are not listed (`INDICATIONS_SAYS_ANSWER_UNLISTED`).
  */
 /** The section's fixed text as the section is built from it: each line a string, the method's and DECIDING's in order. */
 export interface ReviewSectionText {
 	readonly THE_REVIEW: string;
 	readonly INDICATIONS_HEADING: string;
 	readonly INDICATIONS_SAYS: string;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L9 — D64 (`REG-D-153`; design §12.18; the lead's words) — the block's second line in
+	 * place of `INDICATIONS_SAYS`, in a prompt that lists none of the answer's statements (`reviewPrompt`): its first sentence
+	 * drops `answer and ` from today's, its second says the answer's statements were not asked about and are not listed, and
+	 * its last two are today's.
+	 */
+	readonly INDICATIONS_SAYS_ANSWER_UNLISTED: string;
 	readonly CHECKS_HEADING: string;
 	readonly STATEMENTS_HEADING: string;
 	readonly METHOD: readonly string[];
@@ -45,6 +53,10 @@ export const REVIEW_SECTION_TEXT: ReviewSectionText = Object.freeze({
 	INDICATIONS_HEADING: 'POTENTIAL INDICATIONS FROM A DECISION MODEL',
 	INDICATIONS_SAYS:
 		"Before this review, a decision model was asked about this work one question at a time: each check below on its own, and each statement from the producer's answer and account on its own. Each number is the model's probability, from 0 to 1. These are potential indications to consider as you judge every check and every claim against the evidence.",
+	// ⭐⭐ Package L9 — D64 (`REG-D-153`; the lead's words): a review whose prompt, listing every statement, would pass a bound
+	// of D52's room lists none of the answer's statements and asks the decision model none of them, under this sentence.
+	INDICATIONS_SAYS_ANSWER_UNLISTED:
+		"Before this review, a decision model was asked about this work one question at a time: each check below on its own, and each statement from the producer's account on its own. The statements of the producer's answer were not asked about and are not listed, since listing them would make this prompt too long; the answer itself is shown above. Each number is the model's probability, from 0 to 1. These are potential indications to consider as you judge every check and every claim against the evidence.",
 	CHECKS_HEADING: 'Checks, from most to least likely to be unmet (the probability that the check is not met):',
 	STATEMENTS_HEADING:
 		'Statements, from most to least likely to be contradicted (the probability that the evidence contradicts the statement):',

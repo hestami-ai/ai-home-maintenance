@@ -2042,6 +2042,13 @@ function scoresFor(requests: readonly IndicationRequest[], result: IndicationsRe
 	return out;
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L9 — D64 (`REG-D-153`; design §12.18) — A REFUSAL FOR A BOUND OF THE ROOM (D52), its statement
+ * the one `sectionOverBoundStatement` writes, byte for byte: a class of its own, so a prompt refused for its growth or its whole
+ * length — and for nothing else — is known as one (`listedFor`).
+ */
+class PastABound extends Error {}
+
 /** The prompt sent with the block built from `checks` and `statements`, scored as given, and its length against today's. */
 function measuredPrompt(
 	t: TodayPrompt,
@@ -2060,9 +2067,50 @@ function measuredPrompt(
 	const prompt = t.head + measuredSection(t.today, block, text);
 	const todayLength = t.head.length + t.today.text.length;
 	if (prompt.length - todayLength > SECTION_GROWTH_MAX)
-		throw new Error(sectionOverBoundStatement('its growth beyond today’s prompt', prompt.length - todayLength, SECTION_GROWTH_MAX));
-	if (prompt.length > WHOLE_PROMPT_MAX) throw new Error(sectionOverBoundStatement('its whole prompt', prompt.length, WHOLE_PROMPT_MAX));
+		throw new PastABound(sectionOverBoundStatement('its growth beyond today’s prompt', prompt.length - todayLength, SECTION_GROWTH_MAX));
+	if (prompt.length > WHOLE_PROMPT_MAX) throw new PastABound(sectionOverBoundStatement('its whole prompt', prompt.length, WHOLE_PROMPT_MAX));
 	return prompt;
+}
+
+/**
+ * ⭐⭐ Package L9 — D64 (`REG-D-153`) — WHETHER A STATEMENT IS ONE OF THE ANSWER'S: cut from the region under the subject line
+ * *"The WORK PRODUCT to review"*, its source `answer` — an answer read by its sentences, or whole — or `answer.<key>`, a field of
+ * an answer that is one JSON object (`answerItems`, `review-cuts.ts`). ⭑ A work product's review alone holds one: a process
+ * result's, a part's and a declared policy's subjects carry other lines before their regions.
+ */
+const isAnswerStatement = (s: CutStatement): boolean => s.from === 'answer' || s.from.startsWith('answer.');
+
+/**
+ * ⭐⭐ Package L9 — D64 (`REG-D-153`; `REG-F-626`; design §12.18) — WHAT THE BLOCK LISTS, AND THE TEXT IT IS BUILT WITH. The prompt
+ * that lists every statement is measured with every score at `0.00`, as D52 measures it: within both bounds, it is today's — every
+ * statement, the section's text as given — byte for byte. Past either bound, when the cut holds statements of the answer, it is
+ * measured again with every one of them removed and the block's second line the variant sentence
+ * (`INDICATIONS_SAYS_ANSWER_UNLISTED`): within both bounds, that is what the block lists and the decision model is asked.
+ * ⛔ Otherwise the review is refused with the statement for the prompt that lists every statement, byte for byte — the first
+ * measurement's. ⭑ Only an answer shown whole has statements cut (a cut answer's region is labelled by its cut's declaration),
+ * so the answer the variant sentence names is shown whole.
+ */
+function listedFor(
+	t: TodayPrompt,
+	checks: readonly CutCheck[],
+	statements: readonly CutStatement[],
+	text: ReviewSectionText
+): { readonly statements: readonly CutStatement[]; readonly text: ReviewSectionText } {
+	const zeros = (n: number): number[] => new Array<number>(n).fill(0);
+	try {
+		measuredPrompt(t, checks, statements, zeros(checks.length + statements.length), text);
+		return { statements, text };
+	} catch (refusal) {
+		const kept = statements.filter((s) => !isAnswerStatement(s));
+		if (!(refusal instanceof PastABound) || kept.length === statements.length) throw refusal;
+		const unlisted: ReviewSectionText = { ...text, INDICATIONS_SAYS: text.INDICATIONS_SAYS_ANSWER_UNLISTED };
+		try {
+			measuredPrompt(t, checks, kept, zeros(checks.length + kept.length), unlisted);
+		} catch {
+			throw refusal;
+		}
+		return { statements: kept, text: unlisted };
+	}
 }
 
 /**
@@ -2076,6 +2124,9 @@ function measuredPrompt(
  *     sent.
  *   · The source is asked ONCE, with every request; its scores are taken only if it scored exactly what was asked, each a
  *     probability from 0 to 1.
+ *   · ⭐⭐ Package L9 — D64 (`REG-D-153`): past a bound, a work product's review whose cut holds statements of the answer lists
+ *     none of them and asks none of them, under the variant sentence, where that prompt is within both bounds (`listedFor`);
+ *     else it is refused with the statement for the prompt that lists every statement. Within both bounds, nothing changes.
  * `text` is the section's fixed text: the product's, but where a test shows the acceptance moves with one character of it.
  */
 export async function reviewPrompt(
@@ -2088,11 +2139,13 @@ export async function reviewPrompt(
 	const { checks, statements } = cutOf(t);
 	if (JSON.stringify([checks, statements]) !== JSON.stringify([first.checks, first.statements]))
 		throw new Error(SECTION_LAYOUT_REFUSAL);
+	// ⭐⭐ Package L9 — D64 (`REG-D-153`): the room checked first with every score at `0.00` (D52), and what the block lists —
+	// every statement, or, past a bound, none of the answer's where that fits (`listedFor`); the requests are made of what it lists.
+	const listed = listedFor(t, checks, statements, text);
 	const requests: IndicationRequest[] = [
 		...checks.map((c, i): IndicationRequest => ({ kind: 'check', key: keyOf('c', i), id: c.id, label: c.label })),
-		...statements.map((s, i): IndicationRequest => ({ kind: 'statement', key: keyOf('s', i), statement: s.text }))
+		...listed.statements.map((s, i): IndicationRequest => ({ kind: 'statement', key: keyOf('s', i), statement: s.text }))
 	];
-	measuredPrompt(t, checks, statements, requests.map(() => 0), text);
 	if (indications === undefined) throw new Error(NO_INDICATIONS_SOURCE_STATEMENT);
 	// ⭐⭐ Package Z2a — D51 — what each request carries in its state: the head, less its first four lines.
 	const material = materialOf(t.head);
@@ -2104,7 +2157,7 @@ export async function reviewPrompt(
 	}
 	const scores = scoresFor(requests, result);
 	if (typeof scores === 'string') throw new Error(indicationsRefusedStatement(scores));
-	return measuredPrompt(t, checks, statements, scores, text);
+	return measuredPrompt(t, checks, listed.statements, scores, listed.text);
 }
 
 /**

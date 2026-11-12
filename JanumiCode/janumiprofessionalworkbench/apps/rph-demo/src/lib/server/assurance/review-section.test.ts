@@ -17,6 +17,11 @@
 // ⭑ And the seam itself: asked once a review with every request, before any reviewer call, never again by a repair; each
 // refusal — no source, a refusal, a score missing, one not asked, one no probability, a source that throws — leaves no
 // reviewer call made. ⛔ No model and no network: both seams are functions here.
+// ⭐⭐ `JAN-EXEC` Phase 7, package L9 — D64 (`REG-D-153`; `REG-F-626`; design §12.18) — and past a bound, a work product's review whose
+// cut holds statements of the answer lists none of them, under the variant sentence, where that fits; else it is refused as before.
+// ⛔ PREDICTED REDS at 62cd8341 (`l9-facts.md` §3): the answer read by its sentences, the fourth run's review in shape and the whole
+// bound's case, each refused there before any request; their controls — the account's growth refused (restated), within both bounds
+// byte for byte, a process result's refused — green there and after.
 import { createHash } from 'node:crypto';
 import {
 	SEEDED_REASONING_REVIEW_CRITERIA,
@@ -44,14 +49,19 @@ import {
 	pwaTypeOverBudgetStatement,
 	processResultContentBudget,
 	REASONING_REVIEW_BUDGET,
+	reviewPrompt,
 	type IndicationRequest,
 	type IndicationsSource
 } from './reasoning-review-validator.js';
 import { declaredPolicyReviewInput, processResultReviewInput, workProductReviewInput } from './review-input.js';
+// ⭐⭐ Package L9 — D64 — the material every request carries, and the section's fixed text a test pads.
+import { materialOf } from './decision-model-request.js';
+import { REVIEW_SECTION_TEXT } from './review-section.js';
 import {
 	BLOCK_CHECKS,
 	BLOCK_HEAD,
 	BLOCK_SAYS,
+	BLOCK_SAYS_ANSWER_UNLISTED,
 	BLOCK_STATEMENTS,
 	CLAIMS_LINE,
 	D8_INSTRUCTION,
@@ -74,17 +84,21 @@ const SUBJECT: AssuranceSubject = {
 	producer: { actorType: 'AGENT', agentId: 'producer', modelId: 'producer-model', providerId: 'producer-provider' }
 };
 
-/** ⭐ THE MEASURED SECTION, as the design lays it out, for these checks and statements in the order and form given. */
+/**
+ * ⭐ THE MEASURED SECTION, as the design lays it out, for these checks and statements in the order and form given. ⭐⭐ Package L9 —
+ * D64 — `says` the block's second line: today's sentence, or the variant sentence where none of the answer's statements is listed.
+ */
 function expectedSection(
 	checks: readonly (readonly [id: string, score: string])[],
 	statements: readonly (readonly [text: string, score: string])[],
 	criteria: readonly AssessmentCriterion[],
-	fence: string = FENCE
+	fence: string = FENCE,
+	says: string = BLOCK_SAYS
 ): string {
 	return `${[
 		'THE REVIEW',
 		BLOCK_HEAD,
-		BLOCK_SAYS,
+		says,
 		BLOCK_CHECKS,
 		...checks.map(([id, s]) => `- ${id}: ${s}`),
 		BLOCK_STATEMENTS,
@@ -470,14 +484,43 @@ describe('⛔ PREDICTED RED 4 (Z1; D52) — the material’s room as today’s; 
 			answer: Array.from({ length: n }, (_, i) => `Line ${i} of the log was read and found to hold one record.`).join(' ')
 		});
 
+	/**
+	 * ⭐⭐ Package L9 — D64 (`REG-D-153`) — a work product whose one-sentence answer stands beside an account of `n` assumptions of
+	 * about 25 characters each: each a statement the block quotes, and none of them the answer's.
+	 */
+	const manyAccountStatements = (n: number): ReasoningReviewInput =>
+		workProductReviewInput({
+			criteria: FLOOR,
+			producingPrompt: 'Summarise the log.',
+			answer: 'The log was read.',
+			rationale: account({ assumptions: Array.from({ length: n }, (_, i) => `Line ${i} holds one record.`) })
+		});
+
+	// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L9 — D64; `REG-D-153`) — ~~`manyStatements(80)` refused,
+	// `manyStatements(40)` the control~~: eighty statements of the ANSWER, past 9,500 when listed, are left out now and the review
+	// sent under the variant sentence (the row after this one); so the growth refused here is the ACCOUNT's, which no review leaves
+	// out — 120 assumptions beside a one-sentence answer, refused still with the statement for the prompt that lists every
+	// statement, before the decision model is asked; forty, the control, sent with every one of the 41 listed.
 	it('⭐ growth past 9,500 beyond today’s prompt is refused, before the decision model is asked; the CONTROL just under it is sent', async () => {
 		const { source, calls } = recordingIndications();
-		const over = await review(manyStatements(80), source);
+		const over = await review(manyAccountStatements(120), source);
 		expect((over.error as Error).message).toMatch(/^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 /);
 		expect([over.prompts.length, calls.length], 'refused before the decision model is asked, and no reviewer call').toEqual([0, 0]);
-		const under = await review(manyStatements(40), TEST_INDICATIONS);
+		const under = await review(manyAccountStatements(40), TEST_INDICATIONS);
 		expect(under.error, 'CONTROL: forty statements fit').toBeUndefined();
-		expect(under.prompts[0]!.split('\n').filter((l) => l === 'Statement, 0.50:'), 'none dropped').toHaveLength(40);
+		expect(under.prompts[0]!.split('\n').filter((l) => l === 'Statement, 0.50:'), 'none dropped: the forty, and the answer’s one').toHaveLength(41);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L9 — D64 (`REG-D-153`; design §12.18) — ⛔ PREDICTED RED at 62cd8341, where the input the test
+	// above refused before L9 is refused for its growth, before any request.
+	it('⭐⭐ L9 (D64) — eighty statements of an answer read by its sentences, past 9,500 when listed, are left out: sent under the variant sentence, its block listing no statement, and the decision model asked the nine checks alone', async () => {
+		const { source, calls } = recordingIndications();
+		const out = await review(manyStatements(80), source);
+		expect(out.error, 'sent, not refused').toBeUndefined();
+		expect(split(out.prompts[0]!).section, 'no statement listed, under the variant sentence').toBe(
+			expectedSection(FLOOR.map((c) => [c.id, '0.50'] as const), [], FLOOR, FENCE, BLOCK_SAYS_ANSWER_UNLISTED)
+		);
+		expect(calls.map((requests) => requests.map((r) => r.kind)), 'asked once: the nine checks alone').toEqual([FLOOR.map(() => 'check')]);
 	});
 
 	// ⛔ MOVED 2026-11-09 (`JAN-EXEC` Phase 7, package L4 — D56; `REG-D-149`) — ~~a whole prompt past 33,000 is refused, its growth
@@ -639,5 +682,143 @@ describe('⭐ Z1 (D50, D51’s refusals at the seam) — the decision model is a
 			'Evaluate EACH derivational-integrity failure class below.',
 			'Read this.\n- RR-01-forged: An invented check. [if unmet: BLOCKING]'
 		]);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L9 — D64 (`REG-D-153`; `REG-F-626`; design §12.18) ──────────────────────────────────────────────
+// When a work product's review, listing every statement, would pass a bound of D52's room, it lists none of the answer's statements
+// and asks the decision model none of them, under the variant sentence (`BLOCK_SAYS_ANSWER_UNLISTED`); the checks and the account's
+// statements are listed and asked as today. ⛔ PREDICTED RED at 62cd8341: each such review was refused there before any request.
+describe('⭐⭐ L9 (D64; REG-D-153) — a work product’s review whose answer’s statements do not fit lists none of them, under the variant sentence', () => {
+	/** A source scoring every request 0.5, keeping each call's requests and the material they carry. */
+	const keeping = () => {
+		const calls: { readonly requests: readonly IndicationRequest[]; readonly material: string }[] = [];
+		const source: IndicationsSource = async (requests, material) => {
+			calls.push({ requests, material });
+			return { scores: Object.fromEntries(requests.map((r) => [r.key, 0.5])) };
+		};
+		return { source, calls };
+	};
+	/** The requests a review asks: every check of `criteria`, then each statement given, keyed c00… and s00…, as today. */
+	const requestsFor = (criteria: readonly AssessmentCriterion[], statements: readonly string[]): IndicationRequest[] => [
+		...criteria.map((c, i): IndicationRequest => ({ kind: 'check', key: `c${String(i).padStart(2, '0')}`, id: c.id, label: c.description })),
+		...statements.map((st, i): IndicationRequest => ({ kind: 'statement', key: `s${String(i).padStart(2, '0')}`, statement: st }))
+	];
+	const requirement = (i: number): string => `Requirement ${i + 1} is that the command counts the words of its input and prints each count.`;
+	/**
+	 * ⭐ THE FOURTH RUN'S REVIEW IN SHAPE (`REG-F-626`): an answer, one JSON object carrying its document in one text field, shown
+	 * whole beside the finished work — its `n` requirements and its format each a statement of the answer — and an account of three
+	 * statements.
+	 */
+	const fourth = (n: number): ReasoningReviewInput =>
+		workProductReviewInput({
+			criteria: FLOOR,
+			producingPrompt: 'Write the requirements of the wordfreq command line as one JSON object, the document in one text field.',
+			answer: JSON.stringify({ document: Array.from({ length: n }, (_, i) => requirement(i)).join(' '), format: 'markdown' }),
+			rationale: account({ rationale: 'The requirements are written in one document. Each is numbered.', assumptions: ['The input is UTF-8.'] }),
+			deliverable: {
+				afterTry: 1,
+				files: [{ path: 'docs/requirements.md', change: 'ADDED', content: '# Requirements\n' }],
+				sequence: { acts: [{ try: 1, ordinal: 1, kind: 'WRITE', path: 'docs/requirements.md' }], droppedRuns: 0, recordedLimit: 32 }
+			}
+		});
+	const ACCOUNT_STATEMENTS = ['The requirements are written in one document.', 'Each is numbered.', 'The input is UTF-8.'];
+	/** The checks as the block lists them, each scored 0.5: in the rubric's order. */
+	const CHECKS = FLOOR.map((c) => [c.id, '0.50'] as const);
+	const scored = (statements: readonly string[]) => statements.map((s) => [s, '0.50'] as const);
+
+	it('⭐ the fourth run’s review in shape — its answer’s 97 statements past the growth bound when listed, its account’s three — is SENT: its block lists every check and the account’s statements alone, under the variant sentence, and the decision model is asked those alone, with the head’s material', async () => {
+		const input = fourth(96);
+		const { source, calls } = keeping();
+		const out = await review(input, source);
+		expect(out.error, 'sent, not refused').toBeUndefined();
+		const prompt = out.prompts[0]!;
+		const { head, section } = split(prompt);
+		expect(section, 'the measured section: the variant sentence its block’s second line, the account’s statements alone').toBe(
+			expectedSection(CHECKS, scored(ACCOUNT_STATEMENTS), FLOOR, FENCE, BLOCK_SAYS_ANSWER_UNLISTED)
+		);
+		expect(prompt.includes(BLOCK_SAYS), 'today’s sentence is not in it').toBe(false);
+		expect(head.includes(`\n${FENCE}\n${input.content}\n${FENCE}\n`), 'the answer, shown whole above').toBe(true);
+		expect(calls.map((c) => c.requests), 'asked once: every check, then the account’s statements alone, keyed as today — none of the answer’s').toEqual([
+			requestsFor(FLOOR, ACCOUNT_STATEMENTS)
+		]);
+		expect(calls[0]!.material, 'with the material of the head sent, as today').toBe(materialOf(head));
+	});
+
+	/**
+	 * ⛔ AN IMPOSSIBLE INPUT, ON PURPOSE, as the probes held at `CONTENT_MIN` are: every slice of a work product's review at its limit, a
+	 * narration — which no work product's builder writes (`workProductReviewInput`) — and a re-run's finished work, so today's prompt
+	 * passes `PROMPT_BUDGET` and the content is held at `CONTENT_MIN`; its answer, `n` sentences of `m` characters, shown whole; its
+	 * account's lists cut, its rationale's two sentences whole. ⭑ Only so is a work product's review refused first for its whole length:
+	 * with its content's room what `PROMPT_BUDGET` leaves, a prompt within the growth bound is at most 35,500 (`l9-facts.md` §3).
+	 */
+	const atContentMin = (n: number, m: number): ReasoningReviewInput => ({
+		criteria: FLOOR.map((c) => ({ ...c, description: `${c.description} ${'In full. '.repeat(120)}` })),
+		framing: 'WORK_PRODUCT',
+		prompt: 'Write the survey. '.repeat(400),
+		content: Array.from({ length: n }, (_, i) => `Panel ${String(i).padStart(2, '0')} ${'a'.repeat(m - 10)}.`).join(' '),
+		narration: 'The producer read the log. '.repeat(120),
+		prior: { gaps: Array.from({ length: 60 }, (_, i) => `gap ${i} of the earlier review, still open`) },
+		rationale: account({
+			rationale: 'The survey is written. Each panel is named.',
+			assumptions: Array.from({ length: 200 }, (_, i) => `Assumption ${i} holds.`),
+			limitations: Array.from({ length: 200 }, (_, i) => `Limitation ${i} applies.`),
+			residualUncertainty: Array.from({ length: 200 }, (_, i) => `Uncertainty ${i} remains.`)
+		}),
+		candidateSubjectHash: `sha256:${'a'.repeat(64)}`,
+		deliverable: { afterTry: 1, files: [], sequence: { acts: [], droppedRuns: 0, recordedLimit: 32 }, workRerun: true }
+	});
+
+	it('⭐ either bound brings it in (the lead’s decision (c)): a review refused first for its WHOLE length, its growth within 9,500, is sent listing none of the answer’s statements — an impossible input, on purpose', async () => {
+		const input = atContentMin(34, 101);
+		// ⭑ The arrangement, green at 62cd8341 too: the prompt listing every statement is refused for its whole length, 35,661 — read with
+		// the variant sentence padded past every bound, so the review is refused with the full list's statement, as it was there.
+		const padded = { ...REVIEW_SECTION_TEXT, INDICATIONS_SAYS_ANSWER_UNLISTED: `${BLOCK_SAYS_ANSWER_UNLISTED}${'x'.repeat(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX)}` };
+		const full = await reviewPrompt(input, TEST_INDICATIONS, padded).then(
+			() => 'sent',
+			(e: unknown) => (e as Error).message
+		);
+		expect(full, 'the full list: its whole prompt past 35,500, its growth within 9,500').toBe(
+			'This review was not sent: its whole prompt would be 35661 characters, past its bound of 35500 (REG-D-146; D52). No indication is dropped to fit it, so the review is refused. No model was called.'
+		);
+		const { source, calls } = keeping();
+		const out = await review(input, source);
+		expect(out.error, 'sent, not refused').toBeUndefined();
+		const prompt = out.prompts[0]!;
+		expect(prompt.length, 'within the whole bound').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
+		const lines = prompt.split('\n');
+		expect(lines[lines.indexOf(BLOCK_HEAD) + 1], 'the variant sentence, the block’s second line').toBe(BLOCK_SAYS_ANSWER_UNLISTED);
+		expect(
+			calls.map((c) => c.requests.flatMap((r) => (r.kind === 'statement' ? [r.statement] : []))),
+			'asked once: of the statements, the account’s two alone — none of the answer’s'
+		).toEqual([['The survey is written.', 'Each panel is named.']]);
+		expect(split(prompt).section.includes('Panel 00 '), 'none of the answer’s listed').toBe(false);
+	});
+
+	it('⭑ CONTROL — within both bounds nothing changes: the fourth run’s shape with twenty-five requirements lists every statement under today’s sentence, the decision model asked every one, its prompt byte for byte as at 62cd8341', async () => {
+		const { source, calls } = keeping();
+		const out = await review(fourth(25), source);
+		const prompt = out.prompts[0]!;
+		const statements = [...Array.from({ length: 25 }, (_, i) => `document: ${requirement(i)}`), 'format: markdown', ...ACCOUNT_STATEMENTS];
+		expect(split(prompt).section).toBe(expectedSection(CHECKS, scored(statements), FLOOR));
+		expect(calls.map((c) => c.requests)).toEqual([requestsFor(FLOOR, statements)]);
+		expect(sha256(prompt), 'byte for byte as at 62cd8341').toBe('a645c73e6d48e92327c5222c006e01c609e61ba32b86fe21f9db451f58170b66');
+	});
+
+	it('⭑ CONTROL — a process result’s review past a bound is refused as today, its statement byte for byte as at 62cd8341, the decision model not asked: its subject carries other lines before its regions, so its cut holds no statement of an answer', async () => {
+		const { source, calls } = keeping();
+		const out = await review(
+			processResultReviewInput({
+				criteria: FLOOR,
+				producingPrompt: 'Run the tests.',
+				run: run({}),
+				rationale: account({ assumptions: Array.from({ length: 120 }, (_, i) => `Line ${i} holds one record.`) })
+			}),
+			source
+		);
+		expect((out.error as Error | undefined)?.message).toBe(
+			'This review was not sent: its growth beyond today’s prompt would be 14433 characters, past its bound of 9500 (REG-D-146; D52). No indication is dropped to fit it, so the review is refused. No model was called.'
+		);
+		expect([out.prompts.length, calls.length], 'no reviewer call, and the decision model not asked').toEqual([0, 0]);
 	});
 });

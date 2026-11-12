@@ -53,6 +53,9 @@ import {
 import { outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
 // ⭐⭐ Package Z2a — D51 — the decision model's requests, known by their identity. ⚠ A pure module.
 import { isDecisionModelExchange } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
+// ⭐⭐ Package L9 — D64 — the variant sentence, the product's own text, and the cut's own sentence rule. ⚠ Pure modules.
+import { sentences } from '../../apps/rph-demo/src/lib/server/assurance/review-cuts.js';
+import { REVIEW_SECTION_TEXT } from '../../apps/rph-demo/src/lib/server/assurance/review-section.js';
 import { scanText } from './archive-scan.js';
 // ⭐ P5 package B (F5) — the causes the archive's K5 check names, in the words it writes them (`run-archive.ts`).
 import { K5_JOIN_CAUSE, K5_STOP_CAUSE } from './k5-causes.js';
@@ -426,6 +429,8 @@ export type CellValue = (typeof CELL_VALUES)[number];
  * REG-F-521's added — what every run of the executor's commands accepts.
  * ⭐⭐ `JAN-EXEC` Phase 7, package L8 — design D63 (`REG-D-152`; the lead's addition): and REG-D-152's — the decision model's client
  * accepts a server version the reviewer was not measured with.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L9 — design D64 (`REG-D-153`): and REG-D-153's — a review whose answer's statements do not fit
+ * lists none of them, which the sponsor accepted without re-measurement.
  */
 export const ALWAYS_STATED = [
 	// ⛔ RESTATED 2026-11-11 (`JAN-EXEC` Phase 7, package L7 — design D62; `REG-D-151` (2)): ~~'REG-F-510: the PWA had to name
@@ -436,7 +441,10 @@ export const ALWAYS_STATED = [
 	// accept.
 	"REG-F-521: the executor's commands run unconfined: each runs as the server's user and can read or change what that account can; the paid runs accept it (REG-D-102 (3), REG-D-151 (2)).",
 	// ⭐⭐ Package L8 — D63 (`REG-D-152`; the lead's addition) — the decision model's client accepts 0.40.16, unmeasured.
-	"REG-D-152: the decision model's client also accepts Ollama 0.40.16, which the sponsor accepted without re-measurement; the reviewer was measured with indications served by Ollama 0.40.15, and REG-F-608 measured scores moving between two earlier server versions."
+	"REG-D-152: the decision model's client also accepts Ollama 0.40.16, which the sponsor accepted without re-measurement; the reviewer was measured with indications served by Ollama 0.40.15, and REG-F-608 measured scores moving between two earlier server versions.",
+	// ⭐⭐ Package L9 — D64 (`REG-D-153`) — a review whose prompt, listing every statement, would pass a bound lists none of the
+	// answer's statements, unmeasured.
+	"REG-D-153: a work product's review whose prompt, listing every statement, would pass a bound lists none of the answer's statements and asks the decision model none of them; the reviewer reads the answer itself, its indications covering the checks and the producer's account; the sponsor accepted this without re-measurement."
 ] as const;
 
 /**
@@ -598,6 +606,12 @@ export interface StoredContent {
 	 * reader read it from them (`declaredWorkShown`); null where they are not one. Absent, the reader handed no reading.
 	 */
 	readonly declaredWork?: DeclaredWorkShown | null;
+	/**
+	 * ⭐⭐ Package L9 — design D64 (`REG-D-153`; the lead's addition) — whether the bytes hold the variant sentence's second sentence
+	 * (`ANSWER_UNLISTED_SENTENCE`), as the reader read them: a prompt that lists none of its answer's statements. Null when the row
+	 * holds no bytes; absent, the reader read none.
+	 */
+	readonly holdsAnswerUnlisted?: boolean | null;
 }
 
 export interface StoreRows {
@@ -833,6 +847,12 @@ export interface ReviewerCalls extends ReviewerCallCount {
 		readonly over: number;
 		readonly longest: number | null;
 	};
+	/**
+	 * ⭐⭐ Package L9 — design D64 (`REG-D-153`; the lead's addition) — of the initial reviewer calls whose prompt the record holds
+	 * (`untestedSizes.read`), those whose prompt lists none of its answer's statements: it holds the variant sentence's second
+	 * sentence (`ANSWER_UNLISTED_SENTENCE`).
+	 */
+	readonly answerUnlistedPrompts: number;
 	readonly byUnit: Readonly<Record<string, ReviewerCallCount>>;
 	/**
 	 * Design D8's check, restated over the record: prior + recorded + reserve~~, under the limit~~ ⭐ against the limit (R3-B's
@@ -2324,6 +2344,27 @@ function runLimitOf(checks: readonly LaneLimitCheck[], problems: string[]): numb
  */
 export const MEASURED_WHOLE_PROMPT_MAX = 31_867;
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L9 — design D64 (`REG-D-153`; the lead's addition) — THE VARIANT SENTENCE'S SECOND SENTENCE, which
+ * the block of a prompt that lists none of its answer's statements holds: read off the product's own text (`REVIEW_SECTION_TEXT`)
+ * by the cut's own sentence rule (`sentences`), never a copy of it.
+ */
+export const ANSWER_UNLISTED_SENTENCE = sentences(REVIEW_SECTION_TEXT.INDICATIONS_SAYS_ANSWER_UNLISTED)[1]!;
+
+/**
+ * ⭐⭐ Package L9 — design D64 — of the initial reviewer calls whose prompt the record holds, as the count of prompts past 31,867
+ * reads them (`untestedSizesOf`), those whose prompt holds the variant sentence's second sentence.
+ */
+function answerUnlistedPromptsOf(ix: Index, calls: readonly StoredObject[]): number {
+	return calls.filter((x) => {
+		if (str(x.state.exchangeRole) !== 'INITIAL') return false;
+		const ref = rec(x.state.materializedInputRef);
+		if (contentVerdict(ref, ix.content) !== 'VERIFIED') return false;
+		const row = ix.content?.get(str(ref.storageKey));
+		return typeof row?.actualChars === 'number' && row.holdsAnswerUnlisted === true;
+	}).length;
+}
+
 /** ⭐⭐ Package L5 — D57 — of the reviewer calls, the INITIAL ones, and their prompts' lengths as the content store holds them. */
 function untestedSizesOf(ix: Index, calls: readonly StoredObject[]): ReviewerCalls['untestedSizes'] {
 	const initial = calls.filter((x) => str(x.state.exchangeRole) === 'INITIAL');
@@ -2374,6 +2415,8 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows, p
 		decisionModelRequests: assurance.length - calls.length,
 		// ⭐⭐ Package L5 — design D57 (`REG-D-149` (2)) — the initial calls whose prompt passed what the reviewer was measured on.
 		untestedSizes: untestedSizesOf(ix, calls),
+		// ⭐⭐ Package L9 — design D64 (`REG-D-153`) — and of the same calls, the prompts that list none of their answer's statements.
+		answerUnlistedPrompts: answerUnlistedPromptsOf(ix, calls),
 		laneLimitChecks,
 		// ⭐⭐ Package L2's check, finding 1 — ~~`LIMIT_CAVEAT`~~ the caveat of this run, by its Send check ⭐ and, package O (D27), by its
 		// own checks and the limit they used: a run recorded before package L reads its own lane's caveat.
@@ -4937,6 +4980,17 @@ function untestedSizeLines(u: ReviewerCalls['untestedSizes']): string[] {
 	];
 }
 
+/**
+ * ⭐⭐ Package L9 — design D64 (`REG-D-153`; the lead's addition) — beside the count of prompts past 31,867: of the same initial
+ * calls, the prompts that list none of their answer's statements.
+ */
+function answerUnlistedLine(c: ReviewerCalls): string {
+	return (
+		`- **Prompts that list none of their answer's statements (D64; REG-D-153):** ${c.answerUnlistedPrompts} of the ` +
+		`${plural(c.untestedSizes.read, 'initial reviewer call', 'initial reviewer calls')} whose prompt the record holds.`
+	);
+}
+
 function unitLines(r: RunReport): string[] {
 	const limit = r.reviewerCalls.limit;
 	// ⭐ By the one rule (`runStanding`): ~~limit.under ? ', under it' : ', NOT under it'~~.
@@ -4967,6 +5021,9 @@ function unitLines(r: RunReport): string[] {
 			`${r.reviewerCalls.retries} retries, ${r.reviewerCalls.repairs} repairs).`,
 		// ⭐⭐ Package L5 — design D57 (`REG-D-149` (2)) — and the prompts past what the reviewer was measured on.
 		...untestedSizeLines(r.reviewerCalls.untestedSizes),
+		// ⭐⭐ Package L9 — design D64 (`REG-D-153`; the lead's addition) — and beside them, the prompts that list none of their answer's
+		// statements, after the 31,867 line and the lines under it.
+		answerUnlistedLine(r.reviewerCalls),
 		// ⭐⭐ Package Z2a — D51 — and beside them, the decision model's requests, where the record holds any.
 		...(r.reviewerCalls.decisionModelRequests > 0
 			? [

@@ -17,9 +17,14 @@
 //   5. the cold path — the requests the product's client makes, in order, against a server held in memory (no socket, no model):
 //      the identity reads, the unload request for a model found loaded, `/api/ps` read until the model is absent before every
 //      request, each body's hash and the scores read back; and D51's bounds (`DECISION_MODEL_BOUNDS`);
-//   6-8. the model, its digest and the server version — `DECISION_MODEL_RECORDS_IDENTITY`, the identity the records must have.
+//   6-8. the model, its digest and the server version — `DECISION_MODEL_RECORDS_IDENTITY`, the identity the records must have;
+//   9. ⭐⭐ package L9 — D64 (`REG-D-153`; design §12.18) — a witness of D64's branch: a work product whose answer, shown whole, has
+//      statements that pass the growth bound when listed, its account small, rendered by the product's `reviewPrompt` through the
+//      same client against the same server held in memory — no new record of the decision model (`REG-D-152`) — its prompt's
+//      sha256 kept (`answerUnlisted`), which lists none of the answer's statements under the variant sentence.
 // ⛔ It holds no score: the records' scores reach the fingerprint through the prompts the probes and cases render from them.
 import { createHash } from 'node:crypto';
+import { SEEDED_REASONING_REVIEW_CRITERIA, type ReasoningReviewInput } from '@janumipwb/rph-assurance';
 import { createDecisionModelClient, DECISION_MODEL_BOUNDS } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-client.js';
 import {
 	DECISION_MODEL_RECORDS_IDENTITY,
@@ -33,7 +38,9 @@ import {
 	type DecisionModelQuestion,
 	type DecisionModelText
 } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
+import { reviewPrompt } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { checksOf, statementsOf } from '../../apps/rph-demo/src/lib/server/assurance/review-cuts.js';
+import { workProductReviewInput } from '../../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import { indicationsBlock, REVIEW_SECTION_TEXT, type ReviewSectionText } from '../../apps/rph-demo/src/lib/server/assurance/review-section.js';
 
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
@@ -89,6 +96,29 @@ export const WITNESS_QUESTIONS: readonly DecisionModelQuestion[] = [
 	{ kind: 'check', key: 'c00', id: 'RR-01', label: 'Läbel — “quoted” \\ back' },
 	{ kind: 'statement', key: 's00', statement: 'summary: Ünïcode \u{1F600} line\nbreak\ttab "q"' }
 ];
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L9 — D64 (`REG-D-153`; design §12.18) — A WITNESS OF D64'S BRANCH, in the fourth run's shape
+ * (`REG-F-626`): a work product whose answer, one JSON object, carries its document in one text field, shown whole, its
+ * statements past the growth bound when listed, and its account small. Built by the product's own builder.
+ */
+export const WITNESS_ANSWER_UNLISTED: ReasoningReviewInput = workProductReviewInput({
+	criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+	producingPrompt: 'Write the requirements of the wordfreq command line as one JSON object, the document in one text field.',
+	answer: JSON.stringify({
+		document: Array.from(
+			{ length: 96 },
+			(_, i) => `Requirement ${i + 1} is that the command counts the words of its input and prints each count.`
+		).join(' '),
+		format: 'markdown'
+	}),
+	rationale: {
+		rationale: 'The requirements are written in one document. Each is numbered.',
+		assumptions: ['The input is UTF-8.'],
+		limitations: [],
+		residualUncertainty: []
+	}
+});
 
 /** A server held in memory, answering as Ollama does: the model listed at the start, and for one read after each request. */
 function memoryServer(identity: DecisionModelRecordsIdentity) {
@@ -159,9 +189,16 @@ export async function decisionModelPointer(parts: PointerParts = PRODUCT_POINTER
 	const result = await client(WITNESS_QUESTIONS, material);
 	const cold = {
 		bounds: DECISION_MODEL_BOUNDS,
-		requests: server.seen,
+		// ⭑ The requests as they stood after the witness questions: the witness review below asks the same server.
+		requests: [...server.seen],
 		result: 'refusal' in result ? { refusal: result.refusal } : { scores: result.scores, exchanges: (result.exchanges ?? []).map((x) => [x.key, x.outcome.kind]) }
 	};
 	// 6-8 — the identity the records must have.
-	return JSON.stringify({ bodies, cuts, block, sectionText, cold, identity });
+	// 9 — ⭐⭐ Package L9 — D64: the witness's review, through the same client against the same server — its prompt's sha256, or
+	// its refusal, which no product's code makes of it.
+	const answerUnlisted = await reviewPrompt(WITNESS_ANSWER_UNLISTED, client, sectionText).then(
+		(prompt) => ({ prompt: sha256(prompt) }),
+		(e: unknown) => ({ refused: e instanceof Error ? e.message : String(e) })
+	);
+	return JSON.stringify({ bodies, cuts, block, sectionText, cold, identity, answerUnlisted });
 }

@@ -40,6 +40,7 @@ import { join, resolve } from 'node:path';
 import { accountNames, noAccountName, scanText, type ScanHit } from './archive-scan.js';
 import { workspaceTreeSha256 } from './node-tests.js';
 import {
+	ANSWER_UNLISTED_SENTENCE,
 	buildRunReport,
 	declaredWorkShown,
 	FINAL_ARCHIVE,
@@ -172,7 +173,9 @@ export function readStores(archive: string): StoreRows {
 				actualSize: r.bytes === null ? null : Buffer.byteLength(r.bytes, 'utf8'),
 				// ⭐⭐ Package L5 — design D57 — and its length in characters, a JavaScript string's: the unit of D52's bounds.
 				actualChars: r.bytes === null ? null : r.bytes.length,
-				declaredWork: r.bytes === null ? null : declaredWorkShown(r.bytes)
+				declaredWork: r.bytes === null ? null : declaredWorkShown(r.bytes),
+				// ⭐⭐ Package L9 — design D64 (`REG-D-153`) — and whether it lists none of its answer's statements.
+				holdsAnswerUnlisted: r.bytes === null ? null : r.bytes.includes(ANSWER_UNLISTED_SENTENCE)
 			}));
 		} finally {
 			store.close();
