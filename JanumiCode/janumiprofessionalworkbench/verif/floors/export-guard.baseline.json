@@ -48,6 +48,8 @@
 				"resolveUndertakingStatement",
 				"UNDERTAKING_SECTION_HEADING",
 				"undertakingSection",
+				"unitPromptRefusal",
+				"unitSubjectOfType",
 				"withUndertakingSection",
 				"WORK_UNIT_MARKERS"
 			],
@@ -59,6 +61,8 @@
 				"resolveUndertakingStatement",
 				"UNDERTAKING_SECTION_HEADING",
 				"undertakingSection",
+				"unitPromptRefusal",
+				"unitSubjectOfType",
 				"withUndertakingSection",
 				"WORK_UNIT_MARKERS"
 			],
@@ -444,7 +448,7 @@
 				"submitPwaForReview",
 				"validatePwa"
 			],
-			"unattributedMutants": 4
+			"unattributedMutants": 6
 		},
 		"packages/rph-application/src/handlers/pwu.ts": {
 			"consumedExports": [

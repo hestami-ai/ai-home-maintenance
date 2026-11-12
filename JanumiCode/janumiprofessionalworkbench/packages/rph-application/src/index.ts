@@ -49,6 +49,8 @@ export {
 	resolveUndertakingStatement,
 	UNDERTAKING_SECTION_HEADING,
 	undertakingSection,
+	unitPromptRefusal,
+	unitSubjectOfType,
 	withUndertakingSection,
 	WORK_UNIT_MARKERS
 } from './execution-invocation.js';

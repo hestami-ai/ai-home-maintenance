@@ -317,6 +317,55 @@ export function assembleStepContext(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L10 — design D65 (`REG-D-154` (2); `REG-F-508`, remedy 1) — THE WORDS THE STEP REFUSES A TYPE WITH NO
+ * TEMPLATE IN, SPELLED ONCE: `prepareModelInvocation`'s refusal, and Publish's reason for such a type (`unitPromptRefusal`).
+ */
+function noPromptTemplateReason(pwuTypeId: string): string {
+	return `The work-unit type ${pwuTypeId} carries no prompt template, so it declares no agent behaviour. Author one on the type before executing this step as a model invocation.`;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L10 — design D65 — THE SUBJECT A WORK UNIT OF A TYPE IS GIVEN WHEN ITS STEP RUNS, BUILT FROM THE TYPE.
+ * ⚠ APP CODE GIVES EACH VALUE, so none is taken from the code that gives it (D65: the build names each): each is built here exactly as
+ * that code builds it, and the agreement is pinned against it (`apps/rph-demo/src/lib/server/execution/begin-execute-unit-prompt.test.ts`):
+ *   · `title` — the type's name, which instantiation copies onto the unit (`routes/undertakings/+page.server.ts`: `name ?? typeId`) and
+ *     the step reads off it (`resolveInvocationSubject`);
+ *   · `description` — the type's purpose, as instantiation copies it (`purpose ?? title`);
+ *   · `purpose` — the type's purpose ONLY WHEN IT IS NOT EMPTY, as the route sets it beside the unit's own fields
+ *     (`routes/undertakings/[id]/+page.server.ts`: `...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {})`).
+ * The unit's id is no marker (`renderMap`), so the type's stands in for it; and a unit proposed by hand carries a title and a
+ * description of its own, each a string (`ProfessionalWorkUnitSchema`), so it is supplied the same markers.
+ */
+export function unitSubjectOfType(
+	pwuTypeId: string,
+	name: string,
+	purpose: string | undefined
+): InvocationSubject {
+	return { id: pwuTypeId, title: name, description: purpose ?? name, ...(purpose ? { purpose } : {}) };
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L10 — design D65 — WHY A WORK UNIT OF THIS TYPE COULD NOT HAVE ITS PROMPT RENDERED WHEN ITS STEP RUNS, or
+ * `undefined` where it could: with no template, the step's own refusal (`noPromptTemplateReason`); else `renderPromptTemplate`'s own words
+ * — a DRAFT, or a marker nothing supplies — given the context `assembleStepContext` builds for a unit of the type. The code the step
+ * runs, so Publish and the step cannot disagree (the lead's decision). `facts` as `resolvePwuTypeFacts` reads them, as Begin & Execute
+ * does. ⚠ The render alone: the step's other refusals (the context assembly policy, the type's required elements) are outside D65.
+ */
+export function unitPromptRefusal(
+	pwuTypeId: string,
+	name: string,
+	facts: { readonly purpose?: string; readonly promptTemplate?: PromptTemplate }
+): string | undefined {
+	const template = facts.promptTemplate;
+	if (!template) return noPromptTemplateReason(pwuTypeId);
+	const outcome = renderPromptTemplate(
+		template,
+		assembleStepContext(unitSubjectOfType(pwuTypeId, name, facts.purpose), template)
+	);
+	return outcome.rendered ? undefined : outcome.refusedBecause;
+}
+
+/**
  * Decide whether this work unit's type can be executed by a model, and with what.
  *
  * ⭑ EVERY REFUSAL NAMES ITS CAUSE, because the alternative is a step that quietly does nothing and a work unit
@@ -337,11 +386,8 @@ export function prepareModelInvocation(
 	// ⛔ NO DEFAULT PROMPT. A type without a template declares no agent behaviour — TRUE of every type that
 	// existed before REG-D-058 — and inventing one would be the seeded-policy-as-projection defect this
 	// repository already records: an object written once and never read, standing in for a decision nobody made.
-	if (!template)
-		return {
-			ready: false,
-			reason: `The work-unit type ${pwuTypeId} carries no prompt template, so it declares no agent behaviour. Author one on the type before executing this step as a model invocation.`
-		};
+	// ⭐⭐ Package L10 — D65 — in the words Publish gives such a type (`noPromptTemplateReason`), byte for byte as before.
+	if (!template) return { ready: false, reason: noPromptTemplateReason(pwuTypeId) };
 
 	// ── ⭑⭑ CP-04a — THE CEILING, CONSULTED BEFORE ANYTHING IS BUILT ────────────────────────────────────────
 	//

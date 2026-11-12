@@ -98,6 +98,54 @@ function dischargeInput(a: Record<string, unknown>): {
 	return out;
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L10 — design D65 (`REG-D-154` (1); `REG-F-627`) — AN EDIT CHANGES ONLY THE PROMPT FIELDS IT PASSES, as
+ * `edit_pwu_type` has always said (*"Only the fields you pass change."*): the template sent is the type's STORED one with each prompt
+ * field the call passes — the text (`promptTemplateText`), the output contract (`promptOutputContract`), the armed state
+ * (`promptActive`) — taking effect, and every other keeping its stored value.
+ *
+ * ⛔ WHAT IT REPLACES. The edit built a WHOLE template from the fields the call passed, keyed on the text (`dischargeInput`, which
+ * the tools that CREATE a type keep): passing the text reset the status to DRAFT unless `promptActive` was true and dropped an output
+ * contract not passed again, while a status or a contract passed alone changed nothing. In P6 again's fifth paid run the agent's
+ * repair of an ACTIVE prompt passed its new text and contract and was saved DRAFT; the type published, and its unit's step was
+ * refused at render seven hours later (`REG-F-627`).
+ *
+ * The rule, each part the lead's (D65):
+ *   · a field counts as PASSED when the call carries it (`'promptOutputContract' in a`), as the tool's other fields do — ⚠ except the
+ *     text, where an EMPTY one (after trim) is read as not passed: it neither makes a template nor clears one, as before;
+ *   · `promptActive` passed: ACTIVE when it is `true`, else DRAFT — the flag read as before; an output contract passed empty (after
+ *     trim) removes the stored one;
+ *   · no stored template: a template only from a passed text, DRAFT unless armed, version 1 — `dischargeInput`'s rule, unchanged; a
+ *     status or a contract passed with no stored template and no text changes no prompt field;
+ *   · `declaredPlaceholders` derived from the text the template ends with (`markersIn`), never taken from the agent; and the version
+ *     the stored one (the lead's decision).
+ * `stored` is read only when a prompt field is passed (the broker's `getType`), so an edit of other fields reads nothing more.
+ */
+function editedDischargeInput(
+	a: Record<string, unknown>,
+	stored: () => PromptTemplate | undefined
+): { workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED'; promptTemplate?: PromptTemplate } {
+	const created = dischargeInput(a);
+	const text = str(a.promptTemplateText).trim();
+	const contractPassed = 'promptOutputContract' in a;
+	const activePassed = 'promptActive' in a;
+	if (text === '' && !contractPassed && !activePassed) return created;
+	const template = stored();
+	if (template === undefined) return created;
+	const templateText = text === '' ? template.templateText : text;
+	const outputContract = contractPassed ? str(a.promptOutputContract).trim() : template.outputContract;
+	return {
+		...created,
+		promptTemplate: {
+			templateText,
+			templateVersion: template.templateVersion,
+			declaredPlaceholders: markersIn(templateText),
+			...(outputContract ? { outputContract } : {}),
+			status: activePassed ? (a.promptActive === true ? 'ACTIVE' : 'DRAFT') : template.status
+		}
+	};
+}
+
 function boundaryInput(a: Record<string, unknown>): {
 	executionBoundary?: ExecutionBoundary;
 	boundaryContract?: BoundaryContract;
@@ -640,7 +688,11 @@ export function buildAuthoringTools(
 				if ('requiredOutputs' in a) patch.requiredOutputs = strArr(a.requiredOutputs);
 				if ('requiredAssurancePolicyIds' in a)
 					patch.requiredAssurancePolicyIds = strArr(a.requiredAssurancePolicyIds);
-				Object.assign(patch, dischargeInput(a));
+				// ⭐⭐ Package L10 — D65 — the prompt fields passed, applied to the stored template (`editedDischargeInput`).
+				Object.assign(
+					patch,
+					editedDischargeInput(a, () => broker.getType(str(a.pwuTypeId))?.promptTemplate)
+				);
 				Object.assign(patch, boundaryInput(a));
 				return fromProposal(
 					broker.editType(str(a.pwuTypeId), patch),

@@ -85,6 +85,30 @@ const PLAN = {
 	]
 };
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L10 — design D65 — THE SAME PLAN WITH NOTHING ARMED: its MODEL leaf's prompt, written without
+ * `promptActive`, stays DRAFT (`dischargeInput`, unchanged for the tools that create a type).
+ */
+const PLAN_DRAFT_LEFT = {
+	plan: [
+		{
+			tool: 'scaffold_graph',
+			args: {
+				types: PLAN.plan[0]!.args.types.map((type) =>
+					Object.fromEntries(Object.entries(type).filter(([key]) => key !== 'promptActive'))
+				)
+			}
+		}
+	]
+};
+
+/**
+ * ⭐⭐ Package L10 — D65 — PUBLISH'S REFUSAL, in the engine's words (`pwaPromptGate`), restated, not imported: the lane writes them as its
+ * end, so a change to them must redden here. Each refused type `[n] "name" (id): reason`.
+ */
+const publishRefusal = (pwaId: string, items: readonly string[]): string =>
+	`PublishPwa blocked: each type of PWA ${pwaId} named here declares workDischarge MODEL, but the step of its unit could not render its prompt, so that unit would be stopped once its step had started, when the PWA could no longer change (REG-F-508). ${items.join(' ')} Nothing was published: the PWA stays VALIDATED, where its types cannot be edited, so its repair is a new PWA in which each type declaring MODEL carries an ACTIVE prompt that uses only the markers a work unit supplies.`;
+
 test.describe('Phase 7 half B — the turn, accepted, published and run, through the operator’s own order (E3, C6)', () => {
 	test.beforeEach(async ({ request }) => {
 		await resetEngine(request, 'empty');
@@ -271,5 +295,85 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 		const exchanges = (await introspect(request)).modelExchanges.filter((x) => x.state.plane === 'EXECUTION');
 		const triesOf = (title: string) => exchanges.filter((x) => x.state.subjectObjectId === idOf(title)).length;
 		expect([triesOf('Specify wordfreq') > 0, triesOf('Verify wordfreq')]).toEqual([true, 0]);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L10 — design D65 (`REG-D-154` (2); the builder's choice (e), `l10-facts.md` §8) — A PROMPT LEFT DRAFT
+	// ON A MODEL TYPE IS REFUSED AT PUBLISH, AND THE LANE ENDS AT AUTHORING, IN THE REFUSAL'S WORDS, BEFORE ANY UNIT IS PRESSED. The order
+	// above, the mock's plan arming nothing: its MODEL leaf's prompt stays DRAFT, the candidate checks record it and refuse nothing
+	// (`REG-D-110` (4)), Submit and Validate are answered, and Publish is refused, naming the type (`pwaPromptGate`); the lane writes its
+	// end (`designerEnd`), and no Undertaking is made. ⚠ The fifth run's own case, an edit after a review, is not rehearsed: the mock's
+	// plan cannot name a type it defines in the same turn (its id is minted as the plan runs), and the operator's order has no repair turn.
+	test('⭐ L10 (D65) — a MODEL leaf’s prompt left DRAFT: Publish refuses it, naming the type, and the lane ends authoring-stopped with the refusal’s words, before any unit', async ({
+		page,
+		request
+	}) => {
+		test.setTimeout(180_000);
+		const lane = openLane(test.info().outputPath('half-b-lane-draft-left'));
+		const record: RunRecord = {
+			mode: 'paid',
+			half: 'B',
+			units: [],
+			authoring: authoringRecordOf(JSON.stringify(PLAN_DRAFT_LEFT), null),
+			dryRun: null,
+			end: null,
+			problems: []
+		};
+		let pwaId = '';
+		const turn = agentTurnOn(page);
+		const author: AuthoringHands = {
+			createDraft: async () => {
+				pwaId = await createDraftPwa(page, request, PHASE7_HALF_B_DRAFT);
+				await registerStipulation(request, pwaId, 'PWA_TYPE');
+				return pwaId;
+			},
+			send: (instruction) => turn.send(instruction),
+			turnRunning: () => turnRunning(page),
+			producerLine: () => turn.producer(),
+			accept: () => acceptCandidate(page, actionFields),
+			lifecycle: (act) => designerAct(page, act, actionFields),
+			createUndertaking: () => createUndertakingThroughForm(page, PHASE7_UNDERTAKING),
+			pause: (ms) => page.waitForTimeout(ms),
+			now: () => Date.now()
+		};
+		const read = async () => {
+			const snapshot = await introspect(request);
+			return { text: JSON.stringify(snapshot), snapshot };
+		};
+
+		const authored = await authorThePwa({
+			record,
+			authoring: record.authoring!,
+			author,
+			read,
+			lane,
+			dry: false,
+			undertakingName: PHASE7_UNDERTAKING.name,
+			prior: 0
+		});
+		const store = await introspect(request);
+		const specify = store.pwuTypes.find((t) => t.state.pwaId === pwaId && t.state.name === 'Specify wordfreq');
+		expect(
+			(specify?.state.promptTemplate as { status?: string } | undefined)?.status,
+			'arrangement: the MODEL leaf’s prompt is not DRAFT'
+		).toBe('DRAFT');
+		expect('end' in authored ? authored.end : 'the order reached the units', 'the lane’s end').toEqual({
+			reason: 'authoring-stopped',
+			detail: `the PWA's publish was refused: ${publishRefusal(pwaId, [
+				`[1] "Specify wordfreq" (${specify!.id}): The template is DRAFT and only an ACTIVE template is a runnable asset. A DRAFT is authored text, not an instruction anyone approved.`
+			])}`
+		});
+		const a = record.authoring!;
+		expect(a.lifecycle.map((x) => [x.act, x.envelopeType])).toEqual([
+			['submitForReview', 'success'],
+			['validate', 'success'],
+			['publish', 'failure']
+		]);
+		// ⭐ The candidate checks recorded the DRAFT leaf and refused nothing (`REG-D-110` (4)); Publish refused it.
+		expect(a.checks?.refused).toBe(false);
+		expect(a.checks?.findings.map((f) => [f.check, f.typeName])).toContainEqual(['model-leaf', 'Specify wordfreq']);
+		expect(
+			[store.pwas.find((p) => p.id === pwaId)?.state.publicationStatus, store.undertakings.length, record.units],
+			'the refused PWA did not stay VALIDATED, or the order went on past it'
+		).toEqual(['VALIDATED', 0, []]);
 	});
 });

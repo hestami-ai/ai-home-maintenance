@@ -37,6 +37,7 @@ import {
 } from './kit.js';
 import { fromStates, noOpEditPrecondition, predicate } from './command-precondition.js';
 import { AI_ACTOR_TYPES, FLOOR_POLICY_IDS_REQUIRED, pwaPartsFloorBlock } from './floor-gate.js';
+import { resolvePwuTypeFacts, unitPromptRefusal } from '../execution-invocation.js';
 
 const PWA = 'PROFESSIONAL_WORK_ARCHITECTURE';
 const PWU_TYPE = 'PWU_TYPE';
@@ -1100,8 +1101,43 @@ function pwaFloorGate(
 	);
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L10 — design D65 (`REG-D-154` (2); `REG-F-508`, remedy 1; `REG-F-627`) — PUBLISH REFUSES A PWA WITH A
+ * TYPE DECLARING MODEL WHOSE PROMPT THE STEP OF ITS UNIT COULD NOT RUN, naming each such type and why, before any event.
+ *
+ * ⛔ WHAT IT CLOSES. Nothing before a unit's step read a prompt: the per-edit rule refuses only an ACTIVE template on a type that does
+ * not declare MODEL (`checkDischargeCoherence`; its converse was dropped as a rule against drafting, `REG-F-353`), ValidatePwa reads
+ * the graph and Publish the floor. So a PWA published with a DRAFT prompt, none, or a marker nothing supplies, and its unit's step was
+ * refused at render after it had started, when the PWA could no longer change: P6 again's fifth paid run, seven hours in (`REG-F-627`).
+ * ⭑ NOT A RULE AGAINST DRAFTING: a draft may hold any prompt, and publishing ends the draft (`REG-F-508`).
+ * ⭑ DECIDED BY THE CODE THE STEP RUNS (`unitPromptRefusal`: `renderPromptTemplate` over the context a unit of the type is given), over
+ * the live types the floor reads (`pwuTypeNodesOf`), each declaring MODEL as Begin & Execute reads it (`workDischarge === 'MODEL'`).
+ * ⚠ A REFUSED PWA STAYS VALIDATED: the publication machine has no arrow back to DRAFT, so its repair is a new PWA (D65).
+ */
+function pwaPromptGate(command: DomainCommand, ctx: HandlerContext): CommandResult | null {
+	const pwaId = command.targetAggregateId;
+	// A node is a type the store holds (`pwuTypeNodesOf` read it there).
+	const find = (id: string) => ctx.store.loadObject(id)!.state as Record<string, unknown>;
+	const refused: string[] = [];
+	for (const node of pwuTypeNodesOf(ctx, pwaId)) {
+		if (find(node.id).workDischarge !== 'MODEL') continue;
+		const reason = unitPromptRefusal(node.id, node.name, resolvePwuTypeFacts(find, node.id));
+		if (reason !== undefined) refused.push(`[${refused.length + 1}] "${node.name}" (${node.id}): ${reason}`);
+	}
+	if (refused.length === 0) return null;
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		// ⭐ The builder's words (D65), read by a person and by the lane (`designerEnd`), never by a model: each refused type numbered
+		// `[n] "name" (id): reason`, its reason the render's own words or the step's no-template words.
+		`PublishPwa blocked: each type of PWA ${pwaId} named here declares workDischarge MODEL, but the step of its unit could not render its prompt, so that unit would be stopped once its step had started, when the PWA could no longer change (REG-F-508). ${refused.join(' ')} Nothing was published: the PWA stays VALIDATED, where its types cannot be edited, so its repair is a new PWA in which each type declaring MODEL carries an ACTIVE prompt that uses only the markers a work unit supplies.`,
+		[pwaId]
+	);
+}
+
 /** PublishPwa — VALIDATED -> PUBLISHED (the published version is immutable). Gated by the de minimis assurance
- *  floor for AI-produced PWAs (pwaFloorGate). */
+ *  floor for AI-produced PWAs (pwaFloorGate) ⭐⭐ and, before it, by the prompts of the types a model is to run (package L10,
+ *  `pwaPromptGate`). */
 export const publishPwa: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: PWA,
@@ -1117,7 +1153,11 @@ export const publishPwa: CommandHandler = (ctx, command) =>
 		// previously surfaced the floor's RPH_INVARIANT_VIOLATION — the state fact is the more fundamental refusal.
 		precondition: fromStates('VALIDATED'),
 		eventType: 'PwaPublished',
-		guard: (state, gctx) => pwaFloorGate(command, state, gctx),
+		// ⭐⭐ Package L10 — D65 — THE PROMPTS FIRST, THEN THE FLOOR (the builder's order): a prompt the step would refuse is final for
+		// this PWA (no arrow back to DRAFT; its repair is a new PWA), and deciding it costs no reviewer call, while an unsatisfied
+		// floor is recorded again on the same PWA — so the refusal a person can still act on in place is never shown first, only to
+		// be followed, once the floor is re-recorded, by one that no recording discharges.
+		guard: (state, gctx) => pwaPromptGate(command, gctx) ?? pwaFloorGate(command, state, gctx),
 		mutate: (base) => {
 			const p = command.payload as PublishPwaPayload;
 			return p.rootPwuTypeId ? { ...base, rootPwuTypeId: p.rootPwuTypeId } : base;
