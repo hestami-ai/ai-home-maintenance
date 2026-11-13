@@ -218,7 +218,10 @@ afterEach(() => {
 });
 
 describe('⭐⭐ package E, E1 — through the route: a rejected part beside a part whose review failed is answered by revision', () => {
-	it('⭐ RED — the one refinement runs, sent the finding and the failed part’s name; every part is reviewed again after it; the candidate is staged for revision, the banner and the hint naming the failed part', async () => {
+	// ⭐⭐ RESTATED by package L12 — design D67 (`REG-D-156` (2); the lead's decision (b)): this arrangement rejects Realize and fails
+	// Check's review in EVERY round, so the second round's remediation asks for refinement by the rule that asked for the first, and
+	// the route refines a second time and runs a third round. ⛔ PREDICTED RED at 7e45efb0: one refinement, two agent runs.
+	it('⭐ RED — the ~~one~~ refinements run (⭐ two, package L12, D67), each sent the finding and the failed part’s name; every part is reviewed again after each; the candidate is staged for revision, the banner and the hint naming the failed part', async () => {
 		vi.stubEnv('JPWB_AGENT', 'pi');
 		const pwaId = draftPwa();
 
@@ -227,18 +230,32 @@ describe('⭐⭐ package E, E1 — through the route: a rejected part beside a p
 		expect(events.at(-1)?.kind).toBe('done');
 		const check = typeIdOf(pwaId, 'Check');
 		const named = `"Check" (${check})`;
-		// ⭐ THE REFINEMENT RAN, ONCE.
-		expect(seam.instructions, 'no auto-refinement pass ran beside the rejected part’s finding').toHaveLength(2);
-		const directive = seam.instructions[1]!;
-		expect(directive, 'the directive did not carry the rejected part’s finding').toContain(FAULT);
-		expect(directive, 'the directive did not name the part whose review failed').toContain(
-			`Do not change them on account of that failure:\n- ${named}\n`
-		);
-		// ⭐ AND AFTER IT EVERY PART IS REVIEWED AGAIN, THE FAILED ONE INCLUDED (design D8).
-		const after = seam.timeline.slice(seam.timeline.indexOf('agent run 2') + 1);
-		expect(seam.timeline.indexOf('agent run 2'), 'arrangement: the refinement is not in the timeline').toBeGreaterThan(0);
-		expect(after, 'the failed part was not reviewed again').toContain('review Check');
-		expect(after, 'the rejected part was not reviewed again').toContain('review Realize');
+		// ⭐ THE REFINEMENT RAN, ~~ONCE~~ ⭐ TWICE (package L12, D67): ⛔ MOVED DELIBERATELY — ~~`toHaveLength(2)`~~ — the operator's
+		// instruction and two directives, each over the round before it.
+		expect(seam.instructions, 'the two auto-refinement passes did not run beside the rejected part’s finding').toHaveLength(3);
+		for (const [i, directive] of seam.instructions.slice(1).entries()) {
+			expect(directive, `directive ${i + 1} did not carry the rejected part’s finding`).toContain(FAULT);
+			expect(directive, `directive ${i + 1} did not name the part whose review failed`).toContain(
+				`Do not change them on account of that failure:\n- ${named}\n`
+			);
+		}
+		// ⭐ AND AFTER EACH, EVERY PART IS REVIEWED AGAIN, THE FAILED ONE INCLUDED (design D8).
+		for (const [run, next] of [
+			['agent run 2', 'agent run 3'],
+			['agent run 3', undefined]
+		] as const) {
+			const at = seam.timeline.indexOf(run);
+			expect(at, `arrangement: ${run} is not in the timeline`).toBeGreaterThan(0);
+			const after = seam.timeline.slice(at + 1, next === undefined ? undefined : seam.timeline.indexOf(next));
+			expect(after, `the failed part was not reviewed again after ${run}`).toContain('review Check');
+			expect(after, `the rejected part was not reviewed again after ${run}`).toContain('review Realize');
+		}
+		// ⭑ And no third refinement: the third round still asks for one, and two is the bound.
+		expect(seam.timeline.filter((t) => t.startsWith('agent run')), 'a third refinement ran').toEqual([
+			'agent run 1',
+			'agent run 2',
+			'agent run 3'
+		]);
 		// ⭐ THE CANDIDATE IS STAGED FOR REVISION, NEVER AS AN EXTERNAL BLOCK.
 		const turn = getPendingAuthoringTurn(pwaId);
 		expect(turn?.status, 'the round was staged as a review that produced no usable verdict').toBe('REVISION_REQUIRED');

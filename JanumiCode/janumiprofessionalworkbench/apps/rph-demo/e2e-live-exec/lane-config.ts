@@ -801,11 +801,13 @@ function halfFaults(env: Readonly<Record<string, string | undefined>>): string[]
 }
 
 /**
- * ⭐ C3 — THE AUTHORING FLOOR'S RUNS IN ONE TURN: the floor after the agent's run, and the ONE auto-refinement pass — a
+ * ⭐ C3 — THE AUTHORING FLOOR'S RUNS IN ONE TURN: the floor after the agent's run, and the ~~ONE~~ auto-refinement pass — a
  * second run of the agent and of the floor — that may follow it (`src/routes/pwa/[id]/agent/+server.ts`,
- * `runFloorAfterTurn`: *"auto-refine at most once"*).
+ * `runFloorAfterTurn`: ~~*"auto-refine at most once"*~~ ⭐ *"auto-refine at most twice"*). ⭐⭐ `JAN-EXEC` Phase 7, package L12 —
+ * design D67 (`REG-D-156` (2); the lead's decision (d)) — AND THE SECOND, which may follow the second round when it still asks
+ * for refinement (`AUTHORING_REFINEMENTS`, two): three floor runs in all, each reviewing every type. ⛔ It was 2.
  */
-export const PHASE7_AUTHORING_FLOOR_RUNS = 2;
+export const PHASE7_AUTHORING_FLOOR_RUNS = 3;
 
 /**
  * ⭐⭐ C3 — THE AUTHORING ALLOWANCE: ~~the turn and its reviews, each floor run the agent's run and one review of up to
@@ -816,9 +818,12 @@ export const PHASE7_AUTHORING_FLOOR_RUNS = 2;
  * parts × 4 × 240 s): 2,400 s (40 minutes) for one part, 31,200 s (520 minutes) for run-11's sixteen ⭐ — package L, D13 (each
  * review six calls): 2 × (240 s + parts × 6 × 240 s), 3,360 s (56 minutes) for one part, 46,560 s (776 minutes) for sixteen.
  * ⭐ package X, D35 (devin’s bound 480 s): 2 × (240 s + parts × 6 × 480 s), 6,240 s (104 minutes) for one part, 92,640 s (1,544 minutes) for
- * sixteen. ⛔ The figure was
+ * sixteen. ⭐⭐ `JAN-EXEC` Phase 7, package L12 — design D67 (`REG-D-156` (2); the lead's decision (d)) — THREE floor runs, the floor and its
+ * two possible refinements, each review with its decision model's 1,200 s (package Z3): 3 × (240 s + parts × (6 × 480 s + 1,200 s)),
+ * 12,960 s (216 minutes) for one part, 196,560 s (3,276 minutes) for sixteen, 221,040 s (61.4 hours) for the sixth paid run's eighteen —
+ * 147,360 s at two runs, the allowance that run's turn was held to. ⛔ The figure was
  * one part's for every turn: it counted two reviews in all, and the floor now reviews each type of the candidate in each of
- * its two possible rounds (design D9). ⚠ AT LEAST ONE PART: the turn stages its types as the agent authors them, so a count
+ * its ~~two~~ ⭐ three (package L12) possible rounds (design D9). ⚠ AT LEAST ONE PART: the turn stages its types as the agent authors them, so a count
  * read before the first is staged says nothing of the candidate to come, and is given one part's, the 2,400 s every turn was
  * given before. ⚠ AN ALLOWANCE, NOT A BOUND: the agent's turn has none, as the executor's has none (`executorCallMs`). A
  * turn that outlasts it ends the run there, `allowance-exceeded`: the page that holds the turn must not leave it (a turn is
@@ -828,7 +833,8 @@ export function phase7AuthoringAllowanceMs(parts: number): number {
 	return (
 		PHASE7_AUTHORING_FLOOR_RUNS *
 		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): and each part's review its decision model's
-		// requests — 2 × parts × 1,200 s more: 8,640 s at one part, 131,040 s at sixteen.
+		// requests — 2 × parts × 1,200 s more: 8,640 s at one part, 131,040 s at sixteen. ⭐ Package L12 (D67): at three floor runs,
+		// 3 × parts × 1,200 s — 12,960 s at one part, 196,560 s at sixteen.
 		(LANE_BUDGET.executorCallMs +
 			Math.max(1, parts) * (LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs + LANE_BUDGET.reviewIndicationsMs))
 	);
@@ -852,7 +858,9 @@ export function phase7AuthoringAllowanceMs(parts: number): number {
  * review of up to `reviewerCallsPerTry` calls — 2 × 4 = 8, the calls the allowance above counts in time~~ ⭐⭐ the review in
  * parts, B6 (design D11) — FOR `parts` TYPES: each of its floor runs a review of each part, each of up to
  * `reviewerCallsPerTry` calls — 2 × parts × 4: 128 for sixteen ⭐ — package L, D16 (`REG-D-135` (4): Send counts the authoring
- * floor's worst case at 6 calls a review): 2 × parts × 6, 192 for sixteen — the calls the allowance above counts in time. ⛔ It was a
+ * floor's worst case at 6 calls a review): 2 × parts × 6, 192 for sixteen — the calls the allowance above counts in time ⭐ —
+ * package L12, D67 (`REG-D-156` (2)): three floor runs, 3 × parts × 6, 288 for sixteen and 324 for the sixth paid run's eighteen, the
+ * three rounds' reservations (`REG-F-580`). ⛔ It was a
  * constant, 8, and a candidate of sixteen types inherited it. ⛔ ~~Half B checks it against the limit BEFORE SEND (D8), for the
  * anticipated inventory (`PHASE7_AUTHORING_ANTICIPATED_PARTS`)~~ ⭐ Half B checks the limit BEFORE SEND (D8) — ⛔ package L2, D20:
  * counting the allowance it hands the authoring review (`phase7AuthoringReviewAllowance`), never this figure, which no check
@@ -996,7 +1004,8 @@ export const PHASE7_DESIGNER_ACTS = 4;
  * the Undertaking are the setup allowance's, as half A's typing is (`PHASE7_SETUP_MS`).
  * ⭐ The review in parts, B6 (design D9) — FOR `parts` TYPES, the allowance theirs (`phase7AuthoringAllowanceMs`): 5,585 s at
  * one part, as before, and 34,385 s at sixteen. ⭐ Package L, D13 — each review six calls: 6,545 s at one part, 49,745 s at
- * sixteen. ⭐ package X, D35 (devin’s bound 480 s): 9,425 s at one part, 95,825 s at sixteen.
+ * sixteen. ⭐ package X, D35 (devin’s bound 480 s): 9,425 s at one part, 95,825 s at sixteen. ⭐ Package Z3 (D51): 11,825 s and
+ * 134,225 s. ⭐ Package L12 (D67; three floor runs): 16,145 s at one part, 199,745 s at sixteen.
  */
 export function phase7AuthoringMs(parts: number): number {
 	return (
@@ -1063,6 +1072,9 @@ export const PHASE7_TIMEOUT_CEILING_MS = NODE_TIMER_CEILING_MS - 1_000;
  * 1,200 s too, so ~~1,101,240 s + 9,425 s = 1,110,665 s~~ for four phases is 1,527,240 s + 11,825 s = 1,539,065 s (1,527,240 s +
  * 134,225 s = 1,661,465 s at sixteen parts), and the ceiling ~~9 phases (8 at sixteen parts)~~ comes at 6 phases at one part and
  * at sixteen alike; eight policies each, 6 at one part and 5 at sixteen; one each, 7 at one part and 6 at sixteen.
+ * ⭐ Package L12 (D67; three floor runs): for four phases 1,527,240 s + 16,145 s = 1,543,385 s (1,527,240 s + 199,745 s = 1,726,985 s
+ * at sixteen parts); each ceiling count above is unchanged (computed by these functions: 6 and 6; eight policies each, 6 and 5; one
+ * each, 7 and 6).
  */
 export function phase7HalfBTestTimeoutMs(declared: readonly number[], parts: number): number {
 	const phases = declared.length - 1;
@@ -1077,7 +1089,8 @@ export function phase7HalfBTestTimeoutMs(declared: readonly number[], parts: num
  * ⭐ The review in parts, B6 (design D9: *"carry the allowance into the spec timeout"*) — HALF B'S TIMEOUT WHILE ITS TURN RUNS:
  * half A's, which half B starts under, and the authoring's share for the `parts` its turn has staged — capped at Node's
  * timer ceiling. The lane sets it each time it derives a larger allowance (`waitForTheCandidate`), so a turn the allowance
- * still holds is not cut off by the test's own timeout: from ~~217~~ ⭐ 191 parts on (package X, D35; 204 at package L’s figures, which this sentence had not restated),
+ * still holds is not cut off by the test's own timeout: from ~~217~~ ~~⭐ 191~~ ⭐ 125 parts on (package L12, D67, three floor runs; 187 at
+ * package Z3's figures and two runs, and 191 at package X's; 204 at package L’s figures, which this sentence had not restated),
  * the authoring's share alone is longer than half
  * A's timeout.
  */

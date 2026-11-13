@@ -2,7 +2,8 @@
 //
 // ── WHAT THIS CLOSES ────────────────────────────────────────────────────────────────────────────────────────
 // The Reasoning Review runs up to FOUR bounded tries per authoring turn: the floor runs twice (once, then the
-// auto-refine pass), and each run can call the model twice (the original and its repair). Today that produces
+// auto-refine pass) ⭐ (when this was written; since package L12, D67, up to three times — once, then each of at most two
+// auto-refine passes — and each run reviews every type as a part), and each run can call the model twice (the original and its repair). Today that produces
 // ZERO records — findings #24 (the materialized input is never recorded), #25 (the pre-coercion answer is
 // destroyed by reassignment on the repair path) and #62 (the parse outcome is swallowed by a bare catch).
 //

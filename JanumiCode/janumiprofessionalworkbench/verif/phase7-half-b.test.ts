@@ -1303,12 +1303,26 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 	// candidate as a part, so the allowance is the inventory's — 2,400 s at one part, as before, and 31,200 s at sixteen.
 	// ⭐ Package L — D13 (`REG-D-135` (3)): each review up to SIX calls of 240 s, so ~~2,400 s / 31,200 s~~ 3,360 s at one part
 	// and 46,560 s at sixteen.
-	it('⭐ two floor runs — the floor, and the one auto-refinement pass the agent route makes — each the agent’s run and one review of each part: ~~2,400 s~~ ~~3,360 s~~ 6,240 s at one part, ~~31,200 s~~ ~~46,560 s~~ 92,640 s at sixteen (package X, D35)', () => {
+	// ⭐⭐ RESTATED by package L12 — design D67 (`REG-D-156` (2); the lead's decision (d)): THREE floor runs — the floor, and the auto-
+	// refinement passes the route makes, at most two, each a run of the agent and a round of the floor. ⛔ PREDICTED RED at 7e45efb0:
+	// the route says "auto-refine at most once" and the lane counts two runs.
+	it('⭐ ~~two~~ ⭐ three floor runs (package L12, D67) — the floor, and the ~~one auto-refinement pass~~ ⭐ auto-refinement passes, at most two, the agent route makes — each the agent’s run and one review of each part: ~~2,400 s~~ ~~3,360 s~~ ~~6,240 s~~ ⭐ 12,960 s at one part, ~~31,200 s~~ ~~46,560 s~~ ~~92,640 s~~ ⭐ 196,560 s at sixteen', () => {
 		const route = readFileSync(join(REPO, 'apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts'), 'utf8');
-		expect(route).toContain('auto-refine at most once');
-		expect(route.split('await runPwaFloor(').length - 1, 'the route runs the floor once, and once more to refine').toBe(
-			PHASE7_AUTHORING_FLOOR_RUNS
-		);
+		// ⛔ MOVED DELIBERATELY by package L12 — D67: ~~`toContain('auto-refine at most once')`~~ and ~~the route's
+		// `await runPwaFloor(` count equal to the lane's runs~~ — the route runs the floor once, then once in its loop for each
+		// refinement, at most `AUTHORING_REFINEMENTS` of them: so two call sites, and that bound one less than the runs the lane counts,
+		// read from the route's source as before.
+		expect(route).toContain('auto-refine at most twice');
+		expect(route).not.toContain('auto-refine at most once');
+		expect(
+			route.split('await runPwaFloor(').length - 1,
+			'the route runs the floor once, and once more in its loop for each refinement'
+		).toBe(2);
+		expect(
+			/\nconst AUTHORING_REFINEMENTS = (\d+);\n/.exec(route)?.[1],
+			'the route’s refinements are not one fewer than the floor runs the lane counts'
+		).toBe(String(PHASE7_AUTHORING_FLOOR_RUNS - 1));
+		expect(PHASE7_AUTHORING_FLOOR_RUNS, 'the lane does not count three floor runs').toBe(3);
 		expect([1, 2, 16].map(phase7AuthoringAllowanceMs)).toEqual(
 			[1, 2, 16].map((parts) => PHASE7_AUTHORING_FLOOR_RUNS * (LANE_BUDGET.executorCallMs + parts * REVIEW_MS))
 		);
@@ -1317,17 +1331,30 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`6_240_000, 92_640_000, 3_120_000`~~: 2 × (240 s
 		// + 6 × 480 s + 1,200 s) = 8,640 s, 2 × (240 s + 16 × (6 × 480 s + 1,200 s)) = 131,040 s — each 2 × parts × 1,200 s more —
 		// and one try's share of the Begin & Execute wait 4,320 s.
+		// ⛔ MOVED 2026-11-12 (`JAN-EXEC` Phase 7, package L12 — design D67; the lead's decision (d)) — ~~`8_640_000, 131_040_000, 4_320_000`~~:
+		// 3 × (240 s + 6 × 480 s + 1,200 s) = 12,960 s, 3 × (240 s + 16 × (6 × 480 s + 1,200 s)) = 196,560 s — each half as much again — and
+		// one try's share of the Begin & Execute wait, 4,320 s, unchanged.
 		expect([phase7AuthoringAllowanceMs(1), phase7AuthoringAllowanceMs(16), EXECUTE_TIMEOUT_MS / LANE_BUDGET.tries]).toEqual([
-			8_640_000, 131_040_000, 4_320_000
+			12_960_000, 196_560_000, 4_320_000
 		]);
-		expect(phase7AuthoringAllowanceMs(16) - 92_640_000, 'the gain over package X’s figure: 2 × parts × 1,200 s').toBe(2 * 16 * 1_200_000);
+		// ⛔ MOVED 2026-11-12 (package L12 — D67) — ~~`phase7AuthoringAllowanceMs(16) - 92_640_000` is `2 * 16 * 1_200_000`~~: package X's
+		// figure counted at three runs, 3 × (240 s + 16 × 6 × 480 s) = 138,960 s, and the gain over it the decision model's 1,200 s for each
+		// part's review in each run, 3 × parts × 1,200 s.
+		expect(
+			phase7AuthoringAllowanceMs(16) - 138_960_000,
+			'the gain over package X’s figure, counted at three runs: 3 × parts × 1,200 s'
+		).toBe(3 * 16 * 1_200_000);
+		// ⭐ Package L12 — D67: the sixth paid run's eighteen types (`REG-F-628`), 3 × (240 s + 18 × 4,080 s) = 221,040 s — 147,360 s at two
+		// runs, the allowance that run's turn was held to.
+		expect([phase7AuthoringAllowanceMs(18), (phase7AuthoringAllowanceMs(18) / 3) * 2]).toEqual([221_040_000, 147_360_000]);
 		// ⭑ AT LEAST ONE PART: a turn that has staged no type yet is given one part's, ~~the 2,400 s every turn had~~ ~~3,360 s~~
 		// 6,240 s (package X, D35).
 		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`toBe(6_240_000)`~~: 8,640 s.
-		expect(phase7AuthoringAllowanceMs(0)).toBe(8_640_000);
+		// ⛔ MOVED 2026-11-12 (package L12 — D67) — ~~`toBe(8_640_000)`~~: 12,960 s.
+		expect(phase7AuthoringAllowanceMs(0)).toBe(12_960_000);
 	});
 
-	it('⭐ the authoring’s share: the allowance, one overrunning poll, and four designer acts each at its bound — ~~5,585 s~~ ~~6,545 s~~ 9,425 s at one part, ~~34,385 s~~ ~~49,745 s (package L, D13)~~ 95,825 s at sixteen (package X, D35)', () => {
+	it('⭐ the authoring’s share: the allowance, one overrunning poll, and four designer acts each at its bound — ~~5,585 s~~ ~~6,545 s~~ ~~9,425 s~~ ⭐ 16,145 s at one part, ~~34,385 s~~ ~~49,745 s (package L, D13)~~ ~~95,825 s at sixteen (package X, D35)~~ ⭐ 199,745 s at sixteen (package L12, D67)', () => {
 		expect([PHASE7_CANDIDATE_POLL_MS, PHASE7_DESIGNER_ACTS, DESIGNER_ACTS.length + 1]).toEqual([5_000, 4, 4]);
 		for (const parts of [1, 16])
 			expect(phase7AuthoringMs(parts)).toBe(
@@ -1339,7 +1366,9 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`[6_545_000, 49_745_000]`~~: 6,240 s + 3,185 s and 92,640 s + 3,185 s.
 		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`[9_425_000, 95_825_000]`~~: 8,640 s + 3,185 s and
 		// 131,040 s + 3,185 s.
-		expect([phase7AuthoringMs(1), phase7AuthoringMs(16)]).toEqual([11_825_000, 134_225_000]);
+		// ⛔ MOVED 2026-11-12 (`JAN-EXEC` Phase 7, package L12 — design D67; the lead's decision (d)) — ~~`[11_825_000, 134_225_000]`~~: three floor
+		// runs, 12,960 s + 3,185 s and 196,560 s + 3,185 s.
+		expect([phase7AuthoringMs(1), phase7AuthoringMs(16)]).toEqual([16_145_000, 199_745_000]);
 	});
 
 	it('⭐ half B’s timeout: half A’s re-counted for the agent’s phases, plus the authoring for its parts; capped at Node’s timer ceiling', () => {
@@ -1367,16 +1396,19 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		// ⭐ Package L — D13: ~~425,225 s~~ 590,040 s + 6,545 s.
 		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`toBe(596_585_000)`~~: 1,101,240 s + 9,425 s.
 		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`toBe(1_110_665_000)`~~: 1,527,240 s + 11,825 s.
-		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(1_539_065_000);
+		// ⛔ MOVED 2026-11-12 (`JAN-EXEC` Phase 7, package L12 — design D67; three floor runs) — ~~`toBe(1_539_065_000)`~~: 1,527,240 s + 16,145 s.
+		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(1_543_385_000);
 		// ⭐ The review in parts, B6 — the authoring's share is the inventory's: sixteen parts, ~~454,025 s~~ ⭐ 639,785 s for four
 		// phases. ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`toBe(639_785_000)`~~: 1,101,240 s + 95,825 s.
 		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`toBe(1_197_065_000)`~~: 1,527,240 s + 134,225 s.
-		expect(phase7HalfBTestTimeoutMs(units(4), 16)).toBe(1_661_465_000);
+		// ⛔ MOVED 2026-11-12 (package L12 — D67; three floor runs) — ~~`toBe(1_661_465_000)`~~: 1,527,240 s + 199,745 s.
+		expect(phase7HalfBTestTimeoutMs(units(4), 16)).toBe(1_726_985_000);
 		// ⭐ And the ceiling's first phase count, as lane-config.ts states it: ~~23, at one part and at sixteen alike~~ ⭐ package
 		// L, D13: 17 at one part, 16 at sixteen — the larger allowance now reaches the ceiling a phase sooner.
 		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`[1, 17]`, `[16, 16]`~~: 9 at one part, 8 at sixteen, as lane-config.ts now states them.
 		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`[1, 9]`, `[16, 8]`~~: 6 at one part and 6 at sixteen,
-		// as lane-config.ts now states them (each phase's share 335,160 s).
+		// as lane-config.ts now states them (each phase's share 335,160 s). ⭑ Package L12 — D67: unmoved by three floor runs — five phases at
+		// sixteen parts are 1,726,985 s + 335,160 s = 2,062,145 s, under the cap, and six pass it.
 		for (const [parts, first] of [
 			[1, 6],
 			[16, 6]
@@ -2280,10 +2312,11 @@ describe('⛔ REG-D-112 (E3’s review, 1) — a run that stops during authoring
 
 describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send and before the root’s press, ~~each act’s worst case counted~~ ⭐ what each act counts by the one rule as amended (REG-D-114 (14))', () => {
 	/**
-	 * The authoring floor's worst case: two floor runs, each ~~one review~~ ⭐ (the review in parts, B6) a review of each part, of up
+	 * The authoring floor's worst case: ~~two~~ floor runs, each ~~one review~~ ⭐ (the review in parts, B6) a review of each part, of up
 	 * to `reviewerCallsPerTry` calls — ~~8~~ ⭐ 128, ~~counted before Send for the inventory anticipated, sixteen types~~ ⛔ package
 	 * L2, D20: Send counts the allowance it hands the authoring review — so here the floor's spend after Send in the root's
-	 * arrangements, sixteen parts' worst case, 192.
+	 * arrangements, sixteen parts' worst case, ~~192~~ ⭐ 288 at package L12's three floor runs (D67). ⭑ TODAY's lane runs here, so the
+	 * figure follows its count (the lead's decision of 2026-11-12: a fixture of what the current code does follows the constant).
 	 */
 	const FLOOR_WORST = phase7AuthoringReviewerCalls(SIXTEEN);
 	/** ⭐ Package L2 — D20 — what Send's check says it counted, restated: the allowance the lane hands the authoring review. */
@@ -2459,7 +2492,8 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 	/**
 	 * The authoring floor's worst case, ~~counted before Send~~: ~~8~~ ⭐ (the review in parts, B6) 128, for sixteen ~~anticipated~~
 	 * types ⛔ — package L2, D20: Send counts the allowance it hands the authoring review; this is the floor's spend after Send
-	 * that the arrangement stages, 192.
+	 * that the arrangement stages, ~~192~~ ⭐ 288 at package L12's three floor runs (D67). ⭑ TODAY's lane runs here and the report reads
+	 * the record it writes, so the figure follows the lane's count (the lead's decision of 2026-11-12).
 	 */
 	const FLOOR_WORST = phase7AuthoringReviewerCalls(SIXTEEN);
 	/**
@@ -3398,9 +3432,10 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 	 */
 	const WHOLE_PRESS = (3 + 32) * 6;
 	/**
-	 * ⭐ The floor's worst case, its two runs' reviews of up to four calls each ⭐ (the review in parts, B6) of each of sixteen
+	 * ⭐ The floor's worst case, its ~~two~~ runs' reviews of up to four calls each ⭐ (the review in parts, B6) of each of sixteen
 	 * ~~anticipated~~ parts, ~~8~~ 128 ⭐ (six calls each, 192): ~~so Send's read, before it, stays under the limit~~ ⛔ package L2,
 	 * D20 — the calls the arrangement has the floor record after Send, whose read counts the allowance and reaches the limit.
+	 * ⭐ Package L12 (D67): three floor runs, 288. ⭑ TODAY's lane runs here, so the figure follows its count (the lead's decision).
 	 */
 	const FLOOR_CALLS = phase7AuthoringReviewerCalls(SIXTEEN);
 	/**
@@ -3957,7 +3992,7 @@ describe('⛔ The check of 241158f4, 1 — only an acceptance answered SUCCESS n
 });
 
 // ── ⭐⭐ THE REVIEW IN PARTS, B6 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D6, D11; roadmap 9a.7) ───────────────────────
-// The floor reviews each type of the candidate as a part, in each of its two possible rounds: the spend reserve before Send
+// The floor reviews each type of the candidate as a part, in each of its ~~two~~ ⭐ three (package L12, D67) possible rounds: the spend reserve before Send
 // counts parts, the inventory the turn staged is counted against it, and the lane's record and the run report hold ONE round
 // and its complete part set — never one Reasoning Review of the PWA as a whole, which a round in parts never records.
 
@@ -3966,8 +4001,16 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 	 * The authoring floor's worst case for ~~the inventory anticipated before Send~~ sixteen parts: 2 × 16 × ~~4~~ 6 — ⛔ package L2,
 	 * D20: what Send's check counted in a run recorded before D20, the 16 anticipated types (the report's cases below read such a
 	 * record); Send now counts the allowance it hands the authoring review.
+	 * ⭐⭐ PINNED by package L12 — design D67 (the lead's decision of 2026-11-12): ~~`phase7AuthoringReviewerCalls(SIXTEEN)`~~ — a record
+	 * written by a lane before D20 holds that lane's own figure, its floor's TWO runs: 2 × 16 × 6 = 192, never today's count (three runs
+	 * since package L12, `phase7AuthoringReviewerCalls`). The report's cases below build such a record and read it back.
 	 */
-	const FLOOR_WORST = phase7AuthoringReviewerCalls(SIXTEEN);
+	const FLOOR_WORST = 192;
+	/**
+	 * ⭐⭐ Package L12 — D67 (the lead's decision): what the same lane counted again for an inventory of twenty staged types, its record's
+	 * own figure: 2 × 20 × 6 = 240 — ~~`phase7AuthoringReviewerCalls(20)`~~, today's count, three runs.
+	 */
+	const COUNTED_AGAIN_FOR_TWENTY = 240;
 	/** The prior that brought Send's read to the limit exactly, before D20. */
 	const AT_SEND = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FLOOR_WORST;
 	/** ⭐ D20 — the calls spent before P6 again, as planned: the allowance handed over, 1,279, is not sixteen types' 192. */
@@ -3983,11 +4026,17 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 	// ⭐ MOVED DELIBERATELY by package L2 — D20 (the brief's step 3): ~~"192 for the sixteen anticipated before Send"~~ — Send
 	// counts the allowance it hands the authoring review, and `PHASE7_AUTHORING_ANTICIPATED_PARTS` is removed, no allowance in
 	// time needing the estimate; the two-round worst case of an inventory stands, read by no check.
-	it('⭐ the authoring’s worst case counts each part in each of its two rounds, ~~four~~ six calls a review: ~~8~~ 12 for one part, ~~128~~ 192 for sixteen ~~anticipated before Send~~', () => {
+	// ⭐⭐ RESTATED by package L12 — design D67 (`REG-D-156` (2); the lead's decision (d)): three rounds. ⛔ PREDICTED RED at 7e45efb0.
+	it('⭐ the authoring’s worst case counts each part in each of its ~~two~~ ⭐ three (package L12, D67) rounds, ~~four~~ six calls a review: ~~8~~ ~~12~~ ⭐ 18 for one part, ~~128~~ ~~192~~ ⭐ 288 for sixteen ~~anticipated before Send~~', () => {
 		expect([1, 4, 16, 20].map(phase7AuthoringReviewerCalls)).toEqual(
 			[1, 4, 16, 20].map((parts) => PHASE7_AUTHORING_FLOOR_RUNS * parts * LANE_BUDGET.reviewerCallsPerTry)
 		);
-		expect([FLOOR_WORST, phase7AuthoringReviewerCalls(1)]).toEqual([192, 12]);
+		// ⛔ MOVED 2026-11-12 (package L12 — D67) — ~~`[FLOOR_WORST, phase7AuthoringReviewerCalls(1)]` is `[192, 12]`~~: today's count, read
+		// from the lane, 3 × 16 × 6 and 3 × 1 × 6, and the sixth paid run's eighteen types, 3 × 18 × 6 = 324, the three rounds' reservation
+		// the facts state (`l12-facts.md` §3; `REG-F-580`). `FLOOR_WORST` is now the figure a record made before D20 holds, 192, pinned.
+		expect([phase7AuthoringReviewerCalls(SIXTEEN), phase7AuthoringReviewerCalls(1), phase7AuthoringReviewerCalls(18)]).toEqual([
+			288, 18, 324
+		]);
 	});
 
 	// ⛔ PREDICTED RED, read from the code: no read counted the inventory the turn staged, so a candidate larger than the reserve
@@ -4023,16 +4072,18 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 	});
 
 	// ⭑ A RUN RECORDED BEFORE D20 (package L2): its Send check counted the 16 anticipated types and its inventory was counted again.
-	// The lane makes neither now; the report still reads such a record as it was made.
+	// The lane makes neither now; the report still reads such a record as it was made. ⭐ Package L12 (D67; the lead's decision): and
+	// with that lane's own figures, its floor's two runs (`FLOOR_WORST`, `COUNTED_AGAIN_FOR_TWENTY`), never today's three — as are the
+	// two records of such a run below.
 	it('⭐ the report lists Send’s check counted again among the lane’s reads, after Send’s own, past the limit where it is', () => {
 		const lane = halfBLaneRows();
 		const inventoryCheck = {
 			prior: AT_SEND,
 			recorded: 0,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-			ahead: phase7AuthoringReviewerCalls(20),
+			ahead: COUNTED_AGAIN_FOR_TWENTY,
 			counted: STAGED_INVENTORY,
-			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + phase7AuthoringReviewerCalls(20),
+			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + COUNTED_AGAIN_FOR_TWENTY,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: false
 		};
@@ -4049,7 +4100,7 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 		]);
 		expect(renderMarkdown(out)).toContain(
 			`  - authoring, before Send, counted again for the inventory its turn staged: ${AT_SEND} + 0 + ` +
-				`${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${phase7AuthoringReviewerCalls(20)} ahead (${STAGED_INVENTORY}) = ` +
+				`${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${COUNTED_AGAIN_FOR_TWENTY} ahead (${STAGED_INVENTORY}) = ` +
 				`${inventoryCheck.total} of ${PHASE7_PAID_LIMIT}, past it: nothing held back, its rounds having run inside the Send press.`
 		);
 	});
@@ -4125,9 +4176,9 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 			prior: AT_SEND,
 			recorded: 0,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-			ahead: phase7AuthoringReviewerCalls(20),
+			ahead: COUNTED_AGAIN_FOR_TWENTY,
 			counted: STAGED_INVENTORY,
-			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + phase7AuthoringReviewerCalls(20),
+			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + COUNTED_AGAIN_FOR_TWENTY,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: false
 		};
@@ -4209,9 +4260,9 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 			prior: AT_SEND,
 			recorded: 0,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-			ahead: phase7AuthoringReviewerCalls(20),
+			ahead: COUNTED_AGAIN_FOR_TWENTY,
 			counted: STAGED_INVENTORY,
-			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + phase7AuthoringReviewerCalls(20),
+			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + COUNTED_AGAIN_FOR_TWENTY,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: false
 		};

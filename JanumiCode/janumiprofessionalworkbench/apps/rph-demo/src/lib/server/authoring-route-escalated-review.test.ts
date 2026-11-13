@@ -33,6 +33,8 @@ const seam = vi.hoisted(() => ({
 	calls: [] as { readonly file: string; readonly args: readonly string[] }[],
 	/** Every review prompt devin was handed, in order — a re-review's carries the prior run's gaps. */
 	prompts: [] as string[],
+	/** ⭐ Package L12 (D67) — the round each prompt was made in, beside it: the agent's runs before it (the operator's, then each directive). */
+	rounds: [] as number[],
 	answer: ''
 }));
 
@@ -55,6 +57,7 @@ vi.mock('./tools/devin-reviewer.js', async (importOriginal) => {
 			actual.devinPrint(prompt, async (file, args) => {
 				seam.calls.push({ file, args: [...args] });
 				seam.prompts.push(prompt);
+				seam.rounds.push(agentSeam.instructions.length);
 				const exportPath = args[args.indexOf('--export') + 1];
 				if (exportPath !== undefined)
 					await writeFile(
@@ -304,6 +307,7 @@ beforeEach(() => {
 	resetEngine('reference');
 	seam.calls.length = 0;
 	seam.prompts.length = 0;
+	seam.rounds.length = 0;
 	seam.answer = ESCALATED_CLEAN;
 	agentSeam.instructions.length = 0;
 	agentSeam.withholdProducer = false;
@@ -576,35 +580,57 @@ describe('⭐ JAN-ESCREC D3 — through the route: an unclassified block names n
 
 		await postInstruction(pwaId, ROOT_ONLY_PLAN);
 
-		expect(agentSeam.instructions, 'arrangement: no auto-refinement pass ran').toHaveLength(2);
-		const directive = agentSeam.instructions[1]!;
-		expect(directive, 'arrangement: the refinement directive did not carry the finding').toContain(
-			FAULT
-		);
-		expect(
-			directive,
-			'the recommendation’s code was sent to the producer as a finding'
-		).not.toContain(RECOMMENDATION_CODE);
-		expect(directive, 'the recommendation was sent to the producer as a finding').not.toContain(
-			RECOMMENDATION_FIRST_SENTENCE
-		);
-		// ⭐ The review in parts, B4 (`REG-D-125`; design D8) — the refined candidate's WHOLE part inventory is reviewed again:
-		// one prompt for the first round's one type, then one per type of the refined candidate, the first its first.
-		const refined = listByType(getPendingAuthoringTurn(pwaId)!.engine, 'PWU_TYPE').filter(
+		// ⭐⭐ RESTATED by package L12 — design D67 (`REG-D-156` (2); the lead's decisions (b), (c)): this reviewer rejects every part of
+		// every round, so the second round asks for refinement too, and the route refines twice and reviews a third time.
+		// ⛔ MOVED DELIBERATELY — ~~`toHaveLength(2)`~~: the operator's instruction and two directives. PREDICTED RED at 7e45efb0.
+		expect(agentSeam.instructions, 'arrangement: the two auto-refinement passes did not run').toHaveLength(3);
+		for (const [i, directive] of agentSeam.instructions.slice(1).entries()) {
+			expect(directive, `arrangement: refinement directive ${i + 1} did not carry the finding`).toContain(FAULT);
+			expect(
+				directive,
+				`the recommendation’s code was sent to the producer as a finding (directive ${i + 1})`
+			).not.toContain(RECOMMENDATION_CODE);
+			expect(directive, `the recommendation was sent to the producer as a finding (directive ${i + 1})`).not.toContain(
+				RECOMMENDATION_FIRST_SENTENCE
+			);
+		}
+		// ⭐ The review in parts, B4 (`REG-D-125`; design D8) — after each refinement the candidate's WHOLE part inventory is reviewed
+		// again: one prompt for the first round's one type, then one per type of the candidate after each refinement — ~~one round
+		// after it~~ ⭐ two (package L12), the last the candidate as it stands.
+		const live = listByType(getPendingAuthoringTurn(pwaId)!.engine, 'PWU_TYPE').filter(
 			(t) => t.state.pwaId === pwaId && t.state.status !== 'REMOVED'
-		).length;
-		expect(refined, 'arrangement: the refinement added types').toBeGreaterThan(1);
-		expect(seam.prompts, 'arrangement: the refined candidate was not reviewed again, part by part').toHaveLength(
-			1 + refined
 		);
+		const refined = live.length;
+		expect(refined, 'arrangement: the refinements added types').toBeGreaterThan(1);
+		const typeOf = (prompt: string) => /\{"subject":\{"type":\{"id":"([^"]+)"/.exec(prompt)?.[1] ?? '';
+		const ofRound = (round: number) => seam.prompts.filter((_, i) => seam.rounds[i] === round);
+		expect(seam.rounds.every((round) => round >= 1 && round <= 3), 'a round ran after a third refinement').toBe(true);
+		const [first, second, third] = [ofRound(1), ofRound(2), ofRound(3)];
+		expect(first, 'arrangement: the first round reviewed other than its one type').toHaveLength(1);
+		expect(second.length, 'arrangement: the first refinement’s candidate was not reviewed again, part by part').toBeGreaterThan(1);
+		expect(third.map(typeOf).sort(), 'the second refinement’s candidate was not reviewed again, part by part').toEqual(
+			live.map((t) => t.id).sort()
+		);
+		// ⭐ B4 — and each part is given its OWN type's findings from the round before, never another's: in the second round the
+		// first round's one type alone; in the third, each type the second round rejected — every one of them, each given its own —
+		// and no type the second refinement added.
+		const plan = typeOf(first[0]!);
+		for (const prompt of second)
+			expect(prompt.includes(FAULT), `the second round’s ${typeOf(prompt)} was shown the wrong prior gaps`).toBe(
+				typeOf(prompt) === plan
+			);
+		// ⭑ The lead's review of package L12: HEAD's positive half, kept unconditional — the first round's type IS reviewed again in
+		// the second round, once, and given its finding as a prior gap (HEAD: ~~`seam.prompts[1]` contains it~~, by position).
 		expect(
-			seam.prompts[1],
+			second.filter((prompt) => typeOf(prompt) === plan).map((prompt) => prompt.includes(FAULT)),
 			'arrangement: the re-review was not given the finding as a prior gap'
-		).toContain(FAULT);
-		// ⭐ B4 — and only the part the finding was about is given it: another type's review is shown none of its findings.
-		for (const other of seam.prompts.slice(2))
-			expect(other, 'another type’s re-review was given this type’s finding').not.toContain(FAULT);
-		for (const prompt of seam.prompts.slice(1))
+		).toEqual([true]);
+		const rejectedInTheSecond = new Set(second.map(typeOf));
+		for (const prompt of third)
+			expect(prompt.includes(FAULT), `the third round’s ${typeOf(prompt)} was shown the wrong prior gaps`).toBe(
+				rejectedInTheSecond.has(typeOf(prompt))
+			);
+		for (const prompt of [...second, ...third])
 			expect(prompt, 'the re-review was given the recommendation as a prior gap').not.toContain(
 				RECOMMENDATION_FIRST_SENTENCE
 			);
@@ -613,7 +639,8 @@ describe('⭐ JAN-ESCREC D3 — through the route: an unclassified block names n
 		expect(
 			recordedRecommendations(pwaId),
 			'arrangement: the recommendation was not recorded'
-		).toHaveLength(1 + refined);
+		).toHaveLength(first.length + second.length + third.length);
+		expect(seam.prompts, 'arrangement: a prompt was made in no round').toHaveLength(first.length + second.length + third.length);
 	});
 });
 

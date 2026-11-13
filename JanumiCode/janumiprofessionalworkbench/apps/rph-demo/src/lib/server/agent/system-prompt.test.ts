@@ -78,6 +78,25 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(governance).not.toContain('There is no staged preview');
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L12 — design D67 as amended (the lead's decision of 2026-11-12; `REG-D-156` (2)): the floor may bring
+	// the agent back at most twice in one turn (`routes/pwa/[id]/agent/+server.ts`, `AUTHORING_REFINEMENTS`), so GOVERNANCE says so — the
+	// one word "once" replaced by "at most twice", nothing else changing, the sentence pinned whole. ⛔ PREDICTED RED, read from the code at
+	// 7e45efb0: the sentence says the review "may bring you back once".
+	it('⭐ L12 (D67) — GOVERNANCE says a valid finding of the review may bring the agent back at most twice in the same turn: the sentence, whole', () => {
+		const prompt = buildSystemPrompt({
+			id: 'PWA-TEST',
+			name: 'Test PWA',
+			domain: 'testing',
+			publicationStatus: 'DRAFT'
+		});
+		const governance = prompt.slice(prompt.indexOf('GOVERNANCE'), prompt.indexOf('CURRENT PWA'));
+		expect(governance, 'arrangement: the GOVERNANCE section').toMatch(/^GOVERNANCE — read carefully/);
+		expect(governance.split('\n'), 'GOVERNANCE does not hold the sentence, whole, as one of its lines').toContain(
+			'- When your turn ends, the workbench runs the assurance floor over the candidate, including an independent reasoning review. A valid finding of that review may bring you back at most twice, in the same turn, to revise the candidate; then the candidate waits for the professional.'
+		);
+		expect(prompt, 'the prompt still says a review brings the agent back once').not.toContain('may bring you back once');
+	});
+
 	// ⭐ `REG-F-505` remedy 2 (`DESIGN-phase-7-completion.md` §4a E1): a PWA meant to run needs MODEL and an ACTIVE
 	// prompt on each type a model is to execute; the catalog's blueprints leave that question open.
 	it('⭐ HOW TO WORK: a type a model is to run declares MODEL and an ACTIVE prompt, using only supplied markers, and blueprints leave the discharge open', () => {

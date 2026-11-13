@@ -68,9 +68,17 @@ interface FloorTurnResult {
 	readonly externalDetail?: string;
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L12 — design D67 (`REG-D-156` (2); `REG-F-628`; the lead's count) — HOW MANY AUTOMATIC
+ * REFINEMENTS ONE TURN MAY RUN: two, so the floor runs at most three rounds. ⛔ It was one. ⭑ The lane counts the rounds this
+ * allows (`e2e-live-exec/lane-config.ts`, `PHASE7_AUTHORING_FLOOR_RUNS`: one more than this).
+ */
+const AUTHORING_REFINEMENTS = 2;
+
 /** Run and RECORD the floor entirely inside the staged candidate. The subject hash is computed immediately before
- * each review and carried into its observable input/correlation. A valid subject finding may cause one isolated
- * refinement/re-review; operational reviewer failures never become graph-edit instructions. */
+ * each review and carried into its observable input/correlation. A valid subject finding may cause ~~one isolated
+ * refinement/re-review~~ ⭐ an isolated refinement and re-review, and the re-review's another, at most
+ * `AUTHORING_REFINEMENTS` in all (package L12, D67); operational reviewer failures never become graph-edit instructions. */
 async function runFloorAfterTurn(ctx: {
 	pwaId: string;
 	instruction: string;
@@ -122,7 +130,17 @@ async function runFloorAfterTurn(ctx: {
 		if (!floor) return { externalDetail: 'The candidate graph could not be loaded for assurance.' };
 		noteFloor(floor);
 		let remediation = classifyFloorRemediation(floor);
-		if (mode !== 'mock' && remediation.autoRefine) {
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L12 — design D67 (`REG-D-156` (2); `REG-F-628`) — AT MOST `AUTHORING_REFINEMENTS`
+		// REFINEMENTS, each followed by a round of the floor, while the round before asks for one by the rule that asked for the
+		// first (`autoRefine`). A round that asks for none — satisfied, its review missing or failed, the allowance's stop, a PWA
+		// with no type, a finding no refinement answers — a candidate that could not be loaded, and mock mode end it, as they
+		// ended the one refinement. ⛔ It was one (`if`): the sixth paid run's second round rejected an unchanged type with no
+		// refinement left.
+		for (
+			let refinements = 0;
+			floor !== undefined && mode !== 'mock' && remediation.autoRefine && refinements < AUTHORING_REFINEMENTS;
+			refinements++
+		) {
 			transcript.push({
 				role: 'SYSTEM',
 				kind: 'message',
@@ -151,7 +169,8 @@ async function runFloorAfterTurn(ctx: {
 					// Re-read after the refinement pass: the producer may have declared a revised account.
 					rationale: agent.rationale(),
 					narration: planText(),
-					// ⭐ B4 — each part is shown its own type's earlier findings (`runPwaFloor`).
+					// ⭐ B4 — each part is shown its own type's earlier findings (`runPwaFloor`): ⭐ L12 (D67, the lead's decision (c))
+					// those of the round before — the second round the first's, the third the second's — as `remediation` is that round's.
 					priorFindings: remediation.findings,
 					candidateSubjectHash: subjectHash
 				},
@@ -405,7 +424,8 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				// A fresh or REVISE-resumed candidate is COLLECTING and advances to ASSURING here; a candidate resumed
 				// from BLOCKED_EXTERNAL is already ASSURING (a mutable state), so the agent refined it in place.
 				if (turn.status === 'COLLECTING') markAuthoringTurnValid(turn);
-				// Run + record the de minimis floor over the same isolated candidate and auto-refine at most once.
+				// Run + record the de minimis floor over the same isolated candidate and auto-refine at most twice (~~once~~; package
+				// L12, D67: `REG-D-156`).
 				const floorResult = await runFloorAfterTurn({
 					pwaId: params.id,
 					instruction,

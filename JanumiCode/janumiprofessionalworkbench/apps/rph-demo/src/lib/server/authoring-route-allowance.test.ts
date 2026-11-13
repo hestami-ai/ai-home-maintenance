@@ -146,6 +146,12 @@ const WORST = 2 * 6;
 /** The refinement's round: the plan's two types and the two the mock agent's canned graph adds — 4 × 6 = 24. */
 const REFINED_REVIEWS = ['review Realize', 'review Check', 'review Product Realization', 'review Architecture Definition'];
 const REFINED_WORST = 4 * 6;
+/**
+ * ⭐⭐ Package L12 — D67 (`REG-D-156` (2)): the SECOND refinement's round — the four above and the two the canned graph adds again,
+ * given the second directive (measured under package L12's prototype, `l12-facts.md` §4 item 3): 6 × 6 = 36.
+ */
+const THIRD_REVIEWS = [...REFINED_REVIEWS, 'review Product Realization', 'review Architecture Definition'];
+const THIRD_WORST = 6 * 6;
 
 function draftPwa(): string {
 	const pwaId = mintUiId('pwa');
@@ -293,7 +299,30 @@ describe('⭐⭐ L2 — D20, through the route: the process’s allowance bounds
 		);
 	});
 
-	it('⭑ CONTROL — an allowance holding both rounds reviews both, and the refined candidate is staged for revision as today', async () => {
+	// ⭐⭐ RESTATED by package L12 — design D67 (`REG-D-156` (2); the lead's decision (e)): Realize is rejected in every round, so the
+	// second round asks for refinement too and a THIRD round follows, reserving its six types × 6 against what the first two left —
+	// so an allowance of ~~`WORST + REFINED_WORST`~~, which held both rounds and holds no third, now stops the third (the red below),
+	// and this CONTROL is given one that holds all three. ⛔ PREDICTED RED at 7e45efb0: no third round is reviewed.
+	it('⭑ CONTROL — an allowance holding ~~both rounds~~ ⭐ all three rounds (package L12, D67) reviews ~~both~~ ⭐ each, and the refined candidate is staged for revision as today', async () => {
+		vi.stubEnv('JPWB_AGENT', 'pi');
+		seam.answerFor = (typeName) => (typeName === 'Realize' ? FAULTING : CLEAN);
+		seam.allowance = allowanceOf(WORST + REFINED_WORST + THIRD_WORST);
+		const pwaId = draftPwa();
+
+		await postInstruction(pwaId, PLAN);
+
+		expect(seam.timeline.indexOf('agent run 3'), 'the second refinement did not run').toBeGreaterThan(0);
+		const second = seam.timeline.slice(seam.timeline.indexOf('agent run 2') + 1, seam.timeline.indexOf('agent run 3'));
+		expect(reviews(second)).toEqual(REFINED_REVIEWS);
+		const third = seam.timeline.slice(seam.timeline.indexOf('agent run 3') + 1);
+		expect(reviews(third), 'the third round was not reviewed within an allowance that holds it').toEqual(THIRD_REVIEWS);
+		expect(getPendingAuthoringTurn(pwaId)?.status).toBe('REVISION_REQUIRED');
+	});
+
+	// ⭐⭐ Package L12 — design D67 (`REG-F-580`; the lead's decision (e): *"Each round's reservation is unchanged … a third round reserves
+	// its types × 6 before its first call, or calls none"*). ⛔ PREDICTED RED, read from the code at 7e45efb0: the route refines once and
+	// returns after the second round, so no third round is reserved for or stopped, and the candidate is staged REVISION_REQUIRED.
+	it('⛔ RED — the third round, past what the first two rounds left, is stopped before its first call, and the candidate is not accepted', async () => {
 		vi.stubEnv('JPWB_AGENT', 'pi');
 		seam.answerFor = (typeName) => (typeName === 'Realize' ? FAULTING : CLEAN);
 		seam.allowance = allowanceOf(WORST + REFINED_WORST);
@@ -301,9 +330,27 @@ describe('⭐⭐ L2 — D20, through the route: the process’s allowance bounds
 
 		await postInstruction(pwaId, PLAN);
 
-		const second = seam.timeline.slice(seam.timeline.indexOf('agent run 2') + 1);
-		expect(reviews(second)).toEqual(REFINED_REVIEWS);
-		expect(getPendingAuthoringTurn(pwaId)?.status).toBe('REVISION_REQUIRED');
+		expect(seam.instructions, 'the second refinement did not run').toHaveLength(3);
+		expect(
+			reviews(seam.timeline.slice(seam.timeline.indexOf('agent run 2') + 1, seam.timeline.indexOf('agent run 3'))),
+			'arrangement: the second round'
+		).toEqual(REFINED_REVIEWS);
+		expect(
+			reviews(seam.timeline.slice(seam.timeline.indexOf('agent run 3') + 1)),
+			'the third round made reviewer calls past what the first two left'
+		).toEqual([]);
+		const turn = getPendingAuthoringTurn(pwaId)!;
+		expect(turn.status, 'a candidate whose third round the allowance stopped was accepted or sent for revision').toBe('BLOCKED_EXTERNAL');
+		expect(summarizeAuthoringTurn(turn).remediationAction).toBe('FIT_THE_REVIEW_ALLOWANCE');
+		const data = await loadThePage(pwaId);
+		expect(data.floorBlockedHint).toBe('FIT_THE_ALLOWANCE');
+		const stated = stoppedGaps(data);
+		expect(stated, 'the page does not read the third round’s reason, for each of its types').toHaveLength(6);
+		for (const gap of stated)
+			expect(gap).toContain(
+				`its worst case is 6 × 6 = ${THIRD_WORST} reviewer calls, and the allowance of ${WORST + REFINED_WORST} has 0 left, ` +
+					`${WORST + REFINED_WORST} reserved by earlier rounds`
+			);
 	});
 
 	it('⭑ CONTROL — a round EXACTLY at the allowance is reviewed, and its clean candidate is assured', async () => {

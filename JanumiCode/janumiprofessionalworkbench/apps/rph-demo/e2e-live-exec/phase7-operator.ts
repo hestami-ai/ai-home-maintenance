@@ -1735,7 +1735,8 @@ export interface AuthoringRecord {
 	 * candidate held, ~~which every review round of the turn reviews as parts~~ ⭐ (package C's check) the largest staged
 	 * inventory, the one the wait's allowance (`allowanceMs`) ~~, the units' timeout and Send's check counted again
 	 * (`inventoryCheck`) are~~ ⭐ and the units' timeout are (package L2, D20) derived from. ⚠ Not every round's inventory: where
-	 * the refinement adds or removes a type, one of the turn's two rounds reviewed fewer types. 0 until a type is staged.
+	 * ~~the refinement~~ ⭐ a refinement adds or removes a type, one of the turn's ~~two~~ ⭐ rounds (at most three since package L12, D67)
+	 * reviewed fewer types. 0 until a type is staged.
 	 */
 	parts: number;
 	/**
@@ -1907,7 +1908,8 @@ interface AuthoringEnd {
  * (`AuthoringRecord.parts`), and the deadline is the allowance for it from the wait's start (`phase7AuthoringAllowanceMs`) —
  * so a type the refinement adds extends it, and one it removes does not shorten it, its first round having reviewed it. Each
  * larger allowance is carried into the spec's timeout (`extendTimeout`, `phase7HalfBAuthoringTimeoutMs`). ⛔ It was one
- * constant, 2,400 s: two reviews at their retry bounds, where a sixteen-type candidate's two rounds are 32 (design D9).
+ * constant, 2,400 s: two reviews at their retry bounds, where a sixteen-type candidate's two rounds are 32 (design D9) — ⭐ and its three
+ * rounds, since package L12 (D67), 48.
  */
 async function waitForTheCandidate(
 	author: AuthoringHands,

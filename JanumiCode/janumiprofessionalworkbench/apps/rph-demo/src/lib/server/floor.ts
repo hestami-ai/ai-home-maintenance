@@ -651,7 +651,7 @@ export const failedOperationally = (part: FloorPartView): boolean =>
  *
  * So the round without its failed parts is classified as any round is (`floorViewOf` over the other parts, the deterministic
  * policies as recorded), and when that answers `REFINE_SUBJECT` its findings go back, with the failed parts named
- * (`failedParts`): the one automatic refinement runs, and the floor then reviews every part again, the failed ones included
+ * (`failedParts`): ~~the one~~ ⭐ an automatic refinement (package L12, D67: one of at most two) runs, and the floor then reviews every part again, the failed ones included
  * (`runPwaFloor` rebuilds the whole inventory; design D8). ⛔ A failed part's record is never a finding (D5), and the round is
  * never SATISFIED by this: `floor` is unchanged, its fold the strictest part's.
  * ⭑ `undefined`, and the ladder answers, when no part failed; when a failed part's review was refused for a substituted model,
@@ -684,7 +684,12 @@ const FINDINGS_LISTED_PER_TYPE = 6;
 
 /**
  * Turn the Reasoning Review's open findings into an auto-refinement directive for the executor (`routes/pwa/[id]/agent/
- * +server.ts`, which sends it once, when `classifyFloorRemediation` answers `REFINE_SUBJECT`).
+ * +server.ts`, which sends it ~~once~~ ⭐ after each round whose remediation asks for refinement, at most twice (package L12, D67),
+ * ~~when `classifyFloorRemediation` answers `REFINE_SUBJECT`~~ ⭐ each time over that round's findings and failed parts).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L12 — design D67 (`REG-D-156` (1); `REG-F-628`; the lead's words) — AND IT ASKS FOR EACH FINDING'S
+ * PROBLEM WHEREVER IT OCCURS: two sentences after the line that asks for the revision and before the findings. ⛔ It listed the
+ * findings by type and asked for nothing beyond them, so the sixth paid run's agent repaired the one type a finding named and left
+ * its sibling, with the same gap, to be rejected in the next round.
  *
  * ⭐ The review in parts, B4 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D7) — GROUPED BY TYPE, each type named by the
  * HOST: the id and name each finding carries from the part it was recorded under (`FloorObservationView.typeId`), never
@@ -722,6 +727,9 @@ export function refineDirective(
 	return [
 		'An independent assurance Reasoning Review produced valid findings about the authored PWA subject, reviewed type by type.',
 		'Revise the PWA graph and/or its recorded professional rationale as each coded finding requires; do not merely restate the intent:',
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L12 — design D67 (`REG-D-156` (1); `REG-F-628`) — THE LEAD'S TWO SENTENCES, after the line
+		// above and before the findings: a finding lands on the type its review saw it in, and every type is reviewed again.
+		'Every type of the PWA is reviewed again after this revision, not only those named below. Where a finding names a problem, look for the same problem in every other type and fix it wherever it occurs.',
 		sections.join('\n\n'),
 		...(failedParts.length === 0
 			? []
