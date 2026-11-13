@@ -86,7 +86,11 @@ describe('JAN-EXECLOOP — the bound', () => {
 // ── EL-02 ───────────────────────────────────────────────────────────────────────────────────────────────────
 const observation = (code: string) => ({ code, severity: 'BLOCKING', statement: 'x' });
 
-function floorWith(disposition: string): FloorView {
+/** ⭐ L13 (D68) — `observations` added, its default the one observation every caller had: a failed declared check. */
+function floorWith(
+	disposition: string,
+	observations: readonly ReturnType<typeof observation>[] = [observation('RR-01-no-problem-substitution')]
+): FloorView {
 	return {
 		subjectId: 'art_1',
 		satisfied: false,
@@ -96,7 +100,7 @@ function floorWith(disposition: string): FloorView {
 				policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
 				disposition,
 				independenceOk: true,
-				observations: [observation('RR-01-no-problem-substitution')]
+				observations: [...observations]
 			}
 		]
 	} as unknown as FloorView;
@@ -114,7 +118,7 @@ describe('JAN-EXECLOOP — only a disposition that JUDGED the subject may send w
 		expect(classifyFloorRemediation(floorWith('CONDITIONALLY_SATISFIED')).autoRefine).toBe(true);
 	});
 
-	it('⛔ INCONCLUSIVE does NOT feed back — it would MANUFACTURE WORK FROM SILENCE', () => {
+	it('⛔ INCONCLUSIVE ⭐ that could not tell does NOT feed back — it would MANUFACTURE WORK FROM SILENCE ⭐ — and one held so for a failed declared check does (package L13, D68)', () => {
 		// ⭑⭑ `REG-D-059`, in terms: "INCONCLUSIVE — the reviewer could not tell — must not feed a finding back
 		// to the agent, because there is no finding." `ASR-11` limb 1: a validator failure "neither rejects nor
 		// satisfies the subject."
@@ -122,9 +126,26 @@ describe('JAN-EXECLOOP — only a disposition that JUDGED the subject may send w
 		// THE MUTANT: restore `disposition !== 'SATISFIED'`. ⚠ AND NO OTHER TEST WOULD REDDEN — the offline
 		// reviewer returns INCONCLUSIVE only with operational codes, which are filtered out before this point,
 		// so the condition was UNREACHABLE until a live model started choosing its own disposition.
-		const r = classifyFloorRemediation(floorWith('INCONCLUSIVE'));
-		expect(r.autoRefine, 'a reviewer that could not tell has not found anything').toBe(false);
-		expect(r.action).not.toBe('REFINE_SUBJECT');
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L13 — design D68 (`REG-D-157`; `REG-F-630`) — RESTATED, THE CONSTRUCT NARROWED BY THE SPONSOR: that
+		// note is the lead's, not the sponsor's words, and assumes the reviewer could not tell. This fixture's one observation is coded by
+		// a check the review declares (`RR-01-no-problem-substitution`): such a review named a problem — the floor held it INCONCLUSIVE —
+		// and is answered as a REJECTED one is. So the promise is kept where it holds, for a review that could not tell: one whose only
+		// observation no check declares (`RR-01`), and one with nothing observed; and the held review is asserted to feed back. ⭑ The
+		// mutant above is still this file's: beside it, UNASSESSED and EVIDENCE_REQUIRED, each carrying the declared check, would feed back.
+		for (const [label, observations] of [
+			['a code no check declares', [observation('RR-01')]],
+			['nothing observed', []]
+		] as const) {
+			const r = classifyFloorRemediation(floorWith('INCONCLUSIVE', observations));
+			expect(r.autoRefine, `${label}: a reviewer that could not tell has not found anything`).toBe(false);
+			expect(r.action, label).not.toBe('REFINE_SUBJECT');
+		}
+		const held = classifyFloorRemediation(floorWith('INCONCLUSIVE'));
+		expect([held.action, held.autoRefine, held.findings.map((f) => f.code)], 'a review held so for a failed declared check').toEqual([
+			'REFINE_SUBJECT',
+			true,
+			['RR-01-no-problem-substitution']
+		]);
 	});
 
 	it('⛔ nor do UNASSESSED or EVIDENCE_REQUIRED, and for their own reasons', () => {

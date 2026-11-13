@@ -2453,6 +2453,8 @@ async function runModelUnit(u: ModelUnitRun) {
 			// ⛔ `autoRefine` IS THE GUARD THAT DECIDES WHETHER THERE IS ANYTHING TO SEND BACK AT ALL. An
 			// INCONCLUSIVE review — *the reviewer could not tell* — sets it false, because feeding that back
 			// as though it were a critique would MANUFACTURE WORK FROM SILENCE (`REG-D-059`, `ASR-11` limb 1).
+			// ⭐⭐ Package L13 — D68 (`REG-D-157`): save one the floor holds INCONCLUSIVE for a failed declared check, which named a
+			// problem: it sets it TRUE, and its failed checks go back, as a REJECTED review's findings do.
 			// ⭐ Package N — D9 — FOR EVERY REFUSED REVIEW OF THE TRY, the work product's first: one that may not be answered by
 			// the producer (a review that did not conclude, an escalation) ends the loop, so a retry never steps past it — the
 			// person's choice follows (RD3), as it always did for the work product's.

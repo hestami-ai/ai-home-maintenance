@@ -744,7 +744,12 @@ describe('⭐⭐ Package E, E1 — revision beside parts whose reviews failed op
 // read the disposition of the FOLD, and the fold is REJECTED beside one rejected part, so every part's observations went back
 // as findings: an INCONCLUSIVE part's — the boundary-rejected reply below, which recommends SATISFIED over a criterion it
 // faults — and a SATISFIED part's INFORMATIONAL one.
-describe('⭐⭐ Package E’s check — the findings sent back are the concluded parts’ own, never an INCONCLUSIVE or SATISFIED part’s', () => {
+// ⭐⭐ `JAN-EXEC` Phase 7, package L13 — design D68 (`REG-D-157`; `REG-F-630`) — RESTATED, THE CONSTRUCT NARROWED BY THE SPONSOR: that
+// boundary-rejected reply is the sixth paid run's held type, which NAMED a problem — a check the review declares, failed — and the
+// floor, not the reviewer, made it INCONCLUSIVE. Such a part's failed declared checks now go back beside the concluded parts' findings
+// (`REG-D-059`'s note on INCONCLUSIVE is the lead's, and the sponsor narrowed it); its other observations, a SATISFIED part's, and an
+// INCONCLUSIVE part's that could not tell still never do (the CONTROL added at the end of this block).
+describe('⭐⭐ Package E’s check — the findings sent back are the concluded parts’ own, never ~~an INCONCLUSIVE or~~ a SATISFIED part’s ⭐ — and of an INCONCLUSIVE part only its failed declared checks (package L13, D68)', () => {
 	/** A reply that faults the policy's second criterion and still recommends SATISFIED: the boundary rejects it, so its part
 	 *  concludes INCONCLUSIVE with the fault recorded beside it. */
 	const boundaryRejected = (statement: string): string =>
@@ -758,7 +763,9 @@ describe('⭐⭐ Package E’s check — the findings sent back are the conclude
 			residualUncertainty: []
 		});
 
-	it('⭐ RED — a boundary-rejected part beside a rejected one: the rejected part’s finding alone goes back', async () => {
+	// ⭐ L13 (D68) — RESTATED: it asserted the held part's check was NOT sent back, nor in the directive; both are now the opposite, each
+	// asserted, and the held part's check is pinned under its own type in the directive. Its arrangement is unchanged.
+	it('⭐ RED — a boundary-rejected part beside a rejected one: ~~the rejected part’s finding alone goes back~~ ⭐ its failed declared check goes back beside the rejected part’s finding, each under its type (package L13, D68)', async () => {
 		const { floor } = await runRound({
 			[BUILD]: boundaryRejected('The build is said to pass a suite it never ran.'),
 			[CHECK]: rejecting('The check reports runs it never made.')
@@ -772,14 +779,18 @@ describe('⭐⭐ Package E’s check — the findings sent back are the conclude
 		expect(remediation.action).toBe('REFINE_SUBJECT');
 		expect(
 			remediation.findings.map((f) => [f.typeId, f.code]),
-			'an INCONCLUSIVE part’s observation was sent back as a finding'
-		).toEqual([[CHECK, reasoningReviewCriteria(session)[0]!.id]]);
-		expect(refineDirective('Build wordfreq.', remediation.findings, remediation.failedParts)).not.toContain(
-			'The build is said to pass a suite it never ran.'
+			'the held part’s failed check did not go back beside the rejected part’s finding'
+		).toEqual([
+			[BUILD, reasoningReviewCriteria(session)[1]!.id],
+			[CHECK, reasoningReviewCriteria(session)[0]!.id]
+		]);
+		expect(refineDirective('Build wordfreq.', remediation.findings, remediation.failedParts)).toContain(
+			`Findings about the type "Build" (${BUILD}):\n1. [${reasoningReviewCriteria(session)[1]!.id}] The build is said to pass a suite it never ran.\n`
 		);
 	});
 
-	it('⭐ RED — and beside a part whose review failed operationally: the rejected part’s finding alone goes back, the failed part named', async () => {
+	// ⭐ L13 (D68) — RESTATED as the one above: the held part's check now goes back beside the rejected part's, the failed part still named.
+	it('⭐ RED — and beside a part whose review failed operationally: ~~the rejected part’s finding alone goes back~~ ⭐ the held part’s failed declared check goes back beside the rejected part’s finding (package L13, D68), the failed part named', async () => {
 		const { floor } = await runRound({
 			[BUILD]: boundaryRejected('The build is said to pass a suite it never ran.'),
 			[CHECK]: rejecting('The check reports runs it never made.'),
@@ -793,11 +804,16 @@ describe('⭐⭐ Package E’s check — the findings sent back are the conclude
 		]);
 		expect(
 			remediation.findings.map((f) => [f.typeId, f.code]),
-			'an INCONCLUSIVE part’s observation was sent back as a finding'
-		).toEqual([[CHECK, reasoningReviewCriteria(session)[0]!.id]]);
+			'the held part’s failed check did not go back beside the rejected part’s finding'
+		).toEqual([
+			[BUILD, reasoningReviewCriteria(session)[1]!.id],
+			[CHECK, reasoningReviewCriteria(session)[0]!.id]
+		]);
 	});
 
-	it('⭐ RED — the check’s round: an INCONCLUSIVE part’s MATERIAL observation and a SATISFIED part’s INFORMATIONAL one stay, with and without a failed part', () => {
+	// ⭐ L13 (D68) — RESTATED: the INCONCLUSIVE part's observation is coded by a check the review declares (`RR-02`), so it now goes back,
+	// at the severity it was recorded with; the SATISFIED part's INFORMATIONAL one still stays, and so does the failed part's record.
+	it('⭐ RED — the check’s round: ~~an INCONCLUSIVE part’s MATERIAL observation and~~ a SATISFIED part’s INFORMATIONAL one stays ⭐ and an INCONCLUSIVE part’s failed declared check, at MATERIAL, goes back (package L13, D68), with and without a failed part', () => {
 		const FOURTH = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Q13';
 		const concluded = [
 			partView(CHECK, 'Check', 'REJECTED', [
@@ -824,9 +840,12 @@ describe('⭐⭐ Package E’s check — the findings sent back are the conclude
 			const remediation = classifyFloorRemediation(roundOf(parts));
 			expect(remediation.action, label).toBe('REFINE_SUBJECT');
 			expect(
-				remediation.findings.map((f) => [f.typeId, f.code]),
-				`${label}: another part’s observation was sent back as a finding`
-			).toEqual([[CHECK, 'RR-01-no-problem-substitution']]);
+				remediation.findings.map((f) => [f.typeId, f.code, f.severity]),
+				`${label}: the SATISFIED part’s observation was sent back, or the held part’s check was not`
+			).toEqual([
+				[CHECK, 'RR-01-no-problem-substitution', 'BLOCKING'],
+				[ROOT, 'RR-02-no-obligation-elision', 'MATERIAL']
+			]);
 		}
 	});
 
@@ -846,6 +865,37 @@ describe('⭐⭐ Package E’s check — the findings sent back are the conclude
 			[BUILD, 'RR-03-no-unjustified-scope-reduction'],
 			[CHECK, 'RR-01-no-problem-substitution']
 		]);
+	});
+
+	// ⭑ L13 (D68) — ADDED: the promise the restated tests above no longer make, kept where it holds. An INCONCLUSIVE part that could not
+	// tell — its one observation coded by no check the review declares, as the waiver e2e stages one — sends nothing back beside a
+	// rejected part, whose finding alone goes back. Green at 230574f3 and after; its mutants: an INCONCLUSIVE part's observations sent
+	// back whatever they are (`ARP-E-M27`, re-anchored), and any code taken for a declared check.
+	it('⭑ CONTROL — an INCONCLUSIVE part that could not tell, beside a rejected one: the rejected part’s finding alone goes back, with and without a failed part', () => {
+		const rejected = partView(CHECK, 'Check', 'REJECTED', [
+			{ code: 'RR-01-no-problem-substitution', severity: 'BLOCKING', statement: 'Reports a run it never made.' }
+		]);
+		const couldNotTell = partView(ROOT, 'Realize', 'INCONCLUSIVE', [
+			{ code: 'RR-04', severity: 'BLOCKING', statement: 'Staged blocking reasoning-review finding.' }
+		]);
+		const failed = partView(
+			BUILD,
+			'Build',
+			'INCONCLUSIVE',
+			[{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: 'No reply.' }],
+			false
+		);
+		for (const [label, parts] of [
+			['beside a failed part', [failed, rejected, couldNotTell]],
+			['with no failed part', [rejected, couldNotTell]]
+		] as const) {
+			const remediation = classifyFloorRemediation(roundOf(parts));
+			expect(remediation.action, label).toBe('REFINE_SUBJECT');
+			expect(
+				remediation.findings.map((f) => [f.typeId, f.code]),
+				`${label}: an INCONCLUSIVE part that could not tell sent its observation back`
+			).toEqual([[CHECK, 'RR-01-no-problem-substitution']]);
+		}
 	});
 });
 

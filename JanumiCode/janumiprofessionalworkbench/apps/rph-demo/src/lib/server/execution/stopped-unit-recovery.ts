@@ -12,6 +12,8 @@
 // `../floor.ts`), and this module reuses that sort rather than restating it:
 //   · the review DID NOT CONCLUDE (an operational action other than an escalation: a validator or transport failure, an
 //     INCONCLUSIVE review, a reply answering no criterion — `REG-F-552`) → re-run the review, re-run the work, abandon;
+//     ⭐ package L13, D68 (`REG-D-157`): save an INCONCLUSIVE review the floor holds so for a failed declared check, which the
+//     classifier answers `REFINE_SUBJECT` — it named a problem — so it is sorted with the review that concluded against the work;
 //   · ⭐ `P76F-A` A4 — the review was refused for WHO reviewed: a substituted model, or a reviewer not independent of the
 //     producer (`REVIEWER_MUST_CHANGE`) → abandon ALONE. Each re-run is reviewed by that same reviewer. ~~so the unit waits
 //     for the reviewer to change, or is abandoned~~ ⛔ `P76F-C` C4: nothing waits for the reviewer to change — the offers

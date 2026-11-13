@@ -16,6 +16,7 @@ import {
 	assuranceRecordingPlan,
 	createValidatorRegistry,
 	FLOOR_POLICY_IDS,
+	REASONING_REVIEW_CRITERIA,
 	REVIEWER_RECOMMENDED_ESCALATION,
 	runFloorPolicies,
 	VALIDATOR_ALLOWANCE_STOPPED,
@@ -436,8 +437,43 @@ function workProductCheckFindings(floor: FloorView): FloorObservationView[] {
 
 /** The dispositions that JUDGED the subject and found something in it — the only ones whose findings may
  *  be sent back to the producer. Of `AggregateAssuranceDisposition`'s six members these are the two that
- *  assert something ABOUT THE WORK; the other four assert something about the REVIEW. */
+ *  assert something ABOUT THE WORK; the other four assert something about the REVIEW.
+ *  ⭐⭐ `JAN-EXEC` Phase 7, package L13 — design D68 (`REG-D-157`): AND BESIDE THEM ONE NARROWER CASE, an INCONCLUSIVE review the floor
+ *  holds so for a failed check the review declares, whose failed declared checks alone go back (`heldForAFailedCheck`, below). */
 const FEEDS_BACK_TO_PRODUCER: ReadonlySet<string> = new Set(['REJECTED', 'CONDITIONALLY_SATISFIED']);
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L13 — design D68 (`REG-D-157`; `REG-F-630`; `REG-D-059`; the lead's test) — THE CHECKS THE REASONING
+ * REVIEW DECLARES, BY ID: `REASONING_REVIEW_CRITERIA`, the seed of the `floor.reasoning-review` policy, which is locked (it cannot be
+ * edited, suspended or superseded), so the store holds these ids. A failed check is recorded as an observation coded by its id, at the
+ * policy's declared severity (`reasoningReviewResultFromJudgement`, `R25`).
+ */
+const DECLARED_CHECKS: ReadonlySet<string> = new Set(REASONING_REVIEW_CRITERIA.map((c) => c.id));
+
+/** ⭐⭐ Package L13 — D68 — a review's failed declared checks: its observations coded by a check the review declares. */
+const failedDeclaredChecks = (observations: readonly FloorObservationView[]): FloorObservationView[] =>
+	observations.filter((o) => DECLARED_CHECKS.has(o.code));
+
+/**
+ * ⭐⭐ Package L13 — D68 — A REVIEW THE FLOOR HOLDS INCONCLUSIVE FOR A FAILED CHECK: INCONCLUSIVE, with an observation coded by a check
+ * the review declares. ⛔ In P6 again's sixth paid run a reviewer recommended SATISFIED and failed a check; the boundary refuses a
+ * SATISFIED over an unmet mandatory check (`classifyValidatorResult`), so the floor, not the reviewer, held the type INCONCLUSIVE, and
+ * no repair carried its check (`REG-F-630`). ⭑ THE RECORD'S OWN TEST: the record keeps no reviewer recommendation but ESCALATED
+ * (`REG-F-475`), so it cannot say what the reviewer recommended, only whether a declared check failed. An INCONCLUSIVE review with no
+ * such observation — an unanswered check, an operational failure, a boundary-rejected reply that recorded no failed check, a code no
+ * check declares — could not tell, and sends nothing back (`REG-D-059`'s note).
+ */
+const heldForAFailedCheck = (review: Pick<FloorPolicyView, 'disposition' | 'observations'>): boolean =>
+	review.disposition === 'INCONCLUSIVE' && failedDeclaredChecks(review.observations).length > 0;
+
+/**
+ * ⭐⭐ Package L13 — D68 — WHAT ONE REVIEW'S OBSERVATIONS OFFER AS FINDINGS: an INCONCLUSIVE review's, its failed declared checks alone,
+ * none of its other observations; any other review's, all of them, as before. ⭑ Whether they go back is still the classifier's to
+ * decide, by the review's disposition — a part's by the parts' filter, a unit's review by the ladder's condition — and its filter still
+ * drops an operational code and the reviewer's recommendation.
+ */
+const findingsOf = (review: Pick<FloorPolicyView, 'disposition' | 'observations'>): readonly FloorObservationView[] =>
+	review.disposition === 'INCONCLUSIVE' ? failedDeclaredChecks(review.observations) : review.observations;
 
 /** Classify remediation from policy identity, disposition, independence, and observation CODES — never prose.
  *
@@ -451,6 +487,9 @@ const FEEDS_BACK_TO_PRODUCER: ReadonlySet<string> = new Set(['REJECTED', 'CONDIT
  * ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 — AND A SECOND: a round the authoring review's allowance stopped before
  * any reviewer call, recorded as `VALIDATOR_ALLOWANCE_STOPPED` beside it. No reviewer ran, so it is answered by a round that
  * fits the allowance (`FIT_THE_REVIEW_ALLOWANCE`), never by retrying or changing the reviewer.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L13 — design D68 (`REG-D-157`) — AND A REVIEW THE FLOOR HOLDS INCONCLUSIVE FOR A FAILED CHECK THE REVIEW
+ * DECLARES (`heldForAFailedCheck`) IS ANSWERED AS A REJECTED ONE IS: its failed declared checks are findings, and a round held so asks
+ * for a repair (`REFINE_SUBJECT`). Every branch above that answer is asked first, as before.
  */
 export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	if (floor.satisfied) {
@@ -565,10 +604,16 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	// PARTS WHOSE OWN DISPOSITION FEEDS BACK. The fold is the strictest part's, so beside one REJECTED part the rule below read
 	// every part's observations as findings: an INCONCLUSIVE part's, a boundary-rejected reply's fault among them, and a
 	// SATISFIED part's INFORMATIONAL one.
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L13 — design D68 (`REG-D-157`; `REG-F-630`) — AND OF A PART HELD INCONCLUSIVE FOR A FAILED CHECK
+	// (`heldForAFailedCheck`), ITS FAILED DECLARED CHECKS, as a REJECTED part's findings: in export order beside the concluded parts' — the
+	// boundary-rejected reply's fault above among them, now the sponsor has ruled; its other observations, and an INCONCLUSIVE part's that
+	// could not tell, never. And of a unit's review, which has no parts, when it is INCONCLUSIVE its failed declared checks alone
+	// (`findingsOf`). ⛔ They were dropped: beside a rejected type the sixth paid run's held type was left out of the repair, and alone it
+	// ended the turn with no repair.
 	const judged =
 		floor.parts === undefined
-			? review.observations
-			: floor.parts.filter((p) => FEEDS_BACK_TO_PRODUCER.has(p.disposition)).flatMap((p) => p.observations);
+			? findingsOf(review)
+			: floor.parts.filter((p) => FEEDS_BACK_TO_PRODUCER.has(p.disposition) || heldForAFailedCheck(p)).flatMap(findingsOf);
 	const subjectFindings = judged.filter(
 		(o) => !OPERATIONAL_REVIEW_CODES.has(o.code) && !isReviewerRecommendation(o)
 	);
@@ -587,7 +632,15 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	//
 	// ⭑ `UNASSESSED` and `EVIDENCE_REQUIRED` are excluded for their own reasons, not by oversight: nothing
 	// assessed the subject in the first, and the remedy is EVIDENCE rather than a subject edit in the second.
-	if (FEEDS_BACK_TO_PRODUCER.has(review.disposition) && subjectFindings.length > 0) {
+	//
+	// ⭐⭐ Package L13 — D68 (`REG-D-157`; the lead's decision (b)) — ⚠ THAT RULE IS NARROWED BY THE SPONSOR: `REG-D-059`'s note on
+	// INCONCLUSIVE is the lead's, not the sponsor's words, and assumes the reviewer could not tell. A round whose folded review is
+	// INCONCLUSIVE because a review in it is held so for a failed check — a part, or a unit's review, which has none
+	// (`heldForAFailedCheck`) — has a finding, and is answered as a REJECTED round is, its findings those `judged` holds. An INCONCLUSIVE
+	// round with no such review still sends nothing back and is answered below, as before.
+	const reviews: readonly Pick<FloorPolicyView, 'disposition' | 'observations'>[] = floor.parts ?? [review];
+	const heldRound = review.disposition === 'INCONCLUSIVE' && reviews.some(heldForAFailedCheck);
+	if ((FEEDS_BACK_TO_PRODUCER.has(review.disposition) || heldRound) && subjectFindings.length > 0) {
 		return {
 			action: 'REFINE_SUBJECT',
 			autoRefine: true,
@@ -815,7 +868,8 @@ function rejectsTheGraph(floor: FloorView): boolean {
  * ⚠ IT WAS FIRST KEYED ON THE RECORDED CODES (`OPERATIONAL_REVIEW_CODES`), and that missed the blocks the classifier
  * answers without one (the RS-3 verifier's MAJOR 1): an INCOMPLETE review, with no verdict that judged the subject
  * (INCONCLUSIVE, ASSESSING, …), with or without subject-coded observations — the classifier's catch-all, which also takes
- * the INCONCLUSIVE review with nothing recorded that an unregistered draft stages (`e2e/resume-hint.e2e.ts`); an
+ * the INCONCLUSIVE review with nothing recorded that an unregistered draft stages (`e2e/resume-hint.e2e.ts`) ⭐ — save, since package L13
+ * (D68), an INCONCLUSIVE review held so for a failed declared check, which the classifier answers `REFINE_SUBJECT`, so `'REVISE'` —; an
  * ESCALATED review whose record names no operational code; and NO reasoning-review result at all. The codes were chosen
  * because the waiver e2e staged its revision test's floor ASSESSING with a BLOCKING `RR-04`: a test about a SUBJECT
  * rejection whose fixture recorded an incomplete review. That test now concludes its review REJECTED, and the classifier

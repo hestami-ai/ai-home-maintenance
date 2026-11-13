@@ -92,7 +92,9 @@ export interface RunModelStepInput {
 	 * a carried finding rides the FIRST turn, AFTER the instruction, and declares `PRIOR_REVIEW_FINDING` alone — the fresh
 	 * session holds no prior work product and no prior rationale, whatever `retainsHistory` says.
 	 * ⛔ Only SUBJECT findings, as the floor's classifier lists them: never an escalation recommendation, and nothing from a
-	 * review that did not conclude (`REG-D-090`, `REG-D-059`). The caller passes them on try 1 only; later tries are repairs
+	 * review that did not conclude (`REG-D-090`, `REG-D-059`) ⭐ — a review the floor holds INCONCLUSIVE for a failed declared check is
+	 * answered as one that concluded against the work (package L13, D68), so its failed checks are carried. The caller passes them
+	 * on try 1 only; later tries are repairs
 	 * on the now-held session and use `priorFindings`.
 	 */
 	readonly carriedFindings?: readonly { readonly code: string; readonly statement: string }[];
