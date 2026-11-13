@@ -420,9 +420,8 @@ export function stoppedUnitOf(
 	} else {
 		attemptKey = attemptKeyOf(engine, waiting.planId, waiting.stepId);
 		workProductId =
-			listByType(engine, 'ARTIFACT')
-				.filter((a) => a.state.producingExecutionAttemptId === attemptKey)
-				.at(-1)?.id ?? '';
+			listByType(engine, 'ARTIFACT').findLast((a) => a.state.producingExecutionAttemptId === attemptKey)
+				?.id ?? '';
 	}
 	if (!workProductId || !attemptKey)
 		return {

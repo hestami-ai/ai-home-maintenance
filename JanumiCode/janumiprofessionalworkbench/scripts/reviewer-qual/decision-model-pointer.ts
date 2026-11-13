@@ -180,7 +180,7 @@ export async function decisionModelPointer(parts: PointerParts = PRODUCT_POINTER
 	// 5 — the cold path, against a server held in memory.
 	const server = memoryServer(identity);
 	const client = createDecisionModelClient({
-		server: 'http://decision-model.invalid',
+		server: 'https://decision-model.invalid',
 		model: identity.model,
 		// ⭐⭐ Package L8 — D63 (`REG-D-152`): the identity's version, and none beside it.
 		identity: { digest: identity.digest, serverVersion: identity.serverVersion, alsoAccepted: [] },
