@@ -86,6 +86,37 @@ export function refusedRequestOf(entry: { readonly refusedRequest?: unknown; rea
 	return { key: r.key, kind: r.kind, bodySha256: r.bodySha256, status: 413, response: r.response };
 }
 
+/** One entry line of a records file, as JSON.parse returns it. */
+type RecordLine = { kind?: unknown; id?: unknown; questions?: unknown; refusedRequest?: unknown; refused?: unknown };
+
+/**
+ * One entry line (`n` its index after the identity line), parsed: its entry name added to `entries` and its questions to
+ * `questions` — or why it cannot be read.
+ */
+function entryOf(line: string, name: string, n: number, questions: { sha: string; score: number }[], entries: string[]): RecordLine | string {
+	let entry: RecordLine;
+	try {
+		entry = JSON.parse(line) as typeof entry;
+	} catch {
+		return `${name} line ${n + 2} is no JSON`;
+	}
+	if (!Array.isArray(entry.questions)) return `${name} line ${n + 2} holds no questions`;
+	if ((entry.kind === 'CASE' || entry.kind === 'PROBE') && typeof entry.id === 'string') entries.push(`${entry.kind} ${entry.id}`);
+	for (const q of entry.questions as { bodySha256?: unknown; score?: unknown }[]) {
+		if (typeof q.bodySha256 !== 'string' || !SHA.test(q.bodySha256) || typeof q.score !== 'number' || !Number.isFinite(q.score) || q.score < 0 || q.score > 1)
+			return `${name} line ${n + 2} holds a question that is no body hash and probability`;
+		questions.push({ sha: q.bodySha256, score: q.score });
+	}
+	return entry;
+}
+
+/** An entry's review refused, in the refusal's own words: its refused request's, else its refusal before any request, else none. */
+function entryRefusalWords(refusal: RecordedRefusal | undefined, entry: RecordLine): string | undefined {
+	if (refusal !== undefined) return refusedRequestReason(refusal.key, refusal.status, refusal.response);
+	if (typeof entry.refused === 'string') return entry.refused;
+	return undefined;
+}
+
 /** One file's lines, parsed: its identity and every question of its entries — or why it cannot be read. */
 function parsed(
 	name: string,
@@ -105,27 +136,14 @@ function parsed(
 	const entries: string[] = [];
 	const refusedEntries: [string, string][] = [];
 	for (const [n, line] of lines.slice(1).entries()) {
-		let entry: { kind?: unknown; id?: unknown; questions?: unknown; refusedRequest?: unknown; refused?: unknown };
-		try {
-			entry = JSON.parse(line) as typeof entry;
-		} catch {
-			return `${name} line ${n + 2} is no JSON`;
-		}
-		if (!Array.isArray(entry.questions)) return `${name} line ${n + 2} holds no questions`;
-		if ((entry.kind === 'CASE' || entry.kind === 'PROBE') && typeof entry.id === 'string') entries.push(`${entry.kind} ${entry.id}`);
-		for (const q of entry.questions as { bodySha256?: unknown; score?: unknown }[]) {
-			if (typeof q.bodySha256 !== 'string' || !SHA.test(q.bodySha256) || typeof q.score !== 'number' || !Number.isFinite(q.score) || q.score < 0 || q.score > 1)
-				return `${name} line ${n + 2} holds a question that is no body hash and probability`;
-			questions.push({ sha: q.bodySha256, score: q.score });
-		}
+		const entry = entryOf(line, name, n, questions, entries);
+		if (typeof entry === 'string') return entry;
 		// ⭐ Z2b phase 1b — and the request the server refused, where the line holds one.
 		const refusal = refusedRequestOf(entry);
 		if (refusal === null) return `${name} line ${n + 2} ${MALFORMED_REFUSED_REQUEST}`;
 		if (refusal !== undefined) refused.push(refusal);
 		// ⭐ Z3 phase 2 — and the entry's review refused, where its line records it so, in the refusal's own words.
-		let why: string | undefined;
-		if (refusal !== undefined) why = refusedRequestReason(refusal.key, refusal.status, refusal.response);
-		else if (typeof entry.refused === 'string') why = entry.refused;
+		const why = entryRefusalWords(refusal, entry);
 		if (why !== undefined && (entry.kind === 'CASE' || entry.kind === 'PROBE') && typeof entry.id === 'string') refusedEntries.push([`${entry.kind} ${entry.id}`, why]);
 	}
 	return { identity: { model: head.model, digest: head.digest, serverVersion: head.serverVersion }, questions, refused, entries, refusedEntries };
@@ -137,6 +155,20 @@ const sameIdentity = (a: DecisionModelRecordsIdentity, b: DecisionModelRecordsId
 /** A records file as the refusal for files that disagree names it: its name, then its identity in words. */
 const fileIdentityWords = (r: { readonly name: string; readonly file: { readonly identity: DecisionModelRecordsIdentity } }): string =>
 	`${r.name} ${identityWords(r.file.identity)}`;
+
+/** Each question's score by its body's sha256, into `scores`; a body two questions score differently, into `contradicted`. */
+function tallyScores(
+	ok: readonly { readonly file: { readonly questions: readonly { sha: string; score: number }[] } }[],
+	scores: Map<string, number>,
+	contradicted: Set<string>
+): void {
+	for (const r of ok)
+		for (const q of r.file.questions) {
+			const had = scores.get(q.sha);
+			if (had !== undefined && had !== q.score) contradicted.add(q.sha);
+			else scores.set(q.sha, q.score);
+		}
+}
 
 /**
  * ⭐ READ RECORDS FILES (their text, by name) — held to `expected`, the identity the product is held to. Every file's identity line
@@ -162,12 +194,7 @@ export function readDecisionModelRecords(
 	const contradicted = new Set<string>();
 	const entries = new Set(ok.flatMap((r) => r.file.entries));
 	const refusedEntries = new Map(ok.flatMap((r) => r.file.refusedEntries));
-	for (const r of ok)
-		for (const q of r.file.questions) {
-			const had = scores.get(q.sha);
-			if (had !== undefined && had !== q.score) contradicted.add(q.sha);
-			else scores.set(q.sha, q.score);
-		}
+	tallyScores(ok, scores, contradicted);
 	// ⭐ Z2b phase 1b — each body recorded refused; one also scored, or refused again with another answer, contradicts itself.
 	const refused = new Map<string, RecordedRefusal>();
 	const refusalContradicted = new Set<string>();

@@ -1469,6 +1469,15 @@ const isFloorPolicy = (id: unknown): boolean =>
 const later = (prev: LatestAssessment | undefined, next: LatestAssessment): LatestAssessment =>
 	!prev || next.at >= prev.at ? next : prev;
 
+/** Each assurance assessment's floor-run token, read off its first event. */
+function assessmentRunTokens(engine: AuthedEngineHandle): Map<string, string> {
+	const tokens = new Map<string, string>();
+	for (const e of engine.readAllEvents())
+		if (e.aggregateType === 'ASSURANCE_ASSESSMENT' && !tokens.has(e.aggregateId))
+			tokens.set(e.aggregateId, e.correlationId);
+	return tokens;
+}
+
 /**
  * ⭐⭐ The review in parts, B3 (`REG-D-125`; design D6) — THE LATEST RECORDED ROUND OF A PWA'S FLOOR, NEVER A PER-POLICY
  * LATEST. The round is the floor run of the latest floor assessment over the PWA's deterministic policies or over one of
@@ -1488,10 +1497,7 @@ function latestFloorRound(
 			readonly parts: ReadonlyMap<string, LatestAssessment>;
 	  }
 	| undefined {
-	const tokens = new Map<string, string>();
-	for (const e of engine.readAllEvents())
-		if (e.aggregateType === 'ASSURANCE_ASSESSMENT' && !tokens.has(e.aggregateId))
-			tokens.set(e.aggregateId, e.correlationId);
+	const tokens = assessmentRunTokens(engine);
 	const inRound: { readonly a: LatestAssessment; readonly key: string; readonly part: boolean }[] = [];
 	let newest: LatestAssessment | undefined;
 	// WORKSPACE: the subjects here are a PWA and its types, which no Undertaking owns — the subject filter on the next lines

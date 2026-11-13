@@ -3193,12 +3193,21 @@ function unitRuns(u: Unit, units: readonly Unit[], lane: LaneRows, ix: Index): U
 		recorded: u.evidence.length,
 		captured: unrecorded === null ? null : own + unrecorded,
 		unrecorded,
-		cause: why !== undefined && 'cause' in why ? why.cause : null,
-		causeIds: why !== undefined && 'cause' in why ? why.registerIds : [],
-		causeNotRecorded: why !== undefined && 'notRecorded' in why ? why.notRecorded : null,
+		...causeFieldsOf(why),
 		unknownBecause,
 		observedCalls,
 		observedCallsCut
+	};
+}
+
+/** K5's cause fields of one unit, read off `unrecordedCause`'s answer (none asked when no captured run became no evidence). */
+function causeFieldsOf(
+	why: ReturnType<typeof unrecordedCause> | undefined
+): Pick<UnitRuns, 'cause' | 'causeIds' | 'causeNotRecorded'> {
+	return {
+		cause: why !== undefined && 'cause' in why ? why.cause : null,
+		causeIds: why !== undefined && 'cause' in why ? why.registerIds : [],
+		causeNotRecorded: why !== undefined && 'notRecorded' in why ? why.notRecorded : null
 	};
 }
 
@@ -3510,6 +3519,13 @@ function failedClosed(cells: readonly MatrixCell[], slug: string, why: string): 
 
 const triesOf = (u: Unit): string[] => u.tries.map((t) => `${str(t.state.disposition)}:${parseClass(t.state.parseOutcome)}`);
 
+/** Stage 3's line for a phase Begin & Execute was never pressed on — and why, in the page's words, where the lane recorded them. */
+function neverPressedLine(u: Unit): string {
+	return u.lane?.notStarted
+		? `Begin & Execute was never pressed on this phase — the lane’s record: ${u.lane.notStarted}`
+		: 'Begin & Execute was never pressed on this phase';
+}
+
 /** Stage 3 — the phase does the work, and a review's findings reach its next try. */
 function stageThree(v: UnitView, ix: Index): MatrixCell {
 	const u = v.unit;
@@ -3523,11 +3539,7 @@ function stageThree(v: UnitView, ix: Index): MatrixCell {
 	if (u.plan === null) {
 		// ⭐ Package M (D4, D6) — and why, in the page's words, where the lane recorded them.
 		if (!v.pressed)
-			return cell('3', row, 'not reached', [], [
-				u.lane?.notStarted
-					? `Begin & Execute was never pressed on this phase — the lane’s record: ${u.lane.notStarted}`
-					: 'Begin & Execute was never pressed on this phase'
-			]);
+			return cell('3', row, 'not reached', [], [neverPressedLine(u)]);
 		const envelope = u.lane?.beginExecute?.envelopeType ?? 'no envelope';
 		return cell('3', row, 'broke', [], [`Begin & Execute was refused before its plan started (${envelope})`]);
 	}
@@ -3574,14 +3586,20 @@ function stageThree(v: UnitView, ix: Index): MatrixCell {
 	]);
 }
 
+/** The register ids `idsOfUnconcluded` reads off a review's ending alone, before the counts of its calls, in that order. */
+const ENDING_IDS_BEFORE_THE_COUNTS: ReadonlyMap<PairingLabel, readonly string[]> = new Map<PairingLabel, readonly string[]>([
+	['criterion-left-without-row', ['REG-F-566']],
+	['no-response', ['REG-F-499']]
+]);
+
 /** The register ids a review that did not conclude with an answer bears on, by why it did not. */
 function idsOfUnconcluded(r: PairingRow): string[] {
 	const ids: string[] = [];
 	// ⭐ P7-6 B2 — a review that concluded on a reply answering no criterion is `REG-F-552`'s, whatever its repair came to.
 	if (r.label === 'no-criterion-answered') ids.push('REG-F-552');
-	// ⭐ Package L — D13 — and one that concluded on a reply leaving a declared criterion without a row is `REG-F-566`'s.
-	if (r.label === 'criterion-left-without-row') ids.push('REG-F-566');
-	if (r.label === 'no-response') ids.push('REG-F-499');
+	// ⭐ Package L — D13 — and one that concluded on a reply leaving a declared criterion without a row is `REG-F-566`'s; one
+	// that concluded on no response, `REG-F-499`'s (`ENDING_IDS_BEFORE_THE_COUNTS`).
+	ids.push(...(ENDING_IDS_BEFORE_THE_COUNTS.get(r.label) ?? []));
 	// ⭐⭐ Package X-2 — D36 (`REG-D-141` (2); THE LEAD'S RULING OF 2026-10-31: the report reads a review by how it ENDED, and cites
 	// every kind of failure among its calls) — a review that ended on a retry thrown SHORT of the bound, after a call thrown at or
 	// past it, reads no-response and cites `REG-F-499` — and `REG-F-590` too, for a call of it timed out.

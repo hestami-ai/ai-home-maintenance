@@ -351,6 +351,26 @@ function exitOf(result: NegativeControlResult): number {
 	return result.held ? 0 : 1;
 }
 
+/** `--live`'s transport, or undefined when it is refused (the refusal said): a harness refusal, or the operator's model. */
+async function liveTransport(
+	model: string,
+	deps: NegativeControlCliDeps,
+	say: (s: string) => void
+): Promise<{ readonly transport: Transport } | undefined> {
+	const refused = programOverrideProblem(deps.env) ?? modelLabelProblem(model);
+	if (refused) {
+		say(refused);
+		return undefined;
+	}
+	try {
+		return { transport: await deps.loadLiveTransport({ transport: 'devin', modelLabel: model }, deps.env) };
+	} catch (e) {
+		if (!isHarnessRefusal(e)) throw e;
+		say(e.message);
+		return undefined;
+	}
+}
+
 /**
  * The command line. Returns the exit code: 0 written, the expectation held; 1 written, it did NOT hold; 2 refused before
  * any call; 4 written, the run stopped short (the call cap, or a harness refusal).
@@ -377,19 +397,9 @@ export async function main(argv: readonly string[], deps: NegativeControlCliDeps
 	const live = flags.live === true;
 	let transport: Transport;
 	if (live) {
-		const model = flags.model as string;
-		const refused = programOverrideProblem(deps.env) ?? modelLabelProblem(model);
-		if (refused) {
-			say(refused);
-			return 2;
-		}
-		try {
-			transport = await deps.loadLiveTransport({ transport: 'devin', modelLabel: model }, deps.env);
-		} catch (e) {
-			if (!isHarnessRefusal(e)) throw e;
-			say(e.message);
-			return 2;
-		}
+		const loaded = await liveTransport(flags.model as string, deps, say);
+		if (loaded === undefined) return 2;
+		transport = loaded.transport;
 	} else {
 		const { SEEDED_REASONING_REVIEW_CRITERIA } = await import('@janumipwb/rph-assurance');
 		const ids = SEEDED_REASONING_REVIEW_CRITERIA.map((k) => k.id);

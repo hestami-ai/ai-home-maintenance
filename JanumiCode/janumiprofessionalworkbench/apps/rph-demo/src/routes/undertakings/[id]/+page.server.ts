@@ -1380,6 +1380,19 @@ function commandsOf(title: string, evidenceIds: readonly string[]): DeclaredRevi
 }
 
 /**
+ * `REG-F-514` remedy 1, as `unitWorkOf` applies it — a recorded executor, with the attempt as its invocation where it names
+ * none and an attempt is known; `undefined` where the record names no executor.
+ */
+function executedByWithAttempt(executedBy: ActorReference | undefined, attemptId: string) {
+	return executedBy
+		? {
+				...executedBy,
+				...(executedBy.executionInstanceId || !attemptId ? {} : { executionInstanceId: attemptId })
+			}
+		: undefined;
+}
+
+/**
  * ⭐⭐ E2 — ONE UNIT'S WORK, AS THE RECORD HOLDS IT: its last completion's work product — REBUILT as a re-review rebuilds it
  * (RD7, `rebuildProducingTurn`): its bytes re-hashed, its instruction re-rendered and checked against the exchange that
  * produced it, its account split from that exchange — the commands its evidence records, and its executor.
@@ -1416,12 +1429,7 @@ async function unitWorkOf(
 	const reused = typeof provenance?.producingExecutionAttemptId === 'string' ? provenance.producingExecutionAttemptId : undefined;
 	const attemptId = reused ?? String((p.executionAttemptId ?? '') as string);
 	// ⭐ `REG-F-514` remedy 1 — the executor's own invocation is its attempt, so a `DIFFERENT_INVOCATION` demand is decided.
-	const executedBy = provenance?.executedBy
-		? {
-				...provenance.executedBy,
-				...(provenance.executedBy.executionInstanceId || !attemptId ? {} : { executionInstanceId: attemptId })
-			}
-		: undefined;
+	const executedBy = executedByWithAttempt(provenance?.executedBy, attemptId);
 	const evidenceIds = Array.isArray(p.proposedEvidenceIds) ? p.proposedEvidenceIds.map(String) : [];
 	const commands = commandsOf(title, evidenceIds);
 	// ⭐ Package N — D11 — and the deliverable view recorded at the completion, read back from the record (RD7). ⭐ Package N's
@@ -2620,6 +2628,138 @@ function holdsTheUnit(v: OtherDeclaredVerdict): string {
 	return `${v.policyId}'s latest verdict did not conclude (${v.state})`;
 }
 
+/**
+ * A refused re-review's message: each refused subject's observations, or the engine's refusal where none is refused, and
+ * whether the wait for a person's choice could be recorded.
+ */
+function rerunReviewRefusedMessage(
+	refused: readonly {
+		readonly subjectId: string;
+		readonly floor: Awaited<ReturnType<typeof runWorkProductFloor>>;
+	}[],
+	completed: string,
+	waited: string | null
+): string {
+	return (
+		`The review was re-run, and the assurance floor is NOT satisfied: ` +
+		(refused
+			.map(
+				(o) =>
+					`${o.subjectId}: ${o.floor.observations.map((ob) => observationLine(ob)).join(' | ') || 'no observation recorded'}` +
+					noFindingNote(o.floor.observations, o.floor.dispositions, o.floor.remediation.action) +
+					escalatedReviewNote(o.floor.remediation.action)
+			)
+			.join(' — ') || completed) +
+		(waited ? ` — and the wait for a person’s choice could not be recorded: ${waited}` : '')
+	);
+}
+
+/** What Begin & Execute's one batch names: the unit, its new plan, step and binding, and whether a model does its work. */
+interface BeginExecuteBatch {
+	readonly pwuId: string;
+	readonly planId: string;
+	readonly stepId: string;
+	readonly pwuTypeId: string;
+	readonly isModelStep: boolean;
+	readonly binding: ReturnType<typeof stepBindingFor>;
+	readonly bindingId: string;
+}
+
+/**
+ * Begin & Execute's one atomic batch, from shaping to the step's start: the binding (a model step's alone), the plan with
+ * its one step, its approval and activation, and the unit's moves to EXECUTING with that step RUNNING.
+ */
+function beginExecuteSteps({
+	pwuId,
+	planId,
+	stepId,
+	pwuTypeId,
+	isModelStep,
+	binding,
+	bindingId
+}: BeginExecuteBatch): Step[] {
+	return [
+		['BeginPwuShaping', PWU, pwuId, {}],
+		// ⭑ BEFORE THE PLAN. `ProposeExecutionPlan` REFUSES a step naming a binding that was requested for a
+		// different step (`execution.ts:246`), so the binding must exist first — and it must be AUTHORIZED,
+		// because `STA-8` says authorized, not merely requested.
+		...(binding
+			? ([
+					// ⭑ `binding.request` AND NOT `binding`. JAN-EXEC Phase 3 gave the binding a second field — the
+					// REQUIRES/USES needs the request was derived FROM — and `RequestRuntimeBindingPayloadSchema` is a
+					// `z.strictObject`, so dispatching the whole object is REFUSED by the command bus. The request half
+					// IS the payload, proved at compile time in `step-binding.ts`, so there is no projection to write.
+					['RequestRuntimeBinding', 'RUNTIME_BINDING', bindingId, binding.request],
+					[
+						'AuthorizeRuntimeBinding',
+						'RUNTIME_BINDING',
+						bindingId,
+						// ⚠ THE DEMO GRANTS EVERYTHING THE STEP ASKED FOR, AND THAT IS A DEMO POSTURE RATHER THAN A RULE.
+						// `grantedWithinRequest` forbids granting MORE; nothing obliges granting ALL, and the precision
+						// control this phase turns on — `file-system` granted, `process-execution` withheld — is exactly a
+						// narrower grant. This surface has no authorizer UI to express one, so it authorizes the full
+						// request and the narrowing is driven at the seam instead.
+						{ grantedCapabilities: [...binding.request.requestedCapabilities] }
+					]
+				] satisfies Step[])
+			: []),
+		[
+			'MarkPwuReady',
+			PWU,
+			pwuId,
+			{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 }
+		],
+		[
+			'ProposeExecutionPlan',
+			'EXECUTION_PLAN',
+			planId,
+			{
+				executionPlanId: planId,
+				workUnitId: pwuId,
+				steps: [
+					{
+						id: stepId,
+						executionPlanId: planId,
+						stepType: isModelStep ? 'MODEL_INVOCATION' : 'TRANSFORMATION',
+						// ⭑ THE STEP NAMES ITS BINDING, which is what makes `bindingAuthorityVerdict` resolve
+						// something other than OUT_OF_SCOPE for the first time in production.
+						...(binding ? { runtimeBindingId: bindingId } : {}),
+						purpose: isModelStep
+							? `Attempt the work described by ${pwuTypeId}'s prompt template`
+							: 'Produce the PWU output',
+						inputBindings: [],
+						outputBindings: [],
+						preconditions: [],
+						postconditions: [],
+						stepState: 'QUEUED'
+					}
+				],
+				transitions: [],
+				retryPolicy: {},
+				tacticalChangePolicy: {},
+				escalationPolicy: {},
+				terminationPolicy: {}
+			}
+		],
+		['ApproveExecutionPlan', 'EXECUTION_PLAN', planId, {}],
+		[
+			'ActivateExecutionPlan',
+			'EXECUTION_PLAN',
+			planId,
+			// ⚠ NOW A TRUE STATEMENT RATHER THAN AN EMPTY ONE. ⛔ The REFUSAL keyed on this list stays
+			// WITHDRAWN — `REG-005` records it as *"an UNRECOVERABLE WEDGE whose refusal message prescribed a
+			// remedy the engine categorically forbids"*, because a plan cannot be re-activated to repair
+			// itself. Populating the field makes the plan's own declaration accurate; it does not revive the
+			// refusal, and a step with no binding still activates with an empty list exactly as before.
+			{ authorizedRuntimeBindingIds: binding ? [bindingId] : [] }
+		],
+		chg(pwuId, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED', [planId]),
+		chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED', [planId]),
+		['StartExecutionStep', 'EXECUTION_PLAN', planId, { stepId }],
+		chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED', [planId])
+	];
+}
+
 export const actions: Actions = {
 	// Instantiate a PWU Instance in this Undertaking, realizing a selected PWU Type (CON-009 ownership binding).
 	proposePwu: async ({ request, params }) => {
@@ -2774,86 +2914,7 @@ export const actions: Actions = {
 			stepId
 		);
 
-		const err = runSteps([
-			['BeginPwuShaping', PWU, pwuId, {}],
-			// ⭑ BEFORE THE PLAN. `ProposeExecutionPlan` REFUSES a step naming a binding that was requested for a
-			// different step (`execution.ts:246`), so the binding must exist first — and it must be AUTHORIZED,
-			// because `STA-8` says authorized, not merely requested.
-			...(binding
-				? ([
-						// ⭑ `binding.request` AND NOT `binding`. JAN-EXEC Phase 3 gave the binding a second field — the
-						// REQUIRES/USES needs the request was derived FROM — and `RequestRuntimeBindingPayloadSchema` is a
-						// `z.strictObject`, so dispatching the whole object is REFUSED by the command bus. The request half
-						// IS the payload, proved at compile time in `step-binding.ts`, so there is no projection to write.
-						['RequestRuntimeBinding', 'RUNTIME_BINDING', bindingId, binding.request],
-						[
-							'AuthorizeRuntimeBinding',
-							'RUNTIME_BINDING',
-							bindingId,
-							// ⚠ THE DEMO GRANTS EVERYTHING THE STEP ASKED FOR, AND THAT IS A DEMO POSTURE RATHER THAN A RULE.
-							// `grantedWithinRequest` forbids granting MORE; nothing obliges granting ALL, and the precision
-							// control this phase turns on — `file-system` granted, `process-execution` withheld — is exactly a
-							// narrower grant. This surface has no authorizer UI to express one, so it authorizes the full
-							// request and the narrowing is driven at the seam instead.
-							{ grantedCapabilities: [...binding.request.requestedCapabilities] }
-						]
-					] satisfies Step[])
-				: []),
-			[
-				'MarkPwuReady',
-				PWU,
-				pwuId,
-				{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 }
-			],
-			[
-				'ProposeExecutionPlan',
-				'EXECUTION_PLAN',
-				planId,
-				{
-					executionPlanId: planId,
-					workUnitId: pwuId,
-					steps: [
-						{
-							id: stepId,
-							executionPlanId: planId,
-							stepType: isModelStep ? 'MODEL_INVOCATION' : 'TRANSFORMATION',
-							// ⭑ THE STEP NAMES ITS BINDING, which is what makes `bindingAuthorityVerdict` resolve
-							// something other than OUT_OF_SCOPE for the first time in production.
-							...(binding ? { runtimeBindingId: bindingId } : {}),
-							purpose: isModelStep
-								? `Attempt the work described by ${pwuTypeId}'s prompt template`
-								: 'Produce the PWU output',
-							inputBindings: [],
-							outputBindings: [],
-							preconditions: [],
-							postconditions: [],
-							stepState: 'QUEUED'
-						}
-					],
-					transitions: [],
-					retryPolicy: {},
-					tacticalChangePolicy: {},
-					escalationPolicy: {},
-					terminationPolicy: {}
-				}
-			],
-			['ApproveExecutionPlan', 'EXECUTION_PLAN', planId, {}],
-			[
-				'ActivateExecutionPlan',
-				'EXECUTION_PLAN',
-				planId,
-				// ⚠ NOW A TRUE STATEMENT RATHER THAN AN EMPTY ONE. ⛔ The REFUSAL keyed on this list stays
-				// WITHDRAWN — `REG-005` records it as *"an UNRECOVERABLE WEDGE whose refusal message prescribed a
-				// remedy the engine categorically forbids"*, because a plan cannot be re-activated to repair
-				// itself. Populating the field makes the plan's own declaration accurate; it does not revive the
-				// refusal, and a step with no binding still activates with an empty list exactly as before.
-				{ authorizedRuntimeBindingIds: binding ? [bindingId] : [] }
-			],
-			chg(pwuId, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED', [planId]),
-			chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED', [planId]),
-			['StartExecutionStep', 'EXECUTION_PLAN', planId, { stepId }],
-			chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED', [planId])
-		]);
+		const err = runSteps(beginExecuteSteps({ pwuId, planId, stepId, pwuTypeId, isModelStep, binding, bindingId }));
 		if (err) return fail(400, { error: `Execution failed: ${err}` });
 
 		// ⭐ `JAN-EXEC` P7-6R — THE MODEL'S PART RUNS IN `runModelUnit`, which a person's re-run of the work runs too (RD5,
@@ -3639,13 +3700,20 @@ export const actions: Actions = {
 			readonly subjectId: string;
 			readonly floor: Awaited<ReturnType<typeof runWorkProductFloor>>;
 		}[] = [];
+		// The floors' optional inputs, each read where the loop below reads it: the producer's account, the adapter's own
+		// observation of the turn, and a command's place in the refused try's sequence where a view is recorded.
+		const rationaleInput = () => (turn.rationale ? { rationale: turn.rationale } : {});
+		const observedToolCallsInput = () =>
+			turn.observedToolCalls ? { observedToolCalls: turn.observedToolCalls } : {};
+		const hostSequenceInput = (subjectId: string) =>
+			view ? { hostSequence: { ...view.deliverable.sequence, subjectOrdinal: runs.get(subjectId)!.ordinal } } : {};
 		for (const r of s.refusals) {
 			const producing = {
 				exchange: turn.exchange,
 				producingPrompt: turn.producingPrompt,
 				producerModelId: turn.producerModelId,
 				producerProviderId: turn.producerProviderId,
-				...(turn.rationale ? { rationale: turn.rationale } : {})
+				...rationaleInput()
 			};
 			// ⭐⭐ Package N — D10, D12 — THROUGH THE SAME BUILDERS, with what the refused try's reviews were shown: the finished
 			// work and the step's sequence (the work product's), each command's place in that sequence (each command's).
@@ -3667,9 +3735,9 @@ export const actions: Actions = {
 								evidenceId: r.subjectId,
 								evidence: getObject(getEngine(), r.subjectId) ?? {},
 								run: runs.get(r.subjectId)!,
-								...(turn.observedToolCalls ? { observedToolCalls: turn.observedToolCalls } : {}),
+								...observedToolCallsInput(),
 								...producing,
-								...(view ? { hostSequence: { ...view.deliverable.sequence, subjectOrdinal: runs.get(r.subjectId)!.ordinal } } : {})
+								...hostSequenceInput(r.subjectId)
 							},
 							uiSession(),
 							opts
@@ -3722,19 +3790,7 @@ export const actions: Actions = {
 				})),
 				completed
 			);
-			return fail(400, {
-				error:
-					`The review was re-run, and the assurance floor is NOT satisfied: ` +
-					(refused
-						.map(
-							(o) =>
-								`${o.subjectId}: ${o.floor.observations.map((ob) => observationLine(ob)).join(' | ') || 'no observation recorded'}` +
-								noFindingNote(o.floor.observations, o.floor.dispositions, o.floor.remediation.action) +
-								escalatedReviewNote(o.floor.remediation.action)
-						)
-						.join(' — ') || completed) +
-					(waited ? ` — and the wait for a person’s choice could not be recorded: ${waited}` : '')
-			});
+			return fail(400, { error: rerunReviewRefusedMessage(refused, completed, waited) });
 		}
 		return { advanced: 'review-rerun' };
 	},

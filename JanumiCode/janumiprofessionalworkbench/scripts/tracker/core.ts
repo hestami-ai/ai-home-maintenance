@@ -22,7 +22,7 @@ import { join } from 'node:path';
 
 import { Database } from 'bun:sqlite';
 
-import { ingestAll } from './ingest.js';
+import { ingestAll, type IngestResult } from './ingest.js';
 
 export const DDL = `
 CREATE TABLE sources (path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, parser TEXT NOT NULL);
@@ -271,6 +271,40 @@ export const SOURCE_DOCS: readonly string[] = [
 	'packages/rph-product-realization-pwa/src/ontology.data.ts'
 ];
 
+function insertSourceRows(db: Database, repoRoot: string, ingested: IngestResult): void {
+	const insertSource = db.prepare('INSERT INTO sources (path, sha256, parser) VALUES (?, ?, ?)');
+	for (const path of SOURCE_DOCS) {
+		const absolute = join(repoRoot, path);
+		if (!existsSync(absolute)) fail(`source document missing: ${path}`);
+		insertSource.run(
+			path,
+			createHash('sha256').update(readFileSync(absolute)).digest('hex'),
+			ingested.parsers.get(path) ?? 'hash-only:w0'
+		);
+	}
+}
+
+function refuseCollidingIds(census: LoadedCensus, ingested: IngestResult): void {
+	// An ingested id colliding with a census id would silently shadow authored ground truth — refuse.
+	const censusIds = new Set(census.items.map((i) => i.id));
+	for (const i of ingested.items)
+		if (censusIds.has(i.id)) fail(`ingested id '${i.id}' collides with a census record id`);
+}
+
+function refuseDanglingTargets(census: LoadedCensus, ingested: IngestResult): void {
+	// THE DANGLING-VERDICT LAW, enforced POST-MERGE (moved from loadRecords in W-3): a measured
+	// verdict or classification may target an ingested item, but never a nonexistent one — a
+	// verdict about nothing is how a roster decays back into a count.
+	const allIds = new Set<string>([
+		...census.items.map((i) => i.id),
+		...ingested.items.map((i) => i.id)
+	]);
+	for (const v of census.verdicts)
+		if (!allIds.has(v.item_id)) fail(`verdict for unknown item '${v.item_id}'`);
+	for (const a of census.attrs)
+		if (!allIds.has(a.item_id)) fail(`attr for unknown item '${a.item_id}'`);
+}
+
 export function buildDb(dbPath: string, repoRoot: string, censusDir: string): Database {
 	const census = loadRecords(censusDir);
 	// W-1: the tracking documents are PARSED, not merely hashed. Ingested rows and census rows share
@@ -285,20 +319,8 @@ export function buildDb(dbPath: string, repoRoot: string, censusDir: string): Da
 	// hook budget under whole-suite contention. One transaction preserves the exact same real build
 	// while making the derived index atomic and avoiding thousands of independent fsync boundaries.
 	const writeDerivedIndex = db.transaction(() => {
-		const insertSource = db.prepare('INSERT INTO sources (path, sha256, parser) VALUES (?, ?, ?)');
-		for (const path of SOURCE_DOCS) {
-			const absolute = join(repoRoot, path);
-			if (!existsSync(absolute)) fail(`source document missing: ${path}`);
-			insertSource.run(
-				path,
-				createHash('sha256').update(readFileSync(absolute)).digest('hex'),
-				ingested.parsers.get(path) ?? 'hash-only:w0'
-			);
-		}
-		// An ingested id colliding with a census id would silently shadow authored ground truth — refuse.
-		const censusIds = new Set(census.items.map((i) => i.id));
-		for (const i of ingested.items)
-			if (censusIds.has(i.id)) fail(`ingested id '${i.id}' collides with a census record id`);
+		insertSourceRows(db, repoRoot, ingested);
+		refuseCollidingIds(census, ingested);
 		const insertItem = db.prepare(
 			'INSERT INTO items (id, kind, name, anchor_doc, anchor_text, origin, created_at, superseded_by) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)'
 		);
@@ -344,17 +366,7 @@ export function buildDb(dbPath: string, repoRoot: string, censusDir: string): Da
 		const insertAttr = db.prepare('INSERT INTO attrs (item_id, key, value) VALUES (?, ?, ?)');
 		for (const a of ingested.attrs) insertAttr.run(a.item_id, a.key, a.value);
 		for (const a of census.attrs) insertAttr.run(a.item_id, a.key, a.value);
-		// THE DANGLING-VERDICT LAW, enforced POST-MERGE (moved from loadRecords in W-3): a measured
-		// verdict or classification may target an ingested item, but never a nonexistent one — a
-		// verdict about nothing is how a roster decays back into a count.
-		const allIds = new Set<string>([
-			...census.items.map((i) => i.id),
-			...ingested.items.map((i) => i.id)
-		]);
-		for (const v of census.verdicts)
-			if (!allIds.has(v.item_id)) fail(`verdict for unknown item '${v.item_id}'`);
-		for (const a of census.attrs)
-			if (!allIds.has(a.item_id)) fail(`attr for unknown item '${a.item_id}'`);
+		refuseDanglingTargets(census, ingested);
 	});
 	writeDerivedIndex();
 	return db;

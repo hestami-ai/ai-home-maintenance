@@ -196,6 +196,18 @@ export function containedWorkspacePath(path: string): string | undefined {
 	// only position two, and `report.md:stolen` carries its colon further along — into an NTFS alternate data
 	// stream that `readdir` cannot name and `list()` therefore cannot report.
 	if (path.includes(':')) return undefined;
+	const out = normalizedWorkspaceParts(path);
+	if (out === undefined) return undefined;
+	// `a/..` normalizes to the workspace ROOT, which is a directory and not a file location.
+	if (out.length === 0) return undefined;
+	return out.join('/');
+}
+
+/**
+ * The per-component walk of {@link containedWorkspacePath}: the normalized components of `path`, or `undefined`
+ * when a component escapes the workspace or names a location other than the one it spells.
+ */
+function normalizedWorkspaceParts(path: string): string[] | undefined {
 	const out: string[] = [];
 	for (const part of path.split(/[\\/]+/)) {
 		if (part === '' || part === '.') continue;
@@ -218,7 +230,5 @@ export function containedWorkspacePath(path: string): string | undefined {
 		if (WIN32_DEVICE_STEM.test(part.replace(/\.[\s\S]*$/, ''))) return undefined;
 		out.push(part);
 	}
-	// `a/..` normalizes to the workspace ROOT, which is a directory and not a file location.
-	if (out.length === 0) return undefined;
-	return out.join('/');
+	return out;
 }

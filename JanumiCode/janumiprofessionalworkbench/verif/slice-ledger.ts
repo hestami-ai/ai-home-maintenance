@@ -113,15 +113,20 @@ export function discover(root: string, files: readonly string[]): string[] {
 	for (const f of files) {
 		if (!isSource(f) || hits.has(f)) continue; // D-3 marker
 		if (PREDICATE_SELF.includes(f)) continue; // the searcher is not the searched-for
-		let text: string;
-		try {
-			text = readFileSync(`${root}/${f}`, 'utf8');
-		} catch {
-			continue; // a working-set entry that vanished mid-run is not a Slice
-		}
-		if (text.includes('export const SLICE')) hits.add(f);
+		if (hasSliceMarker(root, f)) hits.add(f);
 	}
 	return [...hits].sort(byCodeUnit);
+}
+
+/** Discovery's D-3 marker limb for one working-set entry, split out to keep `discover` within budget. */
+function hasSliceMarker(root: string, f: string): boolean {
+	let text: string;
+	try {
+		text = readFileSync(`${root}/${f}`, 'utf8');
+	} catch {
+		return false; // a working-set entry that vanished mid-run is not a Slice
+	}
+	return text.includes('export const SLICE');
 }
 
 function refuse(message: string): never {

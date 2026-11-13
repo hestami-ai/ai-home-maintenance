@@ -130,26 +130,29 @@ function exportedValueSpans(file: string): ExportSpan[] {
 		spans.push({ name, startLine: lineOf(node.getStart(sf)), endLine: lineOf(node.getEnd()) });
 	};
 	for (const st of sf.statements) {
-		if (ts.isFunctionDeclaration(st) && isExported(st) && st.name) push(st.name.text, st);
-		else if (ts.isClassDeclaration(st) && isExported(st) && st.name) push(st.name.text, st);
-		else if (ts.isEnumDeclaration(st) && isExported(st)) push(st.name.text, st);
-		else if (ts.isVariableStatement(st) && isExported(st)) {
-			// Several names can share one statement (`export const a = 1, b = 2`); each owns the whole span.
-			for (const d of st.declarationList.declarations) {
-				if (ts.isIdentifier(d.name)) push(d.name.text, st);
-			}
-		} else if (
-			ts.isExportDeclaration(st) &&
-			!st.moduleSpecifier &&
-			st.exportClause &&
-			ts.isNamedExports(st.exportClause)
-		) {
-			for (const el of st.exportClause.elements) {
-				if (!el.isTypeOnly && !st.isTypeOnly) push(el.name.text, st);
-			}
-		}
+		for (const name of exportedNamesOf(st)) push(name, st);
 	}
 	return spans;
+}
+
+/** The value names one top-level statement exports, in declaration order; each owns the statement's whole span. */
+function exportedNamesOf(st: ts.Statement): string[] {
+	if (ts.isFunctionDeclaration(st) && isExported(st) && st.name) return [st.name.text];
+	if (ts.isClassDeclaration(st) && isExported(st) && st.name) return [st.name.text];
+	if (ts.isEnumDeclaration(st) && isExported(st)) return [st.name.text];
+	if (ts.isVariableStatement(st) && isExported(st)) {
+		// Several names can share one statement (`export const a = 1, b = 2`); each owns the whole span.
+		return st.declarationList.declarations.flatMap((d) => (ts.isIdentifier(d.name) ? [d.name.text] : []));
+	}
+	if (
+		ts.isExportDeclaration(st) &&
+		!st.moduleSpecifier &&
+		st.exportClause &&
+		ts.isNamedExports(st.exportClause)
+	) {
+		return st.exportClause.elements.filter((el) => !el.isTypeOnly && !st.isTypeOnly).map((el) => el.name.text);
+	}
+	return [];
 }
 
 const exportedValues = (file: string): string[] => exportedValueSpans(file).map((e) => e.name);

@@ -437,6 +437,91 @@ const unreviewed = (policyId: string): DeclaredPolicyAnswer => ({
 	failure: `No review of ${policyId} was made, so none of its criteria was answered.`
 });
 
+/** ⭐⭐ E2 (design B2) — one criterion's `RecordCriterionResult`, the stipulation beside a stipulated row (form D). */
+function criterionResultStep(
+	assessmentId: string,
+	row: FloorCriterion,
+	human: boolean,
+	reviewer: ActorReference
+): SignoffStep {
+	return [
+		'RecordCriterionResult',
+		'ASSURANCE_ASSESSMENT',
+		assessmentId,
+		{
+			criterionId: row.criterionId,
+			result: row.outcome,
+			...(human
+				? { rationale: citedRationale(reviewer, row) }
+				: ownRationale(row)),
+			...(row.stipulated !== undefined ? { stipulated: row.stipulated } : {})
+		}
+	];
+}
+
+/** ⭐ E2 — a review's findings: each failed criterion's, and a review that produced nothing, the failure's own (PER-9). */
+function findingsOf(answer: DeclaredPolicyAnswer) {
+	return [
+		...answer.observations.map((o) => ({
+			code: o.code,
+			severity: o.severity,
+			statement: o.statement.trim() || `Criterion ${o.code} was answered NOT MET, with no statement.`
+		})),
+		...(answer.failure === undefined
+			? []
+			: [{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL' as const, statement: answer.failure }])
+	];
+}
+
+/** Where one assessment's findings are recorded: its id, its party's steps, the id minter and the blocking findings. */
+interface FindingsTarget {
+	readonly assessmentId: string;
+	readonly party: SignoffStep[];
+	readonly mintId: (prefix: string) => string;
+	readonly blockingObservationIds: string[];
+}
+
+/** ⭐ E2 — EACH FINDING AN OPEN OBSERVATION of its assessment, in order; a blocking one also listed as blocking. */
+function recordFindings(findings: ReturnType<typeof findingsOf>, target: FindingsTarget): void {
+	const { assessmentId, party, mintId, blockingObservationIds } = target;
+	for (const f of findings) {
+		const observationId = mintId('obs');
+		party.push([
+			'RecordAssuranceObservation',
+			'ASSURANCE_OBSERVATION',
+			observationId,
+			{ assessmentId, observationType: 'FINDING', findingCode: f.code, severity: f.severity, statement: f.statement }
+		]);
+		// ⭐ `REG-D-111` (1) — CANON'S "BLOCKING FINDING": what a REJECTED unit's assurance axis cites.
+		if (BLOCKING_SEVERITIES.has(f.severity)) blockingObservationIds.push(observationId);
+	}
+}
+
+/** ⭐ What the record says beside one policy's verdict, where a reader can reach it (`residualUncertainty`). */
+function notedOf(
+	policy: GoverningDeclaredPolicy,
+	answer: DeclaredPolicyAnswer,
+	disposition: AssessmentDisposition,
+	human: boolean
+) {
+	return [
+		...answer.residualUncertainty,
+		...answer.limitations,
+		// ⛔ `E12F` F6 — a policy with no criterion: why its verdict is INCONCLUSIVE.
+		...(policy.criteria.length === 0 ? [noCriterionDeclared(policy.policyId)] : []),
+		...(answer.recommendation === disposition
+			? []
+			: [
+					`The reviewer recommended ${answer.recommendation}; the verdict, ${disposition}, is computed from its criterion answers (REG-D-110 (3)).`
+				]),
+		...(human
+			? [
+					`The HUMAN decision (REG-D-111 (3)): the operator's Record Assurance adopted the reviewer's criterion answers, each cited on its criterion result; no separate human judgement of each criterion was recorded.`
+				]
+			: [])
+	];
+}
+
 /**
  * Plan the review of `pwuId`'s declared policies: one assessment per governing declared policy, driven through the
  * ratified §30 sequence, its criteria recorded one by one, its failed criteria as open findings, and completed with a
@@ -524,61 +609,15 @@ export function planDeclaredSignoff(opts: {
 		);
 		// ⭐⭐ E2 (design B2) — ONE `RecordCriterionResult` PER CRITERION, the stipulation beside a stipulated row (form D).
 		for (const row of rows) {
-			party.push([
-				'RecordCriterionResult',
-				'ASSURANCE_ASSESSMENT',
-				assessmentId,
-				{
-					criterionId: row.criterionId,
-					result: row.outcome,
-					...(human
-						? { rationale: citedRationale(reviewer, row) }
-						: ownRationale(row)),
-					...(row.stipulated !== undefined ? { stipulated: row.stipulated } : {})
-				}
-			]);
+			party.push(criterionResultStep(assessmentId, row, human, reviewer));
 			criterionResults += 1;
 		}
 		// ⭐ E2 — EACH FAILED CRITERION AN OPEN FINDING at the policy's severity; and a review that produced nothing, the
 		// failure's own finding, so a reader sees why nothing was judged (PER-9).
-		const findings = [
-			...answer.observations.map((o) => ({
-				code: o.code,
-				severity: o.severity,
-				statement: o.statement.trim() || `Criterion ${o.code} was answered NOT MET, with no statement.`
-			})),
-			...(answer.failure === undefined
-				? []
-				: [{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL' as const, statement: answer.failure }])
-		];
-		for (const f of findings) {
-			const observationId = mintId('obs');
-			party.push([
-				'RecordAssuranceObservation',
-				'ASSURANCE_OBSERVATION',
-				observationId,
-				{ assessmentId, observationType: 'FINDING', findingCode: f.code, severity: f.severity, statement: f.statement }
-			]);
-			// ⭐ `REG-D-111` (1) — CANON'S "BLOCKING FINDING": what a REJECTED unit's assurance axis cites.
-			if (BLOCKING_SEVERITIES.has(f.severity)) blockingObservationIds.push(observationId);
-		}
+		const findings = findingsOf(answer);
+		recordFindings(findings, { assessmentId, party, mintId, blockingObservationIds });
 		// ⭐ What the record says beside the verdict, where a reader can reach it (`residualUncertainty`; the header's §20 note).
-		const noted = [
-			...answer.residualUncertainty,
-			...answer.limitations,
-			// ⛔ `E12F` F6 — a policy with no criterion: why its verdict is INCONCLUSIVE.
-			...(policy.criteria.length === 0 ? [noCriterionDeclared(policyId)] : []),
-			...(answer.recommendation === disposition
-				? []
-				: [
-						`The reviewer recommended ${answer.recommendation}; the verdict, ${disposition}, is computed from its criterion answers (REG-D-110 (3)).`
-					]),
-			...(human
-				? [
-						`The HUMAN decision (REG-D-111 (3)): the operator's Record Assurance adopted the reviewer's criterion answers, each cited on its criterion result; no separate human judgement of each criterion was recorded.`
-					]
-				: [])
-		];
+		const noted = notedOf(policy, answer, disposition, human);
 		party.push([
 			'CompleteAssuranceAssessment',
 			'ASSURANCE_ASSESSMENT',

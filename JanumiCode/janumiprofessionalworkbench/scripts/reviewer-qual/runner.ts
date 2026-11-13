@@ -637,6 +637,13 @@ export function rederiving(r: Rederivation, caseId: string, committed: Indicatio
 	};
 }
 
+/** An evaluation's clock, where the run gives one. */
+const nowInput = (i: RunInputs) => (i.now ? { now: i.now } : {});
+
+/** Each call's session export, kept outside the repository, where the run keeps exports (D47). */
+const exportsInput = (i: RunInputs, c: QualificationCase, repetition: number) =>
+	i.exports ? { onCall: (n: number, role: CallRole, text: string | undefined) => keepExport(i.exports!, i.runId, c.id, repetition, n, role, text) } : {};
+
 /**
  * ⭐ A qualification run: the RUN line, then every case × repetition (repetitions outermost, so a case's repetitions
  * are separated by the rest of the set), each call a CALL line. Refuses a program override before the transport is
@@ -685,11 +692,11 @@ export async function runQualification(i: RunInputs): Promise<(RunLine | CallLin
 					candidate,
 					call: (prompt) => withinOneDay(() => i.transport.call(prompt)),
 					scoringDigest: i.fingerprint.scoring,
-					...(i.now ? { now: i.now } : {}),
+					...nowInput(i),
 					// ⭐ Z3 — D53 — the records' source, re-derived live before the case's first paid call where the run re-derives.
 					...(i.indications ? { indications: i.rederive ? rederiving(i.rederive, c.id, i.indications)! : i.indications } : {}),
 					// ⭐ Z3 — D47 — each call's session export, kept outside the repository.
-					...(i.exports ? { onCall: (n: number, role: CallRole, text: string | undefined) => keepExport(i.exports!, i.runId, c.id, repetition, n, role, text) } : {})
+					...exportsInput(i, c, repetition)
 				});
 				if (pending) emit(pending);
 				pending = undefined;

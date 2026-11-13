@@ -966,32 +966,35 @@ export function recordProblems(text: string, opts: { readonly tracked: boolean }
 	const runs = new Map<string, RunLine>();
 	const evaluations = new Map<string, Evaluation>();
 	const rows = (text.endsWith('\n') ? text.slice(0, -1) : text).split('\n');
-	for (const [i, row] of rows.entries()) {
-		const n = i + 1;
-		if (row.trim() === '') {
-			problems.push(`line ${n}: blank`);
-			continue;
-		}
-		let value: unknown;
-		try {
-			value = JSON.parse(row);
-		} catch {
-			problems.push(`line ${n}: not JSON`);
-			continue;
-		}
-		const own = lineProblems(value);
-		if (own.length > 0) {
-			problems.push(...own.map((p) => `line ${n}: ${p}`));
-			continue;
-		}
-		const line = value as RecordLine;
-		if (line.kind === 'RUN') problems.push(...runProblems(line, n, runs, opts.tracked));
-		else if (line.kind === 'CALL') problems.push(...callProblems(line, n, runs, evaluations));
-	}
+	for (const [i, row] of rows.entries())
+		problems.push(...rowProblems(row, i + 1, runs, evaluations, opts.tracked));
 	for (const e of evaluations.values())
 		if (e.scoredAt.at(-1) !== e.lastLine)
 			problems.push(`${e.label}: its last call carries no scored outcome`);
 	return problems;
+}
+
+/** Everything wrong with one row of a record file (line `n`), the RUN and CALL lines checked against those before it. */
+function rowProblems(
+	row: string,
+	n: number,
+	runs: Map<string, RunLine>,
+	evaluations: Map<string, Evaluation>,
+	tracked: boolean
+): string[] {
+	if (row.trim() === '') return [`line ${n}: blank`];
+	let value: unknown;
+	try {
+		value = JSON.parse(row);
+	} catch {
+		return [`line ${n}: not JSON`];
+	}
+	const own = lineProblems(value);
+	if (own.length > 0) return own.map((p) => `line ${n}: ${p}`);
+	const line = value as RecordLine;
+	if (line.kind === 'RUN') return runProblems(line, n, runs, tracked);
+	if (line.kind === 'CALL') return callProblems(line, n, runs, evaluations);
+	return [];
 }
 
 function runProblems(
@@ -1023,14 +1026,7 @@ function callProblems(
 	if (!run) return [`line ${n}: CALL names run ${line.runId}, which no earlier RUN line declares`];
 	const label = `${line.caseId}#${line.repetition}`;
 	const at = `line ${n}: CALL ${label} ${line.role}`;
-	const problems: string[] = [];
-	if (!run.caseIds.includes(line.caseId))
-		problems.push(`${at}: ${line.caseId} is not one of its run’s cases`);
-	if (line.repetition > run.repetitions)
-		problems.push(`${at}: repetition ${line.repetition} is beyond its run’s ${run.repetitions}`);
-	problems.push(...servedProblems(line, run, at));
-	if (line.scored && line.scored.scoringDigest !== run.scoringDigest)
-		problems.push(`${at} is scored under a digest that is not its run’s`);
+	const problems = callAgainstRunProblems(line, run, at);
 	const key = `${line.runId}|${line.caseId}|${line.repetition}`;
 	const e = evaluations.get(key) ?? { label, roles: [], scoredAt: [], lastLine: 0 };
 	evaluations.set(key, e);
@@ -1053,6 +1049,19 @@ function callProblems(
 	e.roles.push(line.role);
 	e.lastLine = n;
 	if (line.scored) e.scoredAt.push(n);
+	return problems;
+}
+
+/** A CALL against its run alone: its case, its repetition, its served facts and its scoring digest. */
+function callAgainstRunProblems(line: CallLine, run: RunLine, at: string): string[] {
+	const problems: string[] = [];
+	if (!run.caseIds.includes(line.caseId))
+		problems.push(`${at}: ${line.caseId} is not one of its run’s cases`);
+	if (line.repetition > run.repetitions)
+		problems.push(`${at}: repetition ${line.repetition} is beyond its run’s ${run.repetitions}`);
+	problems.push(...servedProblems(line, run, at));
+	if (line.scored && line.scored.scoringDigest !== run.scoringDigest)
+		problems.push(`${at} is scored under a digest that is not its run’s`);
 	return problems;
 }
 

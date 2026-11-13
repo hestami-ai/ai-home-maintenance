@@ -235,6 +235,57 @@ export function typesGivenChildren(types: readonly Row[]): ReadonlySet<string> {
 /** ` under <its parent>`: where `treeAgainstPlan` says a missing or duplicated unit belongs. */
 const underParent = (parent: string): string => ` under ${parent}`;
 
+/** One unit the product's planner plans (`planComposition`). */
+type PlanInstance = ReturnType<typeof planComposition>['instances'][number];
+
+/** One planned unit `treeAgainstPlan` found no unit for, as its `missing` list says it: its type, and under what. */
+function missingUnitLine(
+	planned: PlanInstance,
+	parent: Row | null | undefined,
+	nameOf: (typeId: string) => string,
+	typeOfKey: ReadonlyMap<string, string>
+): string {
+	const parentKey = planned.parentKey;
+	const under = parent ? str(parent.state.title) : nameOf(typeOfKey.get(parentKey ?? '') ?? '');
+	return `${nameOf(planned.typeId)}${parentKey === undefined ? '' : underParent(under)}`;
+}
+
+/** The units `treeAgainstPlan` matched to no planned unit, each said as a duplicate, an orphan or unplanned. */
+interface LeftoverUnits {
+	readonly duplicated: ReadonlySet<string>;
+	readonly orphaned: string[];
+	readonly unplanned: { unitId: string; parentTitle: string }[];
+}
+
+/** `treeAgainstPlan`'s leftovers: each unit no planned unit was matched to, read against the plan and the units built. */
+function leftoverUnits(
+	units: readonly Row[],
+	instances: readonly PlanInstance[],
+	built: ReadonlyMap<string, Row>,
+	matched: ReadonlySet<string>,
+	nameOf: (typeId: string) => string
+): LeftoverUnits {
+	const ids = new Set(units.map((u) => u.id));
+	const titleOf = (id: string): string => str(units.find((u) => u.id === id)?.state.title) || id;
+	const plannedFor = (u: Row): boolean =>
+		instances.some(
+			(i) =>
+				i.typeId === str(u.state.pwuTypeId) &&
+				(i.parentKey === undefined ? parentOf(u) === null : built.get(i.parentKey)?.id === parentOf(u))
+		);
+	const duplicated = new Set<string>();
+	const orphaned: string[] = [];
+	const unplanned: { unitId: string; parentTitle: string }[] = [];
+	for (const u of units.filter((x) => !matched.has(x.id))) {
+		const parent = parentOf(u);
+		if (plannedFor(u))
+			duplicated.add(`${nameOf(str(u.state.pwuTypeId))}${parent === null ? '' : underParent(titleOf(parent))}`);
+		else if (parent === null || !ids.has(parent)) orphaned.push(u.id);
+		else unplanned.push({ unitId: u.id, parentTitle: titleOf(parent) });
+	}
+	return { duplicated, orphaned, unplanned };
+}
+
 /**
  * ⭐⭐ `REG-D-112` (E3's review, finding 4) — THE UNDERTAKING'S UNITS, HELD TO THE PLAN INSTANTIATION MAKES OF ITS PWA,
  * PER (PARENT, TYPE): the product's own planner (`planComposition`, as `routes/undertakings/+page.server.ts` asks it) plans
@@ -268,31 +319,13 @@ export function treeAgainstPlan(units: readonly Row[], types: readonly Row[]): T
 						(u) => !matched.has(u.id) && str(u.state.pwuTypeId) === planned.typeId && parentOf(u) === (parent?.id ?? null)
 					);
 		if (unit === undefined) {
-			const under = parent ? str(parent.state.title) : nameOf(typeOfKey.get(parentKey ?? '') ?? '');
-			missing.push(`${nameOf(planned.typeId)}${parentKey === undefined ? '' : underParent(under)}`);
+			missing.push(missingUnitLine(planned, parent, nameOf, typeOfKey));
 			continue;
 		}
 		matched.add(unit.id);
 		built.set(planned.key, unit);
 	}
-	const ids = new Set(units.map((u) => u.id));
-	const titleOf = (id: string): string => str(units.find((u) => u.id === id)?.state.title) || id;
-	const plannedFor = (u: Row): boolean =>
-		plan.instances.some(
-			(i) =>
-				i.typeId === str(u.state.pwuTypeId) &&
-				(i.parentKey === undefined ? parentOf(u) === null : built.get(i.parentKey)?.id === parentOf(u))
-		);
-	const duplicated = new Set<string>();
-	const orphaned: string[] = [];
-	const unplanned: { unitId: string; parentTitle: string }[] = [];
-	for (const u of units.filter((x) => !matched.has(x.id))) {
-		const parent = parentOf(u);
-		if (plannedFor(u))
-			duplicated.add(`${nameOf(str(u.state.pwuTypeId))}${parent === null ? '' : underParent(titleOf(parent))}`);
-		else if (parent === null || !ids.has(parent)) orphaned.push(u.id);
-		else unplanned.push({ unitId: u.id, parentTitle: titleOf(parent) });
-	}
+	const { duplicated, orphaned, unplanned } = leftoverUnits(units, plan.instances, built, matched, nameOf);
 	return {
 		planned: plan.instances.length,
 		missing,

@@ -98,6 +98,25 @@ export function pyJsonLoads(text: string): PyJson {
 	const ws = (): void => {
 		while (isJsonSpace(text[i])) i += 1;
 	};
+	/** The escape at `i`, its backslash and letter read, as the string it stands for. */
+	const escaped = (): string => {
+		const e = text[i + 1];
+		i += 2;
+		if (e === '"' || e === '\\' || e === '/') return e;
+		if (e === 'b') return '\b';
+		if (e === 'f') return '\f';
+		if (e === 'n') return '\n';
+		if (e === 'r') return '\r';
+		if (e === 't') return '\t';
+		if (e !== 'u') return fail(String.raw`Invalid \escape`);
+		const hex = text.slice(i, i + 4);
+		if (!HEX.test(hex)) return fail(String.raw`Invalid \uXXXX escape`);
+		// ⭑ A high surrogate escaped beside a low one is ONE code point to Python, and the same two UTF-16 units here;
+		// a lone one is kept, as Python keeps it.
+		const unit = String.fromCodePoint(Number.parseInt(hex, 16));
+		i += 4;
+		return unit;
+	};
 	const string = (): string => {
 		i += 1; // the opening quote
 		let out = '';
@@ -114,23 +133,19 @@ export function pyJsonLoads(text: string): PyJson {
 				i += 1;
 				continue;
 			}
-			const e = text[i + 1];
-			i += 2;
-			if (e === '"' || e === '\\' || e === '/') out += e;
-			else if (e === 'b') out += '\b';
-			else if (e === 'f') out += '\f';
-			else if (e === 'n') out += '\n';
-			else if (e === 'r') out += '\r';
-			else if (e === 't') out += '\t';
-			else if (e === 'u') {
-				const hex = text.slice(i, i + 4);
-				if (!HEX.test(hex)) return fail(String.raw`Invalid \uXXXX escape`);
-				// ⭑ A high surrogate escaped beside a low one is ONE code point to Python, and the same two UTF-16 units here;
-				// a lone one is kept, as Python keeps it.
-				out += String.fromCodePoint(Number.parseInt(hex, 16));
-				i += 4;
-			} else return fail(String.raw`Invalid \escape`);
+			out += escaped();
 		}
+	};
+	/** An exponent at `i`, read when it holds a digit: true then, else false with `i` where it was. */
+	const exponentRead = (): boolean => {
+		if (text[i] !== 'e' && text[i] !== 'E') return false;
+		const at = i;
+		i += 1;
+		if (text[i] === '-' || text[i] === '+') i += 1;
+		while (isDigit(text[i])) i += 1;
+		if (isDigit(text[i - 1])) return true;
+		i = at;
+		return false;
 	};
 	const number = (): PyJson => {
 		const start = i;
@@ -149,74 +164,47 @@ export function pyJsonLoads(text: string): PyJson {
 			i += 2;
 			while (isDigit(text[i])) i += 1;
 		}
-		if (text[i] === 'e' || text[i] === 'E') {
-			const at = i;
-			i += 1;
-			if (text[i] === '-' || text[i] === '+') i += 1;
-			while (isDigit(text[i])) i += 1;
-			if (isDigit(text[i - 1])) isFloat = true;
-			else i = at;
-		}
+		if (exponentRead()) isFloat = true;
 		const literal = text.slice(start, i);
 		return isFloat ? { t: 'float', v: Number(literal) } : { t: 'int', v: BigInt(literal) };
 	};
-	const value = (depth: number): PyJson => {
-		if (depth > PY_JSON_MAX_DEPTH) throw new PyJsonTooDeep(`an answer nested deeper than ${PY_JSON_MAX_DEPTH} levels`);
-		const c = text[i];
-		if (c === '"') return { t: 'str', v: string() };
-		if (c === '{') {
+	/** After an item of a list or an object: true past `close`, false past a comma and the whitespace after it. */
+	const closesItem = (close: string): boolean => {
+		ws();
+		if (text[i] === close) {
 			i += 1;
-			ws();
-			const keys = new Map<string, number>();
-			const pairs: [string, PyJson][] = [];
-			if (text[i] === '}') {
-				i += 1;
-				return { t: 'dict', v: pairs };
-			}
-			for (;;) {
-				if (text[i] !== '"') return fail('Expecting property name enclosed in double quotes');
-				const key = string();
-				ws();
-				if (text[i] !== ':') return fail("Expecting ':' delimiter");
-				i += 1;
-				ws();
-				const v = value(depth + 1);
-				// ⭑ Python's dict: a repeated key keeps its FIRST place and takes the LAST value.
-				const at = keys.get(key);
-				if (at === undefined) {
-					keys.set(key, pairs.length);
-					pairs.push([key, v]);
-				} else pairs[at] = [key, v];
-				ws();
-				if (text[i] === '}') {
-					i += 1;
-					return { t: 'dict', v: pairs };
-				}
-				if (text[i] !== ',') return fail("Expecting ',' delimiter");
-				i += 1;
-				ws();
-			}
+			return true;
 		}
-		if (c === '[') {
+		if (text[i] !== ',') return fail("Expecting ',' delimiter");
+		i += 1;
+		ws();
+		return false;
+	};
+	/** One member of an object at `i`: its key, the colon and its value, read one level below `depth`. */
+	const member = (depth: number): [string, PyJson] => {
+		if (text[i] !== '"') return fail('Expecting property name enclosed in double quotes');
+		const key = string();
+		ws();
+		if (text[i] !== ':') return fail("Expecting ':' delimiter");
+		i += 1;
+		ws();
+		return [key, value(depth + 1)];
+	};
+	const list = (depth: number): PyJson => {
+		i += 1;
+		ws();
+		const items: PyJson[] = [];
+		if (text[i] === ']') {
 			i += 1;
-			ws();
-			const items: PyJson[] = [];
-			if (text[i] === ']') {
-				i += 1;
-				return { t: 'list', v: items };
-			}
-			for (;;) {
-				items.push(value(depth + 1));
-				ws();
-				if (text[i] === ']') {
-					i += 1;
-					return { t: 'list', v: items };
-				}
-				if (text[i] !== ',') return fail("Expecting ',' delimiter");
-				i += 1;
-				ws();
-			}
+			return { t: 'list', v: items };
 		}
+		for (;;) {
+			items.push(value(depth + 1));
+			if (closesItem(']')) return { t: 'list', v: items };
+		}
+	};
+	/** `null`, `true`, `false`, `NaN`, `Infinity` or `-Infinity` at `i`, or else a number. */
+	const bareValue = (): PyJson => {
 		if (text.startsWith('null', i)) {
 			i += 4;
 			return { t: 'null' };
@@ -242,6 +230,33 @@ export function pyJsonLoads(text: string): PyJson {
 			return { t: 'float', v: Number.NEGATIVE_INFINITY };
 		}
 		return number();
+	};
+	const value = (depth: number): PyJson => {
+		if (depth > PY_JSON_MAX_DEPTH) throw new PyJsonTooDeep(`an answer nested deeper than ${PY_JSON_MAX_DEPTH} levels`);
+		const c = text[i];
+		if (c === '"') return { t: 'str', v: string() };
+		if (c === '{') {
+			i += 1;
+			ws();
+			const keys = new Map<string, number>();
+			const pairs: [string, PyJson][] = [];
+			if (text[i] === '}') {
+				i += 1;
+				return { t: 'dict', v: pairs };
+			}
+			for (;;) {
+				const [key, v] = member(depth);
+				// ⭑ Python's dict: a repeated key keeps its FIRST place and takes the LAST value.
+				const at = keys.get(key);
+				if (at === undefined) {
+					keys.set(key, pairs.length);
+					pairs.push([key, v]);
+				} else pairs[at] = [key, v];
+				if (closesItem('}')) return { t: 'dict', v: pairs };
+			}
+		}
+		if (c === '[') return list(depth);
+		return bareValue();
 	};
 	ws();
 	const v = value(1);
@@ -274,6 +289,23 @@ function withoutTrailingZeros(s: string): string {
 	return s.slice(0, end);
 }
 
+/** A positive finite float as JavaScript's `String` writes it, read as its significant digits and the power of ten of the first. */
+function digitsAndExponent(s: string): [digits: string, exponent: number] {
+	if (s.includes('e')) {
+		const [m, e] = s.split('e') as [string, string];
+		return [m.replace('.', ''), Number(e)];
+	}
+	if (s.includes('.')) {
+		const [whole, fraction] = s.split('.') as [string, string];
+		if (whole === '0') {
+			const zeros = fraction.length - fraction.replace(/^0+/, '').length;
+			return [fraction.slice(zeros), -(zeros + 1)];
+		}
+		return [whole + fraction, whole.length - 1];
+	}
+	return [withoutTrailingZeros(s), s.length - 1];
+}
+
 /**
  * A float as Python's `repr` writes it — the shortest digits that read back as the same double, which JavaScript's
  * `String` gives too, placed as Python places them: in exponent form when the decimal point would sit four or more places
@@ -288,26 +320,7 @@ export function pyFloatRepr(x: number): string {
 	if (x === 0) return Object.is(x, -0) ? '-0.0' : '0.0';
 	const sign = x < 0 ? '-' : '';
 	const s = String(Math.abs(x));
-	let digits: string;
-	let exponent: number; // the power of ten of the first digit
-	if (s.includes('e')) {
-		const [m, e] = s.split('e') as [string, string];
-		digits = m.replace('.', '');
-		exponent = Number(e);
-	} else if (s.includes('.')) {
-		const [whole, fraction] = s.split('.') as [string, string];
-		if (whole === '0') {
-			const zeros = fraction.length - fraction.replace(/^0+/, '').length;
-			digits = fraction.slice(zeros);
-			exponent = -(zeros + 1);
-		} else {
-			digits = whole + fraction;
-			exponent = whole.length - 1;
-		}
-	} else {
-		digits = withoutTrailingZeros(s);
-		exponent = s.length - 1;
-	}
+	const [digits, exponent] = digitsAndExponent(s); // the exponent: the power of ten of the first digit
 	const point = exponent + 1; // Python's `decpt`: the value is 0.d1d2… × 10^point
 	if (point <= -4 || point > 16) {
 		const mantissa = digits.length === 1 ? digits : `${digits[0]}.${digits.slice(1)}`;

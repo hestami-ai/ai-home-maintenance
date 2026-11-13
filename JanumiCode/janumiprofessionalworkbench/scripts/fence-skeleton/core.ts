@@ -300,25 +300,26 @@ function rangeOf(field: string): [number, number] {
 	return [first, hi === undefined ? first : Number.parseInt(hi, 16)];
 }
 
-/**
- * Parse the four inputs' data lines, and read the supplement into them. `lines.confusables` may be the extract's or —
- * for `checkedCut`'s check that the extract loses nothing — every mapping of the whole file.
- */
-export function parseUnicode(
-	lines: Record<InputKey, readonly string[]>,
-	supplement: readonly SupplementLine[] = FENCE_SUPPLEMENT
-): UnicodeData {
+/** TR39's mappings, source code point → prototype, read from `confusables.txt`'s data lines (`parseUnicode`). */
+function parseConfusables(lines: readonly string[]): Map<number, string> {
 	const tr39 = new Map<number, string>();
-	for (const line of lines.confusables) {
+	for (const line of lines) {
 		const [src, tgt] = line.split(';');
 		const from = codePointsOf(src ?? '');
 		if (from.length !== 1) throw new Error(`confusables: a source of ${from.length} code points: ${line}`);
 		tr39.set(from[0]!, String.fromCodePoint(...codePointsOf(tgt ?? '')));
 	}
-	const decompositions = new Map<number, { compat: boolean; tag: string; parts: number[] }>();
-	const upper = new Map<number, number>();
-	const lower = new Map<number, number>();
-	for (const line of lines.unicodeData) {
+	return tr39;
+}
+
+/** Each `UnicodeData.txt` extract line's decomposition and simple case mappings, read into the three maps (`parseUnicode`). */
+function readUnicodeDataLines(
+	lines: readonly string[],
+	decompositions: Map<number, { compat: boolean; tag: string; parts: number[] }>,
+	upper: Map<number, number>,
+	lower: Map<number, number>
+): void {
+	for (const line of lines) {
 		const [cp, decomposition, up, low] = line.split(';');
 		const code = Number.parseInt(cp!, 16);
 		if (decomposition) {
@@ -332,6 +333,21 @@ export function parseUnicode(
 		if (up) upper.set(code, Number.parseInt(up, 16));
 		if (low) lower.set(code, Number.parseInt(low, 16));
 	}
+}
+
+/**
+ * Parse the four inputs' data lines, and read the supplement into them. `lines.confusables` may be the extract's or —
+ * for `checkedCut`'s check that the extract loses nothing — every mapping of the whole file.
+ */
+export function parseUnicode(
+	lines: Record<InputKey, readonly string[]>,
+	supplement: readonly SupplementLine[] = FENCE_SUPPLEMENT
+): UnicodeData {
+	const tr39 = parseConfusables(lines.confusables);
+	const decompositions = new Map<number, { compat: boolean; tag: string; parts: number[] }>();
+	const upper = new Map<number, number>();
+	const lower = new Map<number, number>();
+	readUnicodeDataLines(lines.unicodeData, decompositions, upper, lower);
 	const deleted = new Set<number>();
 	const addRange = (field: string) => {
 		const [first, last] = rangeOf(field);
@@ -611,8 +627,9 @@ export interface FenceSkeletonTable {
 export function fenceSkeletonTable(data: UnicodeData, fold: (c: string) => string = asciiFold): FenceSkeletonTable {
 	// What each fence character's skeleton is, ASCII case aside — the one character a reading must be made of.
 	const fenceOf = new Map<string, string>();
-	for (const f of FENCE_ALPHABET)
-		for (const variant of new Set([f, f.toLowerCase()])) {
+	for (const f of FENCE_ALPHABET) {
+		/** One case of the fence character `f`: its skeleton, one ASCII character no other fence character shares. */
+		const readVariant = (variant: string): void => {
 			const k = tr39Skeleton(data, variant.codePointAt(0)!);
 			if ([...k].length !== 1 || k.codePointAt(0)! >= 0x80)
 				throw new Error(`the skeleton of ${JSON.stringify(variant)} is ${JSON.stringify(k)}, not one ASCII character`);
@@ -620,7 +637,9 @@ export function fenceSkeletonTable(data: UnicodeData, fold: (c: string) => strin
 			if (seen !== undefined && seen !== f)
 				throw new Error(`${JSON.stringify(seen)} and ${JSON.stringify(f)} share the skeleton ${JSON.stringify(k)}`);
 			fenceOf.set(fold(k), f);
-		}
+		};
+		for (const variant of new Set([f, f.toLowerCase()])) readVariant(variant);
+	}
 	/** A prototype's characters with the code points rule 1 deletes removed (`REG-F-481`: U+00D8 is O + U+0338). */
 	const kept = (k: string): string[] => [...k].filter((c) => !data.deleted.has(c.codePointAt(0)!));
 	/** What a prototype reads as when each of its kept characters is a fence character's skeleton, or `undefined`. */
@@ -662,15 +681,17 @@ export function fenceSkeletonTable(data: UnicodeData, fold: (c: string) => strin
 	// read by TR39 alone — deleted, or a fence character's skeleton.
 	const byTr39Alone = (p: number): string | undefined => (data.deleted.has(p) ? '' : plain(tr39Skeleton(data, p)));
 	const classReadings = new Map<string, string[]>();
-	for (const [cp, d] of data.decompositions) {
-		if (!d.compat || d.tag === '<compat>') continue;
+	/** One member's compatibility decomposition, read into its TR39 class's readings when it reads as one. */
+	const readClass = (cp: number, d: { readonly compat: boolean; readonly tag: string }): void => {
+		if (!d.compat || d.tag === '<compat>') return;
 		const parts = decompose(data, cp, true).map(byTr39Alone);
-		if (parts.includes(undefined)) continue;
+		if (parts.includes(undefined)) return;
 		const reading = parts.join('');
 		const key = classOf(data, cp);
-		if (reading === '' || key === '') continue;
+		if (reading === '' || key === '') return;
 		classReadings.set(key, unique([...(classReadings.get(key) ?? []), reading]));
-	}
+	};
+	for (const [cp, d] of data.decompositions) readClass(cp, d);
 	// ⛔ No ASCII code point is given a class reading.
 	const byClass = (cp: number): string[] => (cp < 0x80 ? [] : (classReadings.get(classOf(data, cp)) ?? []));
 	// A part of a compatibility decomposition, read by rules 1, 2 and 4 (a part is decomposed already).
@@ -694,25 +715,20 @@ export function fenceSkeletonTable(data: UnicodeData, fold: (c: string) => strin
 		!data.deleted.has(cp);
 	const deleted: number[] = [];
 	const mapped: [number, string][] = [];
-	for (let cp = 0; cp <= 0x10ffff; cp += 1) {
-		if (cp >= 0xd800 && cp <= 0xdfff) continue;
-		const self = String.fromCodePoint(cp);
-		if (unnamed(cp)) {
-			// ⚠ The general path below, taken short for the million code points no input names: rule 2 of its own
-			// skeleton, then rule 4 — the same answers (measured equal over every code point when this was written).
-			const own = fenceOf.get(fold(self));
-			const reads = own !== undefined && own !== self ? [own] : cp < 0x80 ? [] : [...(classReadings.get(self) ?? [])].sort();
-			for (const r of reads) mapped.push([cp, r]);
-			continue;
-		}
+	/** Rule 3's reading of one part: its readings by rules 1, 2 and 4, or itself when they give it none. */
+	const partOrSelf = (p: number): string[] => {
+		const r = readPart(p);
+		return r.length > 0 ? r : [String.fromCodePoint(p)];
+	};
+	/** Every reading of one code point some input names, by the general path, added to `deleted` and `mapped`. */
+	const readNamed = (cp: number, self: string): void => {
 		const readings = new Set(direct(cp));
 		// Rule 3: the compatibility decomposition, each part read by rules 1, 2 and 4, or as itself.
 		const parts = decompose(data, cp, true);
 		if (parts.length !== 1 || parts[0] !== cp) {
 			let through = [''];
 			for (const p of parts) {
-				const r = readPart(p);
-				through = product(through, r.length > 0 ? r : [String.fromCodePoint(p)]);
+				through = product(through, partOrSelf(p));
 			}
 			for (const t of through) if ([...t].some((c) => FENCE_ALPHABET.includes(c))) readings.add(t);
 		}
@@ -721,7 +737,22 @@ export function fenceSkeletonTable(data: UnicodeData, fold: (c: string) => strin
 		for (const r of byClass(cp)) readings.add(r);
 		if (readings.has('')) deleted.push(cp);
 		for (const r of [...readings].sort()) if (r !== '') mapped.push([cp, r]);
-	}
+	};
+	/** Every reading of one code point but a surrogate, added to `deleted` and `mapped`. */
+	const readCodePoint = (cp: number): void => {
+		if (cp >= 0xd800 && cp <= 0xdfff) return;
+		const self = String.fromCodePoint(cp);
+		if (unnamed(cp)) {
+			// ⚠ The general path below, taken short for the million code points no input names: rule 2 of its own
+			// skeleton, then rule 4 — the same answers (measured equal over every code point when this was written).
+			const own = fenceOf.get(fold(self));
+			const reads = own !== undefined && own !== self ? [own] : cp < 0x80 ? [] : [...(classReadings.get(self) ?? [])].sort();
+			for (const r of reads) mapped.push([cp, r]);
+			return;
+		}
+		readNamed(cp, self);
+	};
+	for (let cp = 0; cp <= 0x10ffff; cp += 1) readCodePoint(cp);
 	// ⛔ The premises the chooser rests on, checked on the table itself.
 	const terminators = [...LINE_TERMINATOR_CONTROLS, ...LINE_SEPARATORS];
 	for (const cp of [...terminators, ...[...FENCE_ALPHABET].map((c) => c.codePointAt(0)!)])

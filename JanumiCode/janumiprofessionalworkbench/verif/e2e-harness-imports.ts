@@ -38,6 +38,47 @@ function tsFiles(dir: string, acc: string[] = []): string[] {
 const fromPlaywright = (n: ts.Expression | undefined): boolean =>
 	n !== undefined && ts.isStringLiteral(n) && PLAYWRIGHT.has(n.text);
 
+/** Records one way a node takes Playwright's `test`. */
+type At = (n: ts.Node, what: string) => void;
+
+/** Whether an import or export specifier names `test` and is not type-only. */
+const namesTest = (el: ts.ImportSpecifier | ts.ExportSpecifier): boolean =>
+	!el.isTypeOnly && (el.propertyName ?? el.name).text === 'test';
+
+function importDeclarationTakes(n: ts.Node, at: At): void {
+	if (
+		!ts.isImportDeclaration(n) ||
+		!fromPlaywright(n.moduleSpecifier) ||
+		n.importClause?.phaseModifier === ts.SyntaxKind.TypeKeyword
+	)
+		return;
+	const clause = n.importClause;
+	if (clause?.name)
+		at(n, `a default import (${clause.name.text}) — the module's default export IS test`);
+	const bindings = clause?.namedBindings;
+	if (bindings && ts.isNamespaceImport(bindings))
+		at(n, `a namespace import (${bindings.name.text})`);
+	if (bindings && ts.isNamedImports(bindings))
+		for (const el of bindings.elements) if (namesTest(el)) at(el, `a named import of test`);
+}
+
+function exportDeclarationTakes(n: ts.Node, at: At): void {
+	if (!ts.isExportDeclaration(n) || !fromPlaywright(n.moduleSpecifier) || n.isTypeOnly) return;
+	const clause = n.exportClause;
+	if (clause === undefined || !ts.isNamedExports(clause)) at(n, 'a re-export of the whole module');
+	else for (const el of clause.elements) if (namesTest(el)) at(el, 'a re-export of test');
+}
+
+function dynamicImportTakes(n: ts.Node, at: At): void {
+	if (
+		ts.isCallExpression(n) &&
+		(n.expression.kind === ts.SyntaxKind.ImportKeyword ||
+			(ts.isIdentifier(n.expression) && n.expression.text === 'require')) &&
+		fromPlaywright(n.arguments[0])
+	)
+		at(n, 'a dynamic import or require of the module');
+}
+
 /** Each way `source` takes Playwright's own `test`, as `line: text`. Empty when it takes none. */
 export function playwrightTestTakes(source: string): string[] {
 	const sf = ts.createSourceFile('x.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -45,38 +86,9 @@ export function playwrightTestTakes(source: string): string[] {
 	const at = (n: ts.Node, what: string) =>
 		out.push(`${sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1}: ${what}`);
 	const visit = (n: ts.Node): void => {
-		if (
-			ts.isImportDeclaration(n) &&
-			fromPlaywright(n.moduleSpecifier) &&
-			n.importClause?.phaseModifier !== ts.SyntaxKind.TypeKeyword
-		) {
-			const clause = n.importClause;
-			if (clause?.name)
-				at(n, `a default import (${clause.name.text}) — the module's default export IS test`);
-			const bindings = clause?.namedBindings;
-			if (bindings && ts.isNamespaceImport(bindings))
-				at(n, `a namespace import (${bindings.name.text})`);
-			if (bindings && ts.isNamedImports(bindings))
-				for (const el of bindings.elements)
-					if (!el.isTypeOnly && (el.propertyName ?? el.name).text === 'test')
-						at(el, `a named import of test`);
-		}
-		if (ts.isExportDeclaration(n) && fromPlaywright(n.moduleSpecifier) && !n.isTypeOnly) {
-			const clause = n.exportClause;
-			if (clause === undefined || !ts.isNamedExports(clause))
-				at(n, 'a re-export of the whole module');
-			else
-				for (const el of clause.elements)
-					if (!el.isTypeOnly && (el.propertyName ?? el.name).text === 'test')
-						at(el, 'a re-export of test');
-		}
-		if (
-			ts.isCallExpression(n) &&
-			(n.expression.kind === ts.SyntaxKind.ImportKeyword ||
-				(ts.isIdentifier(n.expression) && n.expression.text === 'require')) &&
-			fromPlaywright(n.arguments[0])
-		)
-			at(n, 'a dynamic import or require of the module');
+		importDeclarationTakes(n, at);
+		exportDeclarationTakes(n, at);
+		dynamicImportTakes(n, at);
 		if (
 			ts.isImportEqualsDeclaration(n) &&
 			!n.isTypeOnly &&

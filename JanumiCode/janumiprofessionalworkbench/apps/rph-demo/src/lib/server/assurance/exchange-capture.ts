@@ -27,7 +27,7 @@ import type {
 	StoredArtifactRef
 } from '@janumipwb/rph-ports';
 import type { ObservedToolCallReport, WorkProductDerivation } from '@janumipwb/rph-contracts';
-import { splitAnswerSpan } from './agy-cli.js';
+import { splitAnswerSpan, type AnswerSpan } from './agy-cli.js';
 import {
 	beginExchange,
 	type ContentRef,
@@ -285,48 +285,12 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 			put
 		));
 	} else {
-		answerSpanRef = storedRef(
-			await put(span.answer, 'RETAINED_BY_PARTICIPATION'),
+		({ answerSpanRef, volunteeredReasoningRef, rawOutputRef, omittedRegions } = await locatedRefs(
+			span,
+			volunteered,
 			input.store.durability,
-			'RETAINED_BY_PARTICIPATION'
-		);
-		volunteeredReasoningRef = volunteered
-			? storedRef(
-					await put(volunteered, 'PURGEABLE_AT_EXPIRY'),
-					input.store.durability,
-					'PURGEABLE_AT_EXPIRY'
-				)
-			: pendingRef(
-					'No volunteered reasoning arrived with this answer. PER-12: availability is provider- and ' +
-						'configuration-dependent and there is no obligation to solicit or procure a trace — so this ' +
-						'is an observed absence, not an unretained presence.'
-				);
-		rawOutputRef = volunteered
-			? pendingRef(
-					'Separated at retention per Guide §9.7: the answer span and the volunteered reasoning are ' +
-						'retained as two objects under their own classes. The whole blob is not stored because one ' +
-						'stored object carries one retention class and this one is mixed. The reply is NOT lost: ' +
-						'`omittedRegions` carries the answer span’s byte offset, so the two retained objects ' +
-						'reassemble into the exact bytes that arrived.'
-				)
-			: // Nothing to separate: the whole output IS the answer, so a single class fits it exactly.
-				answerSpanRef;
-
-		if (volunteered)
-			omittedRegions = [
-				{
-					role: 'MODEL_ANSWER',
-					reason:
-						'The answer span was cut out of the retained reasoning at retention (Guide §9.7) because ' +
-						'the two halves carry opposite retention classes. It is retained separately as ' +
-						'`answerSpanRef` under RETAINED_BY_PARTICIPATION. Reassemble the reply as ' +
-						'reasoning.slice(0, byteOffset) + answer + reasoning.slice(byteOffset), in BYTES.',
-					// ⚠ UTF-8 BYTES, measured — not `String.length`, which is UTF-16 code units and disagrees
-					// with `byteSize` everywhere else in this record the moment a reply is not ASCII.
-					byteSize: Buffer.byteLength(span.answer, 'utf8'),
-					byteOffset: Buffer.byteLength(span.prefix, 'utf8')
-				}
-			];
+			put
+		));
 	}
 
 	const inputRef = await put(input.prompt, 'RETAINED_BY_PARTICIPATION');
@@ -402,6 +366,62 @@ async function unlocatedRefs(
 			'(PER-12) — wrong in one direction or the other.'
 	);
 	return { answerSpanRef: blocked, volunteeredReasoningRef: blocked, rawOutputRef: blocked };
+}
+
+/**
+ * The E-2 refs of a reply in which an answer span WAS located, and the region the split declares it cut out
+ * (`REG-D-057`): the answer stored RETAINED_BY_PARTICIPATION, any volunteered reasoning PURGEABLE_AT_EXPIRY.
+ */
+async function locatedRefs(
+	span: AnswerSpan,
+	volunteered: string,
+	durability: ContentDurability,
+	put: (bytes: string, purgeability: Purgeability) => Promise<StoredArtifactRef>
+): Promise<ReplyRefs & { readonly omittedRegions: OmittedRegion[] }> {
+	const answerSpanRef = storedRef(
+		await put(span.answer, 'RETAINED_BY_PARTICIPATION'),
+		durability,
+		'RETAINED_BY_PARTICIPATION'
+	);
+	const volunteeredReasoningRef = volunteered
+		? storedRef(
+				await put(volunteered, 'PURGEABLE_AT_EXPIRY'),
+				durability,
+				'PURGEABLE_AT_EXPIRY'
+			)
+		: pendingRef(
+				'No volunteered reasoning arrived with this answer. PER-12: availability is provider- and ' +
+					'configuration-dependent and there is no obligation to solicit or procure a trace — so this ' +
+					'is an observed absence, not an unretained presence.'
+			);
+	const rawOutputRef = volunteered
+		? pendingRef(
+				'Separated at retention per Guide §9.7: the answer span and the volunteered reasoning are ' +
+					'retained as two objects under their own classes. The whole blob is not stored because one ' +
+					'stored object carries one retention class and this one is mixed. The reply is NOT lost: ' +
+					'`omittedRegions` carries the answer span’s byte offset, so the two retained objects ' +
+					'reassemble into the exact bytes that arrived.'
+			)
+		: // Nothing to separate: the whole output IS the answer, so a single class fits it exactly.
+			answerSpanRef;
+
+	let omittedRegions: OmittedRegion[] = [];
+	if (volunteered)
+		omittedRegions = [
+			{
+				role: 'MODEL_ANSWER',
+				reason:
+					'The answer span was cut out of the retained reasoning at retention (Guide §9.7) because ' +
+					'the two halves carry opposite retention classes. It is retained separately as ' +
+					'`answerSpanRef` under RETAINED_BY_PARTICIPATION. Reassemble the reply as ' +
+					'reasoning.slice(0, byteOffset) + answer + reasoning.slice(byteOffset), in BYTES.',
+				// ⚠ UTF-8 BYTES, measured — not `String.length`, which is UTF-16 code units and disagrees
+				// with `byteSize` everywhere else in this record the moment a reply is not ASCII.
+				byteSize: Buffer.byteLength(span.answer, 'utf8'),
+				byteOffset: Buffer.byteLength(span.prefix, 'utf8')
+			}
+		];
+	return { answerSpanRef, volunteeredReasoningRef, rawOutputRef, omittedRegions };
 }
 
 /**
