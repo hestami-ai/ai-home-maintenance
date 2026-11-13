@@ -490,6 +490,8 @@ const findingsOf = (review: Pick<FloorPolicyView, 'disposition' | 'observations'
  * ⭐⭐ `JAN-EXEC` Phase 7, package L13 — design D68 (`REG-D-157`) — AND A REVIEW THE FLOOR HOLDS INCONCLUSIVE FOR A FAILED CHECK THE REVIEW
  * DECLARES (`heldForAFailedCheck`) IS ANSWERED AS A REJECTED ONE IS: its failed declared checks are findings, and a round held so asks
  * for a repair (`REFINE_SUBJECT`). Every branch above that answer is asked first, as before.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L14 — design D68 as amended (`REG-D-158`) — WHATEVER THE ROUND'S FOLD: a round holding such a review asks
+ * for the repair beside a part the round holds no concluded review of too, as a round holding a REJECTED review does.
  */
 export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	if (floor.satisfied) {
@@ -634,12 +636,19 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	// assessed the subject in the first, and the remedy is EVIDENCE rather than a subject edit in the second.
 	//
 	// ⭐⭐ Package L13 — D68 (`REG-D-157`; the lead's decision (b)) — ⚠ THAT RULE IS NARROWED BY THE SPONSOR: `REG-D-059`'s note on
-	// INCONCLUSIVE is the lead's, not the sponsor's words, and assumes the reviewer could not tell. A round whose folded review is
-	// INCONCLUSIVE because a review in it is held so for a failed check — a part, or a unit's review, which has none
+	// INCONCLUSIVE is the lead's, not the sponsor's words, and assumes the reviewer could not tell. A round ~~whose folded review is
+	// INCONCLUSIVE because a review in it~~ ⭐ in which a review is held so for a failed check — a part, or a unit's review, which has none
 	// (`heldForAFailedCheck`) — has a finding, and is answered as a REJECTED round is, its findings those `judged` holds. An INCONCLUSIVE
 	// round with no such review still sends nothing back and is answered below, as before.
+	// ⭐⭐ Package L14 — D68 as amended (`REG-D-158`; the lead's decision (a)) — WHATEVER THE ROUND'S FOLD. ⛔ Asking the fold to be
+	// INCONCLUSIVE left one round out: beside a part the round holds no concluded review of — MISSING, or recorded in a state no
+	// completion concludes in, which the PWA page's read can show (`loadPwaFloor`) — the fold is UNASSESSED (`partsDisposition`), and a
+	// held part there was answered as an incomplete review, nothing sent back, where a REJECTED part beside the same part folds the round
+	// REJECTED and is answered by revision. The fold and the record are unchanged; only the answer moves, and with it the page's hint and
+	// the escalation note keyed on the hint. A part that could not tell, beside such a part, still offers no finding and is answered
+	// below, as before.
 	const reviews: readonly Pick<FloorPolicyView, 'disposition' | 'observations'>[] = floor.parts ?? [review];
-	const heldRound = review.disposition === 'INCONCLUSIVE' && reviews.some(heldForAFailedCheck);
+	const heldRound = reviews.some(heldForAFailedCheck);
 	if ((FEEDS_BACK_TO_PRODUCER.has(review.disposition) || heldRound) && subjectFindings.length > 0) {
 		return {
 			action: 'REFINE_SUBJECT',
@@ -869,7 +878,9 @@ function rejectsTheGraph(floor: FloorView): boolean {
  * answers without one (the RS-3 verifier's MAJOR 1): an INCOMPLETE review, with no verdict that judged the subject
  * (INCONCLUSIVE, ASSESSING, …), with or without subject-coded observations — the classifier's catch-all, which also takes
  * the INCONCLUSIVE review with nothing recorded that an unregistered draft stages (`e2e/resume-hint.e2e.ts`) ⭐ — save, since package L13
- * (D68), an INCONCLUSIVE review held so for a failed declared check, which the classifier answers `REFINE_SUBJECT`, so `'REVISE'` —; an
+ * (D68), an INCONCLUSIVE review held so for a failed declared check, which the classifier answers `REFINE_SUBJECT`, so `'REVISE'` ⭐ (and,
+ * since package L14, `REG-D-158`, whatever the round's fold: beside a part with no concluded review, MISSING, or recorded in a state no
+ * completion concludes in, too) —; an
  * ESCALATED review whose record names no operational code; and NO reasoning-review result at all. The codes were chosen
  * because the waiver e2e staged its revision test's floor ASSESSING with a BLOCKING `RR-04`: a test about a SUBJECT
  * rejection whose fixture recorded an incomplete review. That test now concludes its review REJECTED, and the classifier

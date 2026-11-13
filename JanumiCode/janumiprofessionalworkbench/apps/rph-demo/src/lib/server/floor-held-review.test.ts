@@ -11,10 +11,17 @@
 // ⭑ WHAT MUST HOLD (the lead's test, the record's own: the record keeps no reviewer recommendation but ESCALATED, `REG-F-475`). An
 // INCONCLUSIVE review carrying an observation whose code is a check the review declares (`REASONING_REVIEW_CRITERIA`) is answered as a
 // REJECTED review is: those observations are its findings, beside a REJECTED or CONDITIONALLY_SATISFIED review's, and none of its
-// other observations; a round whose fold is INCONCLUSIVE because of such a review is answered REFINE_SUBJECT, autoRefine true, with
+// other observations; a round ~~whose fold is INCONCLUSIVE because of such a review~~ ⭐ holding such a review, whatever its fold
+// (package L14, `REG-D-158`), is answered REFINE_SUBJECT, autoRefine true, with
 // REFINE_SUBJECT's guidance; and the page reads the hint for a revision. An INCONCLUSIVE review with no failed declared check — an
 // unanswered check, an operational code, a boundary-rejected reply that recorded no failed check, a code no check declares — sends
 // nothing back and is answered as today, word for word.
+// ⭐⭐ `JAN-EXEC` Phase 7, PACKAGE L14 — design D68 as amended (`REG-D-158`; the lead's decisions (a) to (c)) — WHATEVER THE ROUND'S FOLD.
+// ⛔ Package L13 asked the fold to be INCONCLUSIVE. Beside a part the round holds no concluded review of — MISSING, or recorded in a state
+// no completion concludes in — the fold is UNASSESSED (`partsDisposition`), and a held part there was answered as an incomplete review,
+// nothing sent back, where a REJECTED part beside the same part folds the round REJECTED and is answered by revision. The fold and the
+// record stay as they are; only the answer moves, and with it the page's hint and the escalation note keyed on the hint (L14's block
+// below; through the page's own read, `floor-held-review-page.test.ts`).
 //
 // ⭑ THE CLASSIFIER, PURE: rounds as the floor returns one (`floor-parts.test.ts`'s `partView` and `roundOf`, restated: a test file's
 // fixtures are its own), and a unit's view as the execution plane builds one (`execution/floor-over-subject.ts`: the three policies
@@ -38,6 +45,7 @@ import {
 	type AssuranceSubject,
 	type ReasoningReviewJudgement
 } from '@janumipwb/rph-assurance';
+import { AssuranceAssessmentStateSchema, AssuranceDispositionRecommendationSchema } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import {
 	classifyFloorRemediation,
@@ -289,10 +297,23 @@ describe('⭑ L13 — D68, controls: an INCONCLUSIVE review that could not tell 
 		);
 	});
 
-	// ⭑ (b) NAMES A FOLDED INCONCLUSIVE: a held part beside a part the round holds no review of (MISSING) folds UNASSESSED, and is
-	// answered as today. The authoring route never makes such a round (`runPwaFloor` reviews every part it lists); the page's read can.
-	it('⭑ CONTROL — a held part beside a part the round holds no review of: the fold UNASSESSED, answered as today', () => {
-		expect(classifyFloorRemediation(roundOf([part(SUCCESS, 'MISSING'), part(DESIGN, 'INCONCLUSIVE', [DESIGN_FAULT])]))).toEqual(INCOMPLETE);
+	// ⭑ (b) NAMES A FOLDED INCONCLUSIVE: a held part beside a part the round holds no review of (MISSING) folds UNASSESSED, ~~and is
+	// answered as today~~. The authoring route never makes such a round (`runPwaFloor` reviews every part it lists); the page's read can.
+	// ⭐⭐ Package L14 (`REG-D-158`; D68 as amended, the lead's decision (c)) — RESTATED TO THE RULING: a held part is answered as a rejected
+	// one is, whatever the fold, as a REJECTED part beside the same part is (it folds the round REJECTED). The fold stays UNASSESSED; only the
+	// answer moves, and with it the page's hint and the escalation note keyed on the hint. ⛔ PREDICTED RED at 769394ba:
+	// RETRY_OR_CONFIGURE_REVIEWER, nothing sent back. Its old promise is kept where it still holds — a part that could not tell, beside a part
+	// with no concluded review, answered as today — by L14's control below.
+	it('~~⭑ CONTROL~~ ⭐ RED — a held part beside a part the round holds no review of: the fold UNASSESSED, ~~answered as today~~ ⭐ answered as a rejected one is — REFINE_SUBJECT, its check the one finding, and the page reads the hint for a revision (package L14, REG-D-158)', () => {
+		const round = roundOf([part(SUCCESS, 'MISSING'), part(DESIGN, 'INCONCLUSIVE', [DESIGN_FAULT])]);
+		expect(round.policies.find((p) => p.policyId === REVIEW)?.disposition, 'arrangement: the fold').toBe('UNASSESSED');
+		expect(classifyFloorRemediation(round), 'the held part beside a part with no review is not answered as a rejected one').toEqual({
+			action: 'REFINE_SUBJECT',
+			autoRefine: true,
+			findings: [{ ...DESIGN_FAULT, typeId: DESIGN, typeName: NAMES[DESIGN] }],
+			guidance: REFINE_GUIDANCE
+		});
+		expect(floorBlockedHint(round), 'the page does not read the hint for a revision').toBe('REVISE');
 	});
 
 	it('⭑ CONTROL — a satisfied round: nothing to do', () => {
@@ -334,6 +355,134 @@ describe('⭑ L13 — D68, controls: an INCONCLUSIVE review that could not tell 
 				`Original intent: ${INTENT}`
 			].join('\n')
 		);
+	});
+});
+
+// ── Package L14 — the rounds a held part can share, read from the contract ──────────────────────────────────────────────────────────
+/** The assessment states no completion concludes in: the contract's fifteen less the five a completion admits, each read as MISSING by
+ *  the fold (`partsDisposition`), so a round beside any of them folds UNASSESSED. Read from the contract, never restated. */
+const NOT_CONCLUDED: readonly string[] = AssuranceAssessmentStateSchema.options.filter(
+	(s) => !(AssuranceDispositionRecommendationSchema.options as readonly string[]).includes(s)
+);
+/** The fold a round's reasoning review shows. */
+const foldOf = (round: FloorView): string | undefined => round.policies.find((p) => p.policyId === REVIEW)?.disposition;
+/** A round holding the design's held part, answered as a round with a REJECTED part is: its check the one finding, whole. */
+const HELD_ANSWER: FloorRemediation = {
+	action: 'REFINE_SUBJECT',
+	autoRefine: true,
+	findings: [{ ...DESIGN_FAULT, typeId: DESIGN, typeName: NAMES[DESIGN] }],
+	guidance: REFINE_GUIDANCE
+};
+
+describe('⭐⭐ L14 — REG-D-158 (D68 as amended): a held review is answered as a rejected one whatever the round’s fold — beside a part with no concluded review too', () => {
+	// ⛔ PREDICTED RED, read from the code at 769394ba: the condition asks the fold to be INCONCLUSIVE, and beside a part with no concluded
+	// review the fold is UNASSESSED, so the held part's round is answered RETRY_OR_CONFIGURE_REVIEWER, nothing sent back — first beside
+	// REQUESTED, the first of the contract's states no completion concludes in. Its arrangement (the folds) green before it.
+	it('⭐ RED — the general form: beside a part in each state its review can be recorded in (the contract’s fifteen) and beside one the read marks MISSING, the held part’s round is answered as a rejected one is, and the page reads the hint for a revision — the folds it shares REJECTED, UNASSESSED and INCONCLUSIVE alone', () => {
+		expect(NOT_CONCLUDED, 'arrangement: the contract’s states no completion concludes in').toEqual([
+			'REQUESTED',
+			'EVIDENCE_PENDING',
+			'READY',
+			'ASSESSING',
+			'WAIVED',
+			'VALIDATOR_FAILED',
+			'INDEPENDENCE_VIOLATION',
+			'INVALIDATED',
+			'WAIVER_EXPIRED',
+			'CANCELLED'
+		]);
+		const rounds = [...AssuranceAssessmentStateSchema.options, 'MISSING'].map(
+			(state) => [state, roundOf([part(SUCCESS, state), part(DESIGN, 'INCONCLUSIVE', [DESIGN_FAULT])])] as const
+		);
+		const folds = new Map<string, string[]>();
+		for (const [state, round] of rounds) folds.set(foldOf(round) ?? '', [...(folds.get(foldOf(round) ?? '') ?? []), state]);
+		expect(Object.fromEntries(folds), 'arrangement: the folds a held part shares a round in, and beside what').toEqual({
+			INCONCLUSIVE: ['SATISFIED', 'CONDITIONALLY_SATISFIED', 'INCONCLUSIVE', 'ESCALATED'],
+			REJECTED: ['REJECTED'],
+			UNASSESSED: [...NOT_CONCLUDED, 'MISSING']
+		});
+
+		for (const [state, round] of rounds) {
+			expect(
+				classifyFloorRemediation(round),
+				`beside a part recorded ${state} (the fold ${foldOf(round)}): the held part is not answered as a rejected one`
+			).toEqual(HELD_ANSWER);
+			expect(floorBlockedHint(round), `beside a part recorded ${state}: the page does not read the hint for a revision`).toBe('REVISE');
+		}
+	});
+
+	// ⛔ PREDICTED RED: the parts that concluded, classified without the failed one, fold UNASSESSED beside the MISSING part, which the
+	// condition does not answer by revision; so the branch answers nothing, and the execution failure's branch answers the round.
+	it('⭐ RED — beside a part whose review failed operationally and a part the round holds no review of: the beside-failed-reviews branch answers by revision, the held type’s check the finding and the failed type named', () => {
+		const round = roundOf([
+			part(SUCCESS, 'INCONCLUSIVE', [EXECUTION_FAILED], false),
+			part(FAILURE, 'MISSING'),
+			part(DESIGN, 'INCONCLUSIVE', [DESIGN_FAULT])
+		]);
+		expect(foldOf(round), 'arrangement: the fold').toBe('UNASSESSED');
+
+		const remediation = classifyFloorRemediation(round);
+
+		expect([remediation.action, remediation.autoRefine, remediation.failedParts], 'the branch does not answer by revision').toEqual([
+			'REFINE_SUBJECT',
+			true,
+			[{ typeId: SUCCESS, typeName: NAMES[SUCCESS] }]
+		]);
+		expect(typed(remediation)).toEqual([[DESIGN, DESIGN_FAULT.code]]);
+		expect(remediation.guidance).toBe(
+			`${REFINE_GUIDANCE} The Reasoning Review of "Successful Workflow E2E Verification" (${SUCCESS}) failed operationally and recorded no finding: that failure is not a defect in the PWA, and every type, the failed ones included, is reviewed again when assurance reruns.`
+		);
+		expect([floorBlockedHint(round), floorFailedReviews(round)]).toEqual([
+			'REVISE_BESIDE_FAILED_REVIEWS',
+			`"Successful Workflow E2E Verification" (${SUCCESS})`
+		]);
+	});
+
+	// ⭑ THE PARITY THE RULING ASKS FOR: a REJECTED part beside the same parts folds the round REJECTED and is answered by revision, its
+	// finding sent back. Green at 769394ba and after.
+	it('⭑ CONTROL — a REJECTED part beside a part with no concluded review (MISSING, and each state no completion concludes in): the fold REJECTED, REFINE_SUBJECT, its finding — the parity the ruling asks for, before package L14 and after', () => {
+		for (const state of ['MISSING', ...NOT_CONCLUDED]) {
+			const round = roundOf([part(SUCCESS, state), part(FAILURE, 'REJECTED', [LEAF_FAULT])]);
+			expect(foldOf(round), `arrangement: the fold beside a part recorded ${state}`).toBe('REJECTED');
+			expect(classifyFloorRemediation(round), `beside a part recorded ${state}`).toEqual({
+				action: 'REFINE_SUBJECT',
+				autoRefine: true,
+				findings: [{ ...LEAF_FAULT, typeId: FAILURE, typeName: NAMES[FAILURE] }],
+				guidance: REFINE_GUIDANCE
+			});
+			expect(floorBlockedHint(round), `beside a part recorded ${state}: the page`).toBe('REVISE');
+		}
+	});
+
+	// ⭑ L13'S OLD PROMISE, KEPT WHERE IT STILL HOLDS (the lead's decision (b)): a part that could not tell — nothing observed, or a code no
+	// check declares — beside a part with no concluded review is answered as today, word for word, nothing sent back; and beside a failed
+	// part as well, by the execution failure's branch, as today. Green at 769394ba and after.
+	it('⭑ CONTROL — a part that could not tell beside a part with no concluded review, alone and beside a failed part: answered as today, word for word, nothing sent back — the incomplete review’s answer and the page’s NOT_BY_REVISION, or the execution failure’s', () => {
+		const couldNotTell: readonly (readonly [string, readonly Obs[]])[] = [
+			['nothing observed', []],
+			['a code no check declares, as the waiver e2e stages it', [UNDECLARED]],
+			['a code no check declares, the policy’s own form', [UNLISTED]]
+		];
+		for (const [label, observations] of couldNotTell) {
+			for (const state of ['MISSING', ...NOT_CONCLUDED]) {
+				const round = roundOf([part(SUCCESS, state), part(DESIGN, 'INCONCLUSIVE', observations)]);
+				expect(foldOf(round), `arrangement: ${label}, beside a part recorded ${state}: the fold`).toBe('UNASSESSED');
+				expect(classifyFloorRemediation(round), `${label}, beside a part recorded ${state}`).toEqual(INCOMPLETE);
+				expect(floorBlockedHint(round), `${label}, beside a part recorded ${state}: the page`).toBe('NOT_BY_REVISION');
+			}
+			const besideFailed = roundOf([
+				part(SUCCESS, 'INCONCLUSIVE', [EXECUTION_FAILED], false),
+				part(FAILURE, 'MISSING'),
+				part(DESIGN, 'INCONCLUSIVE', observations)
+			]);
+			expect(classifyFloorRemediation(besideFailed), `${label}, beside a failed part and a part with no review`).toEqual({
+				action: 'RETRY_OR_CONFIGURE_REVIEWER',
+				autoRefine: false,
+				findings: [],
+				guidance: EXECUTION_FAILED_GUIDANCE
+			});
+			expect(floorBlockedHint(besideFailed), `${label}, beside a failed part and a part with no review: the page`).toBe('NOT_BY_REVISION');
+		}
 	});
 });
 
