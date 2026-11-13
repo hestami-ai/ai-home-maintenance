@@ -906,7 +906,10 @@ const splitBy = (n: number, split: string): string => `${candidate(n).slice(0, 1
 const writtenBackwards = (n: number): string =>
 	[...candidate(n)]
 		.reverse()
-		.map((c) => (c === '<' ? '>' : c === '>' ? '<' : c))
+		.map((c) => {
+			if (c === '<') return '>';
+			return c === '>' ? '<' : c;
+		})
 		.join('');
 /** Candidate `n`, its two runs — its digits, then `UNTRUSTED` — in reverse order: one only to a reader that lays its
  *  line out with its runs reversed (`review-fence.ts` `runsReversed`). */
@@ -1048,7 +1051,7 @@ const unquotedProse = (first: number): string =>
  *  end of the first; a line laid out inside an isolate at the end of the second, before a tail. */
 const unquotedList = (first: number, opening: string): string[] => [
 	`${longHead(opening)} ${UNBROKEN.map((split, i) => splitBy(first + i, split)).join(' ')}`,
-	`${longHead(opening)} ${LAID_OUT_LINES[LAID_OUT_LINES.length - 1]!(first + UNBROKEN.length)} ${UNQUOTED_FILLER.repeat(2).trimEnd()}`
+	`${longHead(opening)} ${LAID_OUT_LINES.at(-1)!(first + UNBROKEN.length)} ${UNQUOTED_FILLER.repeat(2).trimEnd()}`
 ];
 const PLAIN_ACCOUNT: ProfessionalRationaleSummary = {
 	rationale: 'The survey is split into a desk study and a visual inspection.',
@@ -1263,6 +1266,11 @@ const DELIVERABLE: Deliverable = {
 		subjectOrdinal: undefined
 	}
 };
+/** How `OVERSIZE_DELIVERABLE`'s text `i` opens: the first fence candidate on a line of its own in the first, nothing in the others. */
+const oversizePanelHead = (i: number): string => (i === 0 ? `${candidate(0)}\n` : '');
+/** The sentence `OVERSIZE_DELIVERABLE`'s text `i` repeats past its budget. */
+const oversizePanelSentence = (i: number): string =>
+	`Panel ${i + 1} surveyed; bulging within tolerance. `;
 /**
  * Four files' texts and a long sequence, over the content's budget beside the answer: each text and each act cut. The first
  * text's kept HEAD holds the first fence candidate, so the prompt's token is `01` — and each text ends with `01`, in the
@@ -1273,7 +1281,7 @@ const OVERSIZE_DELIVERABLE: Deliverable = {
 	files: Array.from({ length: 4 }, (_, i) => ({
 		path: `survey/panel_${i + 1}.md`,
 		change: 'ADDED' as const,
-		content: `${i === 0 ? `${candidate(0)}\n` : ''}${over(9_000, `Panel ${i + 1} surveyed; bulging within tolerance. `)}\n${candidate(1)}`
+		content: `${oversizePanelHead(i)}${over(9_000, oversizePanelSentence(i))}\n${candidate(1)}`
 	})),
 	sequence: { ...OVERSIZE_SEQUENCE, subjectOrdinal: undefined }
 };

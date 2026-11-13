@@ -148,6 +148,7 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 			accept: () => acceptCandidate(page, actionFields),
 			lifecycle: (act) => designerAct(page, act, actionFields),
 			createUndertaking: () => createUndertakingThroughForm(page, PHASE7_UNDERTAKING),
+			// S2925: the injected pause of a polling harness - a fixed interval between polls is its purpose.
 			pause: (ms) => page.waitForTimeout(ms),
 			now: () => Date.now()
 		};
@@ -332,6 +333,7 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 			accept: () => acceptCandidate(page, actionFields),
 			lifecycle: (act) => designerAct(page, act, actionFields),
 			createUndertaking: () => createUndertakingThroughForm(page, PHASE7_UNDERTAKING),
+			// S2925: the injected pause of a polling harness - a fixed interval between polls is its purpose.
 			pause: (ms) => page.waitForTimeout(ms),
 			now: () => Date.now()
 		};

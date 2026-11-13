@@ -47,7 +47,7 @@ import {
 	splitAnswerSpan
 } from './agy-cli.js';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
-import type { ExchangeRecord, ModelInput } from '../agent/exchange-record.js';
+import type { ExchangeParseOutcome, ExchangeRecord, ModelInput } from '../agent/exchange-record.js';
 import { captureTry, type ExchangeSink } from './exchange-capture.js';
 import { sanitiseToolFailure } from '../tools/diagnostic-safety.js';
 import {
@@ -67,7 +67,6 @@ import {
 	freeTierRefusalsOf,
 	type FreeTierRefusals
 } from '../tools/free-tier-refusals.js';
-import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { allocate } from './process-result-render.js';
 import {
@@ -727,7 +726,7 @@ function renderObservedCalls(report: ObservedToolCallReport | undefined): string
 	if (!report)
 		return 'The host reported nothing about the tool calls of that turn, so this says nothing about which calls were made in it. That is an absence of observation, not an observation of absence.';
 	if (report.observation === 'NOT_OBSERVABLE')
-		return `The host was NOT IN A POSITION TO OBSERVE the tool calls of that turn${report.reason ? `: ${report.reason}` : '.'} Draw no conclusion from this about which calls were or were not made in it.`;
+		return `The host was NOT IN A POSITION TO OBSERVE the tool calls of that turn${notObservableReason(report.reason)} Draw no conclusion from this about which calls were or were not made in it.`;
 	if (report.observation === 'NONE_OBSERVED')
 		return 'The host WATCHED and observed NO tool calls at all during that turn. Calls made in an earlier turn are not shown here.';
 	const calls = (report.calls ?? [])
@@ -744,6 +743,11 @@ function renderObservedCalls(report: ObservedToolCallReport | undefined): string
 			? `\n  (${report.observedCount} calls were observed; only the first ${report.recordedLimit} are listed.)`
 			: '';
 	return `The host OBSERVED these tool calls in that turn, in the order they started:\n${calls}${truncated}\n⚠ COMPLETED means the CALL completed, NOT that the command passed — a failing test suite completes its call. This command's verdict is in the result above. The other calls' verdicts are not shown.`;
+}
+
+/** The end of the NOT_OBSERVABLE line's first sentence: the report's reason after a colon, or a full stop when it gives none. */
+function notObservableReason(reason: string | undefined): string {
+	return reason ? `: ${reason}` : '.';
 }
 
 /**
@@ -835,8 +839,10 @@ function actParts(act: HostSequenceAct, subjectOrdinal: number | undefined): Act
 }
 
 /** The declaration of a cut of one act's agent text, on its own line before the act. */
-const actCutDeclaration = (p: ActParts, kept: number, total: number, removed: number): string =>
-	`  ${headCutDeclaration(`the ${p.what} of act ${p.act.ordinal}`, kept, total, removed)}`;
+const actCutDeclaration = (p: ActParts, kept: number, total: number, removed: number): string => {
+	const slice = `the ${p.what} of act ${p.act.ordinal}`;
+	return `  ${headCutDeclaration(slice, kept, total, removed)}`;
+};
 
 /** The acts' lines in order, each try's acts under a line naming it, each act's agent text as `shown` gives it. */
 function sequenceBody(acts: readonly ActParts[], shown: (p: ActParts, i: number) => { declaration?: string; json: string }): string {
@@ -882,7 +888,7 @@ function fitActs(acts: readonly ActParts[], room: number): { readonly body: stri
 			continue;
 		}
 		const shownJson = acts.map((p, i) => (cut[i] ? headOf(p.json, shares[i]!) : p.json));
-		if (shownJson.some((j) => j === '')) return undefined;
+		if (shownJson.includes('')) return undefined;
 		const body = sequenceBody(acts, (p, i) =>
 			cut[i]
 				? {
@@ -1956,6 +1962,12 @@ function indicationParseOutcome(e: IndicationExchange): ExchangeParseOutcome {
 	return { outcome: e.outcome.parse, detail: recordable(e.outcome.reason) };
 }
 
+/** A decision-model request's disposition: accepted unless it failed; failed, no-response if nothing arrived, else rejected. */
+function indicationDisposition(e: IndicationExchange): 'accepted' | 'no-response' | 'rejected' {
+	if (e.outcome.kind !== 'FAILED') return 'accepted';
+	return e.response === '' ? 'no-response' : 'rejected';
+}
+
 /** The statement a review fails with when its validator was given no indications source. Host-authored and fixed. */
 export const NO_INDICATIONS_SOURCE_STATEMENT =
 	'This review was not sent: no decision model is configured to give it its potential indications, and a review without each of them is a reviewer the screen of the adopted construct did not measure (REG-D-146). No model was called.';
@@ -2243,7 +2255,7 @@ const PARSED: ExchangeParseOutcome = {
  * span could be LOCATED at all, which `JSON.parse` throwing cannot.
  */
 function classifyParse(raw: string, error: unknown): ExchangeParseOutcome {
-	const detail = error instanceof Error ? error.message : String(error);
+	const detail = error instanceof Error ? error.message : String(error as string);
 	if (raw.trim() === '')
 		return { outcome: 'EMPTY_RESPONSE', detail: 'The model returned no bytes at all.' };
 	if (!splitAnswerSpan(raw).located)
@@ -2655,7 +2667,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					},
 					prompt: e.body,
 					rawOutput: e.response,
-					disposition: e.outcome.kind !== 'FAILED' ? 'accepted' : e.response === '' ? 'no-response' : 'rejected',
+					disposition: indicationDisposition(e),
 					attemptOrdinal: tryCounter,
 					requestedAt: e.requestedAt,
 					respondedAt: e.respondedAt,

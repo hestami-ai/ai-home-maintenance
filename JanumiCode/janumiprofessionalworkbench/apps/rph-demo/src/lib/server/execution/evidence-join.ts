@@ -33,8 +33,7 @@
 // would pass would let a step complete as though the killed command never happened — which is what
 // `unassessableAiContentBlock` already forbids one plane over: *AI-produced content may not enter the governed
 // stream with nothing to assess.*
-import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
-import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
+import type { AssessmentCriterion, ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import {
 	REVIEWER_RECOMMENDED_ESCALATION,
 	type ProfessionalRationaleSummary

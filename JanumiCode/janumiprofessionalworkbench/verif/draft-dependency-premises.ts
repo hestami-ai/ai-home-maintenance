@@ -42,7 +42,7 @@ function declaredGroupKeyFields(): Map<string, string[]> {
 	for (const group of body.split('aggregateType:').slice(1)) {
 		const type = /^\s*'([A-Z_]+)'/.exec(group)?.[1];
 		const key = group.slice(0, group.indexOf('\n\t\t}'));
-		const fields = [...key.matchAll(/field: '([A-Za-z0-9_]+)'/g)].map((m) => m[1]!);
+		const fields = [...key.matchAll(/field: '(\w+)'/g)].map((m) => m[1]!);
 		if (type && fields.length > 0) groups.set(type, fields);
 	}
 	if (groups.size === 0)

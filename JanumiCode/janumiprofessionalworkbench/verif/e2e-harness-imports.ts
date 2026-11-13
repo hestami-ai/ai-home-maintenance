@@ -48,7 +48,7 @@ export function playwrightTestTakes(source: string): string[] {
 		if (
 			ts.isImportDeclaration(n) &&
 			fromPlaywright(n.moduleSpecifier) &&
-			!n.importClause?.isTypeOnly
+			n.importClause?.phaseModifier !== ts.SyntaxKind.TypeKeyword
 		) {
 			const clause = n.importClause;
 			if (clause?.name)
@@ -100,7 +100,7 @@ export function takesHarnessTest(source: string, fromSupport: boolean): boolean 
 			(fromSupport
 				? s.moduleSpecifier.text === './harness'
 				: /(^|\/)support\/harness$/.test(s.moduleSpecifier.text)) &&
-			!s.importClause?.isTypeOnly &&
+			s.importClause?.phaseModifier !== ts.SyntaxKind.TypeKeyword &&
 			s.importClause?.namedBindings !== undefined &&
 			ts.isNamedImports(s.importClause.namedBindings) &&
 			s.importClause.namedBindings.elements.some(

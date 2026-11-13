@@ -390,6 +390,11 @@ function citedRationale(reviewer: ActorReference, row: FloorCriterion): string {
 	return `The reviewer ${reviewer.displayName ?? reviewer.actorId} answered ${row.outcome}${said}`;
 }
 
+/** A reviewer's own criterion result's rationale: its row's, where the row gives one, and no rationale field where it gives none. */
+function ownRationale(row: FloorCriterion): { readonly rationale?: string } {
+	return row.rationale ? { rationale: row.rationale } : {};
+}
+
 /**
  * ⛔ `E12F` F6 — WHAT THE RECORD SAYS BESIDE THE VERDICT OF A POLICY THAT DECLARES NO CRITERION: nothing was checked, so the
  * verdict is INCONCLUSIVE whatever the reviewer recommended (`verdictOf`).
@@ -528,9 +533,7 @@ export function planDeclaredSignoff(opts: {
 					result: row.outcome,
 					...(human
 						? { rationale: citedRationale(reviewer, row) }
-						: row.rationale
-							? { rationale: row.rationale }
-							: {}),
+						: ownRationale(row)),
 					...(row.stipulated !== undefined ? { stipulated: row.stipulated } : {})
 				}
 			]);
@@ -713,7 +716,7 @@ export function latestDeclaredVerdicts(
 		const at = typeof s.updatedAt === 'string' ? s.updatedAt : '';
 		const prev = latest.get(policyId);
 		if (!prev || at >= prev.at)
-			latest.set(policyId, { policyId, assessmentId: a.id, state: String(s.assessmentState ?? ''), at });
+			latest.set(policyId, { policyId, assessmentId: a.id, state: String((s.assessmentState ?? '') as string), at });
 	}
 	return new Map([...latest].map(([k, { at: _at, ...v }]) => [k, v]));
 }
@@ -757,6 +760,11 @@ export interface DeclaredRerunOffer {
 	readonly others: readonly OtherDeclaredVerdict[];
 }
 
+/** The REJECTED verdicts a refused re-run names: each as its policy and REJECTED, in their order, joined by '; '. */
+function namedRejections(verdicts: readonly LatestDeclaredVerdict[]): string {
+	return verdicts.map((v) => `${v.policyId} REJECTED`).join('; ');
+}
+
 /**
  * ⭐⭐ `E12F` F3 (`REG-D-112` (a)) — WHETHER THE PERSON MAY RE-RUN `pwuId`'s DECLARED REVIEWS, AND WHICH: read from the record,
  * so the page offers what the server will accept. ⛔ Refused, with why, unless the unit is UNDER_ASSURANCE and ASSESSING
@@ -778,7 +786,7 @@ export function declaredRerunOffer(
 	if (rejected.length > 0)
 		return {
 			refusedBecause:
-				`a declared review concluded against the work (${rejected.map((v) => `${v.policyId} REJECTED`).join('; ')}): a REJECTED ` +
+				`a declared review concluded against the work (${namedRejections(rejected)}): a REJECTED ` +
 				'is not re-reviewed — the latest verdict wins, so a re-review could clear a reasoned refusal (REG-D-105 (3)); it goes ' +
 				"canon's route, a blocking finding (REG-D-111 (1))"
 		};
@@ -786,7 +794,7 @@ export function declaredRerunOffer(
 	if (unit?.workLifecycleState !== 'UNDER_ASSURANCE' || unit.assuranceState !== 'ASSESSING')
 		return {
 			refusedBecause:
-				`the unit is ${String(unit?.workLifecycleState ?? 'unknown')} with its assurance ${String(unit?.assuranceState ?? 'unknown')}; ` +
+				`the unit is ${String((unit?.workLifecycleState ?? 'unknown') as string)} with its assurance ${String((unit?.assuranceState ?? 'unknown') as string)}; ` +
 				'only a unit left under assessment by a declared review that did not conclude may have its declared reviews re-run (REG-D-112 (a))'
 		};
 	const inconclusive = policies.filter((p) => latest.get(p.policyId)?.state === 'INCONCLUSIVE');
@@ -827,11 +835,11 @@ export function foldAfterRerun(
 	plan: DeclaredSignoff,
 	others: readonly OtherDeclaredVerdict[]
 ): AssessmentDisposition {
-	const states = [
+	const states = new Set([
 		...plan.dispositions,
 		...others.map((v): AssessmentDisposition =>
 			(STRICTEST as readonly string[]).includes(v.state) ? (v.state as AssessmentDisposition) : 'INCONCLUSIVE'
 		)
-	];
-	return STRICTEST.find((d) => states.includes(d)) ?? 'INCONCLUSIVE';
+	]);
+	return STRICTEST.find((d) => states.has(d)) ?? 'INCONCLUSIVE';
 }

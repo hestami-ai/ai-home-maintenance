@@ -36,7 +36,8 @@ import {
 	assessmentHasConcluded,
 	authorizeDecisionEffective,
 	canPromoteBaseline,
-	decisionAuthorizesVersions
+	decisionAuthorizesVersions,
+	declaredAssurancePolicyIds
 } from '@janumipwb/rph-domain';
 import {
 	advanceStatus,
@@ -46,7 +47,6 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
-import { declaredAssurancePolicyIds } from '@janumipwb/rph-domain';
 import { latestAssessmentByPolicy } from './assessment-index.js';
 import { policyGovernance } from './policy-governs.js';
 import {

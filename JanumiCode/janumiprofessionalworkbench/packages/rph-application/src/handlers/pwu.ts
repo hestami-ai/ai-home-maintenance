@@ -173,8 +173,7 @@ function rejectInvalidNonLocalPwuType(
 	// (pwaId, pwaVersion), not pwaId alone. pwaVersion is derived onto every type by definePwuType, so a
 	// type from a DIFFERENT VERSION of the same PWA (same pwaId) can no longer realize into this Undertaking.
 	if (
-		!pwuType ||
-		pwuType.objectType !== 'PWU_TYPE' ||
+		pwuType?.objectType !== 'PWU_TYPE' ||
 		pwuType.pwaId !== undertaking.pwaId ||
 		pwuType.pwaVersion !== undertaking.pwaVersion
 	) {
@@ -203,7 +202,7 @@ function rejectInvalidOwnershipBinding(
 	if (!p.undertakingId) return undefined;
 	const undertaking = ctx.store.loadObject(p.undertakingId)?.state as
 		Con009BindingState | undefined;
-	if (!undertaking || undertaking.objectType !== 'UNDERTAKING') {
+	if (undertaking?.objectType !== 'UNDERTAKING') {
 		return reject(
 			command,
 			'RPH_VALIDATION_SEMANTIC_FAILED',

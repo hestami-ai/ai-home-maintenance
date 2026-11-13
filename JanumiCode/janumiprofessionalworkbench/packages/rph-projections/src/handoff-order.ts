@@ -117,6 +117,7 @@ function kahnLayers(
 function reachableFrom(start: string, adj: Map<string, Set<string>>): Set<string> {
 	const seen = new Set<string>();
 	const queue: string[] = [...(adj.get(start) ?? [])];
+	// S4138: kept - a breadth-first worklist that pushes to the array it walks; the index loop states that the array grows
 	for (let i = 0; i < queue.length; i++) {
 		const n = queue[i];
 		if (n === undefined || seen.has(n)) continue;

@@ -538,11 +538,12 @@ export function boundDisagreements(recording: Recording, bound: number | undefin
 		// once more under any bound it knows.
 		const productRetries = bound !== undefined;
 		if (recordedRetry === productRetries) return;
+		const productBound = bound === undefined ? 'none declared' : `${bound} ms`;
 		out.push(
 			`${describeCall(index, call)} threw after ${call.elapsedMs} ms and the recorded run ` +
 				`${recordedRetry ? 'ran it once more' : 'let it stand'}, where the product's bound for ` +
 				`'${recording.manifest.models.reviewer.agentId}' — ` +
-				`${bound === undefined ? 'none declared' : `${bound} ms`} — would ` +
+				`${productBound} — would ` +
 				`${productRetries ? 'run it once more' : 'let it stand'}`
 		);
 	});

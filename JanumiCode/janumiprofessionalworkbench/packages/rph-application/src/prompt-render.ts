@@ -60,23 +60,28 @@ export function renderPromptTemplate(
 	if (undeclared.length > 0)
 		return {
 			rendered: false,
-			refusedBecause: `The template text uses ${undeclared.map((m) => `{${m}}`).join(', ')}, which ${undeclared.length === 1 ? 'is' : 'are'} not in declaredPlaceholders. An undeclared marker is a hole nobody declared: nothing is obliged to supply it, so it would render empty and the prompt would silently lose whatever it was for.`
+			refusedBecause: `The template text uses ${bracedMarkers(undeclared)}, which ${undeclared.length === 1 ? 'is' : 'are'} not in declaredPlaceholders. An undeclared marker is a hole nobody declared: nothing is obliged to supply it, so it would render empty and the prompt would silently lose whatever it was for.`
 		};
 
 	const unsupplied = [...declared].filter((m) => context[m] === undefined);
 	if (unsupplied.length > 0)
 		return {
 			rendered: false,
-			refusedBecause: `The assembled context supplies no value for ${unsupplied.map((m) => `{${m}}`).join(', ')}. DEC-4 (DOC-003:224-225) governs context assembly and forbids a silent omission; rendering the hole and disclosing it afterwards would disclose AFTER the prompt reached the model, which is the wrong order.`
+			refusedBecause: `The assembled context supplies no value for ${bracedMarkers(unsupplied)}. DEC-4 (DOC-003:224-225) governs context assembly and forbids a silent omission; rendering the hole and disclosing it afterwards would disclose AFTER the prompt reached the model, which is the wrong order.`
 		};
 
 	// Replace only DECLARED markers. Anything else is unreachable by construction — the undeclared check above
 	// already refused it — which is why this cannot quietly interpolate something nobody authorised.
 	const text = template.templateText.replace(
-		/\{([A-Za-z][A-Za-z0-9_]*)\}/g,
+		/\{([A-Za-z]\w*)\}/g,
 		(_whole, name: string) => context[name]!
 	);
 	return { rendered: true, text };
+}
+
+/** The markers a refusal names, each in its braces as the template text writes it, comma-separated. */
+function bracedMarkers(markers: readonly string[]): string {
+	return markers.map((m) => `{${m}}`).join(', ');
 }
 
 /**

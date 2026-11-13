@@ -146,16 +146,9 @@ export function registeredStipulations(): readonly StipulationRegistration[] {
  * Read BY ID on the engine the floor records into.
  */
 export function workProductPwaOf(engine: Pick<EngineHandle, 'loadObject'>, artifactId: string): string | undefined {
-	const field = (id: string | undefined, objectType: string, key: string): string | undefined => {
-		if (id === undefined) return undefined;
-		const object = engine.loadObject(id);
-		if (object?.objectType !== objectType) return undefined;
-		const value = (object.state as Record<string, unknown> | undefined)?.[key];
-		return typeof value === 'string' && value !== '' ? value : undefined;
-	};
-	const pwuId = field(artifactId, 'ARTIFACT', 'producingPwuId');
-	const undertakingId = field(pwuId, 'PROFESSIONAL_WORK_UNIT', 'undertakingId');
-	return field(undertakingId, 'UNDERTAKING', 'pwaId');
+	const pwuId = fieldOf(engine, artifactId, 'ARTIFACT', 'producingPwuId');
+	const undertakingId = fieldOf(engine, pwuId, 'PROFESSIONAL_WORK_UNIT', 'undertakingId');
+	return fieldOf(engine, undertakingId, 'UNDERTAKING', 'pwaId');
 }
 
 /**
@@ -163,14 +156,25 @@ export function workProductPwaOf(engine: Pick<EngineHandle, 'loadObject'>, artif
  * any missing link, as `workProductPwaOf` reads its chain: the declared-policy stand-in's subject is the unit itself.
  */
 export function workUnitPwaOf(engine: Pick<EngineHandle, 'loadObject'>, pwuId: string): string | undefined {
-	const field = (id: string | undefined, objectType: string, key: string): string | undefined => {
-		if (id === undefined) return undefined;
-		const object = engine.loadObject(id);
-		if (object?.objectType !== objectType) return undefined;
-		const value = (object.state as Record<string, unknown> | undefined)?.[key];
-		return typeof value === 'string' && value !== '' ? value : undefined;
-	};
-	return field(field(pwuId, 'PROFESSIONAL_WORK_UNIT', 'undertakingId'), 'UNDERTAKING', 'pwaId');
+	return fieldOf(engine, fieldOf(engine, pwuId, 'PROFESSIONAL_WORK_UNIT', 'undertakingId'), 'UNDERTAKING', 'pwaId');
+}
+
+/**
+ * One link of those chains, read BY ID on `engine`: the `key` of the `objectType` object that `id` names, when it is a
+ * non-empty string, and otherwise (no `id`, no object of that type, or no such value) `undefined`. The one reading
+ * `workProductPwaOf` and `workUnitPwaOf` share.
+ */
+function fieldOf(
+	engine: Pick<EngineHandle, 'loadObject'>,
+	id: string | undefined,
+	objectType: string,
+	key: string
+): string | undefined {
+	if (id === undefined) return undefined;
+	const object = engine.loadObject(id);
+	if (object?.objectType !== objectType) return undefined;
+	const value = (object.state as Record<string, unknown> | undefined)?.[key];
+	return typeof value === 'string' && value !== '' ? value : undefined;
 }
 
 /** Discarded by `resetEngine`, in the same act that replaces the engine. */

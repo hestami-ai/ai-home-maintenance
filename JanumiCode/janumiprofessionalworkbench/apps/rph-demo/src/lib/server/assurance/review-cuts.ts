@@ -33,7 +33,7 @@ export const REVIEW_STARTS = 'Evaluate EACH derivational-integrity failure class
  * strips and `re`'s `\s` matches — measured, every code point, with `chr(c).isspace()` (z1-facts.md).
  */
 export const PY_WHITESPACE =
-	'\t\n\u000b\u000c\r\u001c\u001d\u001e\u001f \u0085                 　';
+	'\t\n\u000b\u000c\r\u001c\u001d\u001e\u001f \u0085             \u2028\u2029  　';
 const IS_PY_SPACE = new Set(PY_WHITESPACE);
 
 /** `s.strip(chars)`: `chars` removed from both ends — Python's whitespace when `chars` is not given. */
@@ -47,7 +47,7 @@ export function pyStrip(s: string, chars?: string): string {
 }
 
 /** The class `\s` reads under Python's `re`, as a JavaScript class body. */
-const PY_SPACE_CLASS = '\\t\\n\\u000b\\u000c\\r\\u001c-\\u001f \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000';
+const PY_SPACE_CLASS = String.raw`\t\n\u000b\u000c\r\u001c-\u001f \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000`;
 
 /** `re.split(r"(?<=[.])\s+(?=[A-Z“\"`])", …)`: a full stop, Python's whitespace, then a capital, an opening quote or a backtick. */
 const SENTENCE_BREAK = new RegExp(`(?<=[.])[${PY_SPACE_CLASS}]+(?=[A-Z\\u201c"\`])`, 'u');
@@ -124,12 +124,12 @@ export function pyJsonLoads(text: string): PyJson {
 			else if (e === 't') out += '\t';
 			else if (e === 'u') {
 				const hex = text.slice(i, i + 4);
-				if (!HEX.test(hex)) return fail('Invalid \\uXXXX escape');
+				if (!HEX.test(hex)) return fail(String.raw`Invalid \uXXXX escape`);
 				// ⭑ A high surrogate escaped beside a low one is ONE code point to Python, and the same two UTF-16 units here;
 				// a lone one is kept, as Python keeps it.
-				out += String.fromCharCode(Number.parseInt(hex, 16));
+				out += String.fromCodePoint(Number.parseInt(hex, 16));
 				i += 4;
-			} else return fail('Invalid \\escape');
+			} else return fail(String.raw`Invalid \escape`);
 		}
 	};
 	const number = (): PyJson => {
@@ -217,12 +217,30 @@ export function pyJsonLoads(text: string): PyJson {
 				ws();
 			}
 		}
-		if (text.startsWith('null', i)) return (i += 4), { t: 'null' };
-		if (text.startsWith('true', i)) return (i += 4), { t: 'bool', v: true };
-		if (text.startsWith('false', i)) return (i += 5), { t: 'bool', v: false };
-		if (text.startsWith('NaN', i)) return (i += 3), { t: 'float', v: Number.NaN };
-		if (text.startsWith('Infinity', i)) return (i += 8), { t: 'float', v: Number.POSITIVE_INFINITY };
-		if (text.startsWith('-Infinity', i)) return (i += 9), { t: 'float', v: Number.NEGATIVE_INFINITY };
+		if (text.startsWith('null', i)) {
+			i += 4;
+			return { t: 'null' };
+		}
+		if (text.startsWith('true', i)) {
+			i += 4;
+			return { t: 'bool', v: true };
+		}
+		if (text.startsWith('false', i)) {
+			i += 5;
+			return { t: 'bool', v: false };
+		}
+		if (text.startsWith('NaN', i)) {
+			i += 3;
+			return { t: 'float', v: Number.NaN };
+		}
+		if (text.startsWith('Infinity', i)) {
+			i += 8;
+			return { t: 'float', v: Number.POSITIVE_INFINITY };
+		}
+		if (text.startsWith('-Infinity', i)) {
+			i += 9;
+			return { t: 'float', v: Number.NEGATIVE_INFINITY };
+		}
 		return number();
 	};
 	ws();
@@ -236,17 +254,24 @@ export function pyJsonLoads(text: string): PyJson {
 function pyJsonString(s: string): string {
 	let out = '"';
 	for (const c of s) {
-		if (c === '"') out += '\\"';
+		if (c === '"') out += String.raw`\"`;
 		else if (c === '\\') out += '\\\\';
-		else if (c === '\n') out += '\\n';
-		else if (c === '\r') out += '\\r';
-		else if (c === '\t') out += '\\t';
-		else if (c === '\b') out += '\\b';
-		else if (c === '\f') out += '\\f';
-		else if (c < ' ') out += `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`;
+		else if (c === '\n') out += String.raw`\n`;
+		else if (c === '\r') out += String.raw`\r`;
+		else if (c === '\t') out += String.raw`\t`;
+		else if (c === '\b') out += String.raw`\b`;
+		else if (c === '\f') out += String.raw`\f`;
+		else if (c < ' ') out += `\\u${c.codePointAt(0)!.toString(16).padStart(4, '0')}`;
 		else out += c;
 	}
 	return `${out}"`;
+}
+
+/** `s` without its trailing zeros, as `s.replace(/0+$/, '')` gives it, read back from its end in one pass. */
+function withoutTrailingZeros(s: string): string {
+	let end = s.length;
+	while (end > 0 && s[end - 1] === '0') end -= 1;
+	return s.slice(0, end);
 }
 
 /**
@@ -280,7 +305,7 @@ export function pyFloatRepr(x: number): string {
 			exponent = whole.length - 1;
 		}
 	} else {
-		digits = s.replace(/0+$/, '');
+		digits = withoutTrailingZeros(s);
 		exponent = s.length - 1;
 	}
 	const point = exponent + 1; // Python's `decpt`: the value is 0.d1d2… × 10^point
@@ -308,8 +333,10 @@ export function pyJsonDumps(value: PyJson): string {
 			return 'null';
 		case 'list':
 			return `[${value.v.map(pyJsonDumps).join(', ')}]`;
-		case 'dict':
-			return `{${value.v.map(([k, v]) => `${pyJsonString(k)}: ${pyJsonDumps(v)}`).join(', ')}}`;
+		case 'dict': {
+			const items = value.v.map(([k, v]) => `${pyJsonString(k)}: ${pyJsonDumps(v)}`).join(', ');
+			return `{${items}}`;
+		}
 	}
 }
 

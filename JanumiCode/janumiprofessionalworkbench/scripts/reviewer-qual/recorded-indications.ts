@@ -123,7 +123,9 @@ function parsed(
 		if (refusal === null) return `${name} line ${n + 2} ${MALFORMED_REFUSED_REQUEST}`;
 		if (refusal !== undefined) refused.push(refusal);
 		// ⭐ Z3 phase 2 — and the entry's review refused, where its line records it so, in the refusal's own words.
-		const why = refusal !== undefined ? refusedRequestReason(refusal.key, refusal.status, refusal.response) : typeof entry.refused === 'string' ? entry.refused : undefined;
+		let why: string | undefined;
+		if (refusal !== undefined) why = refusedRequestReason(refusal.key, refusal.status, refusal.response);
+		else if (typeof entry.refused === 'string') why = entry.refused;
 		if (why !== undefined && (entry.kind === 'CASE' || entry.kind === 'PROBE') && typeof entry.id === 'string') refusedEntries.push([`${entry.kind} ${entry.id}`, why]);
 	}
 	return { identity: { model: head.model, digest: head.digest, serverVersion: head.serverVersion }, questions, refused, entries, refusedEntries };
@@ -131,6 +133,10 @@ function parsed(
 
 const sameIdentity = (a: DecisionModelRecordsIdentity, b: DecisionModelRecordsIdentity): boolean =>
 	a.model === b.model && a.digest === b.digest && a.serverVersion === b.serverVersion;
+
+/** A records file as the refusal for files that disagree names it: its name, then its identity in words. */
+const fileIdentityWords = (r: { readonly name: string; readonly file: { readonly identity: DecisionModelRecordsIdentity } }): string =>
+	`${r.name} ${identityWords(r.file.identity)}`;
 
 /**
  * ⭐ READ RECORDS FILES (their text, by name) — held to `expected`, the identity the product is held to. Every file's identity line
@@ -147,7 +153,7 @@ export function readDecisionModelRecords(
 	const ok = read as { name: string; file: Exclude<ReturnType<typeof parsed>, string> }[];
 	const first = ok[0]!.file.identity;
 	if (!ok.every((r) => sameIdentity(r.file.identity, first)))
-		return { refusal: `the records disagree on their identity: ${ok.map((r) => `${r.name} ${identityWords(r.file.identity)}`).join('; ')}` };
+		return { refusal: `the records disagree on their identity: ${ok.map((r) => fileIdentityWords(r)).join('; ')}` };
 	if (!sameIdentity(first, expected))
 		return {
 			refusal: `the records were made on ${identityWords(first)}, not the identity the product is held to: ${identityWords(expected)} (D51; REG-F-608)`
@@ -238,8 +244,10 @@ let committed: RecordsRead | undefined;
  * place of the placeholder (Z1's departure 8). ⚠ Not the negative control's dry run, whose crafted case is in no record
  * (`../phase7/negative-control.ts`). Read once a process, on its first question, so loading a script reads nothing.
  */
-export const COMMITTED_INDICATIONS: IndicationsSource = async (requests, material) =>
-	recordedIndications((committed ??= committedRecords(REPO_ROOT)))(requests, material);
+export const COMMITTED_INDICATIONS: IndicationsSource = async (requests, material) => {
+	committed ??= committedRecords(REPO_ROOT);
+	return recordedIndications(committed)(requests, material);
+};
 
 /** The committed records' identity, for the RUN line — or why the records cannot be read. */
 export function committedRecordsIdentity(): DecisionModelRecordsIdentity | { readonly refusal: string } {

@@ -60,7 +60,7 @@ function mentionRefs(fromId: string, text: string): RefRecord[] {
 	for (const m of stripCode(text).matchAll(/\bREG-[A-Z]-\d+\b/g)) seen.add(m[0]);
 	seen.delete(fromId.replace(/^reg:/, '').replace(/@\d+$/, ''));
 	return [...seen]
-		.sort()
+		.sort((a, b) => Number(a > b) - Number(a < b))
 		.map((to) => ({ type: 'ref', from_id: fromId, to_id: `reg:${to}`, kind: 'mentions' }));
 }
 
@@ -74,11 +74,11 @@ export function parseRegister(text: string, path: string): IngestResult {
 	// ONLY about fields, never about the population. The verif cross-check asserts exactly that.
 	for (const block of text.split(/^### /m).slice(1)) {
 		const heading = block.split('\n', 1)[0] ?? '';
-		const m = /^(~~)?(REG-[A-Z]-\d+)(~~)?\s*—\s*(.*)$/.exec(heading);
+		const m = /^(~~)?(REG-[A-Z]-\d+)(~~)?\s*—\s*((?:\S.*)?)$/.exec(heading);
 		if (!m) continue;
 		const id = `reg:${m[2]!}`;
 		const struck = m[1] !== undefined;
-		const title = (m[4] ?? '').replace(/~~/g, '').trim() || m[2]!;
+		const title = (m[4] ?? '').replaceAll('~~', '').trim() || m[2]!;
 		// Date: the fused `- **Date:** YYYY-MM-DD · **Type:** X` form (246 entries), the REG-F-196
 		// `**Raised:**` variant, or absent (section-defaulted REG-Q entries — attributed below).
 		const dateMatch = /\*\*(?:Date|Raised):\*\*\s*(\d{4}-\d{2}-\d{2})/.exec(stripCode(block));
@@ -106,7 +106,9 @@ export function parseRegister(text: string, path: string): IngestResult {
 			.filter((l) => l.includes('**Status:**') && !l.trimStart().startsWith('- ~~'));
 		attrs.push({ item_id: id, key: 'live_status_lines', value: String(liveStatuses.length) });
 		const statusValue =
-			liveStatuses[0] === undefined ? undefined : /\*\*Status:\*\*\s*(.*)$/.exec(liveStatuses[0]);
+			liveStatuses[0] === undefined
+				? undefined
+				: /\*\*Status:\*\*\s*((?:\S.*)?)$/.exec(liveStatuses[0]);
 		if (statusValue)
 			attrs.push({ item_id: id, key: 'status', value: statusValue[1]!.trim().slice(0, 200) });
 		refs.push(...mentionRefs(id, block));
@@ -121,7 +123,7 @@ export function parseRegister(text: string, path: string): IngestResult {
 	for (const line of text.split('\n')) {
 		const section = /^\*\*([^*]+):\*\*\s*$/.exec(line.trim());
 		if (section) eSection = section[1]!.trim();
-		const definition = /^- \*\*(~~)?(REG-E-\d{3})(~~)?\*\*\s*—\s*(.*)$/.exec(line);
+		const definition = /^- \*\*(~~)?(REG-E-\d{3})(~~)?\*\*\s*—\s*((?:\S.*)?)$/.exec(line);
 		if (definition) {
 			const bare = definition[2]!;
 			const count = (eSeen.get(bare) ?? 0) + 1;
@@ -148,7 +150,8 @@ export function parseRegister(text: string, path: string): IngestResult {
 			refs.push(...mentionRefs(id, line));
 			continue;
 		}
-		const amendment = /^- \*\*(~~)?(REG-E-\d{3})\s*—\s*([^*]+?):?\*\*/.exec(line);
+		// \s alone matches a blank annotation (`— **`) on its last whitespace, as \s*([^*]+?) did.
+		const amendment = /^- \*\*(~~)?(REG-E-\d{3})\s*—\s*([^*\s][^*]*?|\s):?\*\*/.exec(line);
 		if (amendment) {
 			const bare = amendment[2]!;
 			// ⚠ ORDER-SENSITIVE, LEARNED FROM THE FIRST REAL BUILD: E-023 and E-024 were CLOSED by
@@ -172,12 +175,14 @@ export function parseRegister(text: string, path: string): IngestResult {
 						line.slice(0, 160)
 					)
 				);
-				attrs.push({ item_id: id, key: 'grammar', value: 'bullet' });
-				attrs.push({
-					item_id: id,
-					key: 'annotation',
-					value: stripCode(amendment[3]!).trim().slice(0, 200)
-				});
+				attrs.push(
+					{ item_id: id, key: 'grammar', value: 'bullet' },
+					{
+						item_id: id,
+						key: 'annotation',
+						value: stripCode(amendment[3]!).trim().slice(0, 200)
+					}
+				);
 				if (eSection !== '') attrs.push({ item_id: id, key: 'section', value: eSection });
 				refs.push(...mentionRefs(id, line));
 				continue;
@@ -247,7 +252,7 @@ export function parseSheet(
 			item(
 				id,
 				kind,
-				cells.slice(1, 3).join(' — ').replace(/~~/g, '').slice(0, 200) ||
+				cells.slice(1, 3).join(' — ').replaceAll('~~', '').slice(0, 200) ||
 					`${sheet} row ${rowIndex}`,
 				path,
 				'undated',
@@ -313,7 +318,7 @@ export function parseAuditRoster(text: string, path: string): IngestResult {
 			)
 		)
 			continue;
-		const schema = (cells[1] ?? '').replace(/\\/g, '');
+		const schema = (cells[1] ?? '').replaceAll('\\', '');
 		const id = `audit:shape-survivorship:${doc}:${createHash('sha256').update(schema).digest('hex').slice(0, 8)}`;
 		items.push(
 			item(

@@ -266,7 +266,7 @@ function limitCaveatSendBeforeD20(sendCheck: Record<string, unknown>): string {
 	const count =
 		ahead === null
 			? 'its check counted the authoring floor’s worst case'
-			: `its check counted ${ahead} ahead${counted === '' ? '' : ` (${counted})`}`;
+			: `its check counted ${ahead} ahead${inParens(counted)}`;
 	return (
 		'⚠ Save Send’s. This run was recorded before the lane handed the authoring review an allowance (REG-F-580; design D20): ' +
 		`no candidate existed before Send, so ${count}, an estimate and not a bound, and a turn that staged more spent its ` +
@@ -289,9 +289,10 @@ export const COUNTED_AUTHORING_FLOOR_BEFORE_B6 = 'the authoring floor’s worst 
  */
 function limitCaveatSendBeforeB6(sendCheck: Record<string, unknown>): string {
 	const ahead = int(sendCheck.ahead);
+	const aheadClause = ahead === null ? '' : `${ahead} ahead, `;
 	return (
 		'⚠ Save Send’s. This run was recorded before the review in parts (B6): its check before Send counted ' +
-		`${ahead === null ? '' : `${ahead} ahead, `}${COUNTED_AUTHORING_FLOOR_BEFORE_B6}, in that lane’s words, and this report ` +
+		`${aheadClause}${COUNTED_AUTHORING_FLOOR_BEFORE_B6}, in that lane’s words, and this report ` +
 		'states no rule its Send press was bounded by — only that read’s figures, as listed. '
 	);
 }
@@ -489,6 +490,8 @@ export function unitPurposeCaveat(
 	if (made.length === 0) return [];
 	const counted = (c: (typeof made)[number]): string =>
 		[...(c.reviews > 0 ? [`${c.reviews}`] : []), ...(c.replayed > 0 ? [`${c.replayed} replayed`] : [])].join(' and ');
+	const unitCounted = (c: (typeof made)[number]): string => `${c.unit}: ${counted(c)}`;
+	const unitSeen = (c: (typeof made)[number]): string => `${c.unit}: ${c.seen}`;
 	// ⛔ P5 package B (F6) — "judged over the work it and every unit below it produced" only where it was: P5's root was
 	// judged with its abandoned end-to-end phase contributing no work, and the caveat said every unit. ⭐ Its check, finding
 	// 2: and where a prompt did not show all of the work it was given, as P5's two did not.
@@ -496,9 +499,9 @@ export function unitPurposeCaveat(
 	const judged =
 		partial.length === 0
 			? 'judged over the work it and every unit below it produced (REG-D-111 (2))'
-			: `given the work of the units below it that hold a completion (REG-D-111 (2); ${partial.map((c) => `${c.unit}: ${c.seen}`).join('; ')})`;
+			: `given the work of the units below it that hold a completion (REG-D-111 (2); ${partial.map(unitSeen).join('; ')})`;
 	return [
-		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map((c) => `${c.unit}: ${counted(c)}`).join('; ')}) ` +
+		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map(unitCounted).join('; ')}) ` +
 			`were made in it — the unit’s own purpose, ${judged} — and ` +
 			'no reviewer-qualification case measures it: every declared case is in the PRODUCING_PROMPT framing.'
 	];
@@ -1219,6 +1222,14 @@ const byCodeUnit = (a: string, b: string): number => Number(a > b) - Number(a < 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 /** ` (text)`, or nothing when there is no text. */
 const inParens = (text: string | null | undefined): string => (text ? ` (${text})` : '');
+/** ` (a, b)` of the ids, or nothing when there are none. */
+const idsInParens = (ids: readonly string[]): string => (ids.length === 0 ? '' : ` (${ids.join(', ')})`);
+/** A floor's policy as a line lists it: its id, then its state. */
+const policyAndState = (f: { readonly policyId: string; readonly state: string }): string => `${f.policyId} ${f.state}`;
+/** A reasoning review's part as a line lists it: its type's name, then its state. */
+const partAndState = (p: { readonly typeName: string; readonly state: string }): string => `${p.typeName} ${p.state}`;
+/** A unit a withheld run held back, as the header lists it: its title, then the lane's reason. */
+const withheldEntry = (w: WithheldUnit): string => `${w.title} — ${w.reason}`;
 
 /** The Undertaking workspace's directory, as `workspace-host.ts` derives it from `JPWB_DEMO_DB` and the owner id. */
 export function workspaceDirectoryFor(demoDb: string, undertakingId: string): string {
@@ -3119,9 +3130,7 @@ function capturesAdded(
 	const before =
 		pressed === null
 			? units.filter((o) => o.order < u.order).at(-1)
-			: at > 0
-				? units.find((o) => o.slug === pressed[at - 1])
-				: undefined;
+			: units.find((o) => at > 0 && o.slug === pressed[at - 1]);
 	// The root's archive holds no process-output: the first model unit's predecessor left no capture.
 	let prior: readonly string[] | null = [];
 	if (before !== undefined) prior = capturesIn(archiveFacts(lane, before)) ?? (before.order === 1 ? [] : null);
@@ -3769,7 +3778,7 @@ function accountOfCommand(ix: Index, u: Unit, evidence: StoredObject): StoredObj
 	if (ran === undefined) return undefined;
 	const made = u.artifacts.find((a) => {
 		const t = tryOfWorkProduct(ix, a);
-		return t !== undefined && t.attempt === ran.attempt && t.try === ran.try;
+		return t?.attempt === ran.attempt && t.try === ran.try;
 	});
 	const key = made === undefined ? '' : str(made.state.storageKey);
 	return key === '' ? undefined : u.tries.find((t) => str(rec(t.state.workProductDerivation).storageKey) === key);
@@ -3997,7 +4006,7 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 		authorFaults.registerIds,
 		[
 			authorshipLine(pwa, status, accepted, authoring, lane),
-			`the authoring floor: ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ')}`,
+			`the authoring floor: ${floor.map(policyAndState).join(', ')}`,
 			`the reviewer: ${reviewer ?? 'none recorded'}; ${authorRead} (configured: ${configured ?? 'unset'})`,
 			`the accepted hash: ${accepted ?? noHashAccepted(unansweredAcceptance(authoring))}; ` +
 				`the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
@@ -4918,7 +4927,7 @@ function headerLines(r: RunReport): string[] {
 		// ⭐ Package O (D24) — and, a run that ended `withheld`, each unit it never pressed or never signed off, in the lane's words.
 		...(r.run.withheld === null
 			? []
-			: [`- **Withheld (design D24):** ${r.run.withheld.map((w) => `${w.title} — ${w.reason}`).join('; ')}.`]),
+			: [`- **Withheld (design D24):** ${r.run.withheld.map(withheldEntry).join('; ')}.`]),
 		// ⭐ Package M (`REG-D-135` (2); design D6) — the order the lane pressed in, read from its record, never inferred.
 		r.run.pressOrder === null
 			? '- **Press order:** not recorded — a record made before package M, whose lane pressed the root first, then the phases in the tree’s order, and signed them off after.'
@@ -4965,11 +4974,13 @@ export const REG_D_149_2 =
 /** ⭐⭐ Package L5 — D57 — the reviewer-calls section's count of the prompts past what the reviewer was measured on. */
 function untestedSizeLines(u: ReviewerCalls['untestedSizes']): string[] {
 	const unread = u.initial - u.read;
+	// S8786: kept - the lookahead rescans one digit run of String(v), at most 21 digits; toLocaleString would round fractions and respell exponents
 	const n = (v: number): string => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+	const longestClause = u.longest === null ? '' : `; the longest, ${n(u.longest)} characters`;
 	return [
 		`- **Prompts longer than the ${n(u.measured)} characters the reviewer was measured on (design D57):** ${u.over} of the ` +
 			`${plural(u.read, 'initial reviewer call', 'initial reviewer calls')} whose prompt the record holds` +
-			`${u.longest === null ? '' : `; the longest, ${n(u.longest)} characters`}.`,
+			`${longestClause}.`,
 		...(unread > 0
 			? [
 					`  - ${plural(unread, 'initial reviewer call has', 'initial reviewer calls have')} no prompt the record holds, so ` +
@@ -4995,10 +5006,11 @@ function unitLines(r: RunReport): string[] {
 	const limit = r.reviewerCalls.limit;
 	// ⭐ By the one rule (`runStanding`): ~~limit.under ? ', under it' : ', NOT under it'~~.
 	// ⭐⭐ Package O's check, finding 4 (D27) — and against no limit where the record states none: ~~`of ${limit.limit}`~~, today's.
-	const against =
-		limit.limit === null
-			? ', against no limit: this run’s record holds no read of one (design D27)'
-			: ` of ${limit.limit}${limit.total === null ? '' : `, ${runStanding(limit.total, limit.limit)}`}`;
+	let against = ', against no limit: this run’s record holds no read of one (design D27)';
+	if (limit.limit !== null) {
+		const standing = limit.total === null ? '' : `, ${runStanding(limit.total, limit.limit)}`;
+		against = ` of ${limit.limit}${standing}`;
+	}
 	return [
 		'## The units',
 		'',
@@ -5069,9 +5081,9 @@ function authoringLines(r: RunReport): string[] {
 		'',
 		`- **The PWA:** ${a.pwaId ?? 'none'}; the candidate as last read: ${a.candidate.status ?? 'none'}` +
 			`${inParens(a.candidate.detail)}, ${a.candidate.hash ?? 'no hash'}.`,
-		`- **The authoring floor, as the store holds it:** ${a.floor.map((f) => `${f.policyId} ${f.state}`).join(', ') || 'none'}.`,
+		`- **The authoring floor, as the store holds it:** ${a.floor.map(policyAndState).join(', ') || 'none'}.`,
 		// ⭐ The review in parts, B6 — and its Reasoning Review by type: the complete part set of the round.
-		`- **Its reasoning review, by type, as the store holds it:** ${a.floor.find((f) => f.policyId === REASONING_REVIEW)?.parts?.map((p) => `${p.typeName} ${p.state}`).join(', ') || 'no type'}.`,
+		`- **Its reasoning review, by type, as the store holds it:** ${a.floor.find((f) => f.policyId === REASONING_REVIEW)?.parts?.map(partAndState).join(', ') || 'no type'}.`,
 		// ⭐⭐ Package L5 — design D57 (`REG-F-620`) — labelled by its source, as the floor the lane recorded is beside it.
 		...laneFloorLines(a.laneFloor),
 		`- **The reviewer:** ${a.reviewer ?? 'none recorded'}. **The author:** ${a.author.resolved ?? 'none recorded'} ` +
@@ -5081,7 +5093,7 @@ function authoringLines(r: RunReport): string[] {
 		`- **The candidate checks (C4), recorded before Submit, refusing nothing (REG-D-110 (4)):** ` +
 			`${plural(a.findings.length, 'finding', 'findings')}.`,
 		...a.findings.map(
-			(f) => `  - ${f.check} on "${f.typeName}"${f.registerIds.length === 0 ? '' : ` (${f.registerIds.join(', ')})`}: ${f.detail}.`
+			(f) => `  - ${f.check} on "${f.typeName}"${idsInParens(f.registerIds)}: ${f.detail}.`
 		),
 		'- **Measured as they are, and disclosed:**',
 		...a.caveats.map((c) => `  - ${c}`)
@@ -5092,11 +5104,11 @@ function authoringLines(r: RunReport): string[] {
 function laneFloorLines(floor: AuthoringSummary['laneFloor']): string[] {
 	const review = floor.find((f) => f.policyId === REASONING_REVIEW);
 	return [
-		`- **The authoring floor, as the lane recorded it (lane/run.json):** ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ') || 'none recorded'}.`,
+		`- **The authoring floor, as the lane recorded it (lane/run.json):** ${floor.map(policyAndState).join(', ') || 'none recorded'}.`,
 		...(review?.parts === undefined
 			? []
 			: [
-					`- **Its reasoning review, by type, as the lane recorded it:** ${review.parts.map((p) => `${p.typeName} ${p.state}`).join(', ') || 'no type'}.`,
+					`- **Its reasoning review, by type, as the lane recorded it:** ${review.parts.map(partAndState).join(', ') || 'no type'}.`,
 					...review.parts.flatMap((p) => p.refusals.map((s) => `  - "${p.typeName}" refused: ${s}`))
 				])
 	];

@@ -483,6 +483,14 @@ export function stoppedUnitOf(
 	};
 }
 
+/** One policy and its disposition, as the engine names them: `<policy>=<disposition>` (each entry of `describeRefusals`). */
+function policyAndDisposition(p: {
+	readonly policyId: string;
+	readonly disposition: string;
+}): string {
+	return `${p.policyId}=${p.disposition}`;
+}
+
 /** Each refused subject and the policies that refused it, as the engine names them: `<id>: <policy>=<disposition>, …`. */
 export function describeRefusals(
 	refusals: readonly {
@@ -493,7 +501,7 @@ export function describeRefusals(
 	return refusals
 		.map(
 			(r) =>
-				`${r.subjectId}: ${r.unsatisfied.map((p) => `${p.policyId}=${p.disposition}`).join(', ') || 'no floor recorded'}`
+				`${r.subjectId}: ${r.unsatisfied.map((p) => policyAndDisposition(p)).join(', ') || 'no floor recorded'}`
 		)
 		.join('; ');
 }

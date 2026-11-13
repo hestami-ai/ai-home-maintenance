@@ -87,10 +87,18 @@ const isCut = (e: unknown): boolean => {
 };
 /** What a failed fetch says of itself: its message, and its cause's code where it has one (`ECONNREFUSED`). */
 const causeOf = (e: unknown): string => {
-	const message = e instanceof Error ? e.message : String(e);
+	const message = e instanceof Error ? e.message : String(e as string);
 	const cause = (e as { readonly cause?: { readonly code?: unknown; readonly message?: unknown } } | null)?.cause;
-	const detail = typeof cause?.code === 'string' ? cause.code : typeof cause?.message === 'string' ? cause.message : '';
+	let detail = '';
+	if (typeof cause?.code === 'string') detail = cause.code;
+	else if (typeof cause?.message === 'string') detail = cause.message;
 	return detail ? `${message}: ${detail}` : message;
+};
+/** The address less every slash it ends with, read back from its end: no regular expression, so no backtracking (S8786). */
+const withoutTrailingSlashes = (address: string): string => {
+	let end = address.length;
+	while (end > 0 && address[end - 1] === '/') end -= 1;
+	return address.slice(0, end);
 };
 
 /** What a `POST /v1/systemone` came to: a response, a request cut at its bound, or no server reached. */
@@ -162,7 +170,7 @@ function versionRefusal(version: string, identity: DecisionModelIdentity): strin
  * ⚠ It keeps no state between reviews: each review's identity is read again, before its first request.
  */
 export function createDecisionModelClient(o: DecisionModelClientOptions): IndicationsSource {
-	const base = o.server.replace(/\/+$/, '');
+	const base = withoutTrailingSlashes(o.server);
 	const bounds: DecisionModelBounds = { ...DECISION_MODEL_BOUNDS, ...o.bounds };
 	const clock = o.clock ?? (() => new Date().toISOString());
 	const text = o.text ?? DECISION_MODEL_TEXT;
@@ -174,7 +182,8 @@ export function createDecisionModelClient(o: DecisionModelClientOptions): Indica
 		try {
 			res = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(bounds.readMs) });
 		} catch (e) {
-			throw new Refused(`the decision model’s server at ${base} did not answer ${path} (${isCut(e) ? `no answer within ${seconds(bounds.readMs)}` : causeOf(e)})`);
+			const why = isCut(e) ? `no answer within ${seconds(bounds.readMs)}` : causeOf(e);
+			throw new Refused(`the decision model’s server at ${base} did not answer ${path} (${why})`);
 		}
 		if (!res.ok) throw new Refused(`the decision model’s server at ${base} answered ${path} with HTTP ${res.status}`);
 		try {
@@ -189,7 +198,7 @@ export function createDecisionModelClient(o: DecisionModelClientOptions): Indica
 		const models = (await get('/api/ps')).models;
 		return (Array.isArray(models) ? models : []).map((m) => {
 			const r = (m ?? {}) as { readonly name?: unknown; readonly model?: unknown };
-			return String(r.name || r.model);
+			return String((r.name || r.model) as string);
 		});
 	};
 
@@ -212,7 +221,7 @@ export function createDecisionModelClient(o: DecisionModelClientOptions): Indica
 		const entry = (Array.isArray(models) ? models : []).find((m) => (m as { readonly name?: unknown } | null)?.name === o.model) as
 			| { readonly digest?: unknown }
 			| undefined;
-		const version = String((await get('/api/version')).version);
+		const version = String((await get('/api/version')).version as string);
 		if (entry === undefined) throw new Refused(`the server serves no model named ${o.model} (/api/tags)`);
 		const digest = typeof entry.digest === 'string' ? entry.digest : '';
 		if (!digest.startsWith(o.identity.digest))
@@ -259,10 +268,11 @@ export function createDecisionModelClient(o: DecisionModelClientOptions): Indica
 			const requestedAt = clock();
 			const posted = await post(body, limit);
 			const respondedAt = clock();
-			const outcome: IndicationExchange['outcome'] =
-				posted.kind === 'ANSWERED'
-					? read(posted)
-					: posted.kind === 'CUT'
+			let outcome: IndicationExchange['outcome'];
+			if (posted.kind === 'ANSWERED') outcome = read(posted);
+			else
+				outcome =
+					posted.kind === 'CUT'
 						? {
 								kind: 'FAILED',
 								parse: 'NOT_ATTEMPTED',

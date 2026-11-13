@@ -93,6 +93,7 @@ export const WITNESS_RUBRIC = [
 
 /** ⭐ Witness questions: non-ASCII, an astral character, quotes, a backslash, controls. */
 export const WITNESS_QUESTIONS: readonly DecisionModelQuestion[] = [
+	// S7780: kept - under Bun 1.3.14 String.raw returns the non-ASCII characters of its raw text as \uXXXX escapes, so it would change this witness and the pointer's bytes (Node does not)
 	{ kind: 'check', key: 'c00', id: 'RR-01', label: 'Läbel — “quoted” \\ back' },
 	{ kind: 'statement', key: 's00', statement: 'summary: Ünïcode \u{1F600} line\nbreak\ttab "q"' }
 ];
@@ -126,11 +127,13 @@ function memoryServer(identity: DecisionModelRecordsIdentity) {
 	let lingering = Number.POSITIVE_INFINITY;
 	const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } });
 	const serve = (async (input: string | URL | Request, init?: RequestInit) => {
-		const url = new URL(String(input));
+		const url = new URL(String(input as string));
 		const method = init?.method ?? 'GET';
 		const body = typeof init?.body === 'string' ? init.body : '';
 		const type = new Headers(init?.headers).get('content-type') ?? '';
-		seen.push(`${method} ${url.pathname}${body === '' ? '' : ` ${sha256(body)}`}${type === '' ? '' : ` ${type}`}`);
+		const hashPart = body === '' ? '' : ` ${sha256(body)}`;
+		const typePart = type === '' ? '' : ` ${type}`;
+		seen.push(`${method} ${url.pathname}${hashPart}${typePart}`);
 		if (url.pathname === '/api/tags') return json({ models: [{ name: identity.model, model: identity.model, digest: identity.digest }] });
 		if (url.pathname === '/api/version') return json({ version: identity.serverVersion });
 		if (url.pathname === '/api/ps') {
@@ -142,7 +145,7 @@ function memoryServer(identity: DecisionModelRecordsIdentity) {
 		lingering = 1;
 		return json({
 			model: identity.model,
-			answers: Object.fromEntries(Object.keys(parsed.questions).map((k) => [k, { type: 'noul', noul: parseInt(sha256(body).slice(0, 8), 16) / 2 ** 32 }])),
+			answers: Object.fromEntries(Object.keys(parsed.questions).map((k) => [k, { type: 'noul', noul: Number.parseInt(sha256(body).slice(0, 8), 16) / 2 ** 32 }])),
 			usage: { input_tokens: 1, output_tokens: 1 }
 		});
 	}) as typeof globalThis.fetch;

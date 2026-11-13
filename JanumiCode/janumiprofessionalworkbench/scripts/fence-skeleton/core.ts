@@ -206,7 +206,7 @@ export function checkedWhole(source: UnicodeSource, bytes: Uint8Array): string {
 /** The data part of a UCD line (before `#`), trailing blanks removed — `''` for a comment or blank line. */
 function dataOf(line: string): string {
 	const hash = line.indexOf('#');
-	return (hash < 0 ? line : line.slice(0, hash)).replace(/\s+$/, '');
+	return (hash < 0 ? line : line.slice(0, hash)).trimEnd();
 }
 
 /** Every data line of a whole UCD file, in order — what an extract's rule is applied to. */
@@ -430,7 +430,7 @@ export function assertClosed(
 	const unread = unreadClassMembers(lines, table, supplement);
 	if (unread.length > 0)
 		throw new Error(
-			`supplement.ts is not closed under TR39's classes: ${unread.map((cp) => `U+${hex(cp)}`).join(' ')} ` +
+			`supplement.ts is not closed under TR39's classes: ${unread.map((cp) => uPlus(cp)).join(' ')} ` +
 				'belong to a class it reads and are not read so - give each a line of its own, or drop the line'
 		);
 }
@@ -492,6 +492,11 @@ function supplementReadings(
 /** `cp` as four or more upper-case hex digits. */
 function hex(cp: number): string {
 	return cp.toString(16).toUpperCase().padStart(4, '0');
+}
+
+/** `cp` as a message names it: `U+` and its `hex` digits. */
+function uPlus(cp: number): string {
+	return `U+${hex(cp)}`;
 }
 
 /** The Hangul syllable decomposition (The Unicode Standard §3.12) — algorithmic, so in no data file. */
@@ -660,7 +665,7 @@ export function fenceSkeletonTable(data: UnicodeData, fold: (c: string) => strin
 	for (const [cp, d] of data.decompositions) {
 		if (!d.compat || d.tag === '<compat>') continue;
 		const parts = decompose(data, cp, true).map(byTr39Alone);
-		if (parts.some((p) => p === undefined)) continue;
+		if (parts.includes(undefined)) continue;
 		const reading = parts.join('');
 		const key = classOf(data, cp);
 		if (reading === '' || key === '') continue;
@@ -733,7 +738,7 @@ function rangesOf(cps: readonly number[]): [number, number][] {
 	const out: [number, number][] = [];
 	for (const cp of cps) {
 		const last = out.at(-1);
-		if (last && last[1] === cp - 1) last[1] = cp;
+		if (last?.[1] === cp - 1) last[1] = cp;
 		else out.push([cp, cp]);
 	}
 	return out;
@@ -743,6 +748,7 @@ function rangesOf(cps: readonly number[]): [number, number][] {
 function literal(s: string): string {
 	let out = "'";
 	for (let i = 0; i < s.length; i += 1) {
+		// S7758: kept charCodeAt - the loop escapes each UTF-16 code unit; codePointAt would read a surrogate pair as one code point.
 		const unit = s.charCodeAt(i);
 		const c = s[i]!;
 		out +=

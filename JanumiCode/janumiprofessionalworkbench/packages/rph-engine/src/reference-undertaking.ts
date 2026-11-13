@@ -1471,7 +1471,6 @@ export function driveReferenceUndertaking(
 
 	// Reference §11.5 "Representative requirements". Statements are QUOTED verbatim; the type of each is read
 	// from the fixture's own id prefix (FUNC / SEC / QUAL), which is the only classification it supplies.
-	const requirementIds: string[] = [];
 	for (const [statement, requirementType] of [
 		[
 			'The system shall allow an authorized tenant user to create and maintain customers and service locations.',
@@ -1500,7 +1499,6 @@ export function driveReferenceUndertaking(
 		]
 	] as const) {
 		const requirementId = mintId('req');
-		requirementIds.push(requirementId);
 		send('DefineRequirement', 'REQUIREMENT', requirementId, {
 			requirementId,
 			statement,

@@ -317,7 +317,7 @@ const WRITTEN: Readonly<Record<string, string>> = {
 	'P12-CSV-READ':
 		'Act 2 of W12-CSV-STALE-READ’s step, `cat package.json` (exit 0), shows the setup unit’s CommonJS ' +
 		'scaffold ("type": "commonjs"); act 3 wrote package.json. The account says nothing about this read; its ' +
-		'"package.json declaring \\"type\\": \\"module\\"" is a statement about the file as it now stands, which the ' +
+		String.raw`"package.json declaring \"type\": \"module\"" is a statement about the file as it now stands, which the ` +
 		'finished-work review judges, and which this read, followed by the write that replaced it, neither bears ' +
 		'out nor refutes (design D12). The author’s claim: a reviewer that holds the account’s statement against ' +
 		'this read’s output could fault RR-07. Run-12 case 19’s shape.',
@@ -402,15 +402,24 @@ function oracleOf(id: string): Oracle {
 const IDS_56: readonly string[] = CASE_SET_V12.cases.filter((c) => c.arm !== 'PWA_TYPE' && !RERUN_V12.includes(c.id)).map((c) => c.id);
 const PART_IDS: ReadonlySet<string> = new Set(CASE_SET_V12.cases.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id));
 const CARRIED_IDS: readonly string[] = IDS_56.filter((id) => MOVED_V12[id] === undefined && NEW_ORACLES_V12[id] === undefined);
+/** A carried case as the statement names it: its id, then its version-eleven source's in parentheses. */
+const carriedOf = (id: string): string => `${id} (${SOURCE.get(id)})`;
+/** The criteria a verdict requires faulted, as the statement writes them: none, or each by name. */
+const faultingOf = (o: Pick<Oracle, 'faulted'>): string =>
+	o.faulted.length === 0 ? ', faulting nothing' : `, faulting ${o.faulted.join(', ')}`;
 /** A verdict as the statement writes it: its disposition, the criteria it requires faulted, its standing. */
 const verdictOf = (o: Pick<Oracle, 'disposition' | 'faulted' | 'expectation'>): string =>
-	`${o.disposition}${o.faulted.length === 0 ? ', faulting nothing' : `, faulting ${o.faulted.join(', ')}`}, ${o.expectation}`;
+	`${o.disposition}${faultingOf(o)}, ${o.expectation}`;
 
 /** ⭐ Package V-2 — one of the three re-run cases' oracles, as proposed. */
 function rerunOracleOf(id: string): Oracle {
 	const o = RERUN_ORACLES_V12[id];
 	if (o === undefined) throw new Error(`${id}: no oracle is proposed for it`);
 	return { caseId: id, faulted: o.faulted, disposition: o.disposition, expectation: o.expectation, note: o.note };
+}
+/** One of the three re-run cases as the conferral states it: its id, then its oracle's verdict. */
+function rerunVerdictOf(id: string): string {
+	return `${id}, ${verdictOf(rerunOracleOf(id))}`;
 }
 /**
  * ⭐ Package V-2 — WHAT THE CONFERRAL GAINS AFTER VERSION TWELVE'S STATEMENT, WHOLE: `REG-D-137` Q46 in the sponsor's words, and
@@ -419,7 +428,7 @@ function rerunOracleOf(id: string): Oracle {
 const RERUN_CONFERRAL =
 	`Version twelve then gains three re-run cases, after its 91 (REG-D-137, Q46: asked “${Q46.asked}”, the sponsor chose ` +
 	`“${Q46.chose}”, whose text read “${Q46.read}”). Their oracles are new — ` +
-	`${RERUN_V12.map((id) => `${id}, ${verdictOf(rerunOracleOf(id))}`).join('; ')} — each verdict the one the ruling names, ` +
+	`${RERUN_V12.map((id) => rerunVerdictOf(id)).join('; ')} — each verdict the one the ruling names, ` +
 	'each standing as its author proposed it, and the ruling attributes no standing to the sponsor’s answer. Before they were ' +
 	'built, offline readers, three to a case, agreed with the proposed verdicts for all three: a check of the cases, never a ' +
 	'measurement of the reviewer.';
@@ -446,7 +455,7 @@ export const ORACLES_V12: OracleSet = {
 		`“${Q45.chose}”, whose text read “${Q45.read}”). Before the confirmation, offline readers, three to a case and each ` +
 		'shown only its prompt, agreed with the proposals for all 56 after one case was rebuilt (D12-TA-CLEAN-B) and one ' +
 		'proposal restored (P12-RR-09’s, to version eleven’s): a check of the cases, never a measurement of the reviewer. ' +
-		`The ${CARRIED_IDS.length} re-cast cases whose oracles carry — ${CARRIED_IDS.map((id) => `${id} (${SOURCE.get(id)})`).join(', ')} — ` +
+		`The ${CARRIED_IDS.length} re-cast cases whose oracles carry — ${CARRIED_IDS.map((id) => carriedOf(id)).join(', ')} — ` +
 		'each carries its version-eleven source’s verdict, faulted criteria and standing unchanged, as conferred for that ' +
 		'source, never as the sponsor’s answer. ' +
 		`Three verdicts move under the narrower command question (REG-D-135 (1); design D12) and are re-conferred with the ` +

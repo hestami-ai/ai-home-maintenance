@@ -57,6 +57,8 @@ export type CaseAnswers = Record<string, Record<string, Answered>>;
 
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 const KIND = { check: 'checks', statement: 'statements' } as const;
+/** One side's answer as a difference names it: its score and its body's sha256 cut to 12 characters, or `none` when it has none. */
+const shownAnswer = (x: Answered | undefined): string => (x === undefined ? 'none' : `${x.score} ${x.bodySha256.slice(0, 12)}`);
 
 /**
  * ⭐ THE COMPARISON: every question of every case, the product's answer against the reference's — the same keys, each score
@@ -71,14 +73,15 @@ export function compareAnswers(
 	const cases = [...new Set([...Object.keys(product), ...Object.keys(reference)])];
 	for (const c of cases)
 		for (const kind of ['checks', 'statements'])
-			for (const key of [...new Set([...Object.keys(product[c]?.[kind] ?? {}), ...Object.keys(reference[c]?.[kind] ?? {})])]) {
+			for (const key of new Set([...Object.keys(product[c]?.[kind] ?? {}), ...Object.keys(reference[c]?.[kind] ?? {})])) {
 				const p = product[c]?.[kind]?.[key];
 				const r = reference[c]?.[kind]?.[key];
+				// S6582: kept explicit - an optional chain would read a missing reference answer's fields as undefined, and a product record lacking those fields (unvalidated JSON) would then count as equal
 				if (p !== undefined && r !== undefined && p.score === r.score && p.bodySha256 === r.bodySha256) equal += 1;
 				else
 					differ.push(
-						`${c} ${kind} ${key}: product ${p === undefined ? 'none' : `${p.score} ${p.bodySha256.slice(0, 12)}`}, ` +
-							`step 1 ${r === undefined ? 'none' : `${r.score} ${r.bodySha256.slice(0, 12)}`}`
+						`${c} ${kind} ${key}: product ${shownAnswer(p)}, ` +
+							`step 1 ${shownAnswer(r)}`
 					);
 			}
 	return { equal, differ };
@@ -108,7 +111,7 @@ export function answersOf(requests: readonly IndicationRequest[], result: Indica
 	const out: CaseAnswers = { checks: {}, statements: {} };
 	for (const r of requests) {
 		const x = sent.get(r.key);
-		if (x === undefined || x.outcome.kind !== 'SCORED') return `${r.key} holds no score`;
+		if (x?.outcome.kind !== 'SCORED') return `${r.key} holds no score`;
 		out[KIND[r.kind]]![r.key] = { score: x.outcome.score, bodySha256: sha256(x.body) };
 		if (x.otherModels.length > 0) return `another model was loaded when ${r.key} was sent (${x.otherModels.join(', ')})`;
 	}
@@ -123,7 +126,17 @@ function referenceOf(file: string): { readonly answers: Record<string, CaseAnswe
 	for (const line of readFileSync(file, 'utf8').split('\n').filter((l) => l.trim() !== '')) {
 		const r = JSON.parse(line) as { case: string; kind: string; key: string; score: number; bodySha256: string; server: string };
 		versions.add(r.server);
-		((answers[r.case] ??= {})[r.kind] ??= {})[r.key] = { score: r.score, bodySha256: r.bodySha256 };
+		let byCase = answers[r.case];
+		if (byCase === undefined || byCase === null) {
+			byCase = {};
+			answers[r.case] = byCase;
+		}
+		let byKind = byCase[r.kind];
+		if (byKind === undefined || byKind === null) {
+			byKind = {};
+			byCase[r.kind] = byKind;
+		}
+		byKind[r.key] = { score: r.score, bodySha256: r.bodySha256 };
 	}
 	return { answers, versions };
 }
@@ -133,6 +146,14 @@ function argsOf(argv: readonly string[]): Map<string, string> {
 	const out = new Map<string, string>();
 	for (let i = 0; i < argv.length; i += 1) if (argv[i]!.startsWith('--')) out.set(argv[i]!.slice(2), argv[i + 1] ?? '');
 	return out;
+}
+
+/** An address without the slashes it ends with, found by a scan back from its end; none when none was given. */
+function withoutTrailingSlashes(s: string | undefined): string | undefined {
+	if (s === undefined) return undefined;
+	let end = s.length;
+	while (end > 0 && s[end - 1] === '/') end -= 1;
+	return s.slice(0, end);
 }
 
 /** The server's version and the model's digest, as the server reports them now. */
@@ -147,7 +168,7 @@ async function servedNow(server: string, model: string): Promise<{ readonly dige
 
 export async function main(argv: readonly string[]): Promise<number> {
 	const a = argsOf(argv);
-	const server = a.get('server')?.replace(/\/+$/, '');
+	const server = withoutTrailingSlashes(a.get('server'));
 	const model = a.get('model');
 	const digest = a.get('digest');
 	const step1 = a.get('step1');
@@ -236,7 +257,10 @@ export async function main(argv: readonly string[]): Promise<number> {
 	const { equal, differ } = compareAnswers(product, Object.fromEntries(cases.map((c) => [c, reference.answers[c] ?? {}])));
 	console.log(`exactly equal ${equal} of ${equal + differ.length}, on Ollama ${at.serverVersion}`);
 	for (const d of differ.slice(0, 40)) console.log(`DIFFERS ${d}`);
-	if (times.length > 0) console.log(`the product's client: ${times.map((t) => `${Math.round(t / 1000)} s`).join(', ')} a case`);
+	if (times.length > 0) {
+		const perCase = times.map((t) => `${Math.round(t / 1000)} s`).join(', ');
+		console.log(`the product's client: ${perCase} a case`);
+	}
 	return differ.length === 0 ? 0 : 1;
 }
 

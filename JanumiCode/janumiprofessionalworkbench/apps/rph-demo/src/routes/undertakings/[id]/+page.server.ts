@@ -877,13 +877,13 @@ function demoValidatorResult(
  * required set is empty and the assessment lands directly in READY — so the window is open from the first act.
  */
 function pendingAssessmentFor(pwuId: string): string | null {
-	const OPEN_FOR_EVIDENCE = ['EVIDENCE_PENDING', 'READY', 'ASSESSING'];
+	const OPEN_FOR_EVIDENCE = new Set(['EVIDENCE_PENDING', 'READY', 'ASSESSING']);
 	for (const a of listByType(getEngine(), 'ASSURANCE_ASSESSMENT')) {
 		const subjects = Array.isArray(a.state.subjectObjectIds)
 			? (a.state.subjectObjectIds as unknown[]).map(String)
 			: [];
 		if (!subjects.includes(pwuId)) continue;
-		if (OPEN_FOR_EVIDENCE.includes(String((a.state.assessmentState ?? '') as string))) return a.id;
+		if (OPEN_FOR_EVIDENCE.has(String((a.state.assessmentState ?? '') as string))) return a.id;
 	}
 	return null;
 }
@@ -1351,7 +1351,7 @@ function lastCompletionOf(
 	const engine = getEngine();
 	const plans = new Set(
 		listExecutionPlans(engine)
-			.filter((p) => String(p.state.workUnitId ?? '') === pwuId)
+			.filter((p) => String((p.state.workUnitId ?? '') as string) === pwuId)
 			.map((p) => p.id)
 	);
 	const done = engine
@@ -1537,7 +1537,7 @@ async function declaredReviewWorkOf(
 	if (!own.ok) return own;
 	const producer = own.work.executedBy ?? operator;
 	const units = listPwus(getEngine());
-	const childrenOf = (id: string) => units.filter((u) => String(u.state.parentWorkUnitId ?? '') === id);
+	const childrenOf = (id: string) => units.filter((u) => String((u.state.parentWorkUnitId ?? '') as string) === id);
 	// ⭐ `REG-F-569` (`REG-D-121` Q18) — A LEAF IS GATHERED AS A UNIT COMPOSED OF OTHERS IS, its own work and no unit below it,
 	// so the one refusal below reaches it too: it returned its own work before that check, and was reviewed over nothing.
 	const composite = childrenOf(pwuId).length > 0;
@@ -1865,9 +1865,25 @@ function modelExecutedBy(modelId: string) {
  */
 function failTheStepBeforeItsReview(planId: string, stepId: string, why: string) {
 	const failed = runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
+	const notRecorded = failed ? ` — and the failure could not be recorded: ${failed}` : '';
 	return fail(400, {
-		error: `The model invocation did not run to its review: ${why}${failed ? ` — and the failure could not be recorded: ${failed}` : ''}`
+		error: `The model invocation did not run to its review: ${why}${notRecorded}`
 	});
+}
+
+/** One recorded observation as a refusal message prints it: `code: statement`. */
+function observationLine(o: { readonly code: string; readonly statement: string }): string {
+	return `${o.code}: ${o.statement}`;
+}
+
+/**
+ * The command evidence's own refusal (`describeRefusedEvidence`) as the model step's unsatisfied arm appends it, after why
+ * the loop stopped: `''` where no command result was refused.
+ */
+function refusedEvidenceNote(joined: readonly JoinedProcessEvidence[]): string {
+	return describeRefusedEvidence(joined)
+		? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(joined)}`
+		: '';
 }
 
 /** What one model unit's run needs: the started plan and step, its binding, its executor, and its type's facts. */
@@ -2461,9 +2477,12 @@ async function runModelUnit(u: ModelUnitRun) {
 				...refusedRuns.map((j) => ({ autoRefine: j.autoRefine, action: j.remediationAction }))
 			].find((r) => !r.autoRefine);
 			if (unanswerable || !gate.retry) {
-				loopEnded = unanswerable
-					? `The review did not produce findings that may be sent back to the producer (${unanswerable.action}).`
-					: `${gate.reason} Trend after ${attempt} ${attempt === 1 ? 'try' : 'tries'}: ${trend}.`;
+				if (unanswerable) {
+					loopEnded = `The review did not produce findings that may be sent back to the producer (${unanswerable.action}).`;
+				} else {
+					const tries = attempt === 1 ? 'try' : 'tries';
+					loopEnded = `${gate.reason} Trend after ${attempt} ${tries}: ${trend}.`;
+				}
 				break;
 			}
 			priorFindings = findings;
@@ -2548,6 +2567,8 @@ async function runModelUnit(u: ModelUnitRun) {
 			],
 			completed
 		);
+		// Why the loop stopped (`loopEnded`), as both arms below append it: `''` where it recorded no reason.
+		const loopEndedNote = loopEnded ? ` — ${loopEnded}` : '';
 		return fail(400, {
 			error: (review.satisfied
 				? // ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND WHEN THE WORK PRODUCT PASSED BUT A COMMAND'S RESULT DID NOT, THE COMMAND
@@ -2557,7 +2578,7 @@ async function runModelUnit(u: ModelUnitRun) {
 					// escalation no sentence saying what it asks (the ER-1 app verifier's MAJOR 1, its probe `ER1-VP1`). ⭑ The
 					// same hand-over as the arm below, so one reader splits both; with nothing refused this message is unchanged.
 					// ⭐ Package N — D9 — and, a command's review now able to send the producer back, why the loop stopped.
-					`The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete${describeRefusedEvidence(joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(joined)}` : '.'} ${completed}${loopEnded ? ` — ${loopEnded}` : ''}`
+					`The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete${describeRefusedEvidence(joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(joined)}` : '.'} ${completed}${loopEndedNote}`
 				: // ⭑ THE REVIEW RAN AND DID NOT PASS. That is a JUDGEMENT about the work, not a missing
 					// check, and the two must not read the same. The findings are surfaced; feeding them back
 					// to the producing model is REG-D-059's ruling and needs the loop bound, which is the
@@ -2579,7 +2600,7 @@ async function runModelUnit(u: ModelUnitRun) {
 					// on the codes): the recommendation alone was all this arm printed of a review left INCONCLUSIVE by an
 					// unanswered criterion, and INCONCLUSIVE was named nowhere (the second fix round's re-verifier's finding [0]).
 					// ⛔ Never an ESCALATED review's: the sentence after it explains that one, so the note is keyed on the action too.
-					`The model ran, its work product was reviewed over ${openPerTry.length} ${openPerTry.length === 1 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${noFindingNote(review.observations, review.dispositions, review.remediation.action)}${escalatedReviewNote(review.remediation.action)}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(joined)}` : ''}`) +
+					`The model ran, its work product was reviewed over ${openPerTry.length} ${openPerTry.length === 1 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => observationLine(o)).join(' | ') || completed}${noFindingNote(review.observations, review.dispositions, review.remediation.action)}${escalatedReviewNote(review.remediation.action)}${loopEndedNote}${refusedEvidenceNote(joined)}`) +
 				// ⚠ A WAIT THAT COULD NOT BE RECORDED IS SAID, never swallowed: the unit is then left as K1 left it.
 				(waited ? ` — and the wait for a person’s choice could not be recorded: ${waited}` : '')
 		});
@@ -3707,7 +3728,7 @@ export const actions: Actions = {
 					(refused
 						.map(
 							(o) =>
-								`${o.subjectId}: ${o.floor.observations.map((ob) => `${ob.code}: ${ob.statement}`).join(' | ') || 'no observation recorded'}` +
+								`${o.subjectId}: ${o.floor.observations.map((ob) => observationLine(ob)).join(' | ') || 'no observation recorded'}` +
 								noFindingNote(o.floor.observations, o.floor.dispositions, o.floor.remediation.action) +
 								escalatedReviewNote(o.floor.remediation.action)
 						)

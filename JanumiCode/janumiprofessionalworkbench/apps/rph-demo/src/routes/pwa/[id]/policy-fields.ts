@@ -112,7 +112,7 @@ const SEPARATORS = /[\n,;]/;
 
 /** A ratified-array field the author supplied, or the stated default when the form could not express it. */
 export function listOrDefault(v: string[] | undefined, fallback: string): string[] {
-	return v && v.length ? v : [fallback];
+	return v?.length ? v : [fallback];
 }
 
 /**

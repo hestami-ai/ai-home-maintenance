@@ -681,7 +681,9 @@ export class Engine {
 							? resolved.principal
 							: undefined
 						: sessionPrincipal;
-					const reason = resolved ? (resolved.ok ? undefined : resolved.reason) : sessionReason;
+					let reason: string | undefined;
+					if (resolved) reason = resolved.ok ? undefined : resolved.reason;
+					else reason = sessionReason;
 					const r = this.dispatchAs(principal, reason, entry.command);
 					results.push(r);
 					if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE') {

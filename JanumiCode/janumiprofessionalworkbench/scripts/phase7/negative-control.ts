@@ -259,7 +259,7 @@ export async function runNegativeControl(i: {
 	};
 	const repetitions: NegativeControlRepetition[] = [];
 	let stopped: string | undefined;
-	let candidate = STUB_CANDIDATE;
+	let candidate: CandidateIdentity;
 	try {
 		candidate = await i.transport.identify();
 		for (let repetition = 1; repetition <= requested && stopped === undefined; repetition++) {
@@ -398,9 +398,10 @@ export async function main(argv: readonly string[], deps: NegativeControlCliDeps
 	const result = await runNegativeControl({ transport, mode: live ? 'LIVE' : 'DRY_RUN' });
 	writeNewReport(out, result);
 	const verdicts = result.repetitions.map((r) => `${r.verdict.disposition} [${r.faultedOfExpected.join(', ') || 'none of the four'}]`);
+	const stoppedNote = result.stopped ? `; stopped: ${result.stopped}` : '';
 	say(
 		`${result.mode}: ${verdicts.join('; ') || 'no repetition completed'} — expectation ${result.held ? 'HELD' : 'NOT held'}, ` +
-			`${result.reviewerCalls} reviewer call(s)${result.stopped ? `; stopped: ${result.stopped}` : ''}`
+			`${result.reviewerCalls} reviewer call(s)${stoppedNote}`
 	);
 	return exitOf(result);
 }

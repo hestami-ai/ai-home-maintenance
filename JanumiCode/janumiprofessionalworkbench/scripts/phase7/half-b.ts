@@ -232,6 +232,9 @@ export function typesGivenChildren(types: readonly Row[]): ReadonlySet<string> {
 	return new Set(types.filter((t) => planComposition(nodes, t.id).instances.length > 1).map((t) => t.id));
 }
 
+/** ` under <its parent>`: where `treeAgainstPlan` says a missing or duplicated unit belongs. */
+const underParent = (parent: string): string => ` under ${parent}`;
+
 /**
  * ⭐⭐ `REG-D-112` (E3's review, finding 4) — THE UNDERTAKING'S UNITS, HELD TO THE PLAN INSTANTIATION MAKES OF ITS PWA,
  * PER (PARENT, TYPE): the product's own planner (`planComposition`, as `routes/undertakings/+page.server.ts` asks it) plans
@@ -266,7 +269,7 @@ export function treeAgainstPlan(units: readonly Row[], types: readonly Row[]): T
 					);
 		if (unit === undefined) {
 			const under = parent ? str(parent.state.title) : nameOf(typeOfKey.get(parentKey ?? '') ?? '');
-			missing.push(`${nameOf(planned.typeId)}${parentKey === undefined ? '' : ` under ${under}`}`);
+			missing.push(`${nameOf(planned.typeId)}${parentKey === undefined ? '' : underParent(under)}`);
 			continue;
 		}
 		matched.add(unit.id);
@@ -286,7 +289,7 @@ export function treeAgainstPlan(units: readonly Row[], types: readonly Row[]): T
 	for (const u of units.filter((x) => !matched.has(x.id))) {
 		const parent = parentOf(u);
 		if (plannedFor(u))
-			duplicated.add(`${nameOf(str(u.state.pwuTypeId))}${parent === null ? '' : ` under ${titleOf(parent)}`}`);
+			duplicated.add(`${nameOf(str(u.state.pwuTypeId))}${parent === null ? '' : underParent(titleOf(parent))}`);
 		else if (parent === null || !ids.has(parent)) orphaned.push(u.id);
 		else unplanned.push({ unitId: u.id, parentTitle: titleOf(parent) });
 	}

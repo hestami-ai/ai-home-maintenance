@@ -1022,7 +1022,7 @@ const errorLines = (s: string): string =>
 // ⚠ THE ANSI STRIPPER STAYS A `new RegExp(...)` RATHER THAN A REGEX LITERAL, WHICH SONAR (S6325) ASKS FOR.
 // ESLint's `no-control-regex` (on by default via `js.configs.recommended`, and `eslint .` covers `scripts/`)
 // inspects regex literals and rejects an ESC regardless of whether it is written directly, as `\x1b`, or as
-// `\u001b`. Computing ESC with `String.fromCharCode(27)` keeps the source free of the invisible raw control
+// `\u001b`. Computing ESC with `String.fromCodePoint(27)` keeps the source free of the invisible raw control
 // character while preserving the measured ANSI-stripping behavior.
 const summarise = (s: string): string =>
 	(
@@ -1031,7 +1031,7 @@ const summarise = (s: string): string =>
 			.filter((l) => l.includes('Tests '))
 			.at(-1) ?? ''
 	)
-		.replaceAll(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '')
+		.replaceAll(new RegExp(`${String.fromCodePoint(27)}\\[[0-9;]*m`, 'g'), '')
 		.trim();
 
 // ── CRASH RECOVERY, added after this runner LOST a mutant ────────────────────────────────────────────────────

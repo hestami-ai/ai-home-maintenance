@@ -291,7 +291,8 @@ async function d53Prechecks(
 	if (refusedCases.length > 0)
 		return `REFUSED (D53): D54’s records hold a refusal, not a review, for ${refusedCases.length} of the ${cases.length} current cases: ${refusedCases.join('; ')}. Nothing was run.`;
 	// ⭐ Z3 phase 2 — and what the records hold, said: every current case, none refused, and the files read by their sha256.
-	say(`D53 — D54’s records hold ${cases.length} of the ${cases.length} current cases, none refused (${onFile.files.map((f) => `${f.name} sha256 ${f.sha256}`).join(', ')})`);
+	const recordFiles = onFile.files.map((f) => `${f.name} sha256 ${f.sha256}`).join(', ');
+	say(`D53 — D54’s records hold ${cases.length} of the ${cases.length} current cases, none refused (${recordFiles})`);
 	// D53 — the decision model, for the live re-derivation.
 	const { configuredIndications } = await import('../../apps/rph-demo/src/lib/server/assurance/decision-model.js');
 	// ⭐⭐ Package L8 — D63 (`REG-D-152`; the lead's decision (A)): held to the records' version alone, `[]` — though the product's

@@ -151,7 +151,7 @@ export function loadRecords(censusDir: string): LoadedCensus {
 	const files = existsSync(censusDir)
 		? readdirSync(censusDir)
 				.filter((f) => f.endsWith('.ndjson'))
-				.sort()
+				.sort((a, b) => Number(a > b) - Number(a < b))
 		: [];
 	for (const file of files) {
 		const lines = readFileSync(join(censusDir, file), 'utf8').split('\n');

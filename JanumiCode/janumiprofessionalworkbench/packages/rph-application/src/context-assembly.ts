@@ -88,7 +88,7 @@ export function resolveContextAssemblyPolicy(
 	if (!parsed.success)
 		throw new Error(
 			`Context assembly policy '${policyId}' resolved to an object that is not a policy: ` +
-				`${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+				parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
 		);
 	return parsed.data;
 }

@@ -162,6 +162,13 @@ const USAGE =
 const absoluteOnFamily = (path: string, family: OsFamily): boolean =>
 	family === 'windows' ? /^(?:[A-Za-z]:[\\/]|\\\\)/.test(path) : path.startsWith('/');
 
+/** What one write check says: no archived workspace to hold the writes to, a match, or the files that differ. */
+function writeCheckVerdict(c: ReturnType<typeof verifyWrites>[number]): string {
+	if (c.match === null) return 'no archived workspace to hold them to';
+	if (c.match) return 'the workspace tree matches';
+	return `the workspace tree DIFFERS (${c.differing.length} file(s): ${c.differing.slice(0, 8).join(', ')})`;
+}
+
 /**
  * Returns the exit code: 0 written; 1 refused by a check; 2 refused before anything was read. `names` are the account
  * names the recording is scanned for (`accountNames`), and `home` the folder scrubbed as `JPWB_REPLAY_HOME_NATIVE` — given so a test
@@ -304,10 +311,7 @@ export function main(
 	} finally {
 		rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 	}
-	for (const c of checks)
-		say(
-			`writes replayed through ${c.archive}: ${c.match === null ? 'no archived workspace to hold them to' : c.match ? 'the workspace tree matches' : `the workspace tree DIFFERS (${c.differing.length} file(s): ${c.differing.slice(0, 8).join(', ')})`}`
-		);
+	for (const c of checks) say(`writes replayed through ${c.archive}: ${writeCheckVerdict(c)}`);
 	if (checks.some((c) => c.match === false)) {
 		say(
 			'refused, and nothing was written: the recorded write_file calls do not rebuild the archived workspace (REG-F-530)'

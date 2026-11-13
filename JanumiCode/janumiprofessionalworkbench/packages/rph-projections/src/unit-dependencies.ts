@@ -385,7 +385,7 @@ export function startReadiness(
 	const unknown: string[] = [];
 	for (const id of new Set(unit?.dependencyIds ?? [])) {
 		const d = lookup(id);
-		if (d === undefined || d.undertakingId === undefined || d.undertakingId !== unit?.undertakingId) unknown.push(id);
+		if (d?.undertakingId === undefined || d.undertakingId !== unit?.undertakingId) unknown.push(id);
 		else if (d.workLifecycleState === 'ABANDONED') abandoned.push({ id, title: d.title });
 		else if (!ACCEPTED_UNIT_STATES.includes(d.workLifecycleState))
 			waitingFor.push({ id, title: d.title, state: d.workLifecycleState });
@@ -402,9 +402,11 @@ export function startReadiness(
 		...(loop !== null ? (['loop'] as const) : [])
 	];
 	const quoted = (title: string): string => `"${title}"`;
+	const quotedWithState = (w: { readonly title: string; readonly state: string }): string =>
+		`${quoted(w.title)} (${w.state})`;
 	const reasons = [
 		...(waitingFor.length > 0
-			? [`it waits for ${listed(waitingFor.map((w) => `${quoted(w.title)} (${w.state})`))} to be accepted`]
+			? [`it waits for ${listed(waitingFor.map((w) => quotedWithState(w)))} to be accepted`]
 			: []),
 		...(abandoned.length > 0
 			? [`its producer${abandoned.length > 1 ? 's' : ''} ${listed(abandoned.map((a) => quoted(a.title)))} ${abandoned.length > 1 ? 'were' : 'was'} ABANDONED`]
@@ -434,7 +436,8 @@ export function startReadiness(
  * "a" and "b" from outside this Undertaking`; null for a unit that expects nothing from outside.
  */
 export function expectedFromOutside(outside: readonly string[]): string | null {
-	return outside.length === 0 ? null : `expects ${listed(outside.map((name) => `"${name}"`))} from outside this Undertaking`;
+	const quoted = (name: string): string => `"${name}"`;
+	return outside.length === 0 ? null : `expects ${listed(outside.map((name) => quoted(name)))} from outside this Undertaking`;
 }
 
 /**

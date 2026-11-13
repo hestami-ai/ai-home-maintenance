@@ -592,6 +592,7 @@ export function restampable(
 ): boolean {
 	const last = calls.at(-1);
 	return (
+		// S6582: kept explicit - with no calls the optional chain gives undefined !== null (true), so an empty list would not be refused here
 		last !== undefined &&
 		last.scored !== null &&
 		!calls.some((k) => k.reply.status === 'TRANSPORT_FAILURE') &&
@@ -958,7 +959,7 @@ interface Evaluation {
  */
 export function recordProblems(text: string, opts: { readonly tracked: boolean }): string[] {
 	const problems: string[] = [];
-	if (text.charCodeAt(0) === 0xfeff) problems.push('a BOM');
+	if (text.codePointAt(0) === 0xfeff) problems.push('a BOM');
 	if (text.includes('\r')) problems.push('a CR — the record is LF only');
 	if (text === '') return problems;
 	if (!text.endsWith('\n')) problems.push('no final newline');

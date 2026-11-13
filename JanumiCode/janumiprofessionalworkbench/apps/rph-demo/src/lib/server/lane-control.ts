@@ -144,6 +144,11 @@ function tallyOf(source: LaneSource, assessmentId: string, mandatory: ReadonlySe
 	return { evaluated, stipulatedRows };
 }
 
+/** The part limb 1's registration reason names (B6): nothing when its arm has no part, else the type it reads. */
+function partClauseOf(typeId: string | undefined): string {
+	return typeId === undefined ? '' : ` (nor for its part ${typeId})`;
+}
+
 /** Limb 1's three questions of one stand-in completion; an empty list is a completion the lane may rest on. */
 function limbOneReasons(
 	source: LaneSource,
@@ -171,7 +176,7 @@ function limbOneReasons(
 	// ⭐ B6 — THE FLOOR'S OWN LOOKUP (`registrationFor`): a part's registration, else its PWA's.
 	else if (registrationFor(registrations, arm.pwaId, arm.framing, arm.typeId) === undefined)
 		reasons.push(
-			`no test registered a stipulation for ${arm.pwaId} on ${arm.framing}${arm.typeId === undefined ? '' : ` (nor for its part ${arm.typeId})`}`
+			`no test registered a stipulation for ${arm.pwaId} on ${arm.framing}${partClauseOf(arm.typeId)}`
 		);
 	return reasons;
 }

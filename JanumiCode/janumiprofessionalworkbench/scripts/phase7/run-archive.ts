@@ -600,6 +600,7 @@ function causesOf(
 	const final = input.unitId === null;
 	const joinRefused = (input.refusal ?? '').includes('could not be recorded as evidence');
 	const perUnit = 'the final archive reads every unit at once; each unit’s own archive says';
+	const refusalSays = joinRefused ? 'says' : 'does not say';
 	return [
 		{
 			cause: k5CapCause(input.reviewedRunLimit),
@@ -620,7 +621,7 @@ function causesOf(
 			possible: final || joinRefused,
 			why: final
 				? perUnit
-				: `the unit’s refusal ${joinRefused ? 'says' : 'does not say'} a run could not be recorded as evidence`
+				: `the unit’s refusal ${refusalSays} a run could not be recorded as evidence`
 		},
 		{
 			cause: K5_OWN_FOLDER_CAUSE,
@@ -866,7 +867,7 @@ function instructionFiles(text: string): string[] {
 			at + PI_CONTEXT_MARKERS[1].length + 4096
 		);
 		const end = tail.indexOf('>');
-		const path = (end === -1 ? tail : tail.slice(0, end)).replaceAll('\\"', '').replaceAll('"', '');
+		const path = (end === -1 ? tail : tail.slice(0, end)).replaceAll(String.raw`\"`, '').replaceAll('"', '');
 		out.push(
 			path
 				.split(/[\\/]+/)

@@ -38,7 +38,10 @@ const RENAMED: ReadonlyMap<string, { readonly id: string; readonly source: strin
 );
 
 /** The source id `id`, where it stands as an id: never inside a longer one (`G10-CLEAN` is not `G10-CLEAN-R1`'s head). */
-const asAnId = (id: string): RegExp => new RegExp(`${id.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}(?![-A-Za-z0-9])`, 'g');
+const asAnId = (id: string): RegExp => {
+	const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+	return new RegExp(`${escaped}(?![-A-Za-z0-9])`, 'g');
+};
 
 /**
  * ⭐ D3d — a version-ten oracle as version eleven holds it: one of the 69's, byte for byte; one of the 7's under its case's new

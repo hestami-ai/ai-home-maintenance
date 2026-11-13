@@ -75,7 +75,7 @@ export function changedFiles(
 	before: ReadonlyMap<string, { readonly hash: string }>,
 	after: WorkspaceManifest
 ): DeliverableFile[] {
-	const paths = [...new Set([...before.keys(), ...after.keys()])].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+	const paths = [...new Set([...before.keys(), ...after.keys()])].sort((a, b) => Number(a > b) - Number(a < b));
 	return paths.flatMap((path): DeliverableFile[] => {
 		const was = before.get(path);
 		const now = after.get(path);

@@ -2165,7 +2165,7 @@ const undeterminedMandatoryCriteria = (
 		.filter(([id, result]) => mandatory.has(id) && result === 'UNABLE_TO_DETERMINE')
 		.filter(([id]) => !(admitted && latestStipulated.get(id) === true))
 		.map(([id]) => id)
-		.sort();
+		.sort((a, b) => Number(a > b) - Number(a < b));
 };
 
 /**

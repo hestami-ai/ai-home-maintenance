@@ -1166,7 +1166,10 @@ export async function runPwaFloor(
 	// ⭐ B3 — AND IT IS THE WHOLE ROUND'S: the PWA's plan and every part's carry it, so the round's readers can ask for the
 	// complete inventory under one token (`loadPwaFloor`; `rph-application`'s publication gate).
 	const floorRunId = mintUiId('floorrun');
-	const floorRunToken = `${opts.candidateSubjectHash ? `authoring-floor:${opts.candidateSubjectHash}` : 'authoring-floor'}:${floorRunId}`;
+	const planeCorrelation = opts.candidateSubjectHash
+		? `authoring-floor:${opts.candidateSubjectHash}`
+		: 'authoring-floor';
+	const floorRunToken = `${planeCorrelation}:${floorRunId}`;
 	const record = (plan: AssuranceRecordingPlan, idPrefix: string) =>
 		recordAssuranceRecordingPlan(engine, plan, {
 			issuedAt: hostNow(),
@@ -1498,7 +1501,7 @@ function latestFloorRound(
 		const subjects = subjectsOf(r.state);
 		const a = { id: r.id, state: r.state, at: String((r.state.updatedAt ?? '') as string) };
 		if (subjects.includes(pwaId) && isDeterministicFloorPolicy(policy))
-			inRound.push({ a, key: String(policy), part: false });
+			inRound.push({ a, key: String(policy as string), part: false });
 		else if (policy === FLOOR_POLICY_IDS.REASONING_REVIEW) {
 			const typeId = subjects.find((s) => typeIds.has(s));
 			if (typeId === undefined) continue;

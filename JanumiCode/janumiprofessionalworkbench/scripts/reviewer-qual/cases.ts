@@ -8,10 +8,9 @@
 // ⚠ TYPES, PATHS AND THE SERIALIZER ONLY — NO RUNTIME IMPORT. The generator (`generate.ts`) runs under bare `bun`,
 // where `@janumipwb/*` would resolve to built `dist` (`REG-D-072` D11); nothing here needs a package at runtime.
 import type { AssuranceSubject, ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
-import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
+import type { AssessmentCriterion, ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import type { PwaGraphNode, PwaMeta, PwaPartLibraryPolicy } from '@janumipwb/rph-projections';
 import type { ObservedProcessRun } from '../../apps/rph-demo/src/lib/server/tools/process-run-observer.js';
-import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import type { DeclaredReviewCommand } from '../../apps/rph-demo/src/lib/server/assurance/review-input.js';
 
 /**
