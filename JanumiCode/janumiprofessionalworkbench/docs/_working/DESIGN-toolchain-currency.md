@@ -741,8 +741,11 @@ and the order of the first upgrades, as a preview for the roadmap.
   1. A dry run in scratch, as done for TypeScript 6.0.3: an integrity-checked copy, no repository change.
   2. The lock update.
   3. Ordinary re-baselines in the same commit: `bun run gen`, `coverage:floor`, `guards:export`, `slices:ledger`, and
-     ledger re-anchoring. When a tool upgrade moves `JAN-SONARCM` S2's per-file lint baseline, its new counts are an
-     ordinary re-baseline too, as `coverage:floor`'s are, with the counts before and after recorded.
+     ledger re-anchoring. When a tool upgrade moves `JAN-SONARCM` S2's per-file lint baseline, a FALL in its counts is
+     an ordinary re-baseline, with the counts before and after recorded. A RISE is not: *(amended 2026-11-13 by the
+     lead, reconciling this step with `JAN-SONARCM` D-2)* under the sponsor's QS2 ruling a new finding fails unless it
+     is fixed, recorded as an exception (`JAN-SONARCM` D-5), or ruled, so a rise caused by a tool or engine upgrade is
+     governed like any other.
   4. Governed instruments only after a sponsor ruling: the reviewer fingerprint (REG-D-146, REG-D-149, REG-D-153),
      the Ollama identity (REG-F-608), the fence digest (REG-F-481, REG-D-013) and the Pi pins (REG-D-114 (19)). A
      ledger `abolishedBy` must name an existing REG-D ruling (`verif/mutant-ledger.test.ts:131`), so an upgrade that
@@ -1002,11 +1005,11 @@ check asserts its message, so that the red proves which condition failed.
     seconds unit are documented for current Bun only (F-13); the elkjs deprecation has no URL in the sources (F-13).
 11. **`bun audit` and the deferral.** Using it only in a report is this design's reading of REG-Q-049 and REG-D-046
     Ruling 3, not a ruling (§9).
-12. **Ordinary re-baselines can weaken.** A `coverage:floor` or lint baseline that rises because an upgrade moved it
-    is still an ordinary re-baseline (D-11 step 3), as the brief classifies `coverage:floor`; only the recorded counts
-    before and after keep that visible. And after a vitest or Playwright upgrade, the mutation runner's reading of
-    their output (instruments I14, I15) is checked by no step of D-11 short of a full `bun run mutants`, which the
-    repository last recorded at about 15 hours on 4 lanes (instruments review).
+12. **Ordinary re-baselines can weaken.** *(Restated 2026-11-13 by the lead, with D-11 step 3.)* A `coverage:floor`
+    baseline that an upgrade raises is still an ordinary re-baseline, as the brief classifies it; only the counts
+    before and after keep that visible. A lint baseline that rises is governed. After a vitest or Playwright upgrade,
+    the mutation runner's reading of their output (instruments I14, I15) is checked by no step of D-11 short of a full
+    `bun run mutants`, which the repository last recorded at about 15 hours on 4 lanes (instruments review).
 
 ---
 

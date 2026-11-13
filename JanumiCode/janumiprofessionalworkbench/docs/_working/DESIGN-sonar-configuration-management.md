@@ -1,6 +1,6 @@
 # DESIGN — JAN-SONARCM: the Sonar method under configuration management, checked during builds
 
-**Programme:** `JAN-SONARCM` · **Status:** DESIGN, QS1 and QS2 ruled 2026-11-13, QS3 open · **Opened:** 2026-11-13 · **Occasioned by:** the sponsor —
+**Programme:** `JAN-SONARCM` · **Status:** DESIGN, QS1-QS3 ruled 2026-11-13 · **Opened:** 2026-11-13 · **Occasioned by:** the sponsor —
 *"we probably should formalize the sonarqube methodology and bring that under full configuration management as well"*
 
 **Companion:** `JAN-TOOLCUR` (`docs/_working/DESIGN-toolchain-currency.md`). Its compatibility matrix and its
@@ -39,7 +39,7 @@ can be identified and resolved closer or closest to when changes are made."* And
 which should allow us to update to ES2025"* with *"The other corrections you mentioned are agreeable as well"*,
 which together settle how the 11 open findLast findings are fixed.
 
-**Your rulings and the one open question (2026-11-13).**
+**Your rulings (2026-11-13).**
 - **QS1. The licence.** Ruled: carry on as now. *"Since this is OSS and Sonar has an free OSS license I will look into
   getting this project qualified as such so in the meantime we will carry on as we have been."* You are also
   evaluating Aikido Security's free developer tier (*"TBD if it has the same licensing issues"*). So nothing waits on
@@ -47,10 +47,10 @@ which together settle how the 11 open findLast findings are fixed.
 - **QS2. Fail the gate.** Ruled: *"agree as fully recommended"*. Sonar rules are lint errors from the first package,
   and today's findings are held by the per-file count: no old finding blocks a change, and a new one fails unless it
   replaces a fixed one of the same rule in the same file (§8). The ruling also approves that first count (DOC-004 §7.6).
-- **QS3. Split ledger.ts: open.** You asked why the other session must agree when this work has its own worktree. It
-  need not: the split now keeps the newest entries, and every new one, in `ledger.ts` (D-7), so the other session's
-  appends merge as before. Only an edit to a moved older entry needs a hand merge, which git flags and the checks
-  verify. *Recommended: split on that basis, with a heads-up at merge.*
+- **QS3. Split ledger.ts.** Ruled: *"Yes, proceed with the revised ledger.ts split."* No agreement with the other
+  session is needed: the split keeps the newest entries, and every new one, in `ledger.ts` (D-7), so its appends merge
+  as before. Only an edit to a moved older entry needs a hand merge, which git flags and the checks verify; the other
+  session gets a heads-up at merge.
 
 ---
 
@@ -477,8 +477,8 @@ takes about 23 minutes, and a diff is empty once work is committed (F-11). (e) A
   count (F-7) while §7.4 asks for "the tool, rule, finding, and affected location" (`:498`). Then J1 holds for held
   findings too.
 - **Upgrades.** An upgrade that moves the lint baseline re-records it in the upgrade's own commit. A fall is
-  ordinary; a rise is governed and filed with the upgrade's register entry (J3). `JAN-TOOLCUR`'s D11 names neither
-  this baseline nor the engine's today (§9).
+  ordinary; a rise is governed and filed with the upgrade's register entry (J3). `JAN-TOOLCUR`'s D-11 step 3, as
+  amended 2026-11-13, now says the same of the lint baseline; the engine baseline follows D-4 (§9).
 - **Scope.** Apply the Sonar rule block to the Sonar scope from `sonar-project.properties`, so both channels judge the
   same files, except `apps/rph-demo/harness/`, which lint ignores (F-6); the census names it. The properties file
   excludes `*.test.ts` and `__tests__/` (`sonar-project.properties:21`), so Sonar rules in lint skip them too, while
@@ -602,7 +602,7 @@ quoted through a summarising fetch tool).
 
 **Reason.** It is the only route that exists; making it a later step keeps the first packages to supported paths.
 
-### D-7. Split `ledger.ts` — LEAD DECISION; sponsor question QS3 (open; revised 2026-11-13 after the sponsor's question)
+### D-7. Split `ledger.ts` — LEAD DECISION, revised 2026-11-13 after the sponsor's question; RULED (QS3): *"Yes, proceed with the revised ledger.ts split."*
 
 **Question.** How does the 9.9 MB ledger come inside the engine's reach?
 
@@ -786,7 +786,7 @@ A design-level map, not the roadmap. Proposed names are marked "proposed".
 3. D-4's first recorded sweep, which writes the engine baseline; then D-3's `sonar:changed`, which reads it.
 4. D-2's lint step: measure lint time first. Record the lint baseline after `JAN-TOOLCUR` T2 (ESLint 10), or let T2
    re-record it under its own register entry (D-2's upgrade rule).
-5. D-7's split, once QS3 is answered. It can be built and tested in the worktree at any time; it merges between
+5. D-7's split (QS3 ruled yes, 2026-11-13). It can be built and tested in the worktree at any time; it merges between
    paid runs.
 6. D-10's exception packages and Tier E. The findLast group follows `JAN-TOOLCUR` T1's `lib` raise. In
    `scripts/mutants/run.ts`, the S7750 fix at `:1031` lands in the same commit as the restatement of the findLast note
@@ -885,7 +885,7 @@ to the committed tree: editing in place "edits the very thing it measures, and a
 
 ## 9. Open items
 
-- **QS3** (§0, D-7) is open; QS1 and QS2 were ruled on 2026-11-13. The sponsor is seeking Sonar's OSS plan and
+- QS1, QS2 and QS3 were ruled on 2026-11-13. The sponsor is seeking Sonar's OSS plan and
   evaluating Aikido Security; either result feeds D-8 and, for Aikido, the checks D-9's consequences name.
 - **For the lead: keep or drop each (proposal).** D-1: the configuration, the version source, the rule set as
   differences, the fresh output folder. D-2: route (i) or (ii) for coverage, parameters, typed files, the baseline's
