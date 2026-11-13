@@ -103,11 +103,13 @@ const PLAN_DRAFT_LEFT = {
 };
 
 /**
- * ⭐⭐ Package L10 — D65 — PUBLISH'S REFUSAL, in the engine's words (`pwaPromptGate`), restated, not imported: the lane writes them as its
- * end, so a change to them must redden here. Each refused type `[n] "name" (id): reason`.
+ * ⭐⭐ Package L11 — D66 (`REG-D-155`) — SUBMIT'S REFUSAL, in the engine's words (`pwaSubmitGate`), restated, not imported: the lane writes them
+ * as its end, so a change to them must redden here. ~~Package L10's Publish refusal~~ — the case below, L10's, is restated by the construct to
+ * the refusal at Submit (`l11-facts.md` §3 (d)); Publish's words stay pinned where Publish is still reached (`pwa-publish-prompt-gate.test.ts`).
+ * Here only the prompts' passage: the floor the turn recorded is current. Each refused type `[n] "name" (id): reason`.
  */
-const publishRefusal = (pwaId: string, items: readonly string[]): string =>
-	`PublishPwa blocked: each type of PWA ${pwaId} named here declares workDischarge MODEL, but the step of its unit could not render its prompt, so that unit would be stopped once its step had started, when the PWA could no longer change (REG-F-508). ${items.join(' ')} Nothing was published: the PWA stays VALIDATED, where its types cannot be edited, so its repair is a new PWA in which each type declaring MODEL carries an ACTIVE prompt that uses only the markers a work unit supplies.`;
+const submitRefusal = (pwaId: string, items: readonly string[]): string =>
+	`SubmitPwaForReview blocked: PWA ${pwaId} fails each check named here, for which ValidatePwa or PublishPwa would refuse it later, when it could no longer change (REG-F-502). The prompts, PublishPwa's check: each type named here declares workDischarge MODEL, but the step of its unit could not render its prompt (REG-F-508). ${items.join(' ')} Give each an ACTIVE prompt that uses only the markers a work unit supplies. Nothing was submitted: the PWA stays DRAFT, where its types can be edited.`;
 
 test.describe('Phase 7 half B — the turn, accepted, published and run, through the operator’s own order (E3, C6)', () => {
 	test.beforeEach(async ({ request }) => {
@@ -298,12 +300,14 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 	});
 
 	// ⭐⭐ `JAN-EXEC` Phase 7, package L10 — design D65 (`REG-D-154` (2); the builder's choice (e), `l10-facts.md` §8) — A PROMPT LEFT DRAFT
-	// ON A MODEL TYPE IS REFUSED AT PUBLISH, AND THE LANE ENDS AT AUTHORING, IN THE REFUSAL'S WORDS, BEFORE ANY UNIT IS PRESSED. The order
+	// ON A MODEL TYPE IS REFUSED ~~AT PUBLISH~~, AND THE LANE ENDS AT AUTHORING, IN THE REFUSAL'S WORDS, BEFORE ANY UNIT IS PRESSED. The order
 	// above, the mock's plan arming nothing: its MODEL leaf's prompt stays DRAFT, the candidate checks record it and refuse nothing
-	// (`REG-D-110` (4)), Submit and Validate are answered, and Publish is refused, naming the type (`pwaPromptGate`); the lane writes its
-	// end (`designerEnd`), and no Undertaking is made. ⚠ The fifth run's own case, an edit after a review, is not rehearsed: the mock's
-	// plan cannot name a type it defines in the same turn (its id is minted as the plan runs), and the operator's order has no repair turn.
-	test('⭐ L10 (D65) — a MODEL leaf’s prompt left DRAFT: Publish refuses it, naming the type, and the lane ends authoring-stopped with the refusal’s words, before any unit', async ({
+	// (`REG-D-110` (4)), ~~Submit and Validate are answered, and Publish is refused, naming the type (`pwaPromptGate`)~~ ⭐⭐ RESTATED BY PACKAGE
+	// L11 — design D66 (`REG-D-155` (1), (3); `l11-facts.md` §3 (d)): Submit is refused, naming the type (`pwaSubmitGate`, its prompts the
+	// decision PublishPwa makes), the PWA left DRAFT, where its types can be edited; the lane writes its end (`designerEnd`, unchanged), and no
+	// Undertaking is made. ⚠ The fifth run's own case, an edit after a review, is not rehearsed: the mock's plan cannot name a type it defines in
+	// the same turn (its id is minted as the plan runs), and the operator's order has no repair turn (`REG-D-155` (3): none is added).
+	test('⭐ L10 (D65), restated by L11 (D66) — a MODEL leaf’s prompt left DRAFT: Submit refuses it, naming the type, and the lane ends authoring-stopped with the refusal’s words, the PWA left DRAFT, before any unit', async ({
 		page,
 		request
 	}) => {
@@ -358,22 +362,18 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 		).toBe('DRAFT');
 		expect('end' in authored ? authored.end : 'the order reached the units', 'the lane’s end').toEqual({
 			reason: 'authoring-stopped',
-			detail: `the PWA's publish was refused: ${publishRefusal(pwaId, [
+			detail: `the PWA's submitForReview was refused: ${submitRefusal(pwaId, [
 				`[1] "Specify wordfreq" (${specify!.id}): The template is DRAFT and only an ACTIVE template is a runnable asset. A DRAFT is authored text, not an instruction anyone approved.`
 			])}`
 		});
 		const a = record.authoring!;
-		expect(a.lifecycle.map((x) => [x.act, x.envelopeType])).toEqual([
-			['submitForReview', 'success'],
-			['validate', 'success'],
-			['publish', 'failure']
-		]);
-		// ⭐ The candidate checks recorded the DRAFT leaf and refused nothing (`REG-D-110` (4)); Publish refused it.
+		expect(a.lifecycle.map((x) => [x.act, x.envelopeType])).toEqual([['submitForReview', 'failure']]);
+		// ⭐ The candidate checks recorded the DRAFT leaf and refused nothing (`REG-D-110` (4)); ⭐⭐ L11: Submit refused it.
 		expect(a.checks?.refused).toBe(false);
 		expect(a.checks?.findings.map((f) => [f.check, f.typeName])).toContainEqual(['model-leaf', 'Specify wordfreq']);
 		expect(
 			[store.pwas.find((p) => p.id === pwaId)?.state.publicationStatus, store.undertakings.length, record.units],
-			'the refused PWA did not stay VALIDATED, or the order went on past it'
-		).toEqual(['VALIDATED', 0, []]);
+			'the refused PWA did not stay DRAFT, or the order went on past it'
+		).toEqual(['DRAFT', 0, []]);
 	});
 });

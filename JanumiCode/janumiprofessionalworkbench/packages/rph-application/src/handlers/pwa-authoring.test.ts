@@ -696,8 +696,11 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	const pub = () =>
 		(store.loadObject(AI_PWA)?.state as { publicationStatus: string }).publicationStatus;
 
-	// Author an AGENT-produced PWA and drive it to VALIDATED (the state PublishPwa transitions from).
-	function authorValidatedAiPwa() {
+	// Author an AGENT-produced PWA, DRAFT. ⭐⭐ RESTATED BY PACKAGE L11 — design D66 (`REG-D-155`; `l11-facts.md` §3 (e)): this drove the PWA to
+	// VALIDATED with no floor recorded, and each test recorded its floor after; SubmitPwaForReview now asks the floor PublishPwa asks, so each
+	// test records its floor while the PWA is DRAFT, as an agent turn records it, and Submit decides it first — a floor Publish refuses is
+	// refused at Submit (`refusedAtSubmitThenPublish`), one it admits passes Submit and Validate (`submitThenValidate`).
+	function authorAiPwa() {
 		d(
 			AGENT,
 			'CreatePwa',
@@ -725,8 +728,6 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			AI_ROOT,
 			'PWU_TYPE'
 		);
-		d(AGENT, 'SubmitPwaForReview', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
-		d(AGENT, 'ValidatePwa', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
 	}
 
 	// A ULID-format id (prefix_<26 digits>; digits are valid Crockford base32).
@@ -827,9 +828,66 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	const publish = () =>
 		d(AGENT, 'PublishPwa', { rootPwuTypeId: AI_ROOT }, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
 
-	it('blocks publishing an AI-produced PWA with no recorded floor', () => {
-		authorValidatedAiPwa();
+	/** ⭐⭐ L11 (D66) — Submit and Validate, each answered: PublishPwa is then asked of a floor Submit admitted. */
+	function submitThenValidate(): void {
+		const submitted = d(AGENT, 'SubmitPwaForReview', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		expect(submitted.status, `arrangement: submitted — ${submitted.error?.message ?? ''}`).toBe('ACCEPTED');
+		const validated = d(AGENT, 'ValidatePwa', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		expect(validated.status, `arrangement: validated — ${validated.error?.message ?? ''}`).toBe('ACCEPTED');
+	}
+
+	/** The dispositions a floor refusal names — Submit's and Publish's spell them alike (`pwaFloorFailure`, the one decision both call). */
+	const floorDetailOf = (message: string | undefined): string | undefined =>
+		/assurance floor is not SATISFIED (?:for PWA \S+ )?at v\d+ \(([^)]*)\)/.exec(message ?? '')?.[1];
+
+	/**
+	 * ⭐⭐ L11 (D66; `REG-D-155` (2)) — THE PWA VALIDATED, AS A STORE WRITTEN BEFORE PACKAGE L11 HOLDS IT. Until L11, SubmitPwaForReview had no
+	 * guard, so Submit and Validate took an agent's PWA whose floor Publish refuses to VALIDATED, and PublishPwa's own floor check is the second
+	 * guard for a store that holds one; since L11 no command takes it past DRAFT. Written as the two transitions left it — the status and its
+	 * `lifecycleStatus` mirror, the revision moved and the semantic version not — with no event, the repository's way of arranging a state no
+	 * command reaches (`sta6-superseded-intent.test.ts`).
+	 */
+	function asAStoreBeforeL11Holds(): void {
+		const stored = store.loadObject(AI_PWA);
+		expect(stored?.objectType, 'arrangement: the PWA').toBe('PROFESSIONAL_WORK_ARCHITECTURE');
+		const tag = `fixture-l11-${AI_PWA}-VALIDATED`;
+		const written = store.commit({
+			aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			aggregateId: AI_PWA,
+			objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			expectedRevision: stored!.revision,
+			newRevision: stored!.revision + 1,
+			newSemanticVersion: stored!.semanticVersion,
+			currentState: { ...(stored!.state as Record<string, unknown>), publicationStatus: 'VALIDATED', lifecycleStatus: 'VALIDATED' },
+			events: [],
+			receipt: { commandId: tag, idempotencyKey: tag, commandType: 'FixtureSeedPublicationStatus', targetAggregateId: AI_PWA, status: 'ACCEPTED', producedEventIds: [] }
+		});
+		expect(written.ok, 'arrangement: the status was not written').toBe(true);
+	}
+
+	/**
+	 * ⭐⭐ L11 (D66; `REG-D-155` (1), (2)) — SUBMIT, THEN PUBLISH'S OWN CHECK, ASKED OF ONE ARRANGEMENT. SubmitPwaForReview refuses the PWA for
+	 * its floor while it is DRAFT, and leaves it DRAFT with no event appended; the PWA is then VALIDATED as a store from before L11 holds it, and
+	 * PublishPwa is asked of the same floor, naming the dispositions Submit named. Publish's answer is returned, for the test's own assertions.
+	 */
+	function refusedAtSubmitThenPublish(): ReturnType<typeof publish> {
+		const before = store.readAllEvents().length;
+		const submitted = d(AGENT, 'SubmitPwaForReview', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		expect(submitted.status, 'Submit admitted a PWA whose floor PublishPwa refuses (D66)').toBe('REJECTED');
+		expect(submitted.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(submitted.error?.message).toContain("The floor, PublishPwa's check: the de minimis assurance floor is not SATISFIED at v");
+		expect([pub(), store.readAllEvents().length - before], 'a refused Submit moved the PWA').toEqual(['DRAFT', 0]);
+		asAStoreBeforeL11Holds();
 		const r = publish();
+		expect(floorDetailOf(r.error?.message), 'Submit and Publish named other dispositions').toBe(
+			floorDetailOf(submitted.error?.message)
+		);
+		return r;
+	}
+
+	it('blocks publishing an AI-produced PWA with no recorded floor', () => {
+		authorAiPwa();
+		const r = refusedAtSubmitThenPublish();
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 		expect(pub()).toBe('VALIDATED');
@@ -860,8 +918,9 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	});
 
 	it('permits publish once all three floor policies are recorded SATISFIED', () => {
-		authorValidatedAiPwa();
+		authorAiPwa();
 		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' });
+		submitThenValidate();
 		const r = publish();
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(pub()).toBe('PUBLISHED');
@@ -871,8 +930,9 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	// rewrite rootPwuTypeId (a field editPwa declares immutable) and bypass the single-root gate that runs only on
 	// ValidatePwa — so the precondition, not the floor guard, must refuse it. Weakening the set went unpunished.
 	it('REFUSES a re-published PWA once it is PUBLISHED (rootPwuTypeId is immutable after publish)', () => {
-		authorValidatedAiPwa();
+		authorAiPwa();
 		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' });
+		submitThenValidate();
 		expect(publish().status).toBe('ACCEPTED');
 		expect(pub()).toBe('PUBLISHED');
 		const published = store.readAllEvents().filter((e) => e.eventType === 'PwaPublished').length;
@@ -886,18 +946,18 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	});
 
 	it('keeps publish blocked when the Reasoning Review floor is REJECTED', () => {
-		authorValidatedAiPwa();
+		authorAiPwa();
 		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
-		const r = publish();
+		const r = refusedAtSubmitThenPublish();
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 		expect(pub()).toBe('VALIDATED');
 	});
 
 	it('a partial floor (missing Reasoning Review) blocks publish', () => {
-		authorValidatedAiPwa();
+		authorAiPwa();
 		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED' });
-		const r = publish();
+		const r = refusedAtSubmitThenPublish();
 		expect(r.status).toBe('REJECTED');
 		expect(pub()).toBe('VALIDATED');
 	});
@@ -928,7 +988,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	it.each(Object.values(FLOOR_POLICY_IDS))(
 		'blocks publish when %s is the ONLY required floor policy not recorded SATISFIED',
 		(omitted) => {
-			authorValidatedAiPwa();
+			authorAiPwa();
 			const others: Record<string, AssuranceDispositionRecommendation> = {};
 			for (const policyId of Object.values(FLOOR_POLICY_IDS))
 				if (policyId !== omitted) others[policyId] = 'SATISFIED';
@@ -938,7 +998,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			).toBeGreaterThan(0);
 			recordFloor(others);
 
-			const r = publish();
+			const r = refusedAtSubmitThenPublish();
 			expect(
 				r.status,
 				`${omitted} was the only required floor policy not recorded SATISFIED and PublishPwa was PERMITTED ` +
@@ -970,7 +1030,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	// `${omitted}=MISSING`, so the sweep cannot tell a working gate from one that blocks everything, and this
 	// control is the only thing that can.
 	it('CONTROL — the identical publish is ADMITTED once every required floor policy is SATISFIED', () => {
-		authorValidatedAiPwa();
+		authorAiPwa();
 		const all: Record<string, AssuranceDispositionRecommendation> = {};
 		for (const policyId of Object.values(FLOOR_POLICY_IDS)) all[policyId] = 'SATISFIED';
 		expect(
@@ -978,6 +1038,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			'the sweep above is not a set promise unless the canonical source declares more than one floor policy'
 		).toBeGreaterThan(1);
 		recordFloor(all);
+		submitThenValidate();
 
 		const r = publish();
 		expect(
@@ -993,13 +1054,14 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	// review, all SATISFIED at their current versions, in ONE round — a fold of the recorded assessments.
 	describe('⭐⭐ B3 — publication asks the complete part-review set of one round', () => {
 		const CHILD = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5R11';
-		/** An AGENT-produced PWA of a root and its one child, driven to VALIDATED. */
-		function authorValidatedTwoTypePwa() {
+		/**
+		 * An AGENT-produced PWA of a root and its one child, DRAFT. ⭐⭐ Restated by package L11 (D66), as `authorAiPwa` above: it was driven to
+		 * VALIDATED with no floor recorded; each test now records its round while the PWA is DRAFT, and Submit decides it first.
+		 */
+		function authorTwoTypePwa() {
 			d(AGENT, 'CreatePwa', { pwaId: AI_PWA, name: 'Agent-authored', description: 'd', domain: 'software', version: '1.0.0' }, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
 			d(AGENT, 'DefinePwuType', { pwuTypeId: CHILD, pwaId: AI_PWA, pwuKind: 'PRODUCT_IMPLEMENTATION', name: 'C', purpose: 'child', isRoot: false }, CHILD, 'PWU_TYPE');
 			d(AGENT, 'DefinePwuType', { pwuTypeId: AI_ROOT, pwaId: AI_PWA, pwuKind: 'PRODUCT_REALIZATION', name: 'R', purpose: 'root', isRoot: true, permittedChildTypeIds: [CHILD] }, AI_ROOT, 'PWU_TYPE');
-			d(AGENT, 'SubmitPwaForReview', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
-			expect(d(AGENT, 'ValidatePwa', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE').status, 'arrangement: validated').toBe('ACCEPTED');
 		}
 		const deterministic = (correlationId = 'gate') => {
 			recordAssessment(SCHEMA, 'SATISFIED', AI_PWA, pwaVersion(), correlationId);
@@ -1009,10 +1071,11 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			recordAssessment(REVIEW, disposition, typeId, typeVersion(typeId), correlationId);
 
 		it('⭐ CONTROL — every type reviewed SATISFIED, beside the deterministic policies, in one round: published', () => {
-			authorValidatedTwoTypePwa();
+			authorTwoTypePwa();
 			deterministic();
 			part(AI_ROOT);
 			part(CHILD);
+			submitThenValidate();
 			const r = publish();
 			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 			expect(pub()).toBe('PUBLISHED');
@@ -1020,32 +1083,32 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 
 		it('⛔ RED — a type no review was recorded for blocks publication, naming its part', () => {
 			// PREDICTED RED BEFORE B3: the gate asked for a review of the PWA itself; here no part's absence could be named.
-			authorValidatedTwoTypePwa();
+			authorTwoTypePwa();
 			deterministic();
 			part(AI_ROOT);
-			const r = publish();
+			const r = refusedAtSubmitThenPublish();
 			expect(r.status).toBe('REJECTED');
 			expect(r.error?.message).toContain(`(${REVIEW} of ${CHILD}=MISSING)`);
 			expect(pub()).toBe('VALIDATED');
 		});
 
 		it('⛔ a part that is REJECTED blocks publication beside SATISFIED ones — the strictest part stands', () => {
-			authorValidatedTwoTypePwa();
+			authorTwoTypePwa();
 			deterministic();
 			part(AI_ROOT);
 			part(CHILD, 'REJECTED');
-			const r = publish();
+			const r = refusedAtSubmitThenPublish();
 			expect(r.status).toBe('REJECTED');
 			expect(r.error?.message).toContain(`(${REVIEW} of ${CHILD}=REJECTED)`);
 		});
 
 		it('⛔ a part recorded in another round counts for nothing: a newer round of the deterministic policies does not borrow it', () => {
-			authorValidatedTwoTypePwa();
+			authorTwoTypePwa();
 			part(AI_ROOT, 'SATISFIED', 'round-1');
 			part(CHILD, 'SATISFIED', 'round-1');
 			deterministic('round-2');
 			part(AI_ROOT, 'SATISFIED', 'round-2');
-			const r = publish();
+			const r = refusedAtSubmitThenPublish();
 			expect(r.status).toBe('REJECTED');
 			expect(r.error?.message, 'the older round’s review of the child was borrowed').toContain(
 				`(${REVIEW} of ${CHILD}=MISSING)`
@@ -1053,30 +1116,30 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		});
 
 		it('⛔ and a newer part recorded outside the round of the deterministic policies blocks them, not they it', () => {
-			authorValidatedTwoTypePwa();
+			authorTwoTypePwa();
 			deterministic('round-1');
 			part(AI_ROOT, 'SATISFIED', 'round-1');
 			part(CHILD, 'SATISFIED', 'round-2');
-			const r = publish();
+			const r = refusedAtSubmitThenPublish();
 			expect(r.status).toBe('REJECTED');
 			expect(r.error?.message).toContain(`${SCHEMA}=MISSING, ${IDENTITY}=MISSING, ${REVIEW} of ${AI_ROOT}=MISSING)`);
 		});
 
 		it('⛔ a part bound to another version of its type is stale, and blocks', () => {
-			authorValidatedTwoTypePwa();
+			authorTwoTypePwa();
 			deterministic();
 			part(AI_ROOT);
 			recordAssessment(REVIEW, 'SATISFIED', CHILD, typeVersion(CHILD) + 1);
-			const r = publish();
+			const r = refusedAtSubmitThenPublish();
 			expect(r.status).toBe('REJECTED');
 			expect(r.error?.message).toContain(`(${REVIEW} of ${CHILD}=MISSING)`);
 		});
 
 		it('⛔ a review of the PWA as a whole graph counts for no part', () => {
-			authorValidatedTwoTypePwa();
+			authorTwoTypePwa();
 			deterministic();
 			recordAssessment(REVIEW, 'SATISFIED', AI_PWA, pwaVersion());
-			const r = publish();
+			const r = refusedAtSubmitThenPublish();
 			expect(r.status).toBe('REJECTED');
 			// The parts in the store's order of the types: the child was defined first.
 			expect(r.error?.message).toContain(`(${REVIEW} of ${CHILD}=MISSING, ${REVIEW} of ${AI_ROOT}=MISSING)`);
@@ -1098,7 +1161,8 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 
 		it('⛔ a PWA with no type has no review at all: its review is missing, never a vacuous pass', () => {
 			// ⚠ Not reachable through PublishPwa — validation requires a root — so the gate's own function is asked.
-			authorValidatedAiPwa();
+			// ⭐⭐ L11 (D66): the PWA is no longer submitted — the function reads no status, and Submit refuses this PWA, its floor unreviewed.
+			authorAiPwa();
 			deterministic();
 			const ctx = { store } as unknown as HandlerContext;
 			expect(pwaPartsFloorBlock(ctx, AI_PWA, { aiProduced: true, pwaVersion: pwaVersion(), parts: [] })).toEqual([
@@ -1117,7 +1181,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	});
 
 	it('a floor recorded against a STALE PWA version does not authorize publish (version-binding)', () => {
-		authorValidatedAiPwa();
+		authorAiPwa();
 		// All three policies SATISFIED, but recorded against the version BEFORE the one the PWA is actually at — a
 		// stale floor must not count. The staleness is derived from live state, not a literal: this previously read
 		// "recorded against v2 while the PWA is v1", which pinned BOTH sides to constants and (since a floor ahead of
@@ -1126,7 +1190,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			{ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' },
 			pwaVersion() - 1
 		);
-		const r = publish();
+		const r = refusedAtSubmitThenPublish();
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 		expect(pub()).toBe('VALIDATED');
@@ -1171,14 +1235,14 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	 * waiverStillDischarges, which were written and unit-proven long before anything could call them.
 	 */
 	it('an EFFECTIVE waiver naming the exact failed criterion discharges that policy and lets the PWA publish', () => {
-		authorValidatedAiPwa();
+		authorAiPwa();
 		const ids = recordFloor({
 			[SCHEMA]: 'SATISFIED',
 			[IDENTITY]: 'SATISFIED',
 			[REVIEW]: 'REJECTED'
 		});
 		const findingId = recordFinding(ids[REVIEW]!, 'RR-04-completeness-shortcut');
-		expect(publish().status).toBe('REJECTED');
+		expect(refusedAtSubmitThenPublish().status).toBe('REJECTED');
 
 		grantWaiver({
 			policyId: REVIEW,
@@ -1205,14 +1269,14 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	 * REJECTED independent Reasoning Review.
 	 */
 	it('a waiver naming a DIFFERENT criterion does NOT discharge the failed one (RPH-GOV-005: no bleeding)', () => {
-		authorValidatedAiPwa();
+		authorAiPwa();
 		const ids = recordFloor({
 			[SCHEMA]: 'SATISFIED',
 			[IDENTITY]: 'SATISFIED',
 			[REVIEW]: 'REJECTED'
 		});
 		const findingId = recordFinding(ids[REVIEW]!, 'RR-04-completeness-shortcut');
-		expect(publish().status).toBe('REJECTED');
+		expect(refusedAtSubmitThenPublish().status).toBe('REJECTED');
 
 		// Waives RR-01, but RR-04 is what actually failed.
 		grantWaiver({

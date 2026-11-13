@@ -157,8 +157,16 @@ test.describe('Assurance floor (mock) — staged binding and guarded admission',
 		await expect(page.getByTestId('assurance-disposition')).toContainText('SATISFIED');
 
 		// A SATISFIED floor lets PublishPwa through the gate.
+		// ⭐⭐ Package L11 — design D66 (`REG-D-155`): each hop's answer is read from the store before the next is pressed. SubmitPwaForReview now asks
+		// the floor PublishPwa asks, so a floor that blocks is refused at Submit and the next hop's button never appears: unread, that refusal was a
+		// press waiting out the test's timeout, which measures nothing (`MU-F202-the-floor-blocks-everything` came back INCONCLUSIVE under L11);
+		// read, it is a red at the hop that refused.
+		const statusIs = async (status: string) =>
+			expect.poll(async () => (await introspect(request)).pwas[0]!.state.publicationStatus).toBe(status);
 		await page.getByRole('button', { name: /Submit for Review/i }).click();
+		await statusIs('UNDER_REVIEW');
 		await page.getByRole('button', { name: /Validate/i }).click();
+		await statusIs('VALIDATED');
 		await page.getByRole('button', { name: /^Publish$/ }).click();
 		await expect
 			.poll(async () => (await introspect(request)).pwas[0]!.state.publicationStatus)

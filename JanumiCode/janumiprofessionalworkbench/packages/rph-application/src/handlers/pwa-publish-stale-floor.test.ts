@@ -192,8 +192,19 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 
 		// Step 3 — publish. The recorded floor binds `reviewedVersion` (§10.1 L1379). It is stale with respect to the
 		// graph now being published, so per §8.4 L854 it cannot permit this protected transition.
-		d(AGENT, 'SubmitPwaForReview', {}, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
-		d(AGENT, 'ValidatePwa', {}, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		// ⭐⭐ RESTATED BY PACKAGE L11 — design D66 (`REG-D-155`; `l11-facts.md` §3 (e)): SubmitPwaForReview now asks the floor PublishPwa asks,
+		// so it refuses this PWA first, while it is DRAFT and can still be edited — D66's own case, a floor a type's edit has left at another
+		// version. Then PublishPwa's own check, the second guard, is reached as a store written before L11 holds the PWA (Submit then had no
+		// guard): VALIDATED, as Submit and Validate left it.
+		const before = store.readAllEvents().length;
+		const submitted = d(AGENT, 'SubmitPwaForReview', {}, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		expect(submitted.status, 'Submit admitted a PWA whose floor PublishPwa refuses (D66)').toBe('REJECTED');
+		expect(submitted.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(submitted.error?.message).toContain(
+			`The floor, PublishPwa's check: the de minimis assurance floor is not SATISFIED at v${Number(pwaState().semanticVersion ?? 1)} (`
+		);
+		expect([pwaState().publicationStatus, store.readAllEvents().length - before], 'a refused Submit moved the PWA').toEqual(['DRAFT', 0]);
+		asAStoreBeforeL11Holds();
 		const r = d(
 			AGENT,
 			'PublishPwa',
@@ -208,7 +219,35 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 		// Diagnosis, asserted last so the control failure above is what surfaces first: the floor's binding is only
 		// meaningful if the edit moved the version off the one the review bound.
 		expect(Number(pwaState().semanticVersion ?? 1)).not.toBe(reviewedVersion);
+		// ⭐⭐ L11 — Submit and Publish named the same dispositions (`pwaFloorFailure`, the one decision both call).
+		const dispositions = (m: string | undefined) => /not SATISFIED (?:for PWA \S+ )?at v\d+ \(([^)]*)\)/.exec(m ?? '')?.[1];
+		expect(dispositions(submitted.error?.message), 'Submit and Publish named other dispositions').toBe(dispositions(r.error?.message));
 	});
+
+	/**
+	 * ⭐⭐ L11 (D66; `REG-D-155` (2)) — THE PWA VALIDATED, AS A STORE WRITTEN BEFORE PACKAGE L11 HOLDS IT. Until L11 SubmitPwaForReview had no
+	 * guard, so Submit and Validate took this PWA to VALIDATED, and PublishPwa's own floor check is the second guard for a store that holds it;
+	 * since L11 no command takes it past DRAFT. Written as the two transitions left it — the status and its `lifecycleStatus` mirror, the
+	 * revision moved and the semantic version not — with no event, the repository's way of arranging a state no command reaches
+	 * (`sta6-superseded-intent.test.ts`).
+	 */
+	function asAStoreBeforeL11Holds(): void {
+		const stored = store.loadObject(PWA);
+		expect(stored?.objectType, 'arrangement: the PWA').toBe('PROFESSIONAL_WORK_ARCHITECTURE');
+		const tag = `fixture-l11-${PWA}-VALIDATED`;
+		const written = store.commit({
+			aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			aggregateId: PWA,
+			objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			expectedRevision: stored!.revision,
+			newRevision: stored!.revision + 1,
+			newSemanticVersion: stored!.semanticVersion,
+			currentState: { ...(stored!.state as Record<string, unknown>), publicationStatus: 'VALIDATED', lifecycleStatus: 'VALIDATED' },
+			events: [],
+			receipt: { commandId: tag, idempotencyKey: tag, commandType: 'FixtureSeedPublicationStatus', targetAggregateId: PWA, status: 'ACCEPTED', producedEventIds: [] }
+		});
+		expect(written.ok, 'arrangement: the status was not written').toBe(true);
+	}
 
 	// The mechanism behind the test above, isolated: floor-gate.ts:95 compares `rec?.version === opts.subjectVersion`,
 	// which can only ever fire if an authoring command moves the PWA's semanticVersion. Nothing does.

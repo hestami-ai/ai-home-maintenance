@@ -15,6 +15,11 @@
 //
 // ⭑ THE REFUSAL'S WORDS ARE RESTATED HERE, NOT IMPORTED: they are read by a person and by the lane (`designerEnd`), so a change to
 // them must redden here rather than be followed.
+//
+// ⭐⭐ RESTATED BY PACKAGE L11 — design D66 (`REG-D-155`; `l11-facts.md` §3 (e)). SubmitPwaForReview now asks the prompts PublishPwa asks
+// (and the floor), so it refuses each arrangement below that Publish refuses, while the PWA is DRAFT: each such test asserts Submit's
+// refusal of the same arrangement, pinned whole, and THEN reaches PublishPwa's own check — the second guard (`REG-D-155` (2)) — as a store
+// written before L11 holds the PWA, VALIDATED (Submit then had no guard; `asAStoreBeforeL11Holds`), every assertion on Publish as before.
 import type { ActorReference, DomainCommand, PromptTemplate } from '@janumipwb/rph-contracts';
 import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -58,6 +63,16 @@ const FLOOR_REFUSAL_AT_HEAD = `PublishPwa blocked: the de minimis assurance floo
 /** ⭐ THE REFUSAL, in the builder's words (D65: the build writes them; `l10-facts.md` §8): each refused type `[n] "name" (id): reason`. */
 const refusal = (pwaId: string, items: readonly string[]) =>
 	`PublishPwa blocked: each type of PWA ${pwaId} named here declares workDischarge MODEL, but the step of its unit could not render its prompt, so that unit would be stopped once its step had started, when the PWA could no longer change (REG-F-508). ${items.join(' ')} Nothing was published: the PWA stays VALIDATED, where its types cannot be edited, so its repair is a new PWA in which each type declaring MODEL carries an ACTIVE prompt that uses only the markers a work unit supplies.`;
+
+/** ⭐⭐ L11 — SUBMIT'S REFUSAL, in the builder's words (D66; `l11-facts.md` §9), restated: one passage per check that fails, in order. */
+const submitRefusal = (pwaId: string, checks: readonly string[]) =>
+	`SubmitPwaForReview blocked: PWA ${pwaId} fails each check named here, for which ValidatePwa or PublishPwa would refuse it later, when it could no longer change (REG-F-502). ${checks.join(' ')} Nothing was submitted: the PWA stays DRAFT, where its types can be edited.`;
+const promptsCheck = (items: readonly string[]) =>
+	`The prompts, PublishPwa's check: each type named here declares workDischarge MODEL, but the step of its unit could not render its prompt (REG-F-508). ${items.join(' ')} Give each an ACTIVE prompt that uses only the markers a work unit supplies.`;
+const floorCheck = (version: number, detail: string) =>
+	`The floor, PublishPwa's check: the de minimis assurance floor is not SATISFIED at v${version} (${detail}). An agent turn in the PWA Designer records one while the PWA is DRAFT, once its candidate is accepted; run it after any edit of a type, since an edit raises the PWA's version and leaves a floor recorded before it at another version.`;
+/** The floor's dispositions with no floor recorded for a PWA of the one type ROOT — the detail both the floor's refusals name, at v2. */
+const NO_FLOOR = `floor.schema-invariant=MISSING, floor.identity-provenance=MISSING, floor.reasoning-review of ${ROOT}=MISSING`;
 
 const prompt = (templateText: string, status: PromptTemplate['status'] = 'ACTIVE'): PromptTemplate => ({
 	templateText,
@@ -147,10 +162,52 @@ const statusOf = (pwaId: string) =>
 	(store.loadObject(pwaId)?.state as { publicationStatus: string }).publicationStatus;
 const events = () => store.readAllEvents().length;
 
-/** A PWA a person authored, its one root type as given, published: the refusal, and what it left behind. */
-function publishedOne(root: TypeSpec) {
+/**
+ * ⭐⭐ L11 (D66; `REG-D-155` (1)) — SUBMIT REFUSES THE ARRANGEMENT FIRST, while the PWA is DRAFT: its refusal pinned whole (`expected`), the
+ * PWA left DRAFT and no event appended.
+ */
+function refusedAtSubmit(actor: ActorReference, pwaId: string, expected: string): void {
+	const before = events();
+	const r = d(actor, 'SubmitPwaForReview', {}, pwaId, 'PROFESSIONAL_WORK_ARCHITECTURE');
+	expect(r.status, 'Submit admitted a PWA a later check refuses (D66)').toBe('REJECTED');
+	expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+	expect(r.error?.message).toBe(expected);
+	expect([statusOf(pwaId), events() - before], 'a refused Submit moved the PWA').toEqual(['DRAFT', 0]);
+}
+
+/**
+ * ⭐⭐ L11 (D66; `REG-D-155` (2)) — THE PWA VALIDATED, AS A STORE WRITTEN BEFORE PACKAGE L11 HOLDS IT. Until L11, SubmitPwaForReview had no guard,
+ * so Submit and Validate took a PWA with such a prompt to VALIDATED, and PublishPwa's own check is the second guard for a store that holds one;
+ * since L11 no command takes it past DRAFT (`refusedAtSubmit`, asserted first). Written as the two transitions left it — the status and its
+ * `lifecycleStatus` mirror, the revision moved and the semantic version not — with no event, the repository's way of arranging a state no
+ * command reaches (`sta6-superseded-intent.test.ts`).
+ */
+function asAStoreBeforeL11Holds(pwaId: string, status: 'UNDER_REVIEW' | 'VALIDATED'): void {
+	const stored = store.loadObject(pwaId);
+	expect(stored?.objectType, 'arrangement: the PWA').toBe('PROFESSIONAL_WORK_ARCHITECTURE');
+	const tag = `fixture-l11-${pwaId}-${status}`;
+	const written = store.commit({
+		aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		aggregateId: pwaId,
+		objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		expectedRevision: stored!.revision,
+		newRevision: stored!.revision + 1,
+		newSemanticVersion: stored!.semanticVersion,
+		currentState: { ...(stored!.state as Record<string, unknown>), publicationStatus: status, lifecycleStatus: status },
+		events: [],
+		receipt: { commandId: tag, idempotencyKey: tag, commandType: 'FixtureSeedPublicationStatus', targetAggregateId: pwaId, status: 'ACCEPTED', producedEventIds: [] }
+	});
+	expect(written.ok, 'arrangement: the status was not written').toBe(true);
+}
+
+/**
+ * A PWA a person authored, its one root type as given, published: the refusal, and what it left behind. ⭐⭐ L11: Submit first refuses it,
+ * naming the prompts' `items`, and the PWA is then VALIDATED as a store from before L11 holds it.
+ */
+function publishedOne(root: TypeSpec, items: readonly string[]) {
 	draftPwa(HUMAN, PWA, [root]);
-	validated(HUMAN, PWA);
+	refusedAtSubmit(HUMAN, PWA, submitRefusal(PWA, [promptsCheck(items)]));
+	asAStoreBeforeL11Holds(PWA, 'VALIDATED');
 	const before = events();
 	const r = publish(HUMAN, PWA, root.id);
 	return { r, left: [statusOf(PWA), events() - before] as const };
@@ -158,47 +215,60 @@ function publishedOne(root: TypeSpec) {
 
 describe('⭐⭐ L10 (D65; REG-D-154 (2)) — PublishPwa refuses a type declaring MODEL whose prompt the step of its unit would refuse', () => {
 	it('⭐ its prompt is DRAFT — refused, the type named with the render’s words; nothing published', () => {
-		const { r, left } = publishedOne({
-			id: ROOT,
-			name: 'wordfreq Verification Report',
-			workDischarge: 'MODEL',
-			promptTemplate: prompt('Write the verification report of {subject}: {purpose}', 'DRAFT')
-		});
+		const item = `[1] "wordfreq Verification Report" (${ROOT}): ${DRAFT_WORDS}`;
+		const { r, left } = publishedOne(
+			{
+				id: ROOT,
+				name: 'wordfreq Verification Report',
+				workDischarge: 'MODEL',
+				promptTemplate: prompt('Write the verification report of {subject}: {purpose}', 'DRAFT')
+			},
+			[item]
+		);
 		expect(r.status, 'the PWA was published').toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
-		expect(r.error?.message).toBe(refusal(PWA, [`[1] "wordfreq Verification Report" (${ROOT}): ${DRAFT_WORDS}`]));
+		expect(r.error?.message).toBe(refusal(PWA, [item]));
 		expect(left, 'the PWA did not stay as it was').toEqual(['VALIDATED', 0]);
 	});
 
 	it('⭐ it carries no prompt template — refused with the step’s no-template words', () => {
-		const { r, left } = publishedOne({ id: ROOT, name: 'wordfreq Design', workDischarge: 'MODEL' });
+		const item = `[1] "wordfreq Design" (${ROOT}): ${noTemplateWords(ROOT)}`;
+		const { r, left } = publishedOne({ id: ROOT, name: 'wordfreq Design', workDischarge: 'MODEL' }, [item]);
 		expect(r.status, 'the PWA was published').toBe('REJECTED');
-		expect(r.error?.message).toBe(refusal(PWA, [`[1] "wordfreq Design" (${ROOT}): ${noTemplateWords(ROOT)}`]));
+		expect(r.error?.message).toBe(refusal(PWA, [item]));
 		expect(left, 'the PWA did not stay as it was').toEqual(['VALIDATED', 0]);
 	});
 
 	it('⭐ its prompt uses {criteria}, which no work unit supplies — refused with the render’s words (REG-F-507)', () => {
-		const { r, left } = publishedOne({
-			id: ROOT,
-			name: 'wordfreq Review',
-			workDischarge: 'MODEL',
-			promptTemplate: prompt('Assess {subject} against {criteria}, and report findings.')
-		});
+		const item = `[1] "wordfreq Review" (${ROOT}): ${unsuppliedWords('criteria')}`;
+		const { r, left } = publishedOne(
+			{
+				id: ROOT,
+				name: 'wordfreq Review',
+				workDischarge: 'MODEL',
+				promptTemplate: prompt('Assess {subject} against {criteria}, and report findings.')
+			},
+			[item]
+		);
 		expect(r.status, 'the PWA was published').toBe('REJECTED');
-		expect(r.error?.message).toBe(refusal(PWA, [`[1] "wordfreq Review" (${ROOT}): ${unsuppliedWords('criteria')}`]));
+		expect(r.error?.message).toBe(refusal(PWA, [item]));
 		expect(left, 'the PWA did not stay as it was').toEqual(['VALIDATED', 0]);
 	});
 
 	it('⭐ its prompt uses {purpose} while its purpose is empty — refused: a unit is given {purpose} only when it is not', () => {
-		const { r, left } = publishedOne({
-			id: ROOT,
-			name: 'wordfreq Report',
-			purpose: '',
-			workDischarge: 'MODEL',
-			promptTemplate: prompt('Report on {subject}: {purpose}')
-		});
+		const item = `[1] "wordfreq Report" (${ROOT}): ${unsuppliedWords('purpose')}`;
+		const { r, left } = publishedOne(
+			{
+				id: ROOT,
+				name: 'wordfreq Report',
+				purpose: '',
+				workDischarge: 'MODEL',
+				promptTemplate: prompt('Report on {subject}: {purpose}')
+			},
+			[item]
+		);
 		expect(r.status, 'the PWA was published').toBe('REJECTED');
-		expect(r.error?.message).toBe(refusal(PWA, [`[1] "wordfreq Report" (${ROOT}): ${unsuppliedWords('purpose')}`]));
+		expect(r.error?.message).toBe(refusal(PWA, [item]));
 		expect(left, 'the PWA did not stay as it was').toEqual(['VALIDATED', 0]);
 	});
 
@@ -208,7 +278,17 @@ describe('⭐⭐ L10 (D65; REG-D-154 (2)) — PublishPwa refuses a type declarin
 			{ id: REPORT, name: 'wordfreq Verification Report', workDischarge: 'MODEL', promptTemplate: prompt('Report on {subject}.', 'DRAFT') },
 			{ id: DESIGN, name: 'wordfreq Design', workDischarge: 'MODEL' }
 		]);
-		validated(HUMAN, PWA);
+		refusedAtSubmit(
+			HUMAN,
+			PWA,
+			submitRefusal(PWA, [
+				promptsCheck([
+					`[1] "wordfreq Verification Report" (${REPORT}): ${DRAFT_WORDS}`,
+					`[2] "wordfreq Design" (${DESIGN}): ${noTemplateWords(DESIGN)}`
+				])
+			])
+		);
+		asAStoreBeforeL11Holds(PWA, 'VALIDATED');
 		const before = events();
 		const r = publish(HUMAN, PWA, ROOT);
 		expect(r.status, 'the PWA was published').toBe('REJECTED');
@@ -225,7 +305,16 @@ describe('⭐⭐ L10 (D65; REG-D-154 (2)) — PublishPwa refuses a type declarin
 		draftPwa(AGENT, PWA, [
 			{ id: ROOT, name: 'wordfreq Verification Report', workDischarge: 'MODEL', promptTemplate: prompt('Report on {subject}.', 'DRAFT') }
 		]);
-		validated(AGENT, PWA);
+		// ⭐⭐ L11 (D66) — Submit names both, the prompts before the floor (the lead's order); Publish, its own check, the prompts alone.
+		refusedAtSubmit(
+			AGENT,
+			PWA,
+			submitRefusal(PWA, [
+				promptsCheck([`[1] "wordfreq Verification Report" (${ROOT}): ${DRAFT_WORDS}`]),
+				floorCheck(2, NO_FLOOR)
+			])
+		);
+		asAStoreBeforeL11Holds(PWA, 'VALIDATED');
 		const r = publish(AGENT, PWA, ROOT);
 		expect(r.status, 'the PWA was published').toBe('REJECTED');
 		expect(r.error?.message).toBe(refusal(PWA, [`[1] "wordfreq Verification Report" (${ROOT}): ${DRAFT_WORDS}`]));
@@ -260,7 +349,9 @@ describe('⭐⭐ L10 (D65; REG-D-154 (2)) — PublishPwa refuses a type declarin
 		draftPwa(AGENT, PWA, [
 			{ id: ROOT, name: 'wordfreq Realization', workDischarge: 'MODEL', promptTemplate: prompt('Realize {subject}.') }
 		]);
-		validated(AGENT, PWA);
+		// ⭐⭐ L11 (D66) — Submit names the floor, with the dispositions Publish's floor refusal names.
+		refusedAtSubmit(AGENT, PWA, submitRefusal(PWA, [floorCheck(2, NO_FLOOR)]));
+		asAStoreBeforeL11Holds(PWA, 'VALIDATED');
 		const r = publish(AGENT, PWA, ROOT);
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');

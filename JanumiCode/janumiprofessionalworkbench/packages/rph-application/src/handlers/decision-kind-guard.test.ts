@@ -186,7 +186,10 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 
 	// ---- the floor fixture (pwa-authoring.test.ts's shape) — for proving the DISCHARGE half ----
 
-	function authorValidatedAiPwa() {
+	// ⭐⭐ RESTATED BY PACKAGE L11 — design D66 (`REG-D-155`; `l11-facts.md` §3 (e)): this drove the PWA to VALIDATED with no floor recorded;
+	// SubmitPwaForReview now asks the floor PublishPwa asks, so the floor is recorded while the PWA is DRAFT and Submit decides it first
+	// (`refusedAtSubmitThenPublish`).
+	function authorAiPwa() {
 		d(
 			AGENT,
 			'CreatePwa',
@@ -214,8 +217,6 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 			AI_ROOT,
 			'PWU_TYPE'
 		);
-		d(AGENT, 'SubmitPwaForReview', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
-		d(AGENT, 'ValidatePwa', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
 	}
 
 	const pwaVersion = () =>
@@ -288,19 +289,53 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 	const publish = () =>
 		d(AGENT, 'PublishPwa', { rootPwuTypeId: AI_ROOT }, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
 
+	/**
+	 * ⭐⭐ L11 (D66; `REG-D-155` (1), (2)) — SUBMIT, THEN PUBLISH'S OWN CHECK, ASKED OF ONE ARRANGEMENT. SubmitPwaForReview refuses the PWA for its
+	 * floor while it is DRAFT, and leaves it DRAFT with no event appended; the PWA is then VALIDATED as a store written before L11 holds it
+	 * (Submit then had no guard) — the status and its `lifecycleStatus` mirror written as Submit and Validate left them, the revision moved and the
+	 * semantic version not, no event, the repository's way of arranging a state no command reaches (`sta6-superseded-intent.test.ts`) — and
+	 * PublishPwa, its own floor check the second guard, is asked of the same floor, naming the dispositions Submit named.
+	 */
+	function refusedAtSubmitThenPublish(): ReturnType<typeof publish> {
+		const before = store.readAllEvents().length;
+		const submitted = d(AGENT, 'SubmitPwaForReview', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		expect(submitted.status, 'Submit admitted a PWA whose floor PublishPwa refuses (D66)').toBe('REJECTED');
+		expect(submitted.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(submitted.error?.message).toContain("The floor, PublishPwa's check: the de minimis assurance floor is not SATISFIED at v");
+		const stored = store.loadObject(AI_PWA)!;
+		expect([(stored.state as { publicationStatus: string }).publicationStatus, store.readAllEvents().length - before], 'a refused Submit moved the PWA').toEqual(['DRAFT', 0]);
+		const tag = `fixture-l11-${AI_PWA}-VALIDATED`;
+		const written = store.commit({
+			aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			aggregateId: AI_PWA,
+			objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			expectedRevision: stored.revision,
+			newRevision: stored.revision + 1,
+			newSemanticVersion: stored.semanticVersion,
+			currentState: { ...(stored.state as Record<string, unknown>), publicationStatus: 'VALIDATED', lifecycleStatus: 'VALIDATED' },
+			events: [],
+			receipt: { commandId: tag, idempotencyKey: tag, commandType: 'FixtureSeedPublicationStatus', targetAggregateId: AI_PWA, status: 'ACCEPTED', producedEventIds: [] }
+		});
+		expect(written.ok, 'arrangement: the status was not written').toBe(true);
+		const r = publish();
+		const dispositions = (m: string | undefined) => /not SATISFIED (?:for PWA \S+ )?at v\d+ \(([^)]*)\)/.exec(m ?? '')?.[1];
+		expect(dispositions(r.error?.message), 'Submit and Publish named other dispositions').toBe(dispositions(submitted.error?.message));
+		return r;
+	}
+
 	// THE SECURITY CASE. The floor gate honours any EFFECTIVE WAIVER-typed Decision covering the failed criterion,
 	// however it became effective — so ApproveDecision aimed at a waiver request was a floor discharge that recorded
 	// no waiver fact. The refusal must hold the decision at PROPOSED and keep publish blocked; the SAME waiver then
 	// granted through GrantWaiver must still discharge — proving the guard removed the exploit, not the capability.
 	it('ApproveDecision on a PROPOSED WAIVER is REFUSED — and the floor stays blocked until GrantWaiver records the fact', () => {
-		authorValidatedAiPwa();
+		authorAiPwa();
 		const ids = recordFloor({
 			[SCHEMA]: 'SATISFIED',
 			[IDENTITY]: 'SATISFIED',
 			[REVIEW]: 'REJECTED'
 		});
 		const findingId = recordFinding(ids[REVIEW]!, 'RR-04-completeness-shortcut');
-		expect(publish().status).toBe('REJECTED');
+		expect(refusedAtSubmitThenPublish().status).toBe('REJECTED');
 
 		requestWaiver({
 			policyId: REVIEW,

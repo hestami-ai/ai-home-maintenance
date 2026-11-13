@@ -940,7 +940,8 @@ export const removePwuType: CommandHandler = (ctx, command) => {
 
 /** SubmitPwaForReview — DRAFT -> UNDER_REVIEW. `precondition: fromStates('DRAFT')` (JAN-CMDPRE DWP-05) — the sole
  *  in-arrow to UNDER_REVIEW (PWA.publicationStatus). NONE site: an already-UNDER_REVIEW re-issue was a NOOP appending
- *  a second PwaSubmittedForReview. */
+ *  a second PwaSubmittedForReview. ⭐⭐ Gated, after its precondition, by the checks ValidatePwa and PublishPwa make later
+ *  (package L11, `pwaSubmitGate`), so each refusal comes while the PWA is DRAFT and its types can be edited. */
 export const submitPwaForReview: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: PWA,
@@ -948,7 +949,8 @@ export const submitPwaForReview: CommandHandler = (ctx, command) =>
 		machine: PWA_MACHINE,
 		target: 'UNDER_REVIEW',
 		eventType: 'PwaSubmittedForReview',
-		precondition: fromStates('DRAFT')
+		precondition: fromStates('DRAFT'),
+		guard: (state, gctx) => pwaSubmitGate(command, state, gctx)
 	});
 
 // ── ValidatePwa gate: recursive-composition validation (guide §11.6 L1639) ───────────────────────────────────────
@@ -996,6 +998,22 @@ function pwaGraphExport(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L11 — design D66 (`REG-D-155` (1); `REG-F-502`, remedy 1) — THE STRUCTURE'S DECISION, ValidatePwa's and
+ * SubmitPwaForReview's, spelled once so the two cannot disagree: the invariants of the PWA's composition that fail (`analyzePwaGraph`
+ * over `pwaGraphExport`), each `name: detail`, or null where the composition holds.
+ */
+function pwaCompositionFailures(
+	ctx: HandlerContext,
+	pwaId: string,
+	state: Record<string, unknown>
+): string | null {
+	const report = analyzePwaGraph(pwaGraphExport(ctx, pwaId, state));
+	if (report.valid) return null;
+	const failed = report.invariants.filter((i) => !i.ok);
+	return failed.map((i) => `${i.name}: ${i.detail}`).join('; ');
+}
+
+/**
  * ValidatePwa gate: the PWA's recursive composition must actually hold (guide §11.6 L1639 — "A Draft cannot become
  * `VALIDATED` or `PUBLISHED` unless recursive-composition and assurance-assignment validation proves: explicit
  * leaf/non-leaf treatment; coherent decomposition/recomposition; no missing/disallowed/cyclic child rules; …").
@@ -1021,10 +1039,8 @@ function pwaCompositionGate(
 	ctx: HandlerContext
 ): CommandResult | null {
 	const pwaId = command.targetAggregateId;
-	const report = analyzePwaGraph(pwaGraphExport(ctx, pwaId, state));
-	if (report.valid) return null;
-	const failed = report.invariants.filter((i) => !i.ok);
-	const detail = failed.map((i) => `${i.name}: ${i.detail}`).join('; ');
+	const detail = pwaCompositionFailures(ctx, pwaId, state);
+	if (detail === null) return null;
 	return reject(
 		command,
 		'RPH_INVARIANT_VIOLATION',
@@ -1069,9 +1085,34 @@ function pwaFloorGate(
 	state: Record<string, unknown>,
 	ctx: HandlerContext
 ): CommandResult | null {
+	const pwaId = command.targetAggregateId;
+	const failure = pwaFloorFailure(ctx, pwaId, state);
+	if (!failure) return null;
+	const { version, detail } = failure;
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		// ⚠ THE MESSAGE NAMES ONE ROUTE BECAUSE THERE IS ONE. It used to end "…for the current version, or a
+		// governance waiver, before publishing." — naming a second route that ASR-3 abolished, in the sentence a
+		// blocked user reads to learn what to do next. Recording the waiver and retrying returns this identical
+		// refusal, so the old text sent them in a circle.
+		`PublishPwa blocked: the de minimis assurance floor is not SATISFIED for PWA ${pwaId} at v${version} (${detail}). Record a satisfied floor (schema/invariant, identity/provenance, independent reasoning review) for the current version before publishing. The floor is unconditional: no governance waiver discharges it.`,
+		[pwaId]
+	);
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L11 — design D66 (`REG-D-155` (1); `REG-F-502`, remedy 1) — THE FLOOR'S DECISION, PublishPwa's and
+ * SubmitPwaForReview's, spelled once so the two cannot disagree: the PWA's version and each floor policy's disposition that blocks, part by
+ * part (`pwaPartsFloorBlock`, asked with the same `aiProduced`, `pwaVersion` and `parts` at both), or null where the floor permits.
+ */
+function pwaFloorFailure(
+	ctx: HandlerContext,
+	pwaId: string,
+	state: Record<string, unknown>
+): { readonly version: number; readonly detail: string } | null {
 	const createdBy = state.createdBy as { actorType?: string } | undefined;
 	const aiProduced = createdBy ? AI_ACTOR_TYPES.has(String(createdBy.actorType)) : false;
-	const pwaId = command.targetAggregateId;
 	const version = Number(state.semanticVersion ?? 1);
 	// ⭐ The review in parts, B3 (`REG-D-125`; design D6) — ITS REASONING REVIEW IS EACH LIVE TYPE'S, at the version the store
 	// holds now: the two deterministic assessments of the PWA and the complete part-review set of one round
@@ -1089,16 +1130,24 @@ function pwaFloorGate(
 				`${b.policyId}${b.subjectId === undefined ? '' : ` of ${b.subjectId}`}=${b.disposition}`
 		)
 		.join(', ');
-	return reject(
-		command,
-		'RPH_INVARIANT_VIOLATION',
-		// ⚠ THE MESSAGE NAMES ONE ROUTE BECAUSE THERE IS ONE. It used to end "…for the current version, or a
-		// governance waiver, before publishing." — naming a second route that ASR-3 abolished, in the sentence a
-		// blocked user reads to learn what to do next. Recording the waiver and retrying returns this identical
-		// refusal, so the old text sent them in a circle.
-		`PublishPwa blocked: the de minimis assurance floor is not SATISFIED for PWA ${pwaId} at v${version} (${detail}). Record a satisfied floor (schema/invariant, identity/provenance, independent reasoning review) for the current version before publishing. The floor is unconditional: no governance waiver discharges it.`,
-		[pwaId]
-	);
+	return { version, detail };
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L11 — design D66 (`REG-D-155` (1)) — THE PROMPTS' DECISION, PublishPwa's (package L10, D65) and
+ * SubmitPwaForReview's, spelled once so the two cannot disagree: each live type declaring MODEL whose unit's step could not render its
+ * prompt (`unitPromptRefusal`), numbered `[n] "name" (id): reason`, in the order the store holds them; an empty list where every one renders.
+ */
+function pwaPromptRefusals(ctx: HandlerContext, pwaId: string): string[] {
+	// A node is a type the store holds (`pwuTypeNodesOf` read it there).
+	const find = (id: string) => ctx.store.loadObject(id)!.state as Record<string, unknown>;
+	const refused: string[] = [];
+	for (const node of pwuTypeNodesOf(ctx, pwaId)) {
+		if (find(node.id).workDischarge !== 'MODEL') continue;
+		const reason = unitPromptRefusal(node.id, node.name, resolvePwuTypeFacts(find, node.id));
+		if (reason !== undefined) refused.push(`[${refused.length + 1}] "${node.name}" (${node.id}): ${reason}`);
+	}
+	return refused;
 }
 
 /**
@@ -1116,14 +1165,7 @@ function pwaFloorGate(
  */
 function pwaPromptGate(command: DomainCommand, ctx: HandlerContext): CommandResult | null {
 	const pwaId = command.targetAggregateId;
-	// A node is a type the store holds (`pwuTypeNodesOf` read it there).
-	const find = (id: string) => ctx.store.loadObject(id)!.state as Record<string, unknown>;
-	const refused: string[] = [];
-	for (const node of pwuTypeNodesOf(ctx, pwaId)) {
-		if (find(node.id).workDischarge !== 'MODEL') continue;
-		const reason = unitPromptRefusal(node.id, node.name, resolvePwuTypeFacts(find, node.id));
-		if (reason !== undefined) refused.push(`[${refused.length + 1}] "${node.name}" (${node.id}): ${reason}`);
-	}
+	const refused = pwaPromptRefusals(ctx, pwaId);
 	if (refused.length === 0) return null;
 	return reject(
 		command,
@@ -1131,6 +1173,54 @@ function pwaPromptGate(command: DomainCommand, ctx: HandlerContext): CommandResu
 		// ⭐ The builder's words (D65), read by a person and by the lane (`designerEnd`), never by a model: each refused type numbered
 		// `[n] "name" (id): reason`, its reason the render's own words or the step's no-template words.
 		`PublishPwa blocked: each type of PWA ${pwaId} named here declares workDischarge MODEL, but the step of its unit could not render its prompt, so that unit would be stopped once its step had started, when the PWA could no longer change (REG-F-508). ${refused.join(' ')} Nothing was published: the PWA stays VALIDATED, where its types cannot be edited, so its repair is a new PWA in which each type declaring MODEL carries an ACTIVE prompt that uses only the markers a work unit supplies.`,
+		[pwaId]
+	);
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L11 — design D66 (`REG-D-155`; `REG-F-502`, remedy 1; `REG-F-508`; `REG-F-627`) — SUBMIT REFUSES A PWA
+ * THAT VALIDATE OR PUBLISH WOULD REFUSE FOR ITS STRUCTURE, ITS PROMPTS OR ITS FLOOR, naming every check that fails, while it is DRAFT.
+ *
+ * ⛔ WHAT IT CLOSES (`REG-F-502`). The publication machine has no arrow back to DRAFT, and a PWA's types are edited only while it is DRAFT,
+ * yet its structure was first refused at ValidatePwa and its prompts and floor at PublishPwa, each after it had left DRAFT: a PWA refused
+ * there could never be repaired, only authored again.
+ * ⭑ EACH CHECK IS THE LATER ONE'S DECISION, CALLED, NOT SPELLED AGAIN (the lead's decision): the structure as ValidatePwa decides it
+ * (`pwaCompositionFailures`), the prompts and the floor as PublishPwa decides them (`pwaPromptRefusals`, `pwaFloorFailure`), so Submit and
+ * the later check cannot disagree; the later checks keep their own refusals, as a second guard (`REG-D-155` (2)).
+ * ⭑ ONE REFUSAL NAMES EVERY CHECK THAT FAILS, the structure and the prompts first and the floor last: repairing either is a type's edit, and
+ * an edit raises the PWA's version, leaving a floor recorded before it at another version (the lead's decision).
+ * ⭑ Asked after the precondition (`fromStates('DRAFT')`), as Validate's and Publish's guards are. Read by a person (the PWA's page) and by
+ * the lane (`designerEnd`); no agent tool issues SubmitPwaForReview, so no model reads it.
+ */
+function pwaSubmitGate(
+	command: DomainCommand,
+	state: Record<string, unknown>,
+	ctx: HandlerContext
+): CommandResult | null {
+	const pwaId = command.targetAggregateId;
+	const failing: string[] = [];
+	const structure = pwaCompositionFailures(ctx, pwaId, state);
+	if (structure !== null)
+		failing.push(
+			`The structure, ValidatePwa's check: the PWU-Type composition is not a valid recursive decomposition (${structure}). Fix the child rules so the graph has exactly one root, no composition cycle, and every type reachable from that root (§11.6).`
+		);
+	const prompts = pwaPromptRefusals(ctx, pwaId);
+	if (prompts.length > 0)
+		failing.push(
+			`The prompts, PublishPwa's check: each type named here declares workDischarge MODEL, but the step of its unit could not render its prompt (REG-F-508). ${prompts.join(' ')} Give each an ACTIVE prompt that uses only the markers a work unit supplies.`
+		);
+	const floor = pwaFloorFailure(ctx, pwaId, state);
+	if (floor !== null)
+		failing.push(
+			`The floor, PublishPwa's check: the de minimis assurance floor is not SATISFIED at v${floor.version} (${floor.detail}). An agent turn in the PWA Designer records one while the PWA is DRAFT, once its candidate is accepted; run it after any edit of a type, since an edit raises the PWA's version and leaves a floor recorded before it at another version.`
+		);
+	if (failing.length === 0) return null;
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		// ⭐ The builder's words (D66), read by a person and by the lane, never by a model: one passage per check that fails, in the order the
+		// structure, the prompts, the floor, each with its own check's detail; for the floor, the remedy that exists while the PWA is DRAFT.
+		`SubmitPwaForReview blocked: PWA ${pwaId} fails each check named here, for which ValidatePwa or PublishPwa would refuse it later, when it could no longer change (REG-F-502). ${failing.join(' ')} Nothing was submitted: the PWA stays DRAFT, where its types can be edited.`,
 		[pwaId]
 	);
 }

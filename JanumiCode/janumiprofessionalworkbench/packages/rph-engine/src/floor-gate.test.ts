@@ -17,6 +17,7 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
@@ -120,12 +121,16 @@ const asActor = (eng: EngineHandle, actor: ActorReference) =>
 	eng.as(DIR.credentialFor(actor.actorId));
 
 let seq = 0;
+/** The engine's store, the test's own — ⭐⭐ package L11: so a test can write the PWA's status as a store from before L11 holds it. */
+let store: SqliteStorageAdapter;
 function build(): EngineHandle {
 	let s = 0;
 	seq = 0;
+	store = new SqliteStorageAdapter({ now: () => TS });
 	return createEngine({
 		authenticate: DIR.authenticate,
 		ontology,
+		store,
 		now: () => TS,
 		newEventId: () => `e${++s}`
 	});
@@ -158,7 +163,12 @@ function send(
 	return asActor(eng, actor).dispatch(command);
 }
 
-function authorValidated(eng: EngineHandle) {
+/**
+ * An AGENT-authored PWA, DRAFT. ⭐⭐ RESTATED BY PACKAGE L11 — design D66 (`REG-D-155`; `l11-facts.md` §3 (e)): this drove the PWA to VALIDATED
+ * with no floor recorded; SubmitPwaForReview now asks the floor PublishPwa asks, so Submit decides the floor first, while the PWA is DRAFT
+ * (`refusedAtSubmitThenValidatedAsBefore`, `submitThenValidate`).
+ */
+function author(eng: EngineHandle) {
 	send(eng, AGENT, 'CreatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {
 		pwaId: PWA,
 		name: 'Agent PWA',
@@ -174,8 +184,44 @@ function authorValidated(eng: EngineHandle) {
 		purpose: 'root',
 		isRoot: true
 	});
-	send(eng, AGENT, 'SubmitPwaForReview', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {});
-	send(eng, AGENT, 'ValidatePwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {});
+}
+
+/** ⭐⭐ L11 (D66) — Submit and Validate, each answered: PublishPwa is then asked of a floor Submit admitted. */
+function submitThenValidate(eng: EngineHandle) {
+	for (const step of ['SubmitPwaForReview', 'ValidatePwa']) {
+		const r = send(eng, AGENT, step, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {});
+		expect(r.status, `arrangement: ${step} — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+	}
+}
+
+/**
+ * ⭐⭐ L11 (D66; `REG-D-155` (1), (2)) — SUBMIT REFUSES THE PWA FOR ITS FLOOR, while it is DRAFT, naming the dispositions it names (`expected`),
+ * and leaves it DRAFT; then the PWA is VALIDATED as a store written before L11 holds it (Submit then had no guard) — the status and its
+ * `lifecycleStatus` mirror written as Submit and Validate left them, the revision moved and the semantic version not, no event, the
+ * repository's way of arranging a state no command reaches (`sta6-superseded-intent.test.ts`) — so PublishPwa's own floor check, the second
+ * guard, is asked of the same floor.
+ */
+function refusedAtSubmitThenValidatedAsBefore(eng: EngineHandle, expected: string) {
+	const before = eng.readAllEvents().length;
+	const r = send(eng, AGENT, 'SubmitPwaForReview', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', {});
+	expect(r.status, 'Submit admitted a PWA whose floor PublishPwa refuses (D66)').toBe('REJECTED');
+	expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+	expect(r.error?.message).toContain(expected);
+	const stored = store.loadObject(PWA)!;
+	expect([(stored.state as { publicationStatus: string }).publicationStatus, eng.readAllEvents().length - before], 'a refused Submit moved the PWA').toEqual(['DRAFT', 0]);
+	const tag = `fixture-l11-${PWA}-VALIDATED`;
+	const written = store.commit({
+		aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		aggregateId: PWA,
+		objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		expectedRevision: stored.revision,
+		newRevision: stored.revision + 1,
+		newSemanticVersion: stored.semanticVersion,
+		currentState: { ...(stored.state as Record<string, unknown>), publicationStatus: 'VALIDATED', lifecycleStatus: 'VALIDATED' },
+		events: [],
+		receipt: { commandId: tag, idempotencyKey: tag, commandType: 'FixtureSeedPublicationStatus', targetAggregateId: PWA, status: 'ACCEPTED', producedEventIds: [] }
+	});
+	expect(written.ok, 'arrangement: the status was not written').toBe(true);
 }
 
 const publish = (eng: EngineHandle) =>
@@ -250,9 +296,14 @@ describe('floor gate + recorder compose (3b + 3c)', () => {
 		const eng = build();
 		// the recorder cites floor.* policies — they must exist for RequestAssuranceAssessment
 		seedFloorPolicies(asActor(eng, SVC));
-		authorValidated(eng);
+		author(eng);
 
-		// Gate blocks: no floor recorded yet.
+		// Gate blocks: no floor recorded yet. ⭐⭐ L11 (D66): SubmitPwaForReview, which asks this floor first, refuses the PWA while it is
+		// DRAFT; PublishPwa's own check, the second guard, is then asked of it as a store from before L11 holds the PWA.
+		refusedAtSubmitThenValidatedAsBefore(
+			eng,
+			`(floor.schema-invariant=MISSING, floor.identity-provenance=MISSING, floor.reasoning-review of ${ROOT}=MISSING)`
+		);
 		expect(publish(eng).status).toBe('REJECTED');
 		expect((eng.loadObject(PWA)?.state as { publicationStatus: string }).publicationStatus).toBe(
 			'VALIDATED'
@@ -311,8 +362,10 @@ describe('⭐⭐ JAN-ESCREC D1 — PublishPwa is refused over a recorded ESCALAT
 		// is not blocked"*).
 		const eng = build();
 		seedFloorPolicies(asActor(eng, SVC));
-		authorValidated(eng);
+		author(eng);
 		const plan = await recordFloorRecommending(eng, 'ESCALATED');
+		// ⭐⭐ L11 (D66): Submit refuses it first, naming the escalated review; Publish is then asked as a store from before L11 holds it.
+		refusedAtSubmitThenValidatedAsBefore(eng, `(floor.reasoning-review of ${ROOT}=ESCALATED)`);
 
 		// ⭑ THE ENGINE'S REFUSAL IS ASSERTED FIRST, because it is the claim: the plan's `gatePermitsTransition` is only the
 		// floor's own answer, and a host that published on its own reading would still meet this gate.
@@ -329,9 +382,11 @@ describe('⭐⭐ JAN-ESCREC D1 — PublishPwa is refused over a recorded ESCALAT
 	it('CONTROL — the identical arrangement, the reviewer recommending SATISFIED, publishes', async () => {
 		const eng = build();
 		seedFloorPolicies(asActor(eng, SVC));
-		authorValidated(eng);
+		author(eng);
 		const plan = await recordFloorRecommending(eng, 'SATISFIED');
 		expect(plan.gatePermitsTransition).toBe(true);
+		// ⭐⭐ L11 (D66): the floor recorded while the PWA is DRAFT, Submit and Validate admit it.
+		submitThenValidate(eng);
 		const r = publish(eng);
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(publicationStatus(eng)).toBe('PUBLISHED');

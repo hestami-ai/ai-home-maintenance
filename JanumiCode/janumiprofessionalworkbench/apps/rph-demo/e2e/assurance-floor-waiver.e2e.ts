@@ -112,11 +112,15 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 	async function blockTheFloor(
 		request: APIRequestContext,
 		pwaId: string,
-		concludeAs: 'REJECTED' | 'INCONCLUSIVE'
+		concludeAs: 'REJECTED' | 'INCONCLUSIVE',
+		// ⭐⭐ Package L11 (D66) — the ids are a parameter so one PWA's floor can be blocked twice (test 2); every other caller passes none, and
+		// stages under the ids it always did.
+		{ assessmentId, observationId }: { readonly assessmentId: string; readonly observationId: string } = {
+			assessmentId: 'assess_01ARZ3NDEKTSV4RRFFQ69G5FA1',
+			observationId: 'obs_01ARZ3NDEKTSV4RRFFQ69G5FA2'
+		}
 	): Promise<void> {
 		const { typeId: subjectId, version, correlationId } = await theRootPartOfTheLatestRound(request, pwaId);
-		const assessmentId = 'assess_01ARZ3NDEKTSV4RRFFQ69G5FA1';
-		const observationId = 'obs_01ARZ3NDEKTSV4RRFFQ69G5FA2';
 		const finding = {
 			findingCode: 'RR-04',
 			severity: 'BLOCKING',
@@ -242,30 +246,58 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 		// 3. THE HEADLINE, at the engine, through the same bus the UI uses: an EFFECTIVE waiver over the blocking
 		//    policy leaves PublishPwa refusing — and the refusal no longer names a waiver as the way out.
 		// ⚠ THE FSM GUARD FIRES FIRST, so a DRAFT PublishPwa refuses for being DRAFT and proves nothing about the
-		// floor. Drive the publish FSM to VALIDATED so the FLOOR is the reason the last hop refuses — and note the
-		// floor did NOT block the earlier hops: it gates PUBLICATION, not review.
+		// floor. Drive the publish FSM to VALIDATED so the FLOOR is the reason the last hop refuses — ~~and note the
+		// floor did NOT block the earlier hops: it gates PUBLICATION, not review.~~
+		// ⭐⭐ RESTATED BY PACKAGE L11 — design D66 (`REG-D-155`; `l11-facts.md` §3 (e)): SubmitPwaForReview now asks the floor PublishPwa asks,
+		// so the blocked floor is refused FIRST AT SUBMIT, while the PWA is DRAFT — Submit's words name the floor and no waiver either, and the
+		// EFFECTIVE waiver discharges nothing there too (ASR-3). A lane cannot write the store, so PublishPwa's own check — the second guard —
+		// is reached through real commands: a later accepted turn satisfies the floor (the stipulation above still stands, as test 3 below
+		// relies on), Submit and Validate are answered, and a review recorded after Validate blocks the floor again, the waiver still EFFECTIVE.
 		const rootTypeId = (await introspect(request)).pwuTypes.find(
 			(t) => t.state.isRoot === true && String(t.state.pwaId) === pwaId
 		)!.id;
-		const pub = await request.post('/test-api/dispatch', {
+		const dispatched = async (steps: unknown[]) =>
+			((await (await request.post('/test-api/dispatch', { data: { steps } })).json()) as {
+				results: { status: string; message?: string }[];
+			}).results;
+		const atSubmit = (await dispatched([['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}]]))[0]!;
+		expect(atSubmit.status, 'Submit admitted a PWA whose floor blocks').toBe('REJECTED');
+		expect(atSubmit.message).toContain("The floor, PublishPwa's check: the de minimis assurance floor is not SATISFIED");
+		expect(atSubmit.message, 'Submit’s refusal offers a waiver as a route').not.toMatch(/waiver/i);
+		expect((await introspect(request)).pwas.find((p) => p.id === pwaId)?.state.publicationStatus).toBe('DRAFT');
+
+		const again = await request.post(`/pwa/${pwaId}/agent`, {
 			data: {
-				steps: [
-					['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
-					['ValidatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
-					['PublishPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { rootPwuTypeId: rootTypeId }]
-				]
+				instruction: JSON.stringify({
+					plan: [{ tool: 'set_pwa_details', args: { description: 'Revised in a second authoring turn, after the waiver.' } }]
+				})
 			}
 		});
-		const outcome = (await pub.json()) as {
-			results: { status: string; message?: string }[];
-		};
+		const againBody = await again.text();
+		expect(againBody, 'arrangement: the second turn did not satisfy the floor').toContain('Assurance floor SATISFIED');
+		await acceptAgentCandidate(request, pwaId, againBody);
+		expect((await introspect(request)).authoringCandidates).toEqual([]);
+		const hops = await dispatched([
+			['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
+			['ValidatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}]
+		]);
 		// The two review hops must PASS — otherwise the publish refusal below could be a knock-on and the floor
 		// assertion would be vacuous.
 		expect(
-			outcome.results.slice(0, 2).map((r) => r.status),
+			hops.map((r) => r.status),
 			'the review hops must succeed, or the publish refusal proves nothing'
 		).toEqual(['ACCEPTED', 'ACCEPTED']);
-		const refusal = outcome.results[2]!;
+		await blockTheFloor(request, pwaId, 'INCONCLUSIVE', {
+			assessmentId: 'assess_01ARZ3NDEKTSV4RRFFQ69G5FA3',
+			observationId: 'obs_01ARZ3NDEKTSV4RRFFQ69G5FA4'
+		});
+		expect(
+			(await introspect(request)).decisions.map((d) => `${String(d.state.decisionType)}/${String(d.state.status)}`),
+			'arrangement: the waiver is no longer EFFECTIVE'
+		).toEqual(['WAIVER/EFFECTIVE']);
+		const refusal = (
+			await dispatched([['PublishPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { rootPwuTypeId: rootTypeId }]])
+		)[0]!;
 		expect(refusal.status).toBe('REJECTED');
 		expect(refusal.message).toContain('de minimis assurance floor is not SATISFIED');
 		expect(refusal.message).toContain('no governance waiver discharges it');
