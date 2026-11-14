@@ -32,8 +32,8 @@ export type LoopTrend = 'NO_TREND_YET' | 'CONVERGING' | 'STALLED' | 'DIVERGING';
  */
 export function classifyTrend(openFindingsPerTry: readonly number[]): LoopTrend {
 	if (openFindingsPerTry.length < 2) return 'NO_TREND_YET';
-	const latest = openFindingsPerTry[openFindingsPerTry.length - 1]!;
-	const previous = openFindingsPerTry[openFindingsPerTry.length - 2]!;
+	const latest = openFindingsPerTry.at(-1)!;
+	const previous = openFindingsPerTry.at(-2)!;
 	if (latest < previous) return 'CONVERGING';
 	if (latest > previous) return 'DIVERGING';
 	return 'STALLED';

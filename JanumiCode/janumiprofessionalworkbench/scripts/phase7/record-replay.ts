@@ -162,19 +162,23 @@ const USAGE =
 const absoluteOnFamily = (path: string, family: OsFamily): boolean =>
 	family === 'windows' ? /^(?:[A-Za-z]:[\\/]|\\\\)/.test(path) : path.startsWith('/');
 
-/**
- * Returns the exit code: 0 written; 1 refused by a check; 2 refused before anything was read. `names` are the account
- * names the recording is scanned for (`accountNames`), and `home` the folder scrubbed as `JPWB_REPLAY_HOME_NATIVE` — given so a test
- * can hand its own.
- */
-export function main(
-	argv: readonly string[],
-	write: (s: string) => void,
-	names: readonly string[] = accountNames(),
-	home: string = homedir(),
-	family: OsFamily = osFamilyOf()
-): number {
-	const say = (s: string) => write(`phase7/record-replay — ${s}\n`);
+/** What one write check says: no archived workspace to hold the writes to, a match, or the files that differ. */
+function writeCheckVerdict(c: ReturnType<typeof verifyWrites>[number]): string {
+	if (c.match === null) return 'no archived workspace to hold them to';
+	if (c.match) return 'the workspace tree matches';
+	return `the workspace tree DIFFERS (${c.differing.length} file(s): ${c.differing.slice(0, 8).join(', ')})`;
+}
+
+/** The operator's arguments, once checked. */
+type RecorderArgs = {
+	readonly commit: string;
+	readonly fingerprint: string;
+	readonly run: string;
+	readonly out: string;
+};
+
+/** The operator's arguments, checked, or the exit code (2) of their refusal, said. */
+function recorderArgs(argv: readonly string[], say: (s: string) => void): RecorderArgs | number {
 	const parsed = parseArgs(argv);
 	if (typeof parsed === 'string' || parsed.positional.length !== 2) {
 		say(typeof parsed === 'string' ? `${parsed}; ${USAGE}` : USAGE);
@@ -200,48 +204,112 @@ export function main(
 		);
 		return 2;
 	}
-	if (names.length === 0) {
-		say(`refused, and nothing was read: ${noAccountName('the recording')}`);
-		return 2;
-	}
-	if (archiveToRead(run) !== FINAL_ARCHIVE) {
-		say(
-			`refused: the run has no lane/archive/${FINAL_ARCHIVE} holding a store, and a recording is of the whole run`
-		);
-		return 2;
-	}
+	return { commit, fingerprint, run, out };
+}
+
+/** Why the run's final archive cannot be read, or undefined: no final archive, or a store not archived as the lane does. */
+function finalArchiveRefusal(run: string): string | undefined {
+	if (archiveToRead(run) !== FINAL_ARCHIVE)
+		return `refused: the run has no lane/archive/${FINAL_ARCHIVE} holding a store, and a recording is of the whole run`;
 	const archive = join(run, 'lane', 'archive', FINAL_ARCHIVE);
 	for (const store of [RECORD_STORE, CONTENT_STORE]) {
 		const file = join(archive, store);
 		const problem = existsSync(file) ? archivedStoreProblem(file) : `is absent`;
-		if (problem !== undefined) {
-			say(`refused, and nothing was opened: lane/archive/${FINAL_ARCHIVE}/${store} ${problem}`);
-			return 2;
-		}
+		if (problem !== undefined)
+			return `refused, and nothing was opened: lane/archive/${FINAL_ARCHIVE}/${store} ${problem}`;
 	}
+	return undefined;
+}
 
-	// ── READ ────────────────────────────────────────────────────────────────────────────────────────────────────────────
-	const store = readStores(archive);
-	const runJson = rec(laneJson(run, 'run.json'));
-	const units: RecorderUnit[] = (Array.isArray(runJson.units) ? runJson.units : []).map((u) => {
+/** `lane/run.json`'s units. */
+function recorderUnits(runJson: Record<string, unknown>): RecorderUnit[] {
+	return (Array.isArray(runJson.units) ? runJson.units : []).map((u) => {
 		const r = rec(u);
 		return { slug: str(r.slug), unitId: str(r.unitId), archive: str(r.archive) };
 	});
-	const demoDb = str(rec(rec(laneJson(run, 'boot.json')).overlay).JPWB_DEMO_DB);
-	const undertakings = store.objects.filter((o) => o.objectType === 'UNDERTAKING');
-	const matrix = rec(laneJson(run, 'report', 'report.json')).matrix;
+}
+
+/** The lane files' problems found before anything is recorded, in the order they are said. */
+function laneProblems(
+	units: readonly RecorderUnit[],
+	demoDb: string,
+	undertakingCount: number,
+	matrix: unknown
+): string[] {
 	const before: string[] = [];
 	if (units.length === 0) before.push('lane/run.json names no unit');
 	if (demoDb === '')
 		before.push(
 			"lane/boot.json names no JPWB_DEMO_DB, so the run's workspace is not known to scrub"
 		);
-	if (undertakings.length !== 1)
-		before.push(`the store holds ${undertakings.length} Undertakings, and a recording is of one`);
+	if (undertakingCount !== 1)
+		before.push(`the store holds ${undertakingCount} Undertakings, and a recording is of one`);
 	if (!Array.isArray(matrix))
 		before.push(
 			'lane/report/report.json holds no matrix: the report is final before anything is recorded'
 		);
+	return before;
+}
+
+/** The report's matrix, as the recording expects it. */
+function expectedMatrixOf(matrix: unknown[]): RecordedCell[] {
+	return matrix.map((c) => {
+		const r = rec(c);
+		return {
+			stage: str(r.stage),
+			row: str(r.row),
+			value: typeof r.value === 'string' ? r.value : null
+		};
+	});
+}
+
+/** The scan's refusal, naming each hit's place and kind (at most 40), never its text. */
+function scanRefusal(hits: readonly ScanHit[]): string {
+	return (
+		`refused, and nothing was written: the recording names the account or an absolute path (REG-F-536):\n  ` +
+		hits
+			.slice(0, 40)
+			.map((h) => `${h.file}:${h.line}:${h.column} ${h.kind}`)
+			.join('\n  ') +
+		(hits.length > 40 ? `\n  … ${hits.length - 40} more` : '')
+	);
+}
+
+/**
+ * Returns the exit code: 0 written; 1 refused by a check; 2 refused before anything was read. `names` are the account
+ * names the recording is scanned for (`accountNames`), and `home` the folder scrubbed as `JPWB_REPLAY_HOME_NATIVE` — given so a test
+ * can hand its own.
+ */
+export function main(
+	argv: readonly string[],
+	write: (s: string) => void,
+	names: readonly string[] = accountNames(),
+	home: string = homedir(),
+	family: OsFamily = osFamilyOf()
+): number {
+	const say = (s: string) => write(`phase7/record-replay — ${s}\n`);
+	const args = recorderArgs(argv, say);
+	if (typeof args === 'number') return args;
+	const { commit, fingerprint, run, out } = args;
+	if (names.length === 0) {
+		say(`refused, and nothing was read: ${noAccountName('the recording')}`);
+		return 2;
+	}
+	const archiveRefusal = finalArchiveRefusal(run);
+	if (archiveRefusal !== undefined) {
+		say(archiveRefusal);
+		return 2;
+	}
+	const archive = join(run, 'lane', 'archive', FINAL_ARCHIVE);
+
+	// ── READ ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+	const store = readStores(archive);
+	const runJson = rec(laneJson(run, 'run.json'));
+	const units: RecorderUnit[] = recorderUnits(runJson);
+	const demoDb = str(rec(rec(laneJson(run, 'boot.json')).overlay).JPWB_DEMO_DB);
+	const undertakings = store.objects.filter((o) => o.objectType === 'UNDERTAKING');
+	const matrix = rec(laneJson(run, 'report', 'report.json')).matrix;
+	const before: string[] = laneProblems(units, demoDb, undertakings.length, matrix);
 	if (demoDb !== '' && !absoluteOnFamily(demoDb, family))
 		before.push(
 			`lane/boot.json's JPWB_DEMO_DB is not an absolute path as this host's OS family (${family}) spells one: a run ` +
@@ -255,14 +323,7 @@ export function main(
 	const undertakingId = undertakings[0]!.id;
 	const fp = createHash('sha256').update(undertakingId, 'utf8').digest('hex').slice(0, 16);
 	const workspace = resolve(join(`${demoDb}.workspaces`, `${undertakingId}-${fp}`));
-	const expectedMatrix: RecordedCell[] = (matrix as unknown[]).map((c) => {
-		const r = rec(c);
-		return {
-			stage: str(r.stage),
-			row: str(r.row),
-			value: typeof r.value === 'string' ? r.value : null
-		};
-	});
+	const expectedMatrix: RecordedCell[] = expectedMatrixOf(matrix as unknown[]);
 	const built = buildRecording({
 		store,
 		content: readContentBytes(archive),
@@ -304,10 +365,7 @@ export function main(
 	} finally {
 		rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 	}
-	for (const c of checks)
-		say(
-			`writes replayed through ${c.archive}: ${c.match === null ? 'no archived workspace to hold them to' : c.match ? 'the workspace tree matches' : `the workspace tree DIFFERS (${c.differing.length} file(s): ${c.differing.slice(0, 8).join(', ')})`}`
-		);
+	for (const c of checks) say(`writes replayed through ${c.archive}: ${writeCheckVerdict(c)}`);
 	if (checks.some((c) => c.match === false)) {
 		say(
 			'refused, and nothing was written: the recorded write_file calls do not rebuild the archived workspace (REG-F-530)'
@@ -323,14 +381,7 @@ export function main(
 		scanDecodedJson(text, file, names, file !== RECORDING_FILES.manifest)
 	);
 	if (hits.length > 0) {
-		say(
-			`refused, and nothing was written: the recording names the account or an absolute path (REG-F-536):\n  ` +
-				hits
-					.slice(0, 40)
-					.map((h) => `${h.file}:${h.line}:${h.column} ${h.kind}`)
-					.join('\n  ') +
-				(hits.length > 40 ? `\n  … ${hits.length - 40} more` : '')
-		);
+		say(scanRefusal(hits));
 		return 1;
 	}
 	mkdirSync(out, { recursive: true });

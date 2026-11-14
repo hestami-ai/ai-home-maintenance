@@ -681,7 +681,7 @@ export class Engine {
 							? resolved.principal
 							: undefined
 						: sessionPrincipal;
-					const reason = resolved ? (resolved.ok ? undefined : resolved.reason) : sessionReason;
+					const reason = entryReason(resolved, sessionReason);
 					const r = this.dispatchAs(principal, reason, entry.command);
 					results.push(r);
 					if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE') {
@@ -965,6 +965,18 @@ type ResultBase = { commandId: string; producedEventIds: string[] };
  */
 function targetObjectIdsOf(command: StampedCommand): string[] {
 	return typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : [];
+}
+
+/**
+ * The reason a multi-party batch entry is dispatched under: when it named a credential, that credential's refusal
+ * reason (none when it resolved) — never the composing session's; when it named none, the composing session's.
+ */
+function entryReason(
+	resolved: ReturnType<AuthenticationPort['authenticate']> | undefined,
+	sessionReason: string | undefined
+): string | undefined {
+	if (resolved) return resolved.ok ? undefined : resolved.reason;
+	return sessionReason;
 }
 
 /**

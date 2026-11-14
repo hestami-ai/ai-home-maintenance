@@ -144,6 +144,11 @@ function tallyOf(source: LaneSource, assessmentId: string, mandatory: ReadonlySe
 	return { evaluated, stipulatedRows };
 }
 
+/** The part limb 1's registration reason names (B6): nothing when its arm has no part, else the type it reads. */
+function partClauseOf(typeId: string | undefined): string {
+	return typeId === undefined ? '' : ` (nor for its part ${typeId})`;
+}
+
 /** Limb 1's three questions of one stand-in completion; an empty list is a completion the lane may rest on. */
 function limbOneReasons(
 	source: LaneSource,
@@ -171,7 +176,7 @@ function limbOneReasons(
 	// ⭐ B6 — THE FLOOR'S OWN LOOKUP (`registrationFor`): a part's registration, else its PWA's.
 	else if (registrationFor(registrations, arm.pwaId, arm.framing, arm.typeId) === undefined)
 		reasons.push(
-			`no test registered a stipulation for ${arm.pwaId} on ${arm.framing}${arm.typeId === undefined ? '' : ` (nor for its part ${arm.typeId})`}`
+			`no test registered a stipulation for ${arm.pwaId} on ${arm.framing}${partClauseOf(arm.typeId)}`
 		);
 	return reasons;
 }
@@ -223,6 +228,59 @@ function subjectDeclares(source: LaneSource, subjectId: string, policyId: string
 }
 
 /**
+ * One event's limbs 3 and 4, pushing what they find onto `found`: the completion when it is a positive reasoning review
+ * that limbs 1 and 2 judge, else `undefined` (not a completion, one of limb 3's or limb 4's, or not a positive review).
+ */
+function completionForLimbsOneAndTwo(
+	found: LaneFinding[],
+	source: LaneSource,
+	e: DomainEvent,
+	registrations: readonly StipulationRegistration[]
+): Completion | undefined {
+	if (e.eventType !== 'AssuranceAssessmentCompleted') return undefined;
+	const c = e.payload as Completion;
+	// ⭐ E2 — LIMB 3: a positive declared-policy completion the declared stand-in answered.
+	if (c.validatorId === STANDIN_DECLARED_REVIEW_VALIDATOR_ID && POSITIVE.has(String(c.disposition))) {
+		const subjectId = c.subjectObjectIds?.[0] ?? '';
+		const reasons = limbThreeReasons(source, c, subjectId, registrations);
+		if (reasons.length > 0)
+			found.push({
+				where: source.where,
+				assessmentId: c.assessmentId,
+				validatorId: String(c.validatorId),
+				disposition: String(c.disposition),
+				subjectId,
+				limb: 3,
+				reason: reasons.join('; ')
+			});
+		return undefined;
+	}
+	// ⭐ `E12F` F11 — LIMB 4, limb 2's declared counterpart: a positive verdict of a policy its subject DECLARES, under any
+	// validator but the declared stand-in (whose completions are limb 3's, above). ⚠ The floor's reasoning review is
+	// limbs 1 and 2's, whoever declares it.
+	if (c.assurancePolicyId !== FLOOR_POLICY_IDS.REASONING_REVIEW && POSITIVE.has(String(c.disposition))) {
+		const subjectId = c.subjectObjectIds?.[0] ?? '';
+		if (subjectDeclares(source, subjectId, c.assurancePolicyId))
+			found.push({
+				where: source.where,
+				assessmentId: c.assessmentId,
+				validatorId: String(c.validatorId),
+				disposition: String(c.disposition),
+				subjectId,
+				limb: 4,
+				reason: `a ${String(c.disposition)} verdict of ${String(c.assurancePolicyId)}, which its work unit declares, completed under ${String(c.validatorId)} — on this lane only the declared stand-in may pass a declared policy, and only on a stipulation`
+			});
+		return undefined;
+	}
+	if (
+		c.assurancePolicyId !== FLOOR_POLICY_IDS.REASONING_REVIEW ||
+		!POSITIVE.has(String(c.disposition))
+	)
+		return undefined;
+	return c;
+}
+
+/**
  * ⭐ THE CHECK ITSELF — pure: ~~both~~ ~~the three~~ the four limbs over one segment's sources and the registrations in force.
  */
 export function laneFindings(
@@ -232,46 +290,8 @@ export function laneFindings(
 	const found: LaneFinding[] = [];
 	for (const source of sources)
 		for (const e of source.events) {
-			if (e.eventType !== 'AssuranceAssessmentCompleted') continue;
-			const c = e.payload as Completion;
-			// ⭐ E2 — LIMB 3: a positive declared-policy completion the declared stand-in answered.
-			if (c.validatorId === STANDIN_DECLARED_REVIEW_VALIDATOR_ID && POSITIVE.has(String(c.disposition))) {
-				const subjectId = c.subjectObjectIds?.[0] ?? '';
-				const reasons = limbThreeReasons(source, c, subjectId, registrations);
-				if (reasons.length > 0)
-					found.push({
-						where: source.where,
-						assessmentId: c.assessmentId,
-						validatorId: String(c.validatorId),
-						disposition: String(c.disposition),
-						subjectId,
-						limb: 3,
-						reason: reasons.join('; ')
-					});
-				continue;
-			}
-			// ⭐ `E12F` F11 — LIMB 4, limb 2's declared counterpart: a positive verdict of a policy its subject DECLARES, under any
-			// validator but the declared stand-in (whose completions are limb 3's, above). ⚠ The floor's reasoning review is
-			// limbs 1 and 2's, whoever declares it.
-			if (c.assurancePolicyId !== FLOOR_POLICY_IDS.REASONING_REVIEW && POSITIVE.has(String(c.disposition))) {
-				const subjectId = c.subjectObjectIds?.[0] ?? '';
-				if (subjectDeclares(source, subjectId, c.assurancePolicyId))
-					found.push({
-						where: source.where,
-						assessmentId: c.assessmentId,
-						validatorId: String(c.validatorId),
-						disposition: String(c.disposition),
-						subjectId,
-						limb: 4,
-						reason: `a ${String(c.disposition)} verdict of ${String(c.assurancePolicyId)}, which its work unit declares, completed under ${String(c.validatorId)} — on this lane only the declared stand-in may pass a declared policy, and only on a stipulation`
-					});
-				continue;
-			}
-			if (
-				c.assurancePolicyId !== FLOOR_POLICY_IDS.REASONING_REVIEW ||
-				!POSITIVE.has(String(c.disposition))
-			)
-				continue;
+			const c = completionForLimbsOneAndTwo(found, source, e, registrations);
+			if (c === undefined) continue;
 			const subjectId = c.subjectObjectIds?.[0] ?? '';
 			const base = {
 				where: source.where,

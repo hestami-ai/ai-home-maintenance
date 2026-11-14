@@ -1239,7 +1239,10 @@ export async function runPwaFloor(
 	// ⭐ B3 — AND IT IS THE WHOLE ROUND'S: the PWA's plan and every part's carry it, so the round's readers can ask for the
 	// complete inventory under one token (`loadPwaFloor`; `rph-application`'s publication gate).
 	const floorRunId = mintUiId('floorrun');
-	const floorRunToken = `${opts.candidateSubjectHash ? `authoring-floor:${opts.candidateSubjectHash}` : 'authoring-floor'}:${floorRunId}`;
+	const planeCorrelation = opts.candidateSubjectHash
+		? `authoring-floor:${opts.candidateSubjectHash}`
+		: 'authoring-floor';
+	const floorRunToken = `${planeCorrelation}:${floorRunId}`;
 	const record = (plan: AssuranceRecordingPlan, idPrefix: string) =>
 		recordAssuranceRecordingPlan(engine, plan, {
 			issuedAt: hostNow(),
@@ -1539,6 +1542,15 @@ const isFloorPolicy = (id: unknown): boolean =>
 const later = (prev: LatestAssessment | undefined, next: LatestAssessment): LatestAssessment =>
 	!prev || next.at >= prev.at ? next : prev;
 
+/** Each assurance assessment's floor-run token, read off its first event. */
+function assessmentRunTokens(engine: AuthedEngineHandle): Map<string, string> {
+	const tokens = new Map<string, string>();
+	for (const e of engine.readAllEvents())
+		if (e.aggregateType === 'ASSURANCE_ASSESSMENT' && !tokens.has(e.aggregateId))
+			tokens.set(e.aggregateId, e.correlationId);
+	return tokens;
+}
+
 /**
  * ⭐⭐ The review in parts, B3 (`REG-D-125`; design D6) — THE LATEST RECORDED ROUND OF A PWA'S FLOOR, NEVER A PER-POLICY
  * LATEST. The round is the floor run of the latest floor assessment over the PWA's deterministic policies or over one of
@@ -1558,10 +1570,7 @@ function latestFloorRound(
 			readonly parts: ReadonlyMap<string, LatestAssessment>;
 	  }
 	| undefined {
-	const tokens = new Map<string, string>();
-	for (const e of engine.readAllEvents())
-		if (e.aggregateType === 'ASSURANCE_ASSESSMENT' && !tokens.has(e.aggregateId))
-			tokens.set(e.aggregateId, e.correlationId);
+	const tokens = assessmentRunTokens(engine);
 	const inRound: { readonly a: LatestAssessment; readonly key: string; readonly part: boolean }[] = [];
 	let newest: LatestAssessment | undefined;
 	// WORKSPACE: the subjects here are a PWA and its types, which no Undertaking owns — the subject filter on the next lines
@@ -1571,7 +1580,7 @@ function latestFloorRound(
 		const subjects = subjectsOf(r.state);
 		const a = { id: r.id, state: r.state, at: String((r.state.updatedAt ?? '') as string) };
 		if (subjects.includes(pwaId) && isDeterministicFloorPolicy(policy))
-			inRound.push({ a, key: String(policy), part: false });
+			inRound.push({ a, key: String(policy as string), part: false });
 		else if (policy === FLOOR_POLICY_IDS.REASONING_REVIEW) {
 			const typeId = subjects.find((s) => typeIds.has(s));
 			if (typeId === undefined) continue;

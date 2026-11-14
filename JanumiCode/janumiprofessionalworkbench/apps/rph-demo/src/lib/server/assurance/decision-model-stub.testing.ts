@@ -104,6 +104,55 @@ export async function startDecisionModelStub(o: StubOptions = {}): Promise<Decis
 		res.setHeader('content-type', 'application/json; charset=utf-8');
 		res.end(body);
 	};
+	/** `GET /api/ps`: lists the model while it lingers, and any `others`. */
+	const answerPs = (res: ServerResponse, seen: StubRequest) => {
+		const listed = o.neverUnloads === true || lingering > 0;
+		if (lingering > 0) lingering -= 1;
+		requests.push({ ...seen, listed });
+		const loaded = [...(listed ? [model] : []), ...(o.others ?? [])];
+		send(res, 200, JSON.stringify({ models: loaded.map((name) => ({ name, model: name, expires_at: '2026-11-06T12:00:00-05:00' })) }));
+	};
+	/** The `GET` routes: answers one and returns true, or returns false when the path is none of them. */
+	const answerGet = (path: string, res: ServerResponse, seen: StubRequest): boolean => {
+		if (path === '/api/version') {
+			requests.push(seen);
+			send(res, 200, JSON.stringify({ version: typeof o.version === 'function' ? o.version() : (o.version ?? STUB_VERSION) }));
+			return true;
+		}
+		if (path === '/api/tags') {
+			requests.push(seen);
+			const models = o.serves === false ? [] : [{ name: model, model, digest: o.digest ?? STUB_DIGEST, size: 1 }];
+			send(res, 200, JSON.stringify({ models: [...models, { name: 'other:1b', model: 'other:1b', digest: 'f'.repeat(64) }] }));
+			return true;
+		}
+		if (path === '/api/ps') {
+			answerPs(res, seen);
+			return true;
+		}
+		return false;
+	};
+	/** A `POST /v1/systemone` within the limit whose body parsed: an unload, or a question answered as `o.answer` says. */
+	const answerQuestion = (res: ServerResponse, body: string, parsed: Record<string, unknown>) => {
+		const done = () => {
+			// keep_alive 0: unloaded after the request, seen by `/api/ps` after `lingerPolls` more reads.
+			lingering = o.lingerPolls ?? 0;
+		};
+		if (parsed.state === 'unload') {
+			done();
+			send(res, 200, JSON.stringify(scoredAnswer(body, parsed).json));
+			return;
+		}
+		n += 1;
+		const answer: StubAnswer = o.answer ? o.answer({ body, parsed, n }) : scoredAnswer(body, parsed);
+		if ('hang' in answer) return; // never answers: the client must cut it
+		const reply = () => {
+			done();
+			if ('raw' in answer) send(res, answer.status, answer.raw);
+			else send(res, answer.status ?? 200, JSON.stringify(answer.json));
+		};
+		if (answer.delayMs) setTimeout(reply, answer.delayMs);
+		else reply();
+	};
 	const server = createServer((req: IncomingMessage, res: ServerResponse) => {
 		const chunks: Buffer[] = [];
 		req.on('data', (c: Buffer) => chunks.push(c));
@@ -111,22 +160,7 @@ export async function startDecisionModelStub(o: StubOptions = {}): Promise<Decis
 			const body = Buffer.concat(chunks).toString('utf8');
 			const path = req.url ?? '';
 			const seen = { method: req.method ?? '', path, contentType: req.headers['content-type'], body };
-			if (req.method === 'GET' && path === '/api/version') {
-				requests.push(seen);
-				return send(res, 200, JSON.stringify({ version: typeof o.version === 'function' ? o.version() : (o.version ?? STUB_VERSION) }));
-			}
-			if (req.method === 'GET' && path === '/api/tags') {
-				requests.push(seen);
-				const models = o.serves === false ? [] : [{ name: model, model, digest: o.digest ?? STUB_DIGEST, size: 1 }];
-				return send(res, 200, JSON.stringify({ models: [...models, { name: 'other:1b', model: 'other:1b', digest: 'f'.repeat(64) }] }));
-			}
-			if (req.method === 'GET' && path === '/api/ps') {
-				const listed = o.neverUnloads === true || lingering > 0;
-				if (lingering > 0) lingering -= 1;
-				requests.push({ ...seen, listed });
-				const loaded = [...(listed ? [model] : []), ...(o.others ?? [])];
-				return send(res, 200, JSON.stringify({ models: loaded.map((name) => ({ name, model: name, expires_at: '2026-11-06T12:00:00-05:00' })) }));
-			}
+			if (req.method === 'GET' && answerGet(path, res, seen)) return;
 			if (req.method === 'POST' && path === '/v1/systemone') {
 				requests.push(seen);
 				// ⭐ Z2b phase 1b — past the limit by the bytes as sent: refused before it is read, as the server refuses it.
@@ -137,24 +171,7 @@ export async function startDecisionModelStub(o: StubOptions = {}): Promise<Decis
 				} catch {
 					return send(res, 400, JSON.stringify({ error: 'invalid JSON' }));
 				}
-				const done = () => {
-					// keep_alive 0: unloaded after the request, seen by `/api/ps` after `lingerPolls` more reads.
-					lingering = o.lingerPolls ?? 0;
-				};
-				if (parsed.state === 'unload') {
-					done();
-					return send(res, 200, JSON.stringify(scoredAnswer(body, parsed).json));
-				}
-				n += 1;
-				const answer: StubAnswer = o.answer ? o.answer({ body, parsed, n }) : scoredAnswer(body, parsed);
-				if ('hang' in answer) return; // never answers: the client must cut it
-				const reply = () => {
-					done();
-					if ('raw' in answer) send(res, answer.status, answer.raw);
-					else send(res, answer.status ?? 200, JSON.stringify(answer.json));
-				};
-				if (answer.delayMs) setTimeout(reply, answer.delayMs);
-				else reply();
+				answerQuestion(res, body, parsed);
 				return;
 			}
 			requests.push(seen);

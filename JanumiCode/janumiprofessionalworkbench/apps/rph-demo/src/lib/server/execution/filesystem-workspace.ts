@@ -364,7 +364,7 @@ export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Work
 			// The directory does not exist yet. An empty workspace is a fact, not a failure.
 			return;
 		}
-		for (const name of names.sort()) {
+		for (const name of names.sort((a, b) => Number(a > b) - Number(a < b))) {
 			const rel = prefix === '' ? name : `${prefix}/${name}`;
 			// ⛔ `lstat`, NEVER `stat`, AND A LINK IS NOT PART OF THE DELIVERABLE. `stat` follows a junction, so the
 			// walk descended THROUGH one and reported files from outside the workspace as in-workspace entries — the
@@ -462,7 +462,10 @@ export function createFilesystemWorkspace(input: FilesystemWorkspaceInput): Work
 				// is nothing left for a second name to hold; `byteSize` is what carries WHAT WAS REMOVED.
 				entries.push({ path: rel, byteSize: stone.byteSize, purged: true, nameCount: 1 });
 			}
-			return entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+			return entries.sort((a, b) => {
+				if (a.path < b.path) return -1;
+				return a.path > b.path ? 1 : 0;
+			});
 		},
 
 		async purge(path: string): Promise<PurgeOutcome> {

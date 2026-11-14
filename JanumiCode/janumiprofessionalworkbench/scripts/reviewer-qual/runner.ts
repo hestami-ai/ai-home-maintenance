@@ -141,12 +141,10 @@ function endsWithMissingCriterionLine(prompt: string): boolean {
 const EXCHANGE_CLOCK = () => '1970-01-01T00:00:00.000Z';
 
 /** The text the validator parses out of what a transport returned (`reasoning-review-validator.ts` `timed`). */
-const replyText = (returned: string | ToolInvocationResult): string =>
-	isToolInvocationResult(returned)
-		? returned.answer.arrived
-			? returned.answer.text
-			: ''
-		: returned;
+const replyText = (returned: string | ToolInvocationResult): string => {
+	if (isToolInvocationResult(returned)) return returned.answer.arrived ? returned.answer.text : '';
+	return returned;
+};
 
 /**
  * ⛔ RETENTION (§5.3: reasoning, in its own field or inline, never enters a tracked record).
@@ -577,6 +575,11 @@ function keepExport(c: ExportCustody, runId: string, caseId: string, repetition:
 	c.log(`export ${name} sha256 ${sha256(text)}`);
 }
 
+/** ⭐ Z3 — D53 — one score that differs from the records, as the live re-derivation's refusal names it (`rederiving`). */
+function scoreDifference(key: string, recordedScore: number | undefined, liveScore: number | undefined): string {
+	return `${key}: recorded ${recordedScore}, live ${liveScore}`;
+}
+
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D53 (design §12.5: *"Before a case's first call, re-derive its scores live by D51's cold path
  * and stop on any difference."*) — THE RECORDS' SOURCE FOR ONE CASE, RE-DERIVED LIVE BEFORE ITS FIRST PAID CALL: the validator asks
@@ -622,7 +625,7 @@ export function rederiving(r: Rederivation, caseId: string, committed: Indicatio
 			return {
 				refusal:
 					`REFUSED (D53): ${caseId}: re-derived live, ${differ.length} of ${requests.length} score(s) differ from the records — ` +
-					`${differ.map((q) => `${q.key}: recorded ${recorded.scores[q.key]}, live ${live.scores[q.key]}`).join('; ')}; the run stops before this case’s first call`
+					`${differ.map((q) => scoreDifference(q.key, recorded.scores[q.key], live.scores[q.key])).join('; ')}; the run stops before this case’s first call`
 			};
 		// ~~`questions: requests.map((q) => ({ key: q.key, score: recorded.scores[q.key] }))`~~ ⛔ MOVED 2026-11-07 (Z3 — the
 		// strengthening): each question with its body.
@@ -633,6 +636,13 @@ export function rederiving(r: Rederivation, caseId: string, committed: Indicatio
 		return recorded;
 	};
 }
+
+/** An evaluation's clock, where the run gives one. */
+const nowInput = (i: RunInputs) => (i.now ? { now: i.now } : {});
+
+/** Each call's session export, kept outside the repository, where the run keeps exports (D47). */
+const exportsInput = (i: RunInputs, c: QualificationCase, repetition: number) =>
+	i.exports ? { onCall: (n: number, role: CallRole, text: string | undefined) => keepExport(i.exports!, i.runId, c.id, repetition, n, role, text) } : {};
 
 /**
  * ⭐ A qualification run: the RUN line, then every case × repetition (repetitions outermost, so a case's repetitions
@@ -682,11 +692,11 @@ export async function runQualification(i: RunInputs): Promise<(RunLine | CallLin
 					candidate,
 					call: (prompt) => withinOneDay(() => i.transport.call(prompt)),
 					scoringDigest: i.fingerprint.scoring,
-					...(i.now ? { now: i.now } : {}),
+					...nowInput(i),
 					// ⭐ Z3 — D53 — the records' source, re-derived live before the case's first paid call where the run re-derives.
 					...(i.indications ? { indications: i.rederive ? rederiving(i.rederive, c.id, i.indications)! : i.indications } : {}),
 					// ⭐ Z3 — D47 — each call's session export, kept outside the repository.
-					...(i.exports ? { onCall: (n: number, role: CallRole, text: string | undefined) => keepExport(i.exports!, i.runId, c.id, repetition, n, role, text) } : {})
+					...exportsInput(i, c, repetition)
 				});
 				if (pending) emit(pending);
 				pending = undefined;

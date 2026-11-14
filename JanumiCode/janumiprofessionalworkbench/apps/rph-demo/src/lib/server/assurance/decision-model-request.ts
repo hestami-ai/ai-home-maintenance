@@ -112,13 +112,13 @@ export function pyJsonStringAscii(s: string): string {
 	for (const c of s) {
 		const cp = c.codePointAt(0)!;
 		if (cp >= 0x20 && cp <= 0x7e && c !== '"' && c !== '\\') out += c;
-		else if (c === '"') out += '\\"';
+		else if (c === '"') out += String.raw`\"`;
 		else if (c === '\\') out += '\\\\';
-		else if (c === '\b') out += '\\b';
-		else if (c === '\f') out += '\\f';
-		else if (c === '\n') out += '\\n';
-		else if (c === '\r') out += '\\r';
-		else if (c === '\t') out += '\\t';
+		else if (c === '\b') out += String.raw`\b`;
+		else if (c === '\f') out += String.raw`\f`;
+		else if (c === '\n') out += String.raw`\n`;
+		else if (c === '\r') out += String.raw`\r`;
+		else if (c === '\t') out += String.raw`\t`;
 		else if (cp >= 0x10000) {
 			const v = cp - 0x10000;
 			out += `\\u${hex4(0xd800 + (v >> 10))}\\u${hex4(0xdc00 + (v & 0x3ff))}`;

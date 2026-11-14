@@ -304,10 +304,18 @@ function argsOf(argv: readonly string[]): Map<string, string> {
 	return out;
 }
 
+/** The address less every slash it ends with, read back from its end: no regular expression, so no backtracking (S8786). */
+function withoutTrailingSlashes(address: string): string {
+	let end = address.length;
+	while (end > 0 && address[end - 1] === '/') end -= 1;
+	return address.slice(0, end);
+}
+
 /** The CLI: v13's cases and the fingerprint's probes, into the committed record folder. */
 export async function main(argv: readonly string[]): Promise<number> {
 	const a = argsOf(argv);
-	const server = a.get('server')?.replace(/\/+$/, '');
+	const given = a.get('server');
+	const server = given === undefined ? undefined : withoutTrailingSlashes(given);
 	const model = a.get('model');
 	const digest = a.get('digest');
 	const set = a.get('set') ?? 'both';

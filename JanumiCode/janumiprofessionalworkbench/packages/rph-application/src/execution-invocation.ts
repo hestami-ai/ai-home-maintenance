@@ -98,7 +98,7 @@ export function resolveInvocationSubject(
 	if (!parsed.success)
 		throw new Error(
 			`Work unit '${pwuId}' resolved to an object that does not parse as a PROFESSIONAL_WORK_UNIT: ` +
-				`${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+				parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
 		);
 	const pwu = parsed.data;
 	// ⭑ ONLY THE FIELDS A TEMPLATE MAY DRAW ON, and every one of them is a `z.string()` in the contract. ⛔ A
@@ -132,7 +132,7 @@ export function resolvePwuTypeFacts(
 	if (!parsed.success)
 		throw new Error(
 			`Work-unit type '${pwuTypeId}' resolved to an object that does not parse as a PWU_TYPE: ` +
-				`${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+				parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
 		);
 	const t = parsed.data;
 	return {
@@ -274,7 +274,7 @@ export function resolveUndertakingStatement(
 	if (!parsed.success)
 		throw new Error(
 			`Undertaking '${undertakingId}' resolved to an object that does not parse as an UNDERTAKING: ` +
-				`${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+				parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
 		);
 	return { intendedOutputProduct: parsed.data.intendedOutputProduct, objective: parsed.data.objective };
 }

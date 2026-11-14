@@ -51,6 +51,7 @@ const CATALOG = 'docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md
 const OUT = 'docs/tracking/w3b/limbs.ndjson';
 
 /** R1 — the population rule. */
+// S8786: kept as R1 states it - the title (.+?) may itself hold ".**"; barring that changes which lines match
 const ENTRY = /^\*\*([A-Z]{3})-(\d+) · (.+?)\.\*\*\s*(.*)$/;
 
 export interface InvariantEntry {
@@ -131,7 +132,7 @@ export function splitLimbs(statement: string): string[] {
 	for (const piece of pieces) {
 		const restored = unmask(piece, spans).trim();
 		if (restored.length < 25 && limbs.length > 0) {
-			limbs[limbs.length - 1] = `${limbs[limbs.length - 1]} ${restored}`.trim();
+			limbs[limbs.length - 1] = `${limbs.at(-1)} ${restored}`.trim();
 			continue;
 		}
 		limbs.push(restored);

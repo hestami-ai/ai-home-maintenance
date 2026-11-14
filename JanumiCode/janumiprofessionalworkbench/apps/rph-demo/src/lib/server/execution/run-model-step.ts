@@ -244,6 +244,24 @@ function firstTurn(
 	].join('\n');
 }
 
+/** The turn this call sends: a repair turn when prior findings arrived, otherwise `firstTurn`. */
+function stepTurnText(input: RunModelStepInput, instruction: string): string {
+	return input.priorFindings?.length
+		? [
+				'An independent assurance review of the work product you just produced found the following:',
+				...input.priorFindings.map((f) => `- ${f.code}: ${f.statement}`),
+				'',
+				'Produce the work product again, addressing these findings. Do not argue with them and do not',
+				'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+			].join('\n')
+		: firstTurn(instruction, input.carriedFindings ?? []);
+}
+
+/** A thrown value's message: an Error's own message, anything else stringified. */
+function thrownMessage(e: unknown): string {
+	return e instanceof Error ? e.message : String(e as string);
+}
+
 export type RunModelStepOutcome =
 	| {
 			readonly ran: true;
@@ -357,15 +375,7 @@ export async function runModelInvocationStep(
 	// REVIEWER saw them too — it receives that prompt as the "intent" — so it gained state it was never
 	// designed to have, by accident and mislabelled. The sponsor ruled the reviewer COLD by default; removing
 	// the splice is what makes that true rather than nominal.
-	const turnText = input.priorFindings?.length
-		? [
-				'An independent assurance review of the work product you just produced found the following:',
-				...input.priorFindings.map((f) => `- ${f.code}: ${f.statement}`),
-				'',
-				'Produce the work product again, addressing these findings. Do not argue with them and do not',
-				'restate them back; if you believe a finding is mistaken, say so in your rationale.'
-			].join('\n')
-		: firstTurn(plan.prompt, input.carriedFindings ?? []);
+	const turnText = stepTurnText(input, plan.prompt);
 
 	const sink = createExchangeSink();
 	const exchangeId = input.newId('exch');
@@ -435,7 +445,7 @@ export async function runModelInvocationStep(
 			respondedAt,
 			parseOutcome: {
 				outcome: 'NOT_ATTEMPTED',
-				detail: `The model call itself failed: ${e instanceof Error ? e.message : String(e)}`
+				detail: `The model call itself failed: ${thrownMessage(e)}`
 			},
 			// ⭐⭐ R11 — THE ARM THAT MAKES THE FOURTH MEMBER REAL, AND IT IS NOT THE SAME ABSENCE AS A REVIEWER'S.
 			// This step DOES owe a work product; the call failed before one existed. Recording that as
@@ -471,7 +481,7 @@ export async function runModelInvocationStep(
 		record(input, sink);
 		return {
 			ran: false,
-			refusedBecause: `The model call failed: ${e instanceof Error ? e.message : String(e)}`
+			refusedBecause: `The model call failed: ${thrownMessage(e)}`
 		};
 	}
 

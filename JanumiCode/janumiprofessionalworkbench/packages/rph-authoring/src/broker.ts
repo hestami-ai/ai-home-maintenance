@@ -41,6 +41,9 @@ import {
 	type PwuTypeTemplate
 } from './catalog.js';
 
+/** JAN-DISCHARGE — the values a PWU Type's `workDischarge` declares (who does its work). */
+type WorkDischarge = 'MODEL' | 'HUMAN' | 'UNDECLARED';
+
 /** The current view of the DRAFT PWA being authored. */
 export interface PwaView {
 	readonly id: string;
@@ -78,7 +81,7 @@ export interface PwuTypeView {
 	 *
 	 * ⚠ OPTIONAL ON PURPOSE: `undefined` means the author was never asked, which is not `UNDECLARED`.
 	 */
-	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	readonly workDischarge?: WorkDischarge;
 	/** JAN-PROMPT — projected back for the same reason `workDischarge` is: an author that can write a value
 	 *  and not read it back is the blindness EG-07a measured, with the arrow reversed. */
 	readonly promptTemplate?: PromptTemplate;
@@ -121,7 +124,7 @@ export interface DefineTypeInput {
 	 * deferred"* — so writing a value where the caller said nothing would destroy "never asked" and is
 	 * exactly the collapse this field exists to prevent.
 	 */
-	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	readonly workDischarge?: WorkDischarge;
 	/**
 	 * JAN-PROMPT — what a model is told when this type is executed. Added EG-07b under sponsor decision `G-4`
 	 * (*"text plus arming, AFTER the review surface lands"*), which `EG-07a` discharged.
@@ -152,7 +155,7 @@ export interface EditTypeInput {
 	readonly requiredOutputs?: readonly string[];
 	/** JAN-DISCHARGE / JAN-PROMPT — EG-07b. Patchable for the same reason every sibling here is: an author
 	 *  that can SET a field on create and never change it has been given a declaration, not a decision. */
-	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	readonly workDischarge?: WorkDischarge;
 	readonly promptTemplate?: PromptTemplate;
 	readonly requiredAssurancePolicyIds?: readonly string[];
 	/** STD-2 — reassign the execution boundary. The engine strips a stale contract on a DELEGATED→INTERNAL flip. */
@@ -247,7 +250,7 @@ export interface ScaffoldSpec {
 	 * act — unable to declare how any of its work is discharged, which is `REG-F-024`'s *"a gate that covers
 	 * one of two writers is not a gate"* in the writer direction.
 	 */
-	readonly workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	readonly workDischarge?: WorkDischarge;
 	readonly promptTemplate?: PromptTemplate;
 	readonly requiredAssurancePolicyIds?: readonly string[];
 	/** Temp keys of other specs in THIS batch that this type permits as children. */
@@ -302,7 +305,7 @@ function toTypeView(id: string, s: Record<string, unknown>): PwuTypeView {
 		// ⚠ SPREAD, NOT A DEFAULT. `String(s.workDischarge ?? '')` would turn "never asked" into a value and
 		// erase the distinction the engine keeps; the field is simply absent when the state has none.
 		...(s.workDischarge !== undefined
-			? { workDischarge: s.workDischarge as 'MODEL' | 'HUMAN' | 'UNDECLARED' }
+			? { workDischarge: s.workDischarge as WorkDischarge }
 			: {}),
 		...(s.promptTemplate !== undefined ? { promptTemplate: s.promptTemplate as PromptTemplate } : {}),
 		permittedChildTypeIds: arr(s.permittedChildTypeIds),

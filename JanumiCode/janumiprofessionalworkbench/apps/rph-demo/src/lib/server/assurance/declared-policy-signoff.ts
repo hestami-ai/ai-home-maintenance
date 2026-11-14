@@ -390,6 +390,11 @@ function citedRationale(reviewer: ActorReference, row: FloorCriterion): string {
 	return `The reviewer ${reviewer.displayName ?? reviewer.actorId} answered ${row.outcome}${said}`;
 }
 
+/** A reviewer's own criterion result's rationale: its row's, where the row gives one, and no rationale field where it gives none. */
+function ownRationale(row: FloorCriterion): { readonly rationale?: string } {
+	return row.rationale ? { rationale: row.rationale } : {};
+}
+
 /**
  * ⛔ `E12F` F6 — WHAT THE RECORD SAYS BESIDE THE VERDICT OF A POLICY THAT DECLARES NO CRITERION: nothing was checked, so the
  * verdict is INCONCLUSIVE whatever the reviewer recommended (`verdictOf`).
@@ -431,6 +436,91 @@ const unreviewed = (policyId: string): DeclaredPolicyAnswer => ({
 	limitations: [],
 	failure: `No review of ${policyId} was made, so none of its criteria was answered.`
 });
+
+/** ⭐⭐ E2 (design B2) — one criterion's `RecordCriterionResult`, the stipulation beside a stipulated row (form D). */
+function criterionResultStep(
+	assessmentId: string,
+	row: FloorCriterion,
+	human: boolean,
+	reviewer: ActorReference
+): SignoffStep {
+	return [
+		'RecordCriterionResult',
+		'ASSURANCE_ASSESSMENT',
+		assessmentId,
+		{
+			criterionId: row.criterionId,
+			result: row.outcome,
+			...(human
+				? { rationale: citedRationale(reviewer, row) }
+				: ownRationale(row)),
+			...(row.stipulated !== undefined ? { stipulated: row.stipulated } : {})
+		}
+	];
+}
+
+/** ⭐ E2 — a review's findings: each failed criterion's, and a review that produced nothing, the failure's own (PER-9). */
+function findingsOf(answer: DeclaredPolicyAnswer) {
+	return [
+		...answer.observations.map((o) => ({
+			code: o.code,
+			severity: o.severity,
+			statement: o.statement.trim() || `Criterion ${o.code} was answered NOT MET, with no statement.`
+		})),
+		...(answer.failure === undefined
+			? []
+			: [{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL' as const, statement: answer.failure }])
+	];
+}
+
+/** Where one assessment's findings are recorded: its id, its party's steps, the id minter and the blocking findings. */
+interface FindingsTarget {
+	readonly assessmentId: string;
+	readonly party: SignoffStep[];
+	readonly mintId: (prefix: string) => string;
+	readonly blockingObservationIds: string[];
+}
+
+/** ⭐ E2 — EACH FINDING AN OPEN OBSERVATION of its assessment, in order; a blocking one also listed as blocking. */
+function recordFindings(findings: ReturnType<typeof findingsOf>, target: FindingsTarget): void {
+	const { assessmentId, party, mintId, blockingObservationIds } = target;
+	for (const f of findings) {
+		const observationId = mintId('obs');
+		party.push([
+			'RecordAssuranceObservation',
+			'ASSURANCE_OBSERVATION',
+			observationId,
+			{ assessmentId, observationType: 'FINDING', findingCode: f.code, severity: f.severity, statement: f.statement }
+		]);
+		// ⭐ `REG-D-111` (1) — CANON'S "BLOCKING FINDING": what a REJECTED unit's assurance axis cites.
+		if (BLOCKING_SEVERITIES.has(f.severity)) blockingObservationIds.push(observationId);
+	}
+}
+
+/** ⭐ What the record says beside one policy's verdict, where a reader can reach it (`residualUncertainty`). */
+function notedOf(
+	policy: GoverningDeclaredPolicy,
+	answer: DeclaredPolicyAnswer,
+	disposition: AssessmentDisposition,
+	human: boolean
+) {
+	return [
+		...answer.residualUncertainty,
+		...answer.limitations,
+		// ⛔ `E12F` F6 — a policy with no criterion: why its verdict is INCONCLUSIVE.
+		...(policy.criteria.length === 0 ? [noCriterionDeclared(policy.policyId)] : []),
+		...(answer.recommendation === disposition
+			? []
+			: [
+					`The reviewer recommended ${answer.recommendation}; the verdict, ${disposition}, is computed from its criterion answers (REG-D-110 (3)).`
+				]),
+		...(human
+			? [
+					`The HUMAN decision (REG-D-111 (3)): the operator's Record Assurance adopted the reviewer's criterion answers, each cited on its criterion result; no separate human judgement of each criterion was recorded.`
+				]
+			: [])
+	];
+}
 
 /**
  * Plan the review of `pwuId`'s declared policies: one assessment per governing declared policy, driven through the
@@ -519,63 +609,15 @@ export function planDeclaredSignoff(opts: {
 		);
 		// ⭐⭐ E2 (design B2) — ONE `RecordCriterionResult` PER CRITERION, the stipulation beside a stipulated row (form D).
 		for (const row of rows) {
-			party.push([
-				'RecordCriterionResult',
-				'ASSURANCE_ASSESSMENT',
-				assessmentId,
-				{
-					criterionId: row.criterionId,
-					result: row.outcome,
-					...(human
-						? { rationale: citedRationale(reviewer, row) }
-						: row.rationale
-							? { rationale: row.rationale }
-							: {}),
-					...(row.stipulated !== undefined ? { stipulated: row.stipulated } : {})
-				}
-			]);
+			party.push(criterionResultStep(assessmentId, row, human, reviewer));
 			criterionResults += 1;
 		}
 		// ⭐ E2 — EACH FAILED CRITERION AN OPEN FINDING at the policy's severity; and a review that produced nothing, the
 		// failure's own finding, so a reader sees why nothing was judged (PER-9).
-		const findings = [
-			...answer.observations.map((o) => ({
-				code: o.code,
-				severity: o.severity,
-				statement: o.statement.trim() || `Criterion ${o.code} was answered NOT MET, with no statement.`
-			})),
-			...(answer.failure === undefined
-				? []
-				: [{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL' as const, statement: answer.failure }])
-		];
-		for (const f of findings) {
-			const observationId = mintId('obs');
-			party.push([
-				'RecordAssuranceObservation',
-				'ASSURANCE_OBSERVATION',
-				observationId,
-				{ assessmentId, observationType: 'FINDING', findingCode: f.code, severity: f.severity, statement: f.statement }
-			]);
-			// ⭐ `REG-D-111` (1) — CANON'S "BLOCKING FINDING": what a REJECTED unit's assurance axis cites.
-			if (BLOCKING_SEVERITIES.has(f.severity)) blockingObservationIds.push(observationId);
-		}
+		const findings = findingsOf(answer);
+		recordFindings(findings, { assessmentId, party, mintId, blockingObservationIds });
 		// ⭐ What the record says beside the verdict, where a reader can reach it (`residualUncertainty`; the header's §20 note).
-		const noted = [
-			...answer.residualUncertainty,
-			...answer.limitations,
-			// ⛔ `E12F` F6 — a policy with no criterion: why its verdict is INCONCLUSIVE.
-			...(policy.criteria.length === 0 ? [noCriterionDeclared(policyId)] : []),
-			...(answer.recommendation === disposition
-				? []
-				: [
-						`The reviewer recommended ${answer.recommendation}; the verdict, ${disposition}, is computed from its criterion answers (REG-D-110 (3)).`
-					]),
-			...(human
-				? [
-						`The HUMAN decision (REG-D-111 (3)): the operator's Record Assurance adopted the reviewer's criterion answers, each cited on its criterion result; no separate human judgement of each criterion was recorded.`
-					]
-				: [])
-		];
+		const noted = notedOf(policy, answer, disposition, human);
 		party.push([
 			'CompleteAssuranceAssessment',
 			'ASSURANCE_ASSESSMENT',
@@ -713,7 +755,7 @@ export function latestDeclaredVerdicts(
 		const at = typeof s.updatedAt === 'string' ? s.updatedAt : '';
 		const prev = latest.get(policyId);
 		if (!prev || at >= prev.at)
-			latest.set(policyId, { policyId, assessmentId: a.id, state: String(s.assessmentState ?? ''), at });
+			latest.set(policyId, { policyId, assessmentId: a.id, state: String((s.assessmentState ?? '') as string), at });
 	}
 	return new Map([...latest].map(([k, { at: _at, ...v }]) => [k, v]));
 }
@@ -757,6 +799,11 @@ export interface DeclaredRerunOffer {
 	readonly others: readonly OtherDeclaredVerdict[];
 }
 
+/** The REJECTED verdicts a refused re-run names: each as its policy and REJECTED, in their order, joined by '; '. */
+function namedRejections(verdicts: readonly LatestDeclaredVerdict[]): string {
+	return verdicts.map((v) => `${v.policyId} REJECTED`).join('; ');
+}
+
 /**
  * ⭐⭐ `E12F` F3 (`REG-D-112` (a)) — WHETHER THE PERSON MAY RE-RUN `pwuId`'s DECLARED REVIEWS, AND WHICH: read from the record,
  * so the page offers what the server will accept. ⛔ Refused, with why, unless the unit is UNDER_ASSURANCE and ASSESSING
@@ -778,7 +825,7 @@ export function declaredRerunOffer(
 	if (rejected.length > 0)
 		return {
 			refusedBecause:
-				`a declared review concluded against the work (${rejected.map((v) => `${v.policyId} REJECTED`).join('; ')}): a REJECTED ` +
+				`a declared review concluded against the work (${namedRejections(rejected)}): a REJECTED ` +
 				'is not re-reviewed — the latest verdict wins, so a re-review could clear a reasoned refusal (REG-D-105 (3)); it goes ' +
 				"canon's route, a blocking finding (REG-D-111 (1))"
 		};
@@ -786,7 +833,7 @@ export function declaredRerunOffer(
 	if (unit?.workLifecycleState !== 'UNDER_ASSURANCE' || unit.assuranceState !== 'ASSESSING')
 		return {
 			refusedBecause:
-				`the unit is ${String(unit?.workLifecycleState ?? 'unknown')} with its assurance ${String(unit?.assuranceState ?? 'unknown')}; ` +
+				`the unit is ${String((unit?.workLifecycleState ?? 'unknown') as string)} with its assurance ${String((unit?.assuranceState ?? 'unknown') as string)}; ` +
 				'only a unit left under assessment by a declared review that did not conclude may have its declared reviews re-run (REG-D-112 (a))'
 		};
 	const inconclusive = policies.filter((p) => latest.get(p.policyId)?.state === 'INCONCLUSIVE');
@@ -827,11 +874,11 @@ export function foldAfterRerun(
 	plan: DeclaredSignoff,
 	others: readonly OtherDeclaredVerdict[]
 ): AssessmentDisposition {
-	const states = [
+	const states = new Set([
 		...plan.dispositions,
 		...others.map((v): AssessmentDisposition =>
 			(STRICTEST as readonly string[]).includes(v.state) ? (v.state as AssessmentDisposition) : 'INCONCLUSIVE'
 		)
-	];
-	return STRICTEST.find((d) => states.includes(d)) ?? 'INCONCLUSIVE';
+	]);
+	return STRICTEST.find((d) => states.has(d)) ?? 'INCONCLUSIVE';
 }

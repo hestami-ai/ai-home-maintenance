@@ -14,6 +14,7 @@ test.describe('PWA Designer — review gallery', () => {
 		const link = page.getByRole('link', { name: /Product Realization/ }).first();
 		await gotoHydrated(page, (await link.getAttribute('href'))!);
 		await page.locator('.svelte-flow__node').first().waitFor();
+		// S2925: settle-wait before a screenshot - no observable condition for 'the layout has finished animating'.
 		await page.waitForTimeout(600);
 		await shot(page, 'seeded reference PWA — full composition tree + assurance rail');
 
@@ -23,6 +24,7 @@ test.describe('PWA Designer — review gallery', () => {
 			.filter({ hasText: 'Architecture Definition' })
 			.getByRole('button', { name: 'Collapse subtree' })
 			.click();
+		// S2925: settle-wait before a screenshot - no observable condition for 'the layout has finished animating'.
 		await page.waitForTimeout(400);
 		await shot(page, 'Architecture Definition subtree collapsed');
 	});
@@ -72,10 +74,12 @@ test.describe('PWA Designer — review gallery', () => {
 		await page.getByTestId('agent-input').fill(JSON.stringify(plan));
 		await page.getByRole('button', { name: 'Send' }).click();
 		await page.locator('.svelte-flow__node').nth(1).waitFor();
+		// S2925: settle-wait before a screenshot - no observable condition for 'the layout has finished animating'.
 		await page.waitForTimeout(600);
 		await shot(page, 'composition tree — data-flow overlay OFF (clean by default)');
 
 		await page.getByRole('checkbox', { name: 'Data-flow overlay' }).check();
+		// S2925: settle-wait before a screenshot - no observable condition for 'the overlay's edges have finished rendering'.
 		await page.waitForTimeout(400);
 		await shot(page, 'data-flow overlay ON — the ⤳ hand-off edge appears');
 	});

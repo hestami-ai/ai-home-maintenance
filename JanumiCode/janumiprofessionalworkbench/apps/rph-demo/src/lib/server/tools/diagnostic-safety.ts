@@ -46,7 +46,7 @@ export function diagnosticCarriesPrompt(diagnostic: string, prompt: string): boo
  * it was accepted only because there was no alternative. A clean diagnostic survives.
  */
 export function sanitiseToolFailure(error: unknown, prompt: string, toolLabel: string): Error {
-	const raw = error instanceof Error ? error.message : String(error);
+	const raw = error instanceof Error ? error.message : String(error as string);
 	if (!diagnosticCarriesPrompt(raw, prompt)) return new Error(`${toolLabel} invocation failed: ${raw}`);
 	return new Error(
 		`${toolLabel} invocation failed. Its diagnostic is WITHHELD from the record plane: it was MEASURED to ` +

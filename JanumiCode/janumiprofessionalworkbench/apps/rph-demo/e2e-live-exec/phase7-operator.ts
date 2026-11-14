@@ -370,8 +370,12 @@ function allowanceRefusal(
 	if (!paid || half !== 'B' || typeof prior !== 'number') return [];
 	const computed = String(phase7AuthoringReviewAllowance(prior));
 	if (handed === computed) return [];
+	const handedAs =
+		handed === null
+			? `no ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}`
+			: `${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}=${JSON.stringify(handed)}`;
 	return [
-		`the server was handed ${handed === null ? `no ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}` : `${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}=${JSON.stringify(handed)}`}, ` +
+		`the server was handed ${handedAs}, ` +
 			`not the ${computed} this paid half-B run computes — the limit of ${PHASE7_PAID_LIMIT} less the ${prior} calls spent ` +
 			`before the run and the negative control’s ${PHASE7_NEGATIVE_CONTROL_RESERVE} (REG-F-580; design D20, D26): Send’s check ` +
 			'counts the computed allowance, so a server handed another would bound the authoring review by a figure that check ' +
@@ -716,12 +720,12 @@ export const DRY_PRESS_NOT_REACHED =
 	'not pressed in a dry run: a dry run calls no model, and the first unit the page offers runs one — the root, which runs none, waits for its children (REG-D-112 (b); REG-D-135 (2)); the page was loaded afresh, the row read and Begin & Execute found on it';
 
 /** ⭐ Package M (D4, D6) — a unit the page never offered: not started, with the page's own reason. */
-export const notStartedBecause = (o: StartOffer | undefined): string =>
-	o?.reason !== null && o?.reason !== undefined
-		? `not started: ${o.reason}`
-		: o?.offered === true
-			? 'not started: offered, and the run ended before it was pressed'
-			: 'not started: its row offered no Begin & Execute';
+export const notStartedBecause = (o: StartOffer | undefined): string => {
+	if (o?.reason !== null && o?.reason !== undefined) return `not started: ${o.reason}`;
+	return o?.offered === true
+		? 'not started: offered, and the run ended before it was pressed'
+		: 'not started: its row offered no Begin & Execute';
+};
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package O — D24 (design revision 3) — WHAT A RUN THAT ENDED ITS PRESSES STILL HOLDS UNDONE, one line per
@@ -2642,12 +2646,10 @@ export async function runTheLane(r: {
 			const recorded = recordedReviewerCalls(snapshot);
 			const refused = rerun === 'rerunReview' ? refusedReviewsOf(snapshot, unit.unitId!) : undefined;
 			const reRunAhead = rerun === 'rerunWork' ? PHASE7_UNIT_REVIEWER_CALLS : phase7RereviewReviewerCalls(refused);
-			const reRunCounted =
-				rerun === 'rerunWork'
-					? COUNTED_AHEAD.wholePress
-					: refused === undefined
-						? COUNTED_AHEAD.refusedReviewsUnread
-						: COUNTED_AHEAD.refusedReviews(refused);
+			let reRunCounted: string;
+			if (rerun === 'rerunWork') reRunCounted = COUNTED_AHEAD.wholePress;
+			else if (refused === undefined) reRunCounted = COUNTED_AHEAD.refusedReviewsUnread;
+			else reRunCounted = COUNTED_AHEAD.refusedReviews(refused);
 			const check = limitCheck(boot.prior as number, recorded, reRunAhead, reRunCounted);
 			if (!check.allowed) {
 				notPressed(unit, rerun, check, `the limit: ${check.total} of ${check.limit} reviewer calls (D8)`);
@@ -2898,9 +2900,12 @@ export async function runTheLane(r: {
 		const looped = record.units.filter((u) => offers.get(u.unitId!)?.kinds.includes('loop') === true);
 		if (looped.length > 0) {
 			notStartedFrom(offers);
+			const loopedReasons = looped
+				.map((u) => `${u.title} — ${offers.get(u.unitId!)?.reason ?? 'in a loop'}`)
+				.join('; ');
 			return end(
 				'order-unresolvable',
-				`${looped.map((u) => `${u.title} — ${offers.get(u.unitId!)?.reason ?? 'in a loop'}`).join('; ')}: no unit of a ` +
+				`${loopedReasons}: no unit of a ` +
 					'loop can ever start, so nothing is pressed and the tree’s order is never used instead (D5; REG-D-135 (2))'
 			);
 		}
@@ -3091,11 +3096,13 @@ function halfBDryShortfalls(record: RunRecord): string[] {
 export function laneVerdict(record: RunRecord): string[] {
 	const wanted: EndReason = record.mode === 'paid' ? 'complete' : 'dry-run-stop';
 	const ended = record.end;
-	if (ended?.reason !== wanted)
+	if (ended?.reason !== wanted) {
+		const endedAs = ended === null ? 'with no end recorded' : `'${ended.reason}'`;
 		return [
-			`the run ended ${ended === null ? 'with no end recorded' : `'${ended.reason}'`}, not '${wanted}'` +
+			`the run ended ${endedAs}, not '${wanted}'` +
 				(ended?.detail === undefined ? '' : `: ${ended.detail}`)
 		];
+	}
 	if (record.mode === 'paid') return [];
 	// ⭐ E3 (C6) — HALF B'S DRY REHEARSAL STOPS BEFORE SEND, so what it proves is the draft, and that nothing was sent.
 	if (record.half === 'B') return halfBDryShortfalls(record);

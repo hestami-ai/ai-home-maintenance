@@ -58,7 +58,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compareTrees, genPackages, NOT_SOURCE } from './gen-freshness-core.js';
 
-const ROOT = fileURLToPath(new URL('../', import.meta.url)).split('\\').join('/');
+const ROOT = fileURLToPath(new URL('../', import.meta.url)).replaceAll('\\', '/');
 const PRETTIER_CONFIG = `${ROOT}.prettierrc.json`;
 const PRETTIER_CLI = `${ROOT}node_modules/prettier/bin/prettier.cjs`;
 
@@ -91,7 +91,7 @@ const drifted: string[] = [];
 try {
 	for (const pkg of packages) {
 		const source = join(ROOT, pkg.dir);
-		const copy = join(scratch, pkg.dir.split('/').join('__'));
+		const copy = join(scratch, pkg.dir.replaceAll('/', '__'));
 		cpSync(source, copy, {
 			recursive: true,
 			filter: (from) => !NOT_SOURCE.has(from.split(/[\\/]/).pop() ?? '')

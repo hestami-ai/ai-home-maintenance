@@ -47,7 +47,7 @@ import {
 	splitAnswerSpan
 } from './agy-cli.js';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
-import type { ExchangeRecord, ModelInput } from '../agent/exchange-record.js';
+import type { ExchangeParseOutcome, ExchangeRecord, ModelInput } from '../agent/exchange-record.js';
 import { captureTry, type ExchangeSink } from './exchange-capture.js';
 import { sanitiseToolFailure } from '../tools/diagnostic-safety.js';
 import {
@@ -67,7 +67,6 @@ import {
 	freeTierRefusalsOf,
 	type FreeTierRefusals
 } from '../tools/free-tier-refusals.js';
-import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { allocate } from './process-result-render.js';
 import {
@@ -584,6 +583,19 @@ export const DECLARED_WORK_RERUN_CLAUSE =
 	'; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted ' +
 	'from its first step, so a file an earlier step changed can be among them, and its "sequence" is that step’s alone';
 
+/** The slice a work product's review names its subject by: its answer when it is shown its deliverable, else the work product. */
+const workProductSubjectSlice = (deliverable: Deliverable | undefined): string =>
+	deliverable ? 'the answer' : 'the work product';
+
+/** A declared review's policy — ⛔ refused, never sent, when the input names none. */
+function requireDeclaredPolicy(policy: DeclaredPolicyFraming | undefined): DeclaredPolicyFraming {
+	if (!policy) throw new Error(NO_DECLARED_POLICY_STATEMENT);
+	return policy;
+}
+
+/** The slice a declared review names its intent by: the unit's purpose, or the instruction that produced the work. */
+const declaredIntentSlice = (ownPurpose: boolean): string => (ownPurpose ? 'the purpose' : 'the instruction');
+
 function framingText(
 	input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction' | 'deliverable' | 'declaredWorkRerun'>
 ): Framed {
@@ -606,7 +618,7 @@ function framingText(
 						? WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT
 						: WORK_PRODUCT_DELIVERABLE_SUBJECT
 					: 'The WORK PRODUCT to review — the output a professional work unit produced by running the instruction above:',
-				subjectSlice: input.deliverable ? 'the answer' : 'the work product',
+				subjectSlice: workProductSubjectSlice(input.deliverable),
 				// ⭐⭐ Package X — D32 — and, shown its deliverable, empty or not, the account's heading of its own: the host's record of
 				// this step the measure of what the account says the step did (`WORK_PRODUCT_DELIVERABLE_ACCOUNT_HEADING`). ⛔ Shown
 				// none (a historical case), the shared heading, as before.
@@ -659,8 +671,7 @@ function framingText(
 			// the commands it ran (or, for a unit composed of others, ~~its children's~~ ⭐ R3-A F1: its whole subtree's —
 			// `REG-D-111` (2)'s general form), against the policy's purpose, its criteria the rubric. ⛔ Refused, never sent, when
 			// the input names no policy.
-			const policy = input.declaredPolicy;
-			if (!policy) throw new Error(NO_DECLARED_POLICY_STATEMENT);
+			const policy = requireDeclaredPolicy(input.declaredPolicy);
 			// ⛔ `E12F` F4 (`R14`) — ~~"produced … by a DIFFERENT AI agent (for a unit composed of others, by the agents that did
 			// its children's work), which was given exactly this instruction:"~~ — false of the root, whose instruction is its
 			// purpose. The intent line now says what the instruction IS, as the caller declares it, and refuses when it does not.
@@ -669,7 +680,7 @@ function framingText(
 			const ownPurpose = instruction === 'UNIT_PURPOSE';
 			return {
 				intent: ownPurpose ? DECLARED_UNIT_PURPOSE_INTENT : DECLARED_PRODUCING_PROMPT_INTENT,
-				intentSlice: ownPurpose ? 'the purpose' : 'the instruction',
+				intentSlice: declaredIntentSlice(ownPurpose),
 				// ⭐ The work is ONE line of JSON (`declaredPolicyReviewInput`), and this host line states its serialization —
 				// and that the exit codes in it are the host's record, quoted beside the agent's arguments (`REG-F-481`).
 				// ⭐⭐ Package N — D11 (`REG-D-135` (1), the lead's D11) — and, where the host recorded them at a unit's completion,
@@ -727,7 +738,7 @@ function renderObservedCalls(report: ObservedToolCallReport | undefined): string
 	if (!report)
 		return 'The host reported nothing about the tool calls of that turn, so this says nothing about which calls were made in it. That is an absence of observation, not an observation of absence.';
 	if (report.observation === 'NOT_OBSERVABLE')
-		return `The host was NOT IN A POSITION TO OBSERVE the tool calls of that turn${report.reason ? `: ${report.reason}` : '.'} Draw no conclusion from this about which calls were or were not made in it.`;
+		return `The host was NOT IN A POSITION TO OBSERVE the tool calls of that turn${notObservableReason(report.reason)} Draw no conclusion from this about which calls were or were not made in it.`;
 	if (report.observation === 'NONE_OBSERVED')
 		return 'The host WATCHED and observed NO tool calls at all during that turn. Calls made in an earlier turn are not shown here.';
 	const calls = (report.calls ?? [])
@@ -744,6 +755,11 @@ function renderObservedCalls(report: ObservedToolCallReport | undefined): string
 			? `\n  (${report.observedCount} calls were observed; only the first ${report.recordedLimit} are listed.)`
 			: '';
 	return `The host OBSERVED these tool calls in that turn, in the order they started:\n${calls}${truncated}\n⚠ COMPLETED means the CALL completed, NOT that the command passed — a failing test suite completes its call. This command's verdict is in the result above. The other calls' verdicts are not shown.`;
+}
+
+/** The end of the NOT_OBSERVABLE line's first sentence: the report's reason after a colon, or a full stop when it gives none. */
+function notObservableReason(reason: string | undefined): string {
+	return reason ? `: ${reason}` : '.';
 }
 
 /**
@@ -835,8 +851,10 @@ function actParts(act: HostSequenceAct, subjectOrdinal: number | undefined): Act
 }
 
 /** The declaration of a cut of one act's agent text, on its own line before the act. */
-const actCutDeclaration = (p: ActParts, kept: number, total: number, removed: number): string =>
-	`  ${headCutDeclaration(`the ${p.what} of act ${p.act.ordinal}`, kept, total, removed)}`;
+const actCutDeclaration = (p: ActParts, kept: number, total: number, removed: number): string => {
+	const slice = `the ${p.what} of act ${p.act.ordinal}`;
+	return `  ${headCutDeclaration(slice, kept, total, removed)}`;
+};
 
 /** The acts' lines in order, each try's acts under a line naming it, each act's agent text as `shown` gives it. */
 function sequenceBody(acts: readonly ActParts[], shown: (p: ActParts, i: number) => { declaration?: string; json: string }): string {
@@ -882,7 +900,7 @@ function fitActs(acts: readonly ActParts[], room: number): { readonly body: stri
 			continue;
 		}
 		const shownJson = acts.map((p, i) => (cut[i] ? headOf(p.json, shares[i]!) : p.json));
-		if (shownJson.some((j) => j === '')) return undefined;
+		if (shownJson.includes('')) return undefined;
 		const body = sequenceBody(acts, (p, i) =>
 			cut[i]
 				? {
@@ -1824,6 +1842,21 @@ function deliverablePrompt(input: ReasoningReviewInput, plan: ReturnType<typeof 
 	return plan.assemble(fence, renderDeliverable(fence, layout));
 }
 
+/** A declared review's work as its builder cut it, unit by unit (`declaredWorkCut`); no other framing has one. */
+const declaredWorkCutOf = (input: ReasoningReviewInput): string | undefined =>
+	input.framing === 'DECLARED_POLICY' ? input.declaredWorkCut : undefined;
+
+/** A part's declarations as its builder cut it (`declaredPartCut`); no framing but a part's has one. */
+const declaredPartCutOf = (input: ReasoningReviewInput): string | undefined =>
+	input.framing === 'PWA_TYPE' ? input.declaredPartCut : undefined;
+
+/** Whether a builder's cut, with its line feed and the work it declares, would pass the content's budget. */
+const builderCutOverBudget = (
+	builderCut: string | undefined,
+	input: ReasoningReviewInput,
+	plan: ReturnType<typeof promptPlan>
+): boolean => builderCut !== undefined && builderCut.length + 1 + input.content.length > plan.contentBudget;
+
 /**
  * TODAY'S PROMPT for `input`: the head, every slice cut to its room and fenced, then today's review section. ⭐⭐ Package Z1 —
  * D52: never sent since Z1; what the room is computed with, and what the measured prompt keeps of it — its head, byte for byte.
@@ -1834,13 +1867,13 @@ function judgePrompt(input: ReasoningReviewInput, plan: ReturnType<typeof prompt
 	// A process result: its content is the builder's REVIEW view, already fenced — read whole by the chooser, never cut.
 	// ⭐ P5 package B (F2) — a declared review's work its builder cut unit by unit: shown as cut, its declaration the
 	// builder's, and never cut again here; one that does not fit is refused.
-	const builderCut = input.framing === 'DECLARED_POLICY' ? input.declaredWorkCut : undefined;
-	if (builderCut !== undefined && builderCut.length + 1 + input.content.length > plan.contentBudget)
+	const builderCut = declaredWorkCutOf(input);
+	if (builderCutOverBudget(builderCut, input, plan))
 		throw new Error(DECLARED_WORK_CUT_OVER_BUDGET);
 	// ⭐⭐ The review in parts, B1 (`REG-D-125`; design D3) — A PART IS NEVER CUT HERE: its builder fitted it to this budget,
 	// its subject whole and its children's skeletons cut child by child, each cut declared (`declaredPartCut`). A part that does
 	// not fit, its declarations counted in its room, is refused, so no generic head cut can remove the subject's bytes.
-	const partCut = input.framing === 'PWA_TYPE' ? input.declaredPartCut : undefined;
+	const partCut = declaredPartCutOf(input);
 	const partLength = (partCut === undefined ? 0 : partCut.length + 1) + input.content.length;
 	if (input.framing === 'PWA_TYPE' && partLength > plan.contentBudget)
 		throw new Error(pwaTypeOverBudgetStatement(partLength, plan.contentBudget));
@@ -1954,6 +1987,12 @@ function indicationParseOutcome(e: IndicationExchange): ExchangeParseOutcome {
 	if (e.outcome.kind === 'SCORED') return { outcome: 'PARSED', detail: `answers.${e.key}.noul read: ${e.outcome.score}` };
 	if (e.outcome.kind === 'UNLOAD') return { outcome: 'NOT_ATTEMPTED', detail: 'Step 1’s unload request: its answer is not read (D51).' };
 	return { outcome: e.outcome.parse, detail: recordable(e.outcome.reason) };
+}
+
+/** A decision-model request's disposition: accepted unless it failed; failed, no-response if nothing arrived, else rejected. */
+function indicationDisposition(e: IndicationExchange): 'accepted' | 'no-response' | 'rejected' {
+	if (e.outcome.kind !== 'FAILED') return 'accepted';
+	return e.response === '' ? 'no-response' : 'rejected';
 }
 
 /** The statement a review fails with when its validator was given no indications source. Host-authored and fixed. */
@@ -2243,7 +2282,7 @@ const PARSED: ExchangeParseOutcome = {
  * span could be LOCATED at all, which `JSON.parse` throwing cannot.
  */
 function classifyParse(raw: string, error: unknown): ExchangeParseOutcome {
-	const detail = error instanceof Error ? error.message : String(error);
+	const detail = error instanceof Error ? error.message : String(error as string);
 	if (raw.trim() === '')
 		return { outcome: 'EMPTY_RESPONSE', detail: 'The model returned no bytes at all.' };
 	if (!splitAnswerSpan(raw).located)
@@ -2567,6 +2606,46 @@ export interface AgyValidatorOptions {
 	clock?: () => string;
 }
 
+/** The review's context — ⛔ a validator handed none refuses before anything is asked. */
+function requireReasoningReview(input: ReasoningReviewInput | undefined): ReasoningReviewInput {
+	if (!input) throw new Error('reasoning-review context (prompt + content) is missing');
+	return input;
+}
+
+/**
+ * The indications source as the validator asks it: `source` itself, each result's exchanges handed to `record` as it
+ * arrives (none, when it carries none) — or no source, when none is configured.
+ */
+function recordingSource(
+	source: IndicationsSource | undefined,
+	record: (exchanges: readonly IndicationExchange[]) => void
+): IndicationsSource | undefined {
+	return source === undefined
+		? undefined
+		: async (requests, material) => {
+				const result = await source(requests, material);
+				record(result.exchanges ?? []);
+				return result;
+			};
+}
+
+/**
+ * A reviewer's reply as parsed: its value before coercion (kept when coercion throws), its judgement, and the error
+ * that stopped either — `parsed` undefined and `error` set when one did.
+ */
+function parsedReply(
+	raw: string,
+	input: ReasoningReviewInput
+): { readonly value: unknown; readonly parsed: ReasoningReviewJudgement | undefined; readonly error: unknown } {
+	let value: unknown;
+	try {
+		value = JSON.parse(extractJson(raw));
+		return { value, parsed: coerceJudgement(value, input), error: undefined };
+	} catch (e) {
+		return { value, parsed: undefined, error: e };
+	}
+}
+
 export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}): Validator {
 	const print = opts.print ?? agyPrint;
 	const clock = opts.clock ?? (() => new Date().toISOString());
@@ -2578,8 +2657,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
 		validatorId: 'agy.reasoning-review',
 		async evaluate(subject, ctx): Promise<ValidatorResult> {
-			const input = ctx.reasoningReview;
-			if (!input) throw new Error('reasoning-review context (prompt + content) is missing');
+			const input = requireReasoningReview(ctx.reasoningReview);
 			// Resolved per call, never at module load: §8.4 requires the evaluator's ACTUAL identity be recorded,
 			// and §14.6 the "allowed and resolved" model. Throws when unpinned rather than record a placeholder.
 			// ── ⭑⭑ JAN-ASRIDENT — THE CONFIGURED IDENTITY IS A STARTING POINT, NOT THE RECORD ────────────
@@ -2655,7 +2733,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					},
 					prompt: e.body,
 					rawOutput: e.response,
-					disposition: e.outcome.kind !== 'FAILED' ? 'accepted' : e.response === '' ? 'no-response' : 'rejected',
+					disposition: indicationDisposition(e),
 					attemptOrdinal: tryCounter,
 					requestedAt: e.requestedAt,
 					respondedAt: e.respondedAt,
@@ -2674,14 +2752,9 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// consumer together). ⛔ Never a reviewer call: its provider says whose it is (`isDecisionModelExchange`).
 			let requested: readonly IndicationExchange[] = [];
 			const source = opts.indications;
-			const asked: IndicationsSource | undefined =
-				source === undefined
-					? undefined
-					: async (requests, material) => {
-							const result = await source(requests, material);
-							requested = result.exchanges ?? [];
-							return result;
-						};
+			const asked: IndicationsSource | undefined = recordingSource(source, (exchanges) => {
+				requested = exchanges;
+			});
 			let prompt: string;
 			try {
 				prompt = await reviewPrompt(input, asked);
@@ -2788,6 +2861,56 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			};
 
 			/**
+			 * What one call of the backing tool RETURNED, read by `attempt` inside its `try`: the answer's text, and — when the tool
+			 * returned more than a string — its session export, its observation and, when it named one, the identity it reported.
+			 */
+			const answerOf = (returned: Awaited<ReturnType<AgyPrint>>): string => {
+				if (isToolInvocationResult(returned)) {
+					toolSessionExport = returned.sessionExport;
+					// ⚠ `JAN-NOANS` — NARROWED HERE, AND THIS PLANE'S BEHAVIOUR IS DELIBERATELY UNCHANGED.
+					// `classifyParse` below already asks *"did the model return no bytes?"* FIRST and reports
+					// `EMPTY_RESPONSE` — the assurance plane has been right about this all along, and
+					// `REG-F-410` is that the EXECUTION plane never asked. Collapsing to `''` preserves that
+					// verdict exactly.
+					// ⭐ AND THE COLLAPSE IS CURRENTLY LOSSLESS, WHICH I CHECKED RATHER THAN ASSUMED. My first
+					// note here said a reviewer whose provider refused the model would be recorded as a
+					// reviewer that said nothing — the same finding on this plane. **That is not reachable
+					// today.** Only two adapters can be a reviewer (`agyPrint`, this validator's `print` default,
+					// and `devinPrint`, which `assurance/index.ts` hands in when devin is selected — ⭑ `JAN-SELREV`
+					// SR-3: the `:340` and `index.ts:69` anchors this cited had drifted), and BOTH THROW on a
+					// failed invocation rather than returning. So the only cause that can arrive here is `ENDED_WITHOUT_ANSWER`, which
+					// is exactly what `classifyParse` already reports as `EMPTY_RESPONSE`.
+					//
+					// ⚠ IT BECOMES LOSSY THE MOMENT A SESSION-BASED REVIEWER IS WIRED — one that RESOLVES on a
+					// provider refusal instead of throwing, which is precisely what `pi-executor` does and why
+					// `REG-F-410` happened on the execution plane first. Whoever wires that must widen this
+					// line in the same commit; the bound is stated here rather than left as an asymmetry a
+					// reader would have to assume was considered.
+					const text = returned.answer.arrived ? returned.answer.text : '';
+					// ⚠ TAKEN OUTSIDE THE IDENTITY GUARD BELOW, DELIBERATELY. What a tool observed and whether
+					// it named a usable model are INDEPENDENT facts; nesting this inside the identity check
+					// would silently discard a real observation because an unrelated field was empty.
+					toolObservation = returned.observedToolCalls;
+					// ⭑⭑ THE TOOL'S OWN ACCOUNT BEATS THE HOST'S CONFIGURATION, exactly as it does on the
+					// execution side (`run-model-step`). ⚠ ONLY WHEN NON-EMPTY: `checkIndependence` requires
+					// both sides defined and different, so an empty id overwriting a configured one would
+					// fail the check CLOSED — safe, but for the wrong reason, and indistinguishable from
+					// genuine sameness to a reader.
+					if (returned.producer.modelId && returned.producer.providerId) {
+						evaluator = {
+							...evaluator,
+							agentId: returned.producer.agentId || evaluator.agentId,
+							modelId: returned.producer.modelId,
+							providerId: returned.producer.providerId
+						};
+						identityEvidence = returned.identityEvidence;
+					}
+					return text;
+				}
+				return returned;
+			};
+
+			/**
 			 * ⭐⭐ `JAN-EXEC` Phase 7 `P7-2b` (`REG-D-102` (2)) — ONE CALL OF THE BACKING TOOL, TIMED: its answer, or — when its
 			 * `print` threw — the record of a call that got no reply, and whether it is run once more.
 			 *
@@ -2823,47 +2946,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				toolSessionExport = undefined;
 				try {
 					const returned = await print(p);
-					if (isToolInvocationResult(returned)) {
-						toolSessionExport = returned.sessionExport;
-						// ⚠ `JAN-NOANS` — NARROWED HERE, AND THIS PLANE'S BEHAVIOUR IS DELIBERATELY UNCHANGED.
-						// `classifyParse` below already asks *"did the model return no bytes?"* FIRST and reports
-						// `EMPTY_RESPONSE` — the assurance plane has been right about this all along, and
-						// `REG-F-410` is that the EXECUTION plane never asked. Collapsing to `''` preserves that
-						// verdict exactly.
-						// ⭐ AND THE COLLAPSE IS CURRENTLY LOSSLESS, WHICH I CHECKED RATHER THAN ASSUMED. My first
-						// note here said a reviewer whose provider refused the model would be recorded as a
-						// reviewer that said nothing — the same finding on this plane. **That is not reachable
-						// today.** Only two adapters can be a reviewer (`agyPrint`, this validator's `print` default,
-						// and `devinPrint`, which `assurance/index.ts` hands in when devin is selected — ⭑ `JAN-SELREV`
-						// SR-3: the `:340` and `index.ts:69` anchors this cited had drifted), and BOTH THROW on a
-						// failed invocation rather than returning. So the only cause that can arrive here is `ENDED_WITHOUT_ANSWER`, which
-						// is exactly what `classifyParse` already reports as `EMPTY_RESPONSE`.
-						//
-						// ⚠ IT BECOMES LOSSY THE MOMENT A SESSION-BASED REVIEWER IS WIRED — one that RESOLVES on a
-						// provider refusal instead of throwing, which is precisely what `pi-executor` does and why
-						// `REG-F-410` happened on the execution plane first. Whoever wires that must widen this
-						// line in the same commit; the bound is stated here rather than left as an asymmetry a
-						// reader would have to assume was considered.
-						text = returned.answer.arrived ? returned.answer.text : '';
-						// ⚠ TAKEN OUTSIDE THE IDENTITY GUARD BELOW, DELIBERATELY. What a tool observed and whether
-						// it named a usable model are INDEPENDENT facts; nesting this inside the identity check
-						// would silently discard a real observation because an unrelated field was empty.
-						toolObservation = returned.observedToolCalls;
-						// ⭑⭑ THE TOOL'S OWN ACCOUNT BEATS THE HOST'S CONFIGURATION, exactly as it does on the
-						// execution side (`run-model-step`). ⚠ ONLY WHEN NON-EMPTY: `checkIndependence` requires
-						// both sides defined and different, so an empty id overwriting a configured one would
-						// fail the check CLOSED — safe, but for the wrong reason, and indistinguishable from
-						// genuine sameness to a reader.
-						if (returned.producer.modelId && returned.producer.providerId) {
-							evaluator = {
-								...evaluator,
-								agentId: returned.producer.agentId || evaluator.agentId,
-								modelId: returned.producer.modelId,
-								providerId: returned.producer.providerId
-							};
-							identityEvidence = returned.identityEvidence;
-						}
-					} else text = returned;
+					text = answerOf(returned);
 				} catch (e) {
 					// ⛔ THE SEAM SANITISES, NOT JUST THE ADAPTERS — and that gap was real. `agyPrint` and
 					// `devinPrint` each scrub their own failures, so the guarantee held only for the two adapters
@@ -3173,17 +3256,8 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// legitimately reached — which makes RETENTION capable of leaving assurance incomplete, and that is
 			// `ASR-11` LIMB 1's subject, not limb 3's. The trigger is ARMED, not fired: no flakiness has been
 			// observed, so the behaviour is left as `REG-F-338` chose it and the ground is corrected instead.
-			let firstParsed: ReasoningReviewJudgement | undefined;
-			let firstError: unknown;
 			// ⭐ P7-6 I5 — the reply as parsed, before coercion: what `noCriterionCause` reads the cause off (`P76F-A` A2).
-			let firstValue: unknown;
-			try {
-				firstValue = JSON.parse(extractJson(firstRaw));
-				firstParsed = coerceJudgement(firstValue, input);
-			} catch (e) {
-				firstParsed = undefined;
-				firstError = e;
-			}
+			const { value: firstValue, parsed: firstParsed, error: firstError } = parsedReply(firstRaw, input);
 			// ⭐ `JAN-EXEC` `P7-2b` — EACH ANSWERED TRY IS RECORDED UNDER THE ROLE AND PREDECESSOR `timed` RETURNS: the call
 			// asked for, or its `retry` after a call that threw, so the chain reads as the calls were made.
 			if (firstParsed) {

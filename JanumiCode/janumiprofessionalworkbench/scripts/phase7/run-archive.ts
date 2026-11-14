@@ -275,6 +275,29 @@ function recreateLink(from: string, target: string, to: string): void {
 	}
 }
 
+/** The link at `path` recreated at `target` with its target's text, as `copyTreeExact` records it: made, or why not. */
+function copiedLink(path: string, target: string, relPath: string): TreeCopy['links'][number] {
+	const linked = readlinkSync(path);
+	try {
+		recreateLink(path, linked, target);
+		// ⚠ A junction's target is made absolute, so the copy's text can differ from the original's: said so.
+		const made = readlinkSync(target);
+		return {
+			path: relPath,
+			target: linked,
+			recreated: true,
+			...(made === linked ? {} : { problem: `recreated with the target text ${made}` })
+		};
+	} catch (e) {
+		return {
+			path: relPath,
+			target: linked,
+			recreated: false,
+			problem: e instanceof Error ? e.message : String(e)
+		};
+	}
+}
+
 /**
  * ⭐ D6 — copy the folder `source` to `destination`, byte for byte: each file's bytes as they are (no line ending is
  * touched, no encoding read), each folder, and each link AS A LINK, its target's text kept and never followed — so the
@@ -301,25 +324,7 @@ export function copyTreeExact(source: string, destination: string): TreeCopy {
 			const relPath = rel === '' ? name : `${rel}/${name}`;
 			const stat = lstatSync(path);
 			if (stat.isSymbolicLink()) {
-				const linked = readlinkSync(path);
-				try {
-					recreateLink(path, linked, target);
-					// ⚠ A junction's target is made absolute, so the copy's text can differ from the original's: said so.
-					const made = readlinkSync(target);
-					out.links.push({
-						path: relPath,
-						target: linked,
-						recreated: true,
-						...(made === linked ? {} : { problem: `recreated with the target text ${made}` })
-					});
-				} catch (e) {
-					out.links.push({
-						path: relPath,
-						target: linked,
-						recreated: false,
-						problem: e instanceof Error ? e.message : String(e)
-					});
-				}
+				out.links.push(copiedLink(path, target, relPath));
 			} else if (stat.isDirectory()) {
 				out.folders += 1;
 				walk(path, target, relPath);
@@ -604,6 +609,7 @@ function causesOf(
 	const final = input.unitId === null;
 	const joinRefused = (input.refusal ?? '').includes('could not be recorded as evidence');
 	const perUnit = 'the final archive reads every unit at once; each unit’s own archive says';
+	const refusalSays = joinRefused ? 'says' : 'does not say';
 	return [
 		{
 			cause: k5CapCause(input.reviewedRunLimit),
@@ -624,7 +630,7 @@ function causesOf(
 			possible: final || joinRefused,
 			why: final
 				? perUnit
-				: `the unit’s refusal ${joinRefused ? 'says' : 'does not say'} a run could not be recorded as evidence`
+				: `the unit’s refusal ${refusalSays} a run could not be recorded as evidence`
 		},
 		{
 			cause: K5_OWN_FOLDER_CAUSE,
@@ -870,7 +876,7 @@ function instructionFiles(text: string): string[] {
 			at + PI_CONTEXT_MARKERS[1].length + 4096
 		);
 		const end = tail.indexOf('>');
-		const path = (end === -1 ? tail : tail.slice(0, end)).replaceAll('\\"', '').replaceAll('"', '');
+		const path = (end === -1 ? tail : tail.slice(0, end)).replaceAll(String.raw`\"`, '').replaceAll('"', '');
 		out.push(
 			path
 				.split(/[\\/]+/)
@@ -882,6 +888,28 @@ function instructionFiles(text: string): string[] {
 }
 
 const occurrences = (text: string, needle: string): number => text.split(needle).length - 1;
+
+/** K4's line for each context file in a folder above the workspace, in order. */
+function pushAncestorFindings(
+	findings: string[],
+	withContext: K4Check['ancestors']['withContextFiles']
+): void {
+	for (const a of withContext)
+		for (const f of a.contextFiles)
+			findings.push(
+				`${join(a.path, f)}: above the workspace, on the path Pi reads its context from by default${LEFT_OUT_BY_THE_EXECUTOR}`
+			);
+}
+
+/** K4's line for each try whose recorded executor input holds Pi's context block, in order. */
+function pushInputFindings(findings: string[], inputs: K4Check['inputs']): void {
+	for (const i of inputs)
+		if (Object.values(i.markers).some((n) => n > 0))
+			findings.push(
+				`${i.exchangeId}: its recorded executor input holds Pi's context block` +
+					(i.files.length > 0 ? `, naming ${i.files.join(', ')}` : '')
+			);
+}
 
 /**
  * ⭐ K4 — as Pi's loader takes context by default: its agent folder, every folder above the workspace, the workspace
@@ -911,11 +939,7 @@ export function k4Check(input: K4Input): K4Check {
 	const withContext = above
 		.map((path) => ({ path, contextFiles: contextFilesIn(path) }))
 		.filter((a) => a.contextFiles.length > 0);
-	for (const a of withContext)
-		for (const f of a.contextFiles)
-			findings.push(
-				`${join(a.path, f)}: above the workspace, on the path Pi reads its context from by default${LEFT_OUT_BY_THE_EXECUTOR}`
-			);
+	pushAncestorFindings(findings, withContext);
 	const rootExists = existsSync(input.workspace);
 	const rootFiles = contextFilesIn(input.workspace);
 	for (const f of rootFiles)
@@ -959,12 +983,7 @@ export function k4Check(input: K4Input): K4Check {
 		const markers = Object.fromEntries(PI_CONTEXT_MARKERS.map((m) => [m, occurrences(text, m)]));
 		return { exchangeId: x.id, read: 'searched' as const, markers, files: instructionFiles(text) };
 	});
-	for (const i of inputs)
-		if (Object.values(i.markers).some((n) => n > 0))
-			findings.push(
-				`${i.exchangeId}: its recorded executor input holds Pi's context block` +
-					(i.files.length > 0 ? `, naming ${i.files.join(', ')}` : '')
-			);
+	pushInputFindings(findings, inputs);
 	return {
 		agentDir: { path: agentDir, contextFiles: agentFiles, appendPrompt, extensions },
 		ancestors: { checked: above.length, withContextFiles: withContext },

@@ -275,7 +275,7 @@ interface Run {
 	readonly evaluations: Map<string, Evaluation>;
 }
 const evaluationKey = (caseId: string, repetition: number) => `${caseId}#${repetition}`;
-const lastOf = (e: Evaluation): CallLine => e.calls[e.calls.length - 1]!;
+const lastOf = (e: Evaluation): CallLine => e.calls.at(-1)!;
 /** An evaluation is complete when its last call carries the outcome — a run stopped part-way leaves one that is not. */
 const complete = (e: Evaluation): boolean => lastOf(e).scored !== null;
 /**
@@ -319,15 +319,20 @@ function addLine(line: RecordLine, file: string, at: string, p: Parsed, refuse: 
 		case 'CALL':
 			return addCall(line, file, p);
 		case 'RESCORED':
-			return void p.rescored.push({ line, at });
+			p.rescored.push({ line, at });
+			return;
 		case 'ESCALATION':
-			return void p.escalations.push({ line, at });
+			p.escalations.push({ line, at });
+			return;
 		case 'ACKNOWLEDGED':
-			return void p.acknowledged.push({ line, at });
+			p.acknowledged.push({ line, at });
+			return;
 		case 'SUPERSEDED':
-			return void p.superseded.push({ line, at });
+			p.superseded.push({ line, at });
+			return;
 		case 'HELD_OUT':
-			return void p.heldOut.push({ line, at });
+			p.heldOut.push({ line, at });
+			return;
 		case 'SELECTION':
 			return void p.selections.push({ line, at });
 	}
@@ -561,7 +566,7 @@ function dayProblem(r: Run): string | undefined {
 		return `run ${r.run.runId} counts for nothing: ${days.caseId}#${days.repetition} recorded a server clock that is not an HTTP date (${JSON.stringify(days.served!.serverClock)}), so its day cannot be known`;
 	if (days.size <= 1) return undefined;
 	return (
-		`run ${r.run.runId} counts for nothing: its calls fall on server-clock days ${[...days].sort().join(' and ')} ` +
+		`run ${r.run.runId} counts for nothing: its calls fall on server-clock days ${[...days].sort((a, b) => Number(a > b) - Number(a < b)).join(' and ')} ` +
 		`(UTC${offset}; REG-F-429) — a run must finish within one server-clock day (§5.3)`
 	);
 }
@@ -773,7 +778,8 @@ function attributionOf(
 					}
 				];
 	});
-	return { planted: planted.length, misses: misses.sort(byCaseThenRepetition), leftOut, unheld, reported };
+	misses.sort(byCaseThenRepetition);
+	return { planted: planted.length, misses, leftOut, unheld, reported };
 }
 
 const missLine = (m: Miss): string =>
@@ -902,7 +908,9 @@ async function reproduceRescore(ctx: Ctx, x: Rescore, fail: Fail): Promise<void>
 /** Limb 2 for every record in its scope, before any SUPERSEDED line is weighed: record id → what does not reproduce. */
 async function reproduction(ctx: Ctx): Promise<Map<string, string[]>> {
 	const repro = new Map<string, string[]>();
-	const fail: Fail = (id, message) => void repro.set(id, [...(repro.get(id) ?? []), message]);
+	const fail: Fail = (id, message) => {
+		repro.set(id, [...(repro.get(id) ?? []), message]);
+	};
 	const today = (fingerprint: string, id: string) => fingerprint === ctx.F && !ctx.refused.has(id);
 	for (const r of ctx.p.runs.values()) if (today(r.run.reviewerFingerprint, r.run.runId)) await reproduceRun(ctx, r, fail);
 	for (const x of ctx.rescores)
@@ -1361,8 +1369,9 @@ export async function checkQualification(i: CheckInputs): Promise<CheckReport> {
 		.map(([id, x]) => attributionEntry(x.kind, id, x.attribution))
 		.filter((a): a is string => a !== undefined);
 	const s = ctx.selection;
+	problems.sort((a, b) => LIMB_ORDER.indexOf(a.limb) - LIMB_ORDER.indexOf(b.limb));
 	return {
-		problems: problems.sort((a, b) => LIMB_ORDER.indexOf(a.limb) - LIMB_ORDER.indexOf(b.limb)),
+		problems,
 		notes: ctx.notes,
 		attribution,
 		selection: s && { candidate: s.line.candidate, ruling: s.line.ruling, at: s.at, standing: rulingStanding(i, s.line.ruling) }

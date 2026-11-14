@@ -642,7 +642,23 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			//     deterministic refusal guards need a build sequence beyond that lane's configuration.
 			// ⭑ IT SUBSUMES THE HARNESS SWITCH: one host-owned tool surface serves devin, agy, Codex and Muse;
 			// Claude Code is designed and deferred. The selector and Phase 7 lane consume that shared mechanism.
-		).toBe(55);
+			//
+			// 55 -> 56 (2026-11-13): `ROADMAP-toolchain-and-sonar.md` (`JAN-TOOLCUR`, `JAN-SONARCM`; the sponsor's rulings
+			// of 2026-11-13: R1, QT1, QT2, the Node security update, QS1, QS2 and QS3). ⭑ TWO SPONSOR-RULED PROGRAMMES
+			// WHOSE PACKAGES INTERLEAVE NEED ONE BUILD SEQUENCE, AND NO NEAR CLAIMANT OWNS EITHER.
+			//   · `ROADMAP-per-file-assurance-floor.md` (`JAN-PFA`) owns the gate's per-file ratchets, the pattern the new lint
+			//     and engine baselines follow. ⛔ It never names Sonar, ESLint or the toolchain; a version matrix, a first gate
+			//     step and two Sonar baselines are new instruments, not its ratchets.
+			//   · `ROADMAP-undertaking-execution-sandbox.md` (`JAN-EXEC`) owns the paid runs, and the main line its packages
+			//     land on appends to `scripts/mutants/ledger.ts`. ⛔ T4's re-anchors and the ledger split are timed between its
+			//     runs; they are not its work.
+			//   · `ROADMAP-csaa-extraction.md` (`JAN-CSAAEXT`) is COMPLETE, and `docs/operations/sonarqube.md:64` still names
+			//     `csaa:inventory:check`, a script that left with it. ⛔ Correcting the Sonar procedure is Sonar custody, not
+			//     CSAA's.
+			// ⭑ IT SUBSUMES CYCLE 6'S OPEN WORK (the 152 dispositions, Tier E and the ledger split) AND THE STALE POINTS OF
+			// `docs/operations/sonarqube.md`. The repeatable methods live on in `docs/operations/toolchain.md` and
+			// `docs/operations/sonarqube.md`, not here, and its exit criterion retires it.
+		).toBe(56);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

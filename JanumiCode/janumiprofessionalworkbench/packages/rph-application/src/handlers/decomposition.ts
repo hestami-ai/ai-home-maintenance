@@ -68,6 +68,7 @@ function rejectDanglingDependencies(
 		for (const d of named) {
 			const dependency = typeof d === 'string' ? loadState(ctx, d) : undefined;
 			if (
+				// S6582: kept explicit - loadState casts the stored state unchecked, so a null state throws at dependency.objectType where the optional chain would refuse it
 				dependency === undefined ||
 				dependency.objectType !== 'PROFESSIONAL_WORK_UNIT' ||
 				str(dependency.undertakingId) !== undertakingId ||

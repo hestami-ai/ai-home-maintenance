@@ -57,6 +57,8 @@ export type CaseAnswers = Record<string, Record<string, Answered>>;
 
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 const KIND = { check: 'checks', statement: 'statements' } as const;
+/** One side's answer as a difference names it: its score and its body's sha256 cut to 12 characters, or `none` when it has none. */
+const shownAnswer = (x: Answered | undefined): string => (x === undefined ? 'none' : `${x.score} ${x.bodySha256.slice(0, 12)}`);
 
 /**
  * ⭐ THE COMPARISON: every question of every case, the product's answer against the reference's — the same keys, each score
@@ -71,14 +73,15 @@ export function compareAnswers(
 	const cases = [...new Set([...Object.keys(product), ...Object.keys(reference)])];
 	for (const c of cases)
 		for (const kind of ['checks', 'statements'])
-			for (const key of [...new Set([...Object.keys(product[c]?.[kind] ?? {}), ...Object.keys(reference[c]?.[kind] ?? {})])]) {
+			for (const key of new Set([...Object.keys(product[c]?.[kind] ?? {}), ...Object.keys(reference[c]?.[kind] ?? {})])) {
 				const p = product[c]?.[kind]?.[key];
 				const r = reference[c]?.[kind]?.[key];
+				// S6582: kept explicit - an optional chain would read a missing reference answer's fields as undefined, and a product record lacking those fields (unvalidated JSON) would then count as equal
 				if (p !== undefined && r !== undefined && p.score === r.score && p.bodySha256 === r.bodySha256) equal += 1;
 				else
 					differ.push(
-						`${c} ${kind} ${key}: product ${p === undefined ? 'none' : `${p.score} ${p.bodySha256.slice(0, 12)}`}, ` +
-							`step 1 ${r === undefined ? 'none' : `${r.score} ${r.bodySha256.slice(0, 12)}`}`
+						`${c} ${kind} ${key}: product ${shownAnswer(p)}, ` +
+							`step 1 ${shownAnswer(r)}`
 					);
 			}
 	return { equal, differ };
@@ -108,7 +111,7 @@ export function answersOf(requests: readonly IndicationRequest[], result: Indica
 	const out: CaseAnswers = { checks: {}, statements: {} };
 	for (const r of requests) {
 		const x = sent.get(r.key);
-		if (x === undefined || x.outcome.kind !== 'SCORED') return `${r.key} holds no score`;
+		if (x?.outcome.kind !== 'SCORED') return `${r.key} holds no score`;
 		out[KIND[r.kind]]![r.key] = { score: x.outcome.score, bodySha256: sha256(x.body) };
 		if (x.otherModels.length > 0) return `another model was loaded when ${r.key} was sent (${x.otherModels.join(', ')})`;
 	}
@@ -123,7 +126,17 @@ function referenceOf(file: string): { readonly answers: Record<string, CaseAnswe
 	for (const line of readFileSync(file, 'utf8').split('\n').filter((l) => l.trim() !== '')) {
 		const r = JSON.parse(line) as { case: string; kind: string; key: string; score: number; bodySha256: string; server: string };
 		versions.add(r.server);
-		((answers[r.case] ??= {})[r.kind] ??= {})[r.key] = { score: r.score, bodySha256: r.bodySha256 };
+		let byCase = answers[r.case];
+		if (byCase === undefined || byCase === null) {
+			byCase = {};
+			answers[r.case] = byCase;
+		}
+		let byKind = byCase[r.kind];
+		if (byKind === undefined || byKind === null) {
+			byKind = {};
+			byCase[r.kind] = byKind;
+		}
+		byKind[r.key] = { score: r.score, bodySha256: r.bodySha256 };
 	}
 	return { answers, versions };
 }
@@ -133,6 +146,14 @@ function argsOf(argv: readonly string[]): Map<string, string> {
 	const out = new Map<string, string>();
 	for (let i = 0; i < argv.length; i += 1) if (argv[i]!.startsWith('--')) out.set(argv[i]!.slice(2), argv[i + 1] ?? '');
 	return out;
+}
+
+/** An address without the slashes it ends with, found by a scan back from its end; none when none was given. */
+function withoutTrailingSlashes(s: string | undefined): string | undefined {
+	if (s === undefined) return undefined;
+	let end = s.length;
+	while (end > 0 && s[end - 1] === '/') end -= 1;
+	return s.slice(0, end);
 }
 
 /** The server's version and the model's digest, as the server reports them now. */
@@ -145,9 +166,101 @@ async function servedNow(server: string, model: string): Promise<{ readonly dige
 	return { digest: entry?.digest ?? '', serverVersion: version, others: ps.map((m) => String(m.name || m.model)).filter((m) => m !== model) };
 }
 
+/** What one live check's steps share: the server and model asked, the folder written to, what the server served when the check
+ * began, the product's client, and the answers and times gathered. */
+interface LiveRun {
+	readonly server: string;
+	readonly model: string;
+	readonly outDir: string;
+	readonly at: Awaited<ReturnType<typeof servedNow>>;
+	readonly client: ReturnType<typeof createDecisionModelClient>;
+	readonly product: Record<string, CaseAnswers>;
+	readonly times: number[];
+}
+
+/** Whether the server serves now what it served when the check began; a stop printed when not. */
+async function sameServed(run: LiveRun, when: string): Promise<boolean> {
+	const now = await servedNow(run.server, run.model);
+	if (now.digest === run.at.digest && now.serverVersion === run.at.serverVersion) return true;
+	console.error(`STOPPED: ${when}, the server serves ${now.digest.slice(0, 12)} on Ollama ${now.serverVersion} (REG-F-608)`);
+	return false;
+}
+
+/** One case's requests asked live through the product's client, its answers kept and written; false when the check stops. */
+async function askLive(run: LiveRun, id: string, requests: readonly IndicationRequest[], material: string): Promise<boolean> {
+	if (!(await sameServed(run, `before ${id}`))) return false;
+	const { client } = run;
+	const t0 = Date.now();
+	const result = await client(requests, material);
+	run.times.push(Date.now() - t0);
+	const answers = answersOf(requests, result);
+	if (typeof answers === 'string') return (console.error(`STOPPED: ${id}: ${answers}`), false);
+	run.product[id] = answers;
+	appendFileSync(join(run.outDir, 'product.ndjson'), `${JSON.stringify({ case: id, serverVersion: run.at.serverVersion, answers })}\n`, 'utf8');
+	console.log(`product ${id}: ${requests.length} question(s) asked, ${Math.round((Date.now() - t0) / 1000)} s`);
+	return true;
+}
+
+/** The canary's cases, or the exit code it stops with. */
+async function canaryCases(run: LiveRun, root: URL, canary: string): Promise<string[] | number> {
+	// ⭐ THE CANARY: the product's own review of a v13 case, its requests asked live through its client.
+	const { committedCaseSet, PRODUCT_SEAMS } = await import('./fingerprint.js');
+	const { caseReviewInput } = await import('./materialize.js');
+	const c = committedCaseSet(root).cases.find((x) => x.id === canary);
+	if (c === undefined) return (console.error(`no case ${canary} in the current set`), 2);
+	let asked: { requests: readonly IndicationRequest[]; material: string } | undefined;
+	await reviewPrompt(caseReviewInput(c, PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult), async (requests, material) => {
+		asked = { requests, material };
+		return { scores: Object.fromEntries(requests.map((r) => [r.key, 0])) };
+	});
+	if (!asked || !(await askLive(run, canary, asked.requests, asked.material))) return 1;
+	return [canary];
+}
+
+/** The screen's cases - v13's from the records, W14's asked live - or the exit code the check stops with. */
+async function screenedCases(run: LiveRun, root: URL, hardpairs: string | undefined): Promise<string[] | number> {
+	// ⭑ v13: the records' scores, made through the product's client on this server version.
+	const recordsFile = fileURLToPath(new URL('docs/tracking/reviewer-qualification/decision-model/v13.ndjson', root));
+	const lines = readFileSync(recordsFile, 'utf8').split('\n').filter((l) => l.trim() !== '').map((l) => JSON.parse(l) as Record<string, unknown>);
+	const head = lines[0] as { serverVersion?: string; digest?: string };
+	if (head.serverVersion !== run.at.serverVersion || head.digest !== run.at.digest)
+		return (console.error(`STOPPED: the records were made on Ollama ${head.serverVersion}, not this server's ${run.at.serverVersion}`), 1);
+	for (const l of lines.slice(1))
+		if (l.kind === 'CASE' && (SCREENED_V13 as readonly string[]).includes(l.id as string)) {
+			const out: CaseAnswers = { checks: {}, statements: {} };
+			for (const q of l.questions as { key: string; kind: 'check' | 'statement'; score: number; bodySha256: string }[])
+				out[KIND[q.kind]]![q.key] = { score: q.score, bodySha256: q.bodySha256 };
+			run.product[l.id as string] = out;
+		}
+	for (const id of SCREENED_W14) {
+		const { requests, material } = requestsOfText(readFileSync(join(hardpairs!, `${id}.txt`), 'utf8'));
+		if (!(await askLive(run, id, requests, material))) return 1;
+	}
+	return [...SCREENED_V13, ...SCREENED_W14];
+}
+
+/** Step 1's reference answers for the cases, on the same server - or none, a stop printed, when its path failed or ran on another version. */
+function stepOneReference(step1: string, outDir: string, cases: readonly string[], serverVersion: string): ReturnType<typeof referenceOf> | undefined {
+	// ⭑ THE REFERENCE: step 1's own code, on the same server.
+	const referenceFile = join(outDir, 'step1-reference.ndjson');
+	const py = spawnSync('python', ['-I', fileURLToPath(new URL('step1_reference.py', import.meta.url)), step1, referenceFile, ...cases], {
+		stdio: 'inherit'
+	});
+	if (py.status !== 0) {
+		console.error(`STOPPED: step 1's path ended with ${py.status}`);
+		return undefined;
+	}
+	const reference = referenceOf(referenceFile);
+	if (reference.versions.size !== 1 || !reference.versions.has(serverVersion)) {
+		console.error(`STOPPED: step 1's path ran on ${[...reference.versions].join(', ')}, not ${serverVersion}`);
+		return undefined;
+	}
+	return reference;
+}
+
 export async function main(argv: readonly string[]): Promise<number> {
 	const a = argsOf(argv);
-	const server = a.get('server')?.replace(/\/+$/, '');
+	const server = withoutTrailingSlashes(a.get('server'));
 	const model = a.get('model');
 	const digest = a.get('digest');
 	const step1 = a.get('step1');
@@ -169,74 +282,21 @@ export async function main(argv: readonly string[]): Promise<number> {
 	console.log(`${model} ${at.digest.slice(0, 12)} on Ollama ${at.serverVersion}`);
 	// ⭐⭐ Package L8 — D63 (`REG-D-152`): held to the version the server answered when the check began, and none beside it.
 	const client = createDecisionModelClient({ server, model, identity: { digest, serverVersion: at.serverVersion, alsoAccepted: [] } });
-	const same = async (when: string): Promise<boolean> => {
-		const now = await servedNow(server, model);
-		if (now.digest === at.digest && now.serverVersion === at.serverVersion) return true;
-		console.error(`STOPPED: ${when}, the server serves ${now.digest.slice(0, 12)} on Ollama ${now.serverVersion} (REG-F-608)`);
-		return false;
-	};
 	const product: Record<string, CaseAnswers> = {};
 	const times: number[] = [];
-	const askLive = async (id: string, requests: readonly IndicationRequest[], material: string): Promise<boolean> => {
-		if (!(await same(`before ${id}`))) return false;
-		const t0 = Date.now();
-		const result = await client(requests, material);
-		times.push(Date.now() - t0);
-		const answers = answersOf(requests, result);
-		if (typeof answers === 'string') return (console.error(`STOPPED: ${id}: ${answers}`), false);
-		product[id] = answers;
-		appendFileSync(join(outDir, 'product.ndjson'), `${JSON.stringify({ case: id, serverVersion: at.serverVersion, answers })}\n`, 'utf8');
-		console.log(`product ${id}: ${requests.length} question(s) asked, ${Math.round((Date.now() - t0) / 1000)} s`);
-		return true;
-	};
-	let cases: string[];
-	if (canary) {
-		// ⭐ THE CANARY: the product's own review of a v13 case, its requests asked live through its client.
-		const { committedCaseSet, PRODUCT_SEAMS } = await import('./fingerprint.js');
-		const { caseReviewInput } = await import('./materialize.js');
-		const c = committedCaseSet(root).cases.find((x) => x.id === canary);
-		if (c === undefined) return (console.error(`no case ${canary} in the current set`), 2);
-		let asked: { requests: readonly IndicationRequest[]; material: string } | undefined;
-		await reviewPrompt(caseReviewInput(c, PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult), async (requests, material) => {
-			asked = { requests, material };
-			return { scores: Object.fromEntries(requests.map((r) => [r.key, 0])) };
-		});
-		if (!asked || !(await askLive(canary, asked.requests, asked.material))) return 1;
-		cases = [canary];
-	} else {
-		// ⭑ v13: the records' scores, made through the product's client on this server version.
-		const recordsFile = fileURLToPath(new URL('docs/tracking/reviewer-qualification/decision-model/v13.ndjson', root));
-		const lines = readFileSync(recordsFile, 'utf8').split('\n').filter((l) => l.trim() !== '').map((l) => JSON.parse(l) as Record<string, unknown>);
-		const head = lines[0] as { serverVersion?: string; digest?: string };
-		if (head.serverVersion !== at.serverVersion || head.digest !== at.digest)
-			return (console.error(`STOPPED: the records were made on Ollama ${head.serverVersion}, not this server's ${at.serverVersion}`), 1);
-		for (const l of lines.slice(1))
-			if (l.kind === 'CASE' && (SCREENED_V13 as readonly string[]).includes(l.id as string)) {
-				const out: CaseAnswers = { checks: {}, statements: {} };
-				for (const q of l.questions as { key: string; kind: 'check' | 'statement'; score: number; bodySha256: string }[])
-					out[KIND[q.kind]]![q.key] = { score: q.score, bodySha256: q.bodySha256 };
-				product[l.id as string] = out;
-			}
-		for (const id of SCREENED_W14) {
-			const { requests, material } = requestsOfText(readFileSync(join(hardpairs!, `${id}.txt`), 'utf8'));
-			if (!(await askLive(id, requests, material))) return 1;
-		}
-		cases = [...SCREENED_V13, ...SCREENED_W14];
-	}
-	if (!(await same('after the product’s last case'))) return 1;
-	// ⭑ THE REFERENCE: step 1's own code, on the same server.
-	const referenceFile = join(outDir, 'step1-reference.ndjson');
-	const py = spawnSync('python', ['-I', fileURLToPath(new URL('step1_reference.py', import.meta.url)), step1, referenceFile, ...cases], {
-		stdio: 'inherit'
-	});
-	if (py.status !== 0) return (console.error(`STOPPED: step 1's path ended with ${py.status}`), 1);
-	const reference = referenceOf(referenceFile);
-	if (reference.versions.size !== 1 || !reference.versions.has(at.serverVersion))
-		return (console.error(`STOPPED: step 1's path ran on ${[...reference.versions].join(', ')}, not ${at.serverVersion}`), 1);
+	const run: LiveRun = { server, model, outDir, at, client, product, times };
+	const cases = canary ? await canaryCases(run, root, canary) : await screenedCases(run, root, hardpairs);
+	if (typeof cases === 'number') return cases;
+	if (!(await sameServed(run, 'after the product’s last case'))) return 1;
+	const reference = stepOneReference(step1, outDir, cases, at.serverVersion);
+	if (reference === undefined) return 1;
 	const { equal, differ } = compareAnswers(product, Object.fromEntries(cases.map((c) => [c, reference.answers[c] ?? {}])));
 	console.log(`exactly equal ${equal} of ${equal + differ.length}, on Ollama ${at.serverVersion}`);
 	for (const d of differ.slice(0, 40)) console.log(`DIFFERS ${d}`);
-	if (times.length > 0) console.log(`the product's client: ${times.map((t) => `${Math.round(t / 1000)} s`).join(', ')} a case`);
+	if (times.length > 0) {
+		const perCase = times.map((t) => `${Math.round(t / 1000)} s`).join(', ');
+		console.log(`the product's client: ${perCase} a case`);
+	}
 	return differ.length === 0 ? 0 : 1;
 }
 

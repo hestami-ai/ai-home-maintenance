@@ -296,10 +296,10 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 				`${PHASE7_PRIOR_CALLS_VARIABLE} for the Phase 7 run)`
 		);
 		for (const a of assessments)
-			console.log(`assessment ${policyOf(a)} -> ${String(a.assessmentState ?? '?')}`);
+			console.log(`assessment ${policyOf(a)} -> ${String((a.assessmentState ?? '?') as string)}`);
 		for (const o of observations)
 			console.log(
-				`  · ${String(o.findingCode ?? '?')}: ${String(o.statement ?? '').slice(0, 220)}`
+				`  · ${String((o.findingCode ?? '?') as string)}: ${String((o.statement ?? '') as string).slice(0, 220)}`
 			);
 		console.log('─'.repeat(75) + '\n');
 

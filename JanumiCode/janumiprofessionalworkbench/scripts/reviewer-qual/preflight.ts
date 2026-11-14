@@ -38,8 +38,9 @@ export function programOverrideProblem(
 ): string | undefined {
 	const set = PROGRAM_OVERRIDE_VARIABLES.filter((v) => env[v] !== undefined);
 	if (set.length === 0) return undefined;
+	const whichAreSet = set.map((v) => `${v} is set`).join(' and ');
 	return (
-		`REFUSED (REG-D-072 D12; REG-F-441): ${set.map((v) => `${v} is set`).join(' and ')}. The product reads it once, ` +
+		`REFUSED (REG-D-072 D12; REG-F-441): ${whichAreSet}. The product reads it once, ` +
 		'when its transport module loads, and records whatever program it names as the real tool — so a qualification ' +
 		'run could be measuring a stand-in under the real tool’s name. Unset it; the runner uses the product’s own ' +
 		'program, and asserts the argv it is given.'
