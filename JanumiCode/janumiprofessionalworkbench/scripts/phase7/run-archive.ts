@@ -198,8 +198,12 @@ export interface StoreBackup {
  * it: its header, nothing beside it, and a read-only open that writes nothing. Throws, naming why, when any fails.
  *
  * ⭑ The source is opened READ-ONLY, so the backup cannot write to the server's store, and copied in ONE step (`rate`
- * -1): one read transaction, so the copy is one consistent snapshot, and the server's writes, which a WAL reader does
- * not block, cannot restart it. ⛔ A `destination` that exists is refused: `backup()` would overwrite it.
+ * ~~-1~~ ⭐ 2147483647): one read transaction, so the copy is one consistent snapshot, and the server's writes, which a WAL reader
+ * does not block, cannot restart it. ⛔ A `destination` that exists is refused: `backup()` would overwrite it.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — `REG-F-638` (the lead's remedy) — Node v24.22.3 refuses `rate: -1` (*"The "options.rate"
+ * argument must be a positive integer."*), so the run's first archive would throw. 2147483647, the largest integer it takes, copies a
+ * store of any size the lane makes in that one step: measured on a fresh 266-page store, *"copied 266 page(s) in 0 progress
+ * callback(s)"*, where `rate: 100` took three steps (`rev9/l15/backup-rate-probe.log`, the lead's probe).
  */
 export async function backupStore(source: string, destination: string): Promise<StoreBackup> {
 	if (existsSync(destination))
@@ -209,7 +213,7 @@ export async function backupStore(source: string, destination: string): Promise<
 	const from = new DatabaseSync(source, { readOnly: true, timeout: 5_000 });
 	let pages: number;
 	try {
-		pages = await backup(from, destination, { rate: -1 });
+		pages = await backup(from, destination, { rate: 2147483647 });
 	} finally {
 		from.close();
 	}

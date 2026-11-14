@@ -3,12 +3,16 @@ import { describe, expect, it } from 'vitest';
 import type { ContextSpecification, PromptTemplate } from '@janumipwb/rph-contracts';
 import { ConstraintDispositionSchema, UndertakingSchema } from '@janumipwb/rph-contracts';
 import {
+	ACCEPTED_WORK_SECTION_HEADING,
+	acceptedWorkFile,
+	acceptedWorkSection,
 	assembleStepContext,
 	prepareModelInvocation,
 	resolveUndertakingStatement,
 	UNDERTAKING_SECTION_HEADING,
 	undertakingSection,
 	withUndertakingSection,
+	type AcceptedWorkDependency,
 	type UndertakingStatement
 } from './execution-invocation.js';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from './context-assembly.js';
@@ -37,7 +41,7 @@ const ASSEMBLY = { policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] } 
 
 describe('JAN-EXECRUN — preparing a model invocation', () => {
 	it('renders the prompt and resolves the fingerprint to something a reader can look up', () => {
-		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY, undefined);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY, undefined, []);
 		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 		// PER-9: a fingerprint "identifies that record; it never substitutes for it". Before REG-D-058 this
 		// field named a template with no home.
@@ -49,14 +53,14 @@ describe('JAN-EXECRUN — preparing a model invocation', () => {
 		// demo would then appear to execute every work unit, and every one of them would be executed against an
 		// instruction nobody authored, reviewed or published. That is the seeded-policy-as-projection defect
 		// this repository already records — an object standing in for a decision nobody made.
-		const plan = prepareModelInvocation(PWU, 'pwut_9', undefined, ASSEMBLY, undefined);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', undefined, ASSEMBLY, undefined, []);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason, 'the refusal must name the type').toMatch(/pwut_9/);
 		expect(!plan.ready && plan.reason).toMatch(/declares no agent behaviour/);
 	});
 
 	it('⛔ REFUSES a DRAFT template — authoring is not arming', () => {
-		const plan = prepareModelInvocation(PWU, 'pwut_9', { ...ACTIVE, status: 'DRAFT' }, ASSEMBLY, undefined);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', { ...ACTIVE, status: 'DRAFT' }, ASSEMBLY, undefined, []);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/DRAFT/);
 	});
@@ -70,7 +74,7 @@ describe('JAN-EXECRUN — preparing a model invocation', () => {
 			templateText: 'Assess {subject} against {criteria}.',
 			declaredPlaceholders: ['subject', 'criteria']
 		};
-		const plan = prepareModelInvocation(PWU, 'pwut_9', needsMore, ASSEMBLY, undefined);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', needsMore, ASSEMBLY, undefined, []);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason, 'the refusal must name the missing marker').toMatch(
 			/\{criteria\}/
@@ -113,7 +117,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
 			alsoAssembles: REPAIR
-		}, undefined);
+		}, undefined, []);
 		expect(plan.ready).toBe(true);
 	});
 
@@ -127,7 +131,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			policy: instructionOnly,
 			alsoAssembles: REPAIR
-		}, undefined);
+		}, undefined, []);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/ctx-narrow/);
 		expect(
@@ -145,7 +149,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			policy: nothing,
 			alsoAssembles: []
-		}, undefined);
+		}, undefined, []);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/RENDERED_INSTRUCTION at THIS_TRY/);
 	});
@@ -157,7 +161,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
 			alsoAssembles: [{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }]
-		}, undefined);
+		}, undefined, []);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/THIS_UNDERTAKING/);
 	});
@@ -175,7 +179,7 @@ describe('CP-04a — the CEILING: nothing is assembled that the policy does not 
 		const plan = prepareModelInvocation(PWU, 'pwut_9', needsMore, {
 			policy: { policyId: 'ctx-empty', permittedSources: [] },
 			alsoAssembles: []
-		}, undefined);
+		}, undefined, []);
 		expect(!plan.ready && plan.reason, 'the POLICY refusal, not the render refusal').toMatch(
 			/does not permit/
 		);
@@ -209,7 +213,7 @@ describe('CP-04b CORRECTED — a required element that is MISSING simply REFUSES
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			...ASSEMBLY,
 			specification: requires(['criteria'])
-		}, undefined);
+		}, undefined, []);
 		expect(plan.ready).toBe(false);
 		expect(!plan.ready && plan.reason).toMatch(/criteria/);
 		expect(!plan.ready && plan.reason, 'the rule it enforces, quotable').toMatch(/DEC-4/);
@@ -228,7 +232,7 @@ describe('CP-04b CORRECTED — a required element that is MISSING simply REFUSES
 						{ constraintId: 'criteria', fate, rationale: 'a thorough-looking rationale' }
 					]
 				}
-			}, undefined);
+			}, undefined, []);
 			expect(plan.ready, `fate ${fate} must not excuse a missing required element`).toBe(false);
 		}
 	});
@@ -242,7 +246,7 @@ describe('CP-04b CORRECTED — a required element that is MISSING simply REFUSES
 				requiredElements: ['criteria'],
 				constraintDispositions: [{ constraintId: 'criteria', fate: 'WAIVED_THROUGH_AUTHORITY' }]
 			}
-		}, undefined);
+		}, undefined, []);
 		expect(!plan.ready && plan.reason).toMatch(/CONSTRAINT and not a context ELEMENT/);
 	});
 
@@ -252,14 +256,14 @@ describe('CP-04b CORRECTED — a required element that is MISSING simply REFUSES
 		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, {
 			...ASSEMBLY,
 			specification: requires(['subject'])
-		}, undefined);
+		}, undefined, []);
 		expect(plan.ready).toBe(true);
 	});
 
 	it('⭑ CONTROL — a type declaring NO required elements is unaffected', () => {
 		// The path must stay dormant for every type that declares no contextSpecification, which is all of them
 		// in the seeded workbench today.
-		expect(prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY, undefined).ready).toBe(true);
+		expect(prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY, undefined, []).ready).toBe(true);
 	});
 });
 
@@ -277,7 +281,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 	it('⭑⭑ the contract is APPENDED to the instruction', () => {
 		// THE MUTANT: render the template and drop the contract — i.e. today's behaviour. The harness's own
 		// promise then goes unkept for every type whose author did not repeat the contract inside templateText.
-		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY, undefined);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY, undefined, []);
 		expect(plan.ready && plan.prompt).toContain('Assess Route Assessment');
 		expect(plan.ready && plan.prompt).toContain('{"finding": string, "basis": string[]}');
 	});
@@ -286,7 +290,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 		// ⛔ WITHOUT THIS, "appends the contract" cannot be told apart from "appends a section always". An empty
 		// trailer would announce a contract and then show the producer nothing, which is worse than silence —
 		// and it would change every existing prompt fingerprint's rendered text for no reason.
-		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY, undefined);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', ACTIVE, ASSEMBLY, undefined, []);
 		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 	});
 
@@ -298,7 +302,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 			'pwut_9',
 			{ ...ACTIVE, outputContract: '   ' },
 			ASSEMBLY,
-			undefined
+			undefined, []
 		);
 		expect(plan.ready && plan.prompt).toBe('Assess Route Assessment. Deliver Decide whether the route is viable.');
 	});
@@ -306,7 +310,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 	it('⭑ the contract follows the rendered work, never precedes it', () => {
 		// The instruction reads as "do this work / and return it in this shape". Inverting the order makes the
 		// producer meet the output shape before it has been told what the work is.
-		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY, undefined);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, ASSEMBLY, undefined, []);
 		const text = plan.ready ? plan.prompt : '';
 		expect(text.indexOf('Assess Route Assessment')).toBeLessThan(text.indexOf('{"finding"'));
 	});
@@ -323,7 +327,7 @@ describe('OC-01 — the type’s outputContract reaches the rendered instruction
 		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, {
 			policy: instructionOnly,
 			alsoAssembles: []
-		}, undefined);
+		}, undefined, []);
 		expect(plan.ready).toBe(true);
 	});
 });
@@ -350,7 +354,7 @@ describe('⭐⭐ L7 (D61) — every unit’s instruction states its Undertaking�
 	};
 	const WORK = 'Assess Route Assessment. Deliver Decide whether the route is viable.';
 	const promptOf = (statement: UndertakingStatement | undefined, template: PromptTemplate = WITH_CONTRACT): string => {
-		const plan = prepareModelInvocation(PWU, 'pwut_9', template, ASSEMBLY, statement);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', template, ASSEMBLY, statement, []);
 		return plan.ready ? plan.prompt : `REFUSED: ${plan.reason}`;
 	};
 
@@ -404,13 +408,15 @@ describe('⭐⭐ L7 (D61) — every unit’s instruction states its Undertaking�
 	});
 
 	it('⭑ CONTROL — it is still the RENDERED_INSTRUCTION at THIS_TRY: an instruction-only policy admits it, and no Undertaking source is assembled', () => {
-		// The lead's reading (design D61): `ctx-default`'s THIS_UNDERTAKING, permitted for nothing, concerns material from another
-		// work unit, which still crosses nowhere. THE MUTANT: assemble the statement as a source of its own — this policy refuses it.
+		// The lead's reading (design D61): ~~`ctx-default`'s THIS_UNDERTAKING, permitted for nothing, concerns material from another
+		// work unit, which still crosses nowhere.~~ ⭐ (2026-11-13, package L15, as D61 is amended for D69) D61's section needs nothing at
+		// THIS_UNDERTAKING, whose reason is material from another work unit; D69 hands such material on (below). THE MUTANT: assemble
+		// the statement as a source of its own — this policy refuses it.
 		const instructionOnly: ContextAssemblyPolicyContent = {
 			policyId: 'ctx-instruction-only',
 			permittedSources: [{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' }]
 		};
-		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, { policy: instructionOnly, alsoAssembles: [] }, WORDFREQ);
+		const plan = prepareModelInvocation(PWU, 'pwut_9', WITH_CONTRACT, { policy: instructionOnly, alsoAssembles: [] }, WORDFREQ, []);
 		expect(plan.ready, plan.ready ? '' : plan.reason).toBe(true);
 	});
 
@@ -466,5 +472,81 @@ describe('⭐⭐ L7 (D61) — every unit’s instruction states its Undertaking�
 		expect(() => resolveUndertakingStatement(() => ({ ...stored, objective: 7 }), stored.id)).toThrow(
 			/does not parse as an UNDERTAKING: objective: /
 		);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`; `REG-F-634`; `REG-F-358`) ──────────────────────────────────────────
+//
+// A unit whose recorded dependencies hold accepted work is told, LAST in its instruction — after its output contract — which files in
+// the Undertaking's shared workspace hold that work, and to read them before it begins. ⛔ PREDICTED RED, each limb but its control: at
+// HEAD the instruction named no other unit's work (`REG-F-634`), and P6 again's seventh run's Technical Design never saw the accepted
+// Requirements Specification it depended on.
+describe('⭐⭐ L15 (D69) — a unit is told which files hold the accepted work it depends on, last in its instruction', () => {
+	const WITH_CONTRACT: PromptTemplate = {
+		...ACTIVE,
+		outputContract: 'A single JSON object: {"finding": string, "basis": string[]}.'
+	};
+	const WORDFREQ: UndertakingStatement = {
+		intendedOutputProduct: 'wordfreq',
+		objective: 'Build wordfreq, a Node.js command-line tool.'
+	};
+	const WORK = 'Assess Route Assessment. Deliver Decide whether the route is viable.';
+	const STATED =
+		'This work is part of an Undertaking. Its intended product and its objective, as stated when it was created:\n' +
+		'Intended product: wordfreq\nObjective:\nBuild wordfreq, a Node.js command-line tool.';
+	const CONTRACT = 'The output this work requires:\nA single JSON object: {"finding": string, "basis": string[]}.';
+	/** ⭐ D69's first line, the lead's words, BYTE FOR BYTE — restated here, never imported. */
+	const HEADING =
+		"This work depends on the accepted work of other units of this Undertaking. Before you begin, read each file below. Each holds one unit's accepted work product, exactly as its reviews judged it. The workbench writes these files; do not change them.";
+	const SPEC: AcceptedWorkDependency = { title: 'Requirements Specification', unitId: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5XSP' };
+	const GLOSSARY: AcceptedWorkDependency = { title: 'Glossary', unitId: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5XGL' };
+	const SPEC_LINE = '- Requirements Specification: .jpwb/accepted/requirements-specification--pwu_01ARZ3NDEKTSV4RRFFQ69G5XSP.txt';
+	const GLOSSARY_LINE = '- Glossary: .jpwb/accepted/glossary--pwu_01ARZ3NDEKTSV4RRFFQ69G5XGL.txt';
+	// ⚠ NO DEFAULTS: an explicit `undefined` would take a default parameter's value, and "no statement" would render WORDFREQ's.
+	const promptOf = (
+		work: readonly AcceptedWorkDependency[],
+		template: PromptTemplate,
+		statement: UndertakingStatement | undefined
+	): string => {
+		const plan = prepareModelInvocation(PWU, 'pwut_9', template, ASSEMBLY, statement, work);
+		return plan.ready ? plan.prompt : `REFUSED: ${plan.reason}`;
+	};
+
+	it('⛔ REG-F-634’s predicted red — a unit that depends on accepted work is told its file, LAST, after its output contract', () => {
+		expect(promptOf([SPEC], WITH_CONTRACT, WORDFREQ)).toBe(`${WORK}\n\n${STATED}\n\n${CONTRACT}\n\n${HEADING}\n${SPEC_LINE}`);
+	});
+
+	it('⛔ one line for each unit, in the order given — its recorded dependencies’ order, never sorted', () => {
+		expect(promptOf([SPEC, GLOSSARY], WITH_CONTRACT, WORDFREQ)).toBe(`${WORK}\n\n${STATED}\n\n${CONTRACT}\n\n${HEADING}\n${SPEC_LINE}\n${GLOSSARY_LINE}`);
+		expect(promptOf([GLOSSARY, SPEC], WITH_CONTRACT, WORDFREQ)).toBe(`${WORK}\n\n${STATED}\n\n${CONTRACT}\n\n${HEADING}\n${GLOSSARY_LINE}\n${SPEC_LINE}`);
+	});
+
+	it('⛔ with no output contract and no Undertaking statement, the section still ends the instruction', () => {
+		expect(promptOf([SPEC], ACTIVE, undefined)).toBe(`${WORK}\n\n${HEADING}\n${SPEC_LINE}`);
+	});
+
+	it('⭑ CONTROL — a unit that depends on no accepted work is given its instruction byte for byte as before', () => {
+		expect(promptOf([], WITH_CONTRACT, WORDFREQ)).toBe(`${WORK}\n\n${STATED}\n\n${CONTRACT}`);
+		expect(promptOf([], ACTIVE, WORDFREQ)).toBe(`${WORK}\n\n${STATED}`);
+		expect(promptOf([], ACTIVE, undefined)).toBe(WORK);
+	});
+
+	it('⛔ the file’s name: the title in lower case, each run of other characters one hyphen, trimmed, at most 60 characters, then the unit’s id', () => {
+		expect(acceptedWorkFile('Requirements Specification', 'pwu_1')).toBe('.jpwb/accepted/requirements-specification--pwu_1.txt');
+		expect(acceptedWorkFile('  Unit Test Suite (v2) — "core"!  ', 'pwu_2')).toBe('.jpwb/accepted/unit-test-suite-v2-core--pwu_2.txt');
+		expect(acceptedWorkFile('Résumé Builder', 'pwu_3')).toBe('.jpwb/accepted/r-sum-builder--pwu_3.txt');
+		expect(acceptedWorkFile('x'.repeat(61), 'pwu_4')).toBe(`.jpwb/accepted/${'x'.repeat(60)}--pwu_4.txt`);
+		// ⚠ The cut at 60 falls on a hyphen here: trimmed after the cut too, so a slug never ends in one (the builder's reading of the
+		// order, named in package L15's facts).
+		expect(acceptedWorkFile(`${'a'.repeat(59)} b`, 'pwu_5')).toBe(`.jpwb/accepted/${'a'.repeat(59)}--pwu_5.txt`);
+		// The unit's id makes the name unique: two units of one title, two files.
+		expect(acceptedWorkFile('Glossary', 'pwu_6')).not.toBe(acceptedWorkFile('Glossary', 'pwu_7'));
+	});
+
+	it('⛔ the section is spelled once and exported: its heading, and the one renderer the instruction ends with', () => {
+		expect(ACCEPTED_WORK_SECTION_HEADING).toBe(HEADING);
+		expect(acceptedWorkSection([SPEC, GLOSSARY])).toBe(`${HEADING}\n${SPEC_LINE}\n${GLOSSARY_LINE}`);
+		expect(acceptedWorkSection([])).toBeUndefined();
+		expect(promptOf([SPEC, GLOSSARY], WITH_CONTRACT, WORDFREQ).endsWith(`${CONTRACT}\n\n${acceptedWorkSection([SPEC, GLOSSARY]) ?? ''}`)).toBe(true);
 	});
 });

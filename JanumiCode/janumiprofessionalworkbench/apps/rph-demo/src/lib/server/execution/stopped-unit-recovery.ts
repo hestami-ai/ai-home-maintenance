@@ -46,6 +46,7 @@ import {
 	prepareModelInvocation,
 	readAnswerSpan,
 	resolveInvocationSubject,
+	type AcceptedWorkDependency,
 	type ResolvableExchange,
 	type UndertakingStatement
 } from '@janumipwb/rph-application';
@@ -765,6 +766,13 @@ export async function rebuildProducingTurn(
 		 * producer was not given.
 		 */
 		readonly undertaking: UndertakingStatement | undefined;
+		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`) — the units whose accepted work the producing prompt named,
+		 * last, as Begin & Execute rendered it. ⛔ REQUIRED, `[]` where there is none, for the statement's reason above: the fingerprint
+		 * is the template's alone, so a rebuild that left the section out would pass it and show a review a prompt its producer was
+		 * not given.
+		 */
+		readonly acceptedWork: readonly AcceptedWorkDependency[];
 	}
 ): Promise<Rebuilt<RebuiltProducingTurn>> {
 	const refuse = (why: string): Rebuilt<RebuiltProducingTurn> => ({
@@ -824,8 +832,11 @@ export async function rebuildProducingTurn(
 	};
 }
 
-/** Bytes from the content store, re-hashed against the hash their record names — or why not. */
-async function verifiedBytes(
+/**
+ * Bytes from the content store, re-hashed against the hash their record names — or why not. ⭐⭐ Package L15 — D69 — exported: the
+ * route reads a unit's accepted work product through it before writing it to the unit's file, as this rebuild reads one.
+ */
+export async function verifiedBytes(
 	store: ArtifactStore,
 	storageKey: string,
 	contentHash: string,
@@ -887,6 +898,8 @@ function rerenderedInstruction(
 		readonly contextSpecification?: ContextSpecification;
 		/** ⭐⭐ Package L7 — D61 — the Undertaking's statement (`rebuildProducingTurn`). */
 		readonly undertaking: UndertakingStatement | undefined;
+		/** ⭐⭐ Package L15 — D69 — the units whose accepted work the prompt names (`rebuildProducingTurn`). */
+		readonly acceptedWork: readonly AcceptedWorkDependency[];
 	}
 ): Rebuilt<{ readonly prompt: string; readonly fingerprint: string }> {
 	let policy;
@@ -916,7 +929,11 @@ function rerenderedInstruction(
 			alsoAssembles: [],
 			...(args.contextSpecification ? { specification: args.contextSpecification } : {})
 		},
-		args.undertaking
+		args.undertaking,
+		// ⭐⭐ Package L15 — D69 — and the accepted work it named, last, so the prompt a review is shown is the one its producer was
+		// given. ⚠ Nothing more is declared here: a rebuild invokes no model, and a step whose instruction named accepted work was
+		// refused before its render unless its policy permitted the pair (`run-model-step.ts`).
+		args.acceptedWork
 	);
 	if (!plan.ready)
 		return {

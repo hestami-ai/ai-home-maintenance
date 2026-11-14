@@ -2128,7 +2128,7 @@ describe('JAN-PRQUAL PQ-2 — reviewer-qualification case set v4: version three,
 			const plan = prepareModelInvocation({ id: 'the verifying work unit' }, 'the verifying type', template, {
 				policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
 				alsoAssembles: []
-			}, undefined);
+			}, undefined, []);
 			expect(plan.ready, `${c.id}: production renders the template`).toBe(true);
 			expect(c.input.producingPrompt, `${c.id}: the instruction production renders`).toBe(plan.ready ? plan.prompt : '');
 			expect(c.input.producingPrompt, c.id).toBe(text);
@@ -2509,7 +2509,7 @@ describe('⭐⭐ package P F3 — reviewer-qualification case set v7: version si
 			const plan = prepareModelInvocation({ id: 'the work unit', title: 'wordfreq' }, n.id, template, {
 				policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
 				alsoAssembles: []
-			}, undefined);
+			}, undefined, []);
 			expect(plan.ready, `${n.name}: production renders its prompt`).toBe(true);
 			expect(text, `${n.name}: invented results forbidden`).toMatch(/never invent|report no test or run result that is not in them/);
 		}

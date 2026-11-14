@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import { assembledSources, runModelInvocationStep } from './run-model-step.js';
-import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from '@janumipwb/rph-application';
+import { DEFAULT_CONTEXT_ASSEMBLY_POLICY, type ContextAssemblyPolicyContent } from '@janumipwb/rph-application';
 import { oneShotSession } from './producer-session.js';
 import { stepBindingFor } from './step-binding.js';
 
@@ -74,6 +74,8 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
 		// ⭐⭐ Package L7 — D61 — no Undertaking, SAID: the field is required, so a caller cannot skip it by omission.
 		undertaking: undefined,
+		// ⭐⭐ Package L15 — D69 — no accepted work, SAID: the field is required, so a caller cannot skip it by omission.
+		acceptedWork: [],
 		// ⛔ SAID, NOT OMITTED. `binding` is required with an explicit NONE so that skipping the capability
 		// check cannot be expressed by leaving a field out — the dodge shape `REG-F-364` records.
 		binding: { kind: 'NONE' as const },
@@ -1278,5 +1280,81 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		const stored = await store.get(out.storageKey);
 		expect(stored, 'the retained work product IS the answer').toContain(ANSWER);
 		expect(stored, 'and carries none of the interior').not.toContain(REASONING);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`; `REG-F-634`; `REG-F-358`): the step hands the accepted work it is given to
+// the instruction, LAST — the model is sent it and the reviewers judge against the same text — and it declares PRIOR_WORK_PRODUCT at
+// THIS_UNDERTAKING, which the seeded `ctx-default` permits and a policy without the pair refuses before the render. ⛔ PREDICTED RED: at
+// HEAD the step's input had no such field, the instruction named no other unit's work, and nothing was declared.
+describe('⭐⭐ L15 (D69) — the step hands the accepted work its unit depends on to the instruction, and declares it', () => {
+	const SPEC = { title: 'Requirements Specification', unitId: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5XSP' };
+	const SECTION =
+		"This work depends on the accepted work of other units of this Undertaking. Before you begin, read each file below. Each holds one unit's accepted work product, exactly as its reviews judged it. The workbench writes these files; do not change them.\n" +
+		'- Requirements Specification: .jpwb/accepted/requirements-specification--pwu_01ARZ3NDEKTSV4RRFFQ69G5XSP.txt';
+	const WORK = 'Assess Route Assessment. Deliver Decide whether the route is viable.';
+	/** The four pairs `ctx-default` permitted before package L15: nothing at THIS_UNDERTAKING. */
+	const BEFORE_L15: ContextAssemblyPolicyContent = {
+		policyId: 'ctx-before-l15',
+		permittedSources: [
+			{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' },
+			{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+		]
+	};
+
+	it('⛔ the model is sent the section, last, and the reviewers’ prompt carries it', async () => {
+		let seen = '';
+		const { input } = harness({
+			session: oneShotSession(async (p: string) => {
+				seen = p;
+				return ANSWER;
+			}),
+			acceptedWork: [SPEC]
+		});
+		const out = await runModelInvocationStep(input);
+		expect(seen, 'the model was not sent the section').toBe(`${WORK}\n\n${SECTION}`);
+		expect(out.ran && out.prompt, 'the reviewers’ instruction does not carry it').toBe(`${WORK}\n\n${SECTION}`);
+	});
+
+	it('⛔ it declares PRIOR_WORK_PRODUCT at THIS_UNDERTAKING: a policy without the pair refuses it before the render, the model never called — the seeded ctx-default runs it', async () => {
+		let calls = 0;
+		const session = oneShotSession(async () => {
+			calls += 1;
+			return ANSWER;
+		});
+		const refused = await runModelInvocationStep(harness({ session, acceptedWork: [SPEC], contextPolicy: BEFORE_L15 }).input);
+		expect(refused.ran, 'a step that names accepted work ran under a policy that does not permit it').toBe(false);
+		expect(!refused.ran && refused.refusedBecause).toContain(
+			"Context assembly policy 'ctx-before-l15' does not permit PRIOR_WORK_PRODUCT at THIS_UNDERTAKING."
+		);
+		expect(calls, 'the model was called for a refused step').toBe(0);
+		const ran = await runModelInvocationStep(harness({ session, acceptedWork: [SPEC] }).input);
+		expect(ran.ran, ran.ran ? '' : ran.refusedBecause).toBe(true);
+	});
+
+	it('⛔ and on a repair turn too: every turn’s instruction carries the section, so every turn declares it', async () => {
+		const refused = await runModelInvocationStep(
+			harness({ acceptedWork: [SPEC], contextPolicy: BEFORE_L15, priorFindings: [{ code: 'RR-01', statement: 'Thin.' }] }).input
+		);
+		expect(refused.ran, 'a repair turn that names accepted work ran under a policy that does not permit it').toBe(false);
+		expect(!refused.ran && refused.refusedBecause).toContain('does not permit PRIOR_WORK_PRODUCT at THIS_UNDERTAKING.');
+	});
+
+	it('⭑ CONTROL — a step whose unit depends on no accepted work runs under that policy, its instruction byte for byte as before', async () => {
+		let seen = '';
+		const out = await runModelInvocationStep(
+			harness({
+				session: oneShotSession(async (p: string) => {
+					seen = p;
+					return ANSWER;
+				}),
+				acceptedWork: [],
+				contextPolicy: BEFORE_L15
+			}).input
+		);
+		expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
+		expect(seen).toBe(WORK);
 	});
 });

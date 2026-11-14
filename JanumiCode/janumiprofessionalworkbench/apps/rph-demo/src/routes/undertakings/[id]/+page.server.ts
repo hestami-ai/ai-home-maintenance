@@ -158,6 +158,7 @@ import {
 	stopAtRefusal,
 	stoppedUnitOf,
 	tryOfWorkProduct,
+	verifiedBytes,
 	waitingStepOf,
 	waitReasonFor,
 	type RebuiltProducingTurn,
@@ -181,10 +182,12 @@ import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer'
 // ⭐ `JAN-SELRES` RS-1 (D4): and `resolveExecutorModel`/`resolveExecutorToolId` are gone too — the fallback identity
 // comes from the executor SELECTION, the one read that also opened the executor.
 import {
+	acceptedWorkFile,
 	resolveInvocationSubject,
 	resolvePwuTypeFacts,
 	resolveUndertakingStatement,
 	withUndertakingSection,
+	type AcceptedWorkDependency,
 	type UndertakingStatement
 } from '@janumipwb/rph-application';
 // ⭐ `PromptTemplate` IS NO LONGER IMPORTED HERE, and its absence is the check. Its only use in this route was
@@ -1226,6 +1229,8 @@ async function rebuildForReview(
 		template: typeFacts.promptTemplate,
 		// ⭐⭐ Package L7 — D61 — the Undertaking's statement, which the producing prompt rebuilt states, as its producer was given it.
 		undertaking: undertakingStatementOf(s.pwuId),
+		// ⭐⭐ Package L15 — D69 — and the accepted work it named, last, read from the record as its step was given it.
+		acceptedWork: acceptedWorkNamedBy(s.pwuId),
 		...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {}),
 		...(pwuType?.contextSpecification
 			? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
@@ -1361,6 +1366,132 @@ function lastCompletionOf(
 	return last ? { planId: last.aggregateId, payload: (last.payload ?? {}) as Record<string, unknown> } : undefined;
 }
 
+/** ⭐⭐ `JAN-EXEC` Phase 7, package L15 — D69 — the work products a step completion names, in its order, as the sign-off reads them. */
+function outputsOf(payload: Readonly<Record<string, unknown>>): string[] {
+	return Array.isArray(payload.outputArtifactIds) ? payload.outputArtifactIds.map(String) : [];
+}
+
+/** ⭐⭐ Package L15 — D69 — a unit whose accepted work another unit depends on: its title and id, and the work product the record names. */
+interface AcceptedWork extends AcceptedWorkDependency {
+	readonly workProductId: string;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`; `REG-F-634`) — A UNIT'S ACCEPTED WORK PRODUCT, AS THE RECORD NAMES IT:
+ * the work product its LAST successful step completion names — the one the sign-off rebuilds and its declared reviews judge — by the
+ * sign-off's own selector (`lastCompletionOf`, and its first output, as `unitWorkOf` reads it), reused; none where no step of it
+ * succeeded, or that completion names no work product. ⚠ The record holds no field naming an accepted artifact (the lead's).
+ */
+function acceptedWorkProductOf(pwuId: string): string | undefined {
+	const completion = lastCompletionOf(pwuId);
+	return completion === undefined ? undefined : outputsOf(completion.payload)[0];
+}
+
+/**
+ * ⭐⭐ Package L15 — D69 — THE UNITS WHOSE ACCEPTED WORK A UNIT'S INSTRUCTION NAMES: each unit its recorded dependencies name
+ * (`dependencyIds`, D1, read as the readiness rule reads them — `readinessUnitOf`), once each, in their order, whose accepted work product
+ * the record names (`acceptedWorkProductOf`): its title, its id and that work product. ⛔ A dependency with none has no file, and is not
+ * listed. Direct dependencies only — the producers of its required inputs and, for a parent, its children (the lead's reading).
+ */
+function acceptedWorkOf(pwuId: string): readonly AcceptedWork[] {
+	const unit = readinessUnitOf(pwuId, getObject(getEngine(), pwuId));
+	return [...new Set(unit?.dependencyIds ?? [])].flatMap((unitId): AcceptedWork[] => {
+		const workProductId = acceptedWorkProductOf(unitId);
+		if (workProductId === undefined) return [];
+		const dependency = readinessUnitOf(unitId, getObject(getEngine(), unitId));
+		return [{ title: dependency?.title ?? unitId, unitId, workProductId }];
+	});
+}
+
+/** ⭐⭐ Package L15 — D69 — the units a unit's instruction names, title and id each, read from the record as its step was given them. */
+function acceptedWorkNamedBy(pwuId: string): readonly AcceptedWorkDependency[] {
+	return acceptedWorkOf(pwuId).map(({ title, unitId }) => ({ title, unitId }));
+}
+
+/**
+ * ⭐⭐ Package L15 — D69 — ONE UNIT'S ACCEPTED WORK PRODUCT WRITTEN TO ITS FILE in the Undertaking's shared workspace, byte for byte: its
+ * bytes read from the content store and checked against the ARTIFACT's own content hash before they are written (`verifiedBytes`, as
+ * the stopped-unit recovery reads a work product), then written through the workspace port and its containment checks
+ * (`Workspace.writeFile`) at `acceptedWorkFile`. ⛔ The work product as stored — never the rationale, never the raw reply. Null when
+ * written; else why not.
+ */
+async function writeAcceptedWorkFile(
+	workspace: ReturnType<typeof resolveUndertakingSandbox>['workspace'],
+	work: AcceptedWork
+): Promise<string | null> {
+	const artifact = getObjectOfType(getEngine(), 'ARTIFACT', work.workProductId);
+	if (!artifact) return `${work.workProductId} names no recorded work product.`;
+	const bytes = await verifiedBytes(
+		getArtifactStore(),
+		String((artifact.storageKey ?? '') as string),
+		String((artifact.contentHash ?? '') as string),
+		'the work product’s bytes'
+	);
+	if (!bytes.ok) return bytes.refusedBecause;
+	const file = acceptedWorkFile(work.title, work.unitId);
+	const written = await workspace.writeFile(file, bytes.value);
+	return written.written ? null : `its file ${file} could not be written: ${written.refusedBecause}`;
+}
+
+/** ⭐⭐ Package L15 — D69 — the Undertaking's shared workspace a unit's accepted work is written in (`R8`), or why it cannot be had. */
+function sharedWorkspaceOf(
+	pwuId: string
+):
+	| { readonly ok: true; readonly workspace: ReturnType<typeof resolveUndertakingSandbox>['workspace'] }
+	| { readonly ok: false; readonly why: string } {
+	try {
+		const pwu = getObjectOfType(getEngine(), 'PROFESSIONAL_WORK_UNIT', pwuId);
+		return { ok: true, workspace: resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string)).workspace };
+	} catch (e) {
+		return { ok: false, why: `the Undertaking's workspace cannot be had: ${e instanceof Error ? e.message : String(e)}` };
+	}
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`; `REG-F-634`) — BEFORE A UNIT STARTS, THE FILE OF EACH UNIT IT DEPENDS ON
+ * IS WRITTEN AGAIN FROM THE RECORD: before its Begin & Execute and before a work re-run, so before its workspace baseline is taken — the
+ * unit starts on the accepted bytes even if a command since changed or removed a file in the shared folder, and the files are never
+ * counted as its own change. Returns the units its instruction names, or why the start is refused, naming the dependency and the
+ * reason: ⛔ a dependency whose accepted work cannot be read, whose bytes fail their hash, or whose file cannot be written refuses the
+ * start before any model or reviewer call, and nothing of the unit moves (the lead's).
+ */
+async function handOverAcceptedWork(
+	pwuId: string
+): Promise<
+	| { readonly ok: true; readonly acceptedWork: readonly AcceptedWorkDependency[] }
+	| { readonly ok: false; readonly refusedBecause: string }
+> {
+	const work = acceptedWorkOf(pwuId);
+	if (work.length === 0) return { ok: true, acceptedWork: [] };
+	const place = sharedWorkspaceOf(pwuId);
+	for (const w of work) {
+		const why = place.ok ? await writeAcceptedWorkFile(place.workspace, w) : place.why;
+		if (why !== null)
+			return {
+				ok: false,
+				refusedBecause: `the accepted work of "${w.title}" (${w.unitId}), which this unit depends on, cannot be handed to it: ${why}`
+			};
+	}
+	return { ok: true, acceptedWork: work.map(({ title, unitId }) => ({ title, unitId })) };
+}
+
+/**
+ * ⭐⭐ Package L15 — D69 — WHEN A UNIT IS ACCEPTED, ITS FILE IS WRITTEN: its accepted work product, as the hand-over writes it, once Mark
+ * Satisfied's state change has committed. Null when written, or when its last completion names no work product (it has no file); else
+ * the words the page states. ⚠ A write that fails does not undo the acceptance (the lead's).
+ */
+async function writeOwnAcceptedWork(pwuId: string): Promise<string | null> {
+	const workProductId = acceptedWorkProductOf(pwuId);
+	if (workProductId === undefined) return null;
+	const unit = readinessUnitOf(pwuId, getObject(getEngine(), pwuId));
+	const work: AcceptedWork = { title: unit?.title ?? pwuId, unitId: pwuId, workProductId };
+	const place = sharedWorkspaceOf(pwuId);
+	const why = place.ok ? await writeAcceptedWorkFile(place.workspace, work) : place.why;
+	return why === null
+		? null
+		: `The unit is accepted, but its accepted work product was not written to ${acceptedWorkFile(work.title, pwuId)} in the Undertaking's shared workspace: ${why}`;
+}
+
 /** ⭐ E2 — each command a completion's evidence records: the command, its exit, whether it timed out. Pointers, no bytes. */
 function commandsOf(title: string, evidenceIds: readonly string[]): DeclaredReviewCommand[] {
 	return evidenceIds.flatMap((id) => {
@@ -1429,7 +1560,7 @@ async function unitWorkOf(
 	const viewed = await recordedViewOf(evidenceIds, p.structuredResult);
 	if (!viewed.ok) return { ok: false, refusedBecause: `the work of ${title} cannot be rebuilt from the record: ${viewed.refusedBecause}` };
 	const view = viewed.view ? { view: viewed.view } : {};
-	const outputs = Array.isArray(p.outputArtifactIds) ? p.outputArtifactIds.map(String) : [];
+	const outputs = outputsOf(p);
 	if (outputs.length === 0)
 		return {
 			ok: true,
@@ -1453,6 +1584,8 @@ async function unitWorkOf(
 		template: typeFacts.promptTemplate,
 		// ⭐⭐ Package L7 — D61 — the Undertaking's statement, which its producing prompt states.
 		undertaking,
+		// ⭐⭐ Package L15 — D69 — and the accepted work it named, last, read from the record as its step was given it.
+		acceptedWork: acceptedWorkNamedBy(pwuId),
 		...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {}),
 		...(pwuType?.contextSpecification
 			? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
@@ -1885,6 +2018,11 @@ interface ModelUnitRun {
 	readonly pwuTypeId: string;
 	readonly typeFacts: ReturnType<typeof resolvePwuTypeFacts>;
 	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 — the units whose accepted work its instruction names, last, their files written
+	 * from the record before the step began (`handOverAcceptedWork`). ⛔ Required, `[]` said where there is none.
+	 */
+	readonly acceptedWork: readonly AcceptedWorkDependency[];
+	/**
 	 * ⭐ P7-6R RD8 — a refused attempt's SUBJECT findings, carried by a person's re-run of the work into this run's FRESH
 	 * session, on its first turn only. Absent for Begin & Execute.
 	 */
@@ -2155,6 +2293,8 @@ async function runModelUnit(u: ModelUnitRun) {
 				template,
 				// ⭐⭐ Package L7 — D61 — the Undertaking's statement, which the instruction states before its output contract.
 				undertaking,
+				// ⭐⭐ Package L15 — D69 — the units whose accepted work the instruction names, last, after its output contract.
+				acceptedWork: u.acceptedWork,
 				store: getArtifactStore(),
 				tenantPrefix: EXECUTION_TENANT_PREFIX,
 				dispatchExchange: (payload, aggregateId) =>
@@ -2738,6 +2878,14 @@ export const actions: Actions = {
 			executor = selected;
 		}
 
+		// ── ⭐⭐ `JAN-EXEC` Phase 7, package L15 — D69 (`REG-D-159`; `REG-F-634`) — THE ACCEPTED WORK THIS UNIT DEPENDS ON, WRITTEN AGAIN
+		// FROM THE RECORD BEFORE ANYTHING IS DISPATCHED ─────────────────────────────────────────────────────────────────────────
+		// Each dependency's file, from its accepted work product, before the batch below starts the step and so before the unit's
+		// workspace baseline: the unit starts on the accepted bytes, and they are never counted as its own change. ⛔ One that cannot be
+		// read, verified or written refuses the start here, naming it — before any model or reviewer call, nothing of the unit moved.
+		const handOver = await handOverAcceptedWork(pwuId);
+		if (!handOver.ok) return fail(400, { error: `Execution failed: ${handOver.refusedBecause}` });
+
 		// ── ⭑⭑ JAN-EXECGOV EG-02 — `STA-8` STOPS BEING UNMET ────────────────────────────────────────────────
 		//
 		// *"Execution requires an approved plan and AUTHORIZED RUNTIME BINDINGS."* `REG-F-365` measured zero
@@ -2851,7 +2999,9 @@ export const actions: Actions = {
 				pwu,
 				pwuType,
 				pwuTypeId,
-				typeFacts
+				typeFacts,
+				// ⭐⭐ Package L15 — D69 — the units whose accepted work its instruction names, their files written above.
+				acceptedWork: handOver.acceptedWork
 			});
 
 		const legacy = runSteps([
@@ -3531,7 +3681,11 @@ export const actions: Actions = {
 			chg(pwuId, 'UNDER_ASSURANCE', 'SATISFIED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED')
 		]);
 		if (err) return fail(400, { error: `No green without assurance: ${err}` });
-		return { advanced: 'satisfied' };
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L15 — D69 (`REG-D-159`) — THE UNIT'S ACCEPTED WORK PRODUCT, WRITTEN TO ITS FILE once the state
+		// change has committed, so each unit that depends on it is pointed at it. ⚠ A write that fails is stated on the page, and the
+		// acceptance stands.
+		const notWritten = await writeOwnAcceptedWork(pwuId);
+		return notWritten === null ? { advanced: 'satisfied' } : { advanced: 'satisfied', acceptedWorkNotWritten: notWritten };
 	},
 
 	// ── ⭐⭐ `JAN-EXEC` P7-6R R-1c — RE-RUN THE REVIEW (`DESIGN-the-stopped-unit-recovery.md` RD3, RD4, RD5, RD7; `REG-D-104` (1);
@@ -3752,6 +3906,10 @@ export const actions: Actions = {
 		if (!reviewerReady.ready) return fail(400, { error: reviewerReady.guidance });
 		const chosen = selectExecutor({ testMode: isTestMode() });
 		if (chosen.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(chosen) });
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L15 — D69 — the accepted work this unit depends on, written again from the record before
+		// anything is dispatched, as Begin & Execute writes it: a refusal leaves the unit waiting, with nothing recorded.
+		const handOver = await handOverAcceptedWork(pwuId);
+		if (!handOver.ok) return fail(400, { error: `Re-running the work refused: ${handOver.refusedBecause}` });
 
 		const decisionId = mintUiId('dec');
 		const planB = mintUiId('plan');
@@ -3799,6 +3957,8 @@ export const actions: Actions = {
 			pwuType,
 			pwuTypeId,
 			typeFacts,
+			// ⭐⭐ Package L15 — D69 — the units whose accepted work its instruction names, their files written above.
+			acceptedWork: handOver.acceptedWork,
 			carriedFindings: s.findings
 		});
 		return 'advanced' in ran ? { advanced: 'work-rerun' } : ran;

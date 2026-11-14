@@ -71,24 +71,36 @@ describe('JAN-CTXPOL — the seeded default is a TRUE statement, not a permissiv
 		);
 	});
 
-	it('⭑⭑ and it permits NOTHING at THIS_UNDERTAKING — the boundary that survives the correction', () => {
+	// ⭐⭐ RESTATED 2026-11-13 (`JAN-EXEC` Phase 7, package L15 — design D69; `REG-D-159`; `REG-F-358`): ~~NOTHING at THIS_UNDERTAKING~~ —
+	// the day the comment below foresaw has come. A unit is told which files hold the accepted work of the units it depends on, so its
+	// step assembles PRIOR_WORK_PRODUCT at THIS_UNDERTAKING, and the seed permits that one pair. ⛔ The boundary keeps its teeth for
+	// everything else — no other source is drawable across the Undertaking — and the seed is pinned to its five pairs whole, so a
+	// permissive seed still reddens here.
+	it('⭑⭑ and it permits ~~NOTHING~~ ⭐ only the accepted work a unit depends on at THIS_UNDERTAKING — the boundary that survives the correction (package L15, D69; REG-D-159)', () => {
 		// ⭑ THE FALSIFIABLE CONTENT, and it is a real claim about the code: the producer's session is opened and
 		// disposed PER WORK UNIT (`+page.server.ts` — `getExecutionSession(executor)(…)` before the loop, `dispose()` in
 		// `finally`), so no material crosses into a second unit. The day something does, this policy is wrong
-		// until someone updates it.
+		// until someone updates it. ⭐ (package L15) It has: another unit's accepted work product reaches a unit through the
+		// file its instruction names, and the seed says so — of that source alone.
 		//
-		// THE MUTANT: seed `THIS_UNDERTAKING` for any source. Every other assertion in this file still passes —
+		// THE MUTANT: seed `THIS_UNDERTAKING` for any ~~source~~ ⭐ other source. Every other assertion in this file still passes —
 		// which is exactly why the permissive seed `D-2` refuses is a trap rather than a shortcut.
-		for (const source of [
-			'RENDERED_INSTRUCTION',
-			'PRIOR_REVIEW_FINDING',
-			'PRIOR_WORK_PRODUCT',
-			'PRIOR_RATIONALE'
-		] as const)
+		expect(
+			permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, 'PRIOR_WORK_PRODUCT', 'THIS_UNDERTAKING'),
+			'the accepted work a unit depends on is not drawable across the undertaking'
+		).toBe(true);
+		for (const source of ['RENDERED_INSTRUCTION', 'PRIOR_REVIEW_FINDING', 'PRIOR_RATIONALE'] as const)
 			expect(
 				permits(DEFAULT_CONTEXT_ASSEMBLY_POLICY, source, 'THIS_UNDERTAKING'),
 				`${source} must not be drawable across the undertaking`
 			).toBe(false);
+		expect(DEFAULT_CONTEXT_ASSEMBLY_POLICY.permittedSources, 'the seed permits other than its five pairs').toEqual([
+			{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' },
+			{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_UNDERTAKING' }
+		]);
 	});
 
 	it('⚠ scope is part of the permission, not decoration', () => {

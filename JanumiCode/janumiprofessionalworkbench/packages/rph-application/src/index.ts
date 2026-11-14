@@ -42,6 +42,9 @@ export type {
 export { renderPromptTemplate, markersIn, promptTemplateFingerprint } from './prompt-render.js';
 export type { RenderOutcome } from './prompt-render.js';
 export {
+	ACCEPTED_WORK_SECTION_HEADING,
+	acceptedWorkFile,
+	acceptedWorkSection,
 	assembleStepContext,
 	prepareModelInvocation,
 	resolveInvocationSubject,
@@ -55,6 +58,7 @@ export {
 	WORK_UNIT_MARKERS
 } from './execution-invocation.js';
 export type {
+	AcceptedWorkDependency,
 	ContextAssembly,
 	InvocationPlan,
 	InvocationSubject,

@@ -12,6 +12,7 @@
 // which it was. That the floor may then BLOCK is the system working.
 import {
 	prepareModelInvocation,
+	type AcceptedWorkDependency,
 	type ContextAssemblyPolicyContent,
 	type InvocationSubject,
 	type UndertakingStatement
@@ -55,6 +56,14 @@ export interface RunModelStepInput {
 	 * optional field would let a caller skip it by omission, the dodge `contextPolicy` and `binding` refuse.
 	 */
 	readonly undertaking: UndertakingStatement | undefined;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`; `REG-F-634`) — THE UNITS WHOSE ACCEPTED WORK THIS UNIT DEPENDS ON,
+	 * whose files the route wrote from the record before the step began: the instruction names each file last, after its output
+	 * contract (`prepareModelInvocation`), so the model is sent the section and every review of the step reads it in `prompt`; and a
+	 * step whose instruction carries it declares PRIOR_WORK_PRODUCT at THIS_UNDERTAKING (`acceptedWorkSources`). ⛔ REQUIRED, `[]`
+	 * SAID where there is none: an optional field would let a caller skip it by omission.
+	 */
+	readonly acceptedWork: readonly AcceptedWorkDependency[];
 	/**
 	 * The producer's SESSION, held across the work unit's tries (`JAN-EXECSESS`).
 	 *
@@ -201,6 +210,17 @@ function turnAssembles(input: RunModelStepInput): readonly ContextSourceRule[] {
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`; `REG-F-358`) — WHAT A STEP WHOSE INSTRUCTION NAMES ACCEPTED WORK
+ * DECLARES IT ASSEMBLES: another unit's work product, at the Undertaking's scope — PRIOR_WORK_PRODUCT at THIS_UNDERTAKING, on every
+ * turn, since every turn's instruction carries the section; nothing where it names none. ⭑ `REG-F-358`: *"the day it does, the policy
+ * is wrong until someone updates it"* — the seeded `ctx-default` permits the pair (`context-assembly.ts`), and a policy that does not
+ * refuses the step before its instruction is rendered (`CP-04`'s ceiling, `prepareModelInvocation`).
+ */
+function acceptedWorkSources(acceptedWork: readonly AcceptedWorkDependency[]): readonly ContextSourceRule[] {
+	return acceptedWork.length === 0 ? [] : [{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_UNDERTAKING' }];
+}
+
+/**
  * ⭐ P7-6R RD8 — a turn that is not a repair: the instruction, and — on a re-run of refused work — the refused review's
  * findings AFTER it, since a fresh session has no task until it is given one. ⭑ It says what the session does NOT hold and
  * what it may find, so the record (E-1 holds this turn) says so too: the earlier attempt's files stay in the shared
@@ -318,10 +338,13 @@ export async function runModelInvocationStep(
 		input.template,
 		{
 			policy: input.contextPolicy,
-			alsoAssembles: turnAssembles(input),
+			// ⭐⭐ Package L15 — D69 — and, where the instruction names accepted work, PRIOR_WORK_PRODUCT at THIS_UNDERTAKING.
+			alsoAssembles: [...turnAssembles(input), ...acceptedWorkSources(input.acceptedWork)],
 			...(input.contextSpecification ? { specification: input.contextSpecification } : {})
 		},
-		input.undertaking
+		input.undertaking,
+		// ⭐⭐ Package L15 — D69 — the units whose accepted work the instruction names, last.
+		input.acceptedWork
 	);
 	if (!plan.ready) return { ran: false, refusedBecause: plan.reason };
 

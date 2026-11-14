@@ -41,6 +41,9 @@
 		},
 		"packages/rph-application/src/execution-invocation.ts": {
 			"consumedExports": [
+				"ACCEPTED_WORK_SECTION_HEADING",
+				"acceptedWorkFile",
+				"acceptedWorkSection",
 				"assembleStepContext",
 				"prepareModelInvocation",
 				"resolveInvocationSubject",
@@ -54,6 +57,9 @@
 				"WORK_UNIT_MARKERS"
 			],
 			"guardedExports": [
+				"ACCEPTED_WORK_SECTION_HEADING",
+				"acceptedWorkFile",
+				"acceptedWorkSection",
 				"assembleStepContext",
 				"prepareModelInvocation",
 				"resolveInvocationSubject",
@@ -66,7 +72,7 @@
 				"withUndertakingSection",
 				"WORK_UNIT_MARKERS"
 			],
-			"unattributedMutants": 2
+			"unattributedMutants": 5
 		},
 		"packages/rph-application/src/handlers/abandon-authorization.ts": {
 			"consumedExports": [

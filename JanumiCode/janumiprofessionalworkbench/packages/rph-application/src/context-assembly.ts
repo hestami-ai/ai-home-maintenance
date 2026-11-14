@@ -45,9 +45,15 @@ export const DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID = 'ctx-default';
  * ⚠ THIS IS NOT `D-3`. `D-3` is widening the policy to draw prior work from the STREAM — a behaviour change to
  * every execution, still not taken. Here the BEHAVIOUR is untouched and the CLAIM is corrected to match it.
  *
- * ⭑ AND IT KEEPS ITS TEETH: `THIS_UNDERTAKING` is permitted for NOTHING. The producer's session is opened and
- * disposed per work unit, so no material crosses into a second one — and the day it does, this policy is wrong
+ * ⭑ AND IT KEEPS ITS TEETH: `THIS_UNDERTAKING` is permitted for ~~NOTHING~~ ⭐ one source alone, below. The producer's session is
+ * opened and disposed per work unit, so no material crosses into a second one — and the day it does, this policy is wrong
  * until someone updates it, which is the property that makes it worth storing.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`; `REG-F-358`) — THAT DAY HAS COME, AND THIS IS THE UPDATE. A unit is now
+ * told, at the end of its instruction, which files in the Undertaking's shared workspace hold the accepted work of the units it
+ * depends on, and to read them first (`acceptedWorkSection`): another unit's work product reaches it, so its step declares
+ * PRIOR_WORK_PRODUCT at THIS_UNDERTAKING (`run-model-step.ts`), and this seed permits that pair — and NOTHING ELSE at
+ * THIS_UNDERTAKING: no other unit's instruction, finding or rationale crosses. A policy without the pair refuses such a step
+ * before its instruction is rendered (`CP-04`'s ceiling).
  */
 export const DEFAULT_CONTEXT_ASSEMBLY_POLICY: ContextAssemblyPolicyContent = Object.freeze({
 	policyId: DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID,
@@ -55,7 +61,9 @@ export const DEFAULT_CONTEXT_ASSEMBLY_POLICY: ContextAssemblyPolicyContent = Obj
 		{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' },
 		{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
 		{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
-		{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+		{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' },
+		// ⭐⭐ Package L15 — D69 (`REG-D-159`) — the accepted work of the units a unit depends on, named in its instruction.
+		{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_UNDERTAKING' }
 	]
 }) as ContextAssemblyPolicyContent;
 

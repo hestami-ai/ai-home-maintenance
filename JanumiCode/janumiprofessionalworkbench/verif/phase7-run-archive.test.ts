@@ -177,7 +177,10 @@ describe('⭐ D6 — each store is BACKED UP, converted to a rollback journal, a
 		const db = walStore(join(dir, 'demo.sqlite'), 20);
 		const out = folder('raw-backup');
 		// The backup itself, without the conversion: node's own, as `backupStore` calls it.
-		await backup(db, join(out, 'demo.sqlite'), { rate: -1 });
+		// ⭐⭐ RESTATED 2026-11-13 (`JAN-EXEC` Phase 7, package L15 — `REG-F-638`, the lead's remedy): ~~`rate: -1`~~ `rate: 2147483647`, as
+		// `backupStore` now calls it — Node v24.22.3 refuses -1, and this call threw before the control could look. One step still, so the
+		// copy and this control's promise are as before.
+		await backup(db, join(out, 'demo.sqlite'), { rate: 2147483647 });
 		expect(journalHeaderOf(join(out, 'demo.sqlite'))).toEqual([2, 2]);
 		expect(archivedCopyProblem(join(out, 'demo.sqlite'))).toBe(
 			'its header declares journal 2/2, not a rollback journal (1/1), so a read-only open could write beside it'

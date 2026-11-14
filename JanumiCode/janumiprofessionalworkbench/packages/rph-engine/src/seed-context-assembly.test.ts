@@ -63,7 +63,9 @@ describe('JAN-CTXPOL — the seeded policy resolves from a real engine', () => {
 		);
 	});
 
-	it('⭑ the STORED policy says what the code actually does — CORRECTED at CP-04', () => {
+	// ⭐⭐ RESTATED 2026-11-13 (`JAN-EXEC` Phase 7, package L15 — design D69; `REG-D-159`): the stored seed permits the accepted work of
+	// the units a unit depends on at THIS_UNDERTAKING, which its instruction now names — and still nothing else there.
+	it('⭑ the STORED policy says what the code actually does — CORRECTED at CP-04 ⭐ and at package L15 (D69)', () => {
 		// ⚠ THE SEED IS A CLAIM, NOT A STUB, and this asserts the claim is the true one. Its first version
 		// asserted `PRIOR_WORK_PRODUCT` was NOT permitted, which was false the day it was written: the held
 		// session (`JAN-EXECSESS`) carries the producer's own prior work product into a repair turn. The
@@ -77,7 +79,11 @@ describe('JAN-CTXPOL — the seeded policy resolves from a real engine', () => {
 		const policy = resolveContextAssemblyPolicy(finder(engine), DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID);
 		expect(permits(policy, 'RENDERED_INSTRUCTION', 'THIS_TRY')).toBe(true);
 		expect(permits(policy, 'PRIOR_WORK_PRODUCT', 'THIS_WORK_UNIT')).toBe(true);
-		// ⭑ The boundary the correction keeps: the session is per work unit, so nothing crosses into a second.
-		expect(permits(policy, 'PRIOR_WORK_PRODUCT', 'THIS_UNDERTAKING')).toBe(false);
+		// ⭑ The boundary the correction keeps: the session is per work unit, so nothing crosses into a second ~~.~~ ⭐ — but the
+		// accepted work of the units a unit depends on, which its instruction names (package L15, D69): ~~`.toBe(false)`~~ `.toBe(true)`
+		// for that pair, and every other source at THIS_UNDERTAKING still refused.
+		expect(permits(policy, 'PRIOR_WORK_PRODUCT', 'THIS_UNDERTAKING')).toBe(true);
+		for (const source of ['RENDERED_INSTRUCTION', 'PRIOR_REVIEW_FINDING', 'PRIOR_RATIONALE'] as const)
+			expect(permits(policy, source, 'THIS_UNDERTAKING'), `${source} crosses into a second unit`).toBe(false);
 	});
 });

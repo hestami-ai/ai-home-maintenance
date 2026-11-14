@@ -14,7 +14,7 @@
 		form
 	}: {
 		data: PageData;
-		form: { error?: string; proposed?: string; advanced?: string } | null;
+		form: { error?: string; proposed?: string; advanced?: string; acceptedWorkNotWritten?: string } | null;
 	} = $props();
 	const themeContext = getContext<ThemeContext>(THEME_CONTEXT);
 	const colorTheme = themeContext.theme;
@@ -194,6 +194,9 @@
 				</div>
 			{/if}
 			{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
+			<!-- ⭐⭐ `JAN-EXEC` Phase 7, package L15 — D69 (`REG-D-159`): Mark Satisfied wrote no file for the unit's accepted work; the
+				 acceptance stands, and the page says so. -->
+			{#if form?.acceptedWorkNotWritten}<p class="err" role="alert" data-testid="accepted-work-not-written">{form.acceptedWorkNotWritten}</p>{/if}
 			<h3>PWU Instances → PWU Types</h3>
 			<p class="hint">
 				Each PWU Instance realizes a PWU Type defined by the PWA (or is a declared local extension), and

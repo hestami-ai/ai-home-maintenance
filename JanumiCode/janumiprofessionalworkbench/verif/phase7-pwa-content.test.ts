@@ -148,7 +148,7 @@ function engineInstructionFor(t: Phase7TypeDeclaration, undertaking: Phase7Under
 		storedTemplate(t),
 		{ policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] },
 		// The action trims each value before it stores it (`routes/undertakings/+page.server.ts`).
-		undertaking && { intendedOutputProduct: undertaking.product.trim(), objective: undertaking.objective.trim() }
+		undertaking && { intendedOutputProduct: undertaking.product.trim(), objective: undertaking.objective.trim() }, []
 	);
 	return plan.ready ? plan.prompt : `REFUSED: ${plan.reason}`;
 }

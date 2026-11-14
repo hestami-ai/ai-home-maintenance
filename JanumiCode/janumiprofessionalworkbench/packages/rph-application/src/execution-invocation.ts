@@ -184,6 +184,77 @@ export function withUndertakingSection(text: string, statement: UndertakingState
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`; `REG-F-634`; `REG-F-358`) — A UNIT WHOSE ACCEPTED WORK ANOTHER UNIT
+ * DEPENDS ON: its title and its id, which name the file in the Undertaking's shared workspace that holds its accepted work product
+ * (`acceptedWorkFile`). ⛔ `REG-F-634`: the engine started a unit only once the units it depends on were accepted (D1, D2), and handed
+ * it none of their work — a unit's prompt carried only its own fields — so P6 again's seventh run's Technical Design never saw the
+ * accepted Requirements Specification, contradicted it on two points it had settled, and was rejected by both its declared reviews.
+ */
+export interface AcceptedWorkDependency {
+	readonly title: string;
+	readonly unitId: string;
+}
+
+/** ⭐⭐ Package L15 — D69 — the section's first line, spelled ONCE, here: the lead's words, byte for byte. */
+export const ACCEPTED_WORK_SECTION_HEADING =
+	"This work depends on the accepted work of other units of this Undertaking. Before you begin, read each file below. Each holds one unit's accepted work product, exactly as its reviews judged it. The workbench writes these files; do not change them.";
+
+/** ⭐⭐ Package L15 — D69 — the folder of the Undertaking's shared workspace that holds each accepted unit's file (the lead's). */
+const ACCEPTED_WORK_FOLDER = '.jpwb/accepted';
+
+/** ⭐⭐ Package L15 — D69 — the longest a file's slug may be (the lead's). */
+const ACCEPTED_WORK_SLUG_MAX = 60;
+
+/**
+ * ⭐⭐ Package L15 — D69 — A UNIT'S TITLE AS THE FIRST PART OF ITS FILE'S NAME (the lead's): in lower case, each run of characters other
+ * than `a` to `z` and `0` to `9` one hyphen, trimmed of hyphens, at most 60 characters. ⚠ Trimmed again after the cut, so a slug cut at
+ * a hyphen does not end in one — the builder's reading of an order D69 does not state, named in package L15's facts.
+ */
+function acceptedWorkSlug(title: string): string {
+	return title
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9]+/g, '-')
+		.replace(/^-+/, '')
+		.replace(/-+$/, '')
+		.slice(0, ACCEPTED_WORK_SLUG_MAX)
+		.replace(/-+$/, '');
+}
+
+/**
+ * ⭐⭐ Package L15 — D69 — WHERE A UNIT'S ACCEPTED WORK PRODUCT IS WRITTEN, relative to the Undertaking's shared workspace (the lead's):
+ * `.jpwb/accepted/<slug>--<unit id>.txt`, the unit's id making the name unique. ⭑ ONE SPELLING FOR BOTH ITS USES: the route writes the
+ * file there (`Workspace.writeFile`), and the section names it (`acceptedWorkSection`).
+ */
+export function acceptedWorkFile(title: string, unitId: string): string {
+	return `${ACCEPTED_WORK_FOLDER}/${acceptedWorkSlug(title)}--${unitId}.txt`;
+}
+
+/**
+ * ⭐⭐ Package L15 — D69 — THE SECTION THAT POINTS A UNIT AT THE ACCEPTED WORK IT DEPENDS ON, AND ITS ONE RENDERER: the heading line
+ * (`ACCEPTED_WORK_SECTION_HEADING`), then `- <its title>: <its file>` for each unit, in the order given — the order of the unit's
+ * recorded dependencies (`dependencyIds`, D1). ⚠ ABSENT MEANS ABSENT, as D61's section holds: with none there is no section
+ * (`undefined`), so a unit that depends on no accepted work is given the instruction it was given before, byte for byte.
+ */
+export function acceptedWorkSection(dependencies: readonly AcceptedWorkDependency[]): string | undefined {
+	if (dependencies.length === 0) return undefined;
+	return [
+		ACCEPTED_WORK_SECTION_HEADING,
+		...dependencies.map((d) => `- ${d.title}: ${acceptedWorkFile(d.title, d.unitId)}`)
+	].join('\n');
+}
+
+/**
+ * ⭐⭐ Package L15 — D69 — `text`, a blank line, then the section; `text` alone where there is none. ⚠ LAST in the instruction, after the
+ * output contract (the lead's seat): the candidate checks measure the type's text, the Undertaking's statement and the output contract
+ * against the 4,000 characters a reviewer is shown of an instruction (`PROMPT-LENGTH`; `USER_INTENT_MAX`), so that part is shown as
+ * before, and the section after it as far as it fits.
+ */
+function withAcceptedWorkSection(text: string, dependencies: readonly AcceptedWorkDependency[]): string {
+	const listed = acceptedWorkSection(dependencies);
+	return listed === undefined ? text : `${text}\n\n${listed}`;
+}
+
+/**
  * ⭐⭐ Package L7 — D61 — THE STATEMENT OF THE UNDERTAKING `undertakingId` NAMES, BY **PARSING** THE STORED OBJECT (`R30`, as
  * `resolveInvocationSubject` reads a work unit), never by asserting it: its two fields, and nothing else. ⛔ Refused when it does
  * not resolve, or does not parse as an UNDERTAKING — anything the engine persisted parses (`handlers/kit.ts`), so a refusal means
@@ -381,7 +452,14 @@ export function prepareModelInvocation(
 	 * states after the type's rendered text and before its output contract. ⛔ REQUIRED, `undefined` where there is none, for
 	 * CP-04's reason: an optional one would let a caller skip it by omission, and the type-checker would name no caller.
 	 */
-	undertaking: UndertakingStatement | undefined
+	undertaking: UndertakingStatement | undefined,
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`) — the units whose accepted work this unit depends on, each its
+	 * title and its id, in the order its recorded dependencies name them: the instruction names the file that holds each one's work
+	 * LAST, after its output contract (`acceptedWorkSection`). ⛔ REQUIRED, `[]` where there is none, for D61's reason: an optional
+	 * list would let a caller skip it by omission — a rebuild a review is shown above all — and the type-checker would name no caller.
+	 */
+	acceptedWork: readonly AcceptedWorkDependency[]
 ): InvocationPlan {
 	// ⛔ NO DEFAULT PROMPT. A type without a template declares no agent behaviour — TRUE of every type that
 	// existed before REG-D-058 — and inventing one would be the seeded-policy-as-projection defect this
@@ -478,10 +556,19 @@ export function prepareModelInvocation(
 	return {
 		ready: true,
 		// ⭐⭐ Package L7 — D61 — the work, what it is part of, then the shape to return: the Undertaking's section after the
-		// type's rendered text, and the output contract LAST, as before. ⚠ Still the RENDERED_INSTRUCTION at THIS_TRY, as the
-		// contract is (the lead's reading, named in D61): `ctx-default`'s THIS_UNDERTAKING, permitted for nothing, concerns
-		// material from another work unit, which still crosses nowhere, so no policy needs widening.
-		prompt: withOutputContract(withUndertakingSection(rendered.text, undertaking), template.outputContract),
+		// type's rendered text, and the output contract ~~LAST, as before~~ after it. ⚠ Still the RENDERED_INSTRUCTION at THIS_TRY, as
+		// the contract is (the lead's reading, named in D61): ~~`ctx-default`'s THIS_UNDERTAKING, permitted for nothing, concerns
+		// material from another work unit, which still crosses nowhere, so no policy needs widening.~~ ⭐ (2026-11-13, package L15, as
+		// D61 is amended for D69) D61's section needs nothing at THIS_UNDERTAKING, whose reason is material from another work unit; D69
+		// hands such material on, below.
+		// ⭐⭐ Package L15 — D69 (`REG-D-159`) — and LAST, after the output contract, the section naming the files that hold the accepted
+		// work this unit depends on (`withAcceptedWorkSection`): a step whose instruction carries it declares PRIOR_WORK_PRODUCT at
+		// THIS_UNDERTAKING (`run-model-step.ts`), which the seeded `ctx-default` permits (`context-assembly.ts`). With none, the
+		// instruction is the one it was before, byte for byte.
+		prompt: withAcceptedWorkSection(
+			withOutputContract(withUndertakingSection(rendered.text, undertaking), template.outputContract),
+			acceptedWork
+		),
 		fingerprint: promptTemplateFingerprint(pwuTypeId, template)
 	};
 }
