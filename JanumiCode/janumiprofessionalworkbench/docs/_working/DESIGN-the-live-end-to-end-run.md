@@ -225,7 +225,7 @@ This design's own steps for the roadmap's Phase 7.
     - It logs every POST it makes, because the stores keep accepted acts only.
   - **D6, the archive.**
     - After each unit, it keeps:
-      - both stores, through SQLite's backup, each copy converted to a rollback journal so that a read-only open writes nothing beside it;
+      - both stores, through SQLite's backup, each copy converted to a rollback journal so that a read-only open writes nothing beside it; ⭐ (2026-11-14, `REG-F-641`) Each backup is one step, so the copy is one consistent snapshot, and a test is to hold it so: `backupStore` counts its backup's steps from SQLite's progress calls, recorded per store (package L16).
       - the workspace and `.process-output`, copied byte for byte. Neither exists until the first model unit, and `.process-output` is one per Undertaking;
       - the introspect dump.
     - After Playwright exits, the operator copies the whole run folder, `-wal` and `-shm` files included.
@@ -326,11 +326,11 @@ This design's own steps for the roadmap's Phase 7.
     - **The limit is 200 reviewer calls** (`REG-D-105` (1)), checked as before: between phases, and now also before each recovery re-run.
   - ⭑ **The paid run's recovery rule** (`REG-D-105` (4): *"Rule in run plan (Recommended)"*). When a phase's Begin & Execute is refused, the lane acts as the operator, once, by this rule:
     1. A review that did not conclude is re-run once (the re-run-the-review act).
-    2. A review that concluded against the work has the work re-run once, with its findings (the re-run-the-work act).
+    2. A review that concluded against the work has the work re-run once, with its findings (the re-run-the-work act). ⭐ (2026-11-14, `REG-D-163` (2); design D71) And a unit its declared reviews reject at its sign-off has its work re-run once, with their findings, by D71's act; a second rejection ends the run `withheld`, as today.
     3. If that re-run is refused again, the unit is abandoned.
     - Each act posts the page's own form, with a rationale naming this rule. So each choice is recorded as the operator's Decision, never the engine's.
     - The run report lists each re-run beside the Decision that made it.
-    - **Allowed during the run,** beside the list below: these three acts, by this rule only. Abandon followed by re-proposing stays forbidden.
+    - **Allowed during the run,** beside the list below: ~~these three acts, by this rule only.~~ these three acts and D71's re-run of a unit its declared reviews reject (`REG-D-163` (2)), by this rule only. Abandon followed by re-proposing stays forbidden.
   - ⭑ **D13 after I1.** I1 runs the reviewer in its own folder with the trust check off, so the reviewer no longer needs a trusted checkout. D13 stays as written until the next paid run shows the worktree works.
 - **P7-7, half B.**
   - **The request:** *"Create a PWA for realizing a small command-line product through requirements, design, implementation with unit tests, and end-to-end verification, with the assurance policies each phase needs."*
