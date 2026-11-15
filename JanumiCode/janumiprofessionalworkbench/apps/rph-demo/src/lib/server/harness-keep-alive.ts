@@ -14,7 +14,8 @@
 // ── THE REMEDY, `REG-F-501`'s CANDIDATE 1 ──────────────────────────────────────────────────────────────────────
 // `harnessKeepAlive`, a plugin `vite.config.ts` carries, raises the dev server's `keepAliveTimeout` in harness mode: no
 // connection a test leaves idle is closed under it. Outside harness mode it changes nothing.
-// `harness-keep-alive-connection.test.ts` drives the reset and its remedy; `harness-keep-alive.test.ts` the plugin.
+// `harness-keep-alive-connection.test.ts` drives ~~the reset~~ Node's close (a reset only before Node 22.23.4, 24.22.1 and
+// 26.12.1: `REG-F-639`, as the toolchain session measured it) and its remedy; `harness-keep-alive.test.ts` the plugin.
 import { Server } from 'node:http';
 import type { Plugin } from 'vite';
 

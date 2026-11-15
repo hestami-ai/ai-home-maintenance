@@ -50,6 +50,7 @@ import {
 	k4Check,
 	k5Check,
 	k9Check,
+	ONE_STEP_RATE,
 	PHASE7_ARCHIVE_UNITS,
 	piAgentDirOf,
 	processOutputDirectoryOf,
@@ -207,6 +208,48 @@ describe('⭐ D6 — each store is BACKED UP, converted to a rollback journal, a
 			'refused: demo.sqlite already exists, and an archived store is written once'
 		);
 		expect(readFileSync(join(out, 'demo.sqlite'), 'utf8')).toBe('an earlier archive');
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — `REG-F-641`: no test held the backup to ONE step — the ledger's anchor census pinned only the call's
+	// text (`PQ7-M200`'s find), which a re-anchor clears, and with `backupStore` asking rate 100 every archive test stayed green (measured by the
+	// toolchain session, whose test this is, handed over: its handover note, items 2 and 3). ⚠ Its trap, kept clear: in vitest 4.1.10
+	// `expect(promise, msg).rejects.toThrow(…)` dropped `msg` when the promise resolved, so the boundary's call is settled first and then held.
+	it('⛔ the backup is ONE step: backupStore copies a store larger than node:sqlite’s default step in one, at ONE_STEP_RATE, the largest rate node:sqlite takes (REG-F-641)', async () => {
+		const dir = folder('one-step');
+		walStore(join(dir, 'demo.sqlite'), 3_000);
+		const from = new DatabaseSync(join(dir, 'demo.sqlite'), { readOnly: true });
+		open.push(from);
+		// node:sqlite's backup of the store at `rate`, and the steps it took, counted as `backupStore` counts them: one, and one more for each
+		// `progress` call made with pages still to copy.
+		const backedUp = async (rate: number, name: string) => {
+			let steps = 1;
+			const pages = await backup(from, join(folder(name), 'demo.sqlite'), {
+				rate,
+				progress: ({ remainingPages }) => {
+					if (remainingPages > 0) steps += 1;
+				}
+			});
+			return { pages, steps };
+		};
+		// ⭐ THE ARRANGEMENT'S OWN CONTROLS: the store is larger than node:sqlite's default step of 100 pages, and its backup at that rate is
+		// counted in several steps, so a Node that never called `progress` would show here.
+		const control = await backedUp(100, 'one-step-control');
+		expect(control.pages, 'arrangement: the store fits in one default step').toBeGreaterThan(100);
+		expect(control.steps, `arrangement: ${control.pages} pages at 100 a step were counted as ${control.steps} step(s)`).toBeGreaterThan(1);
+		const one = await backedUp(ONE_STEP_RATE, 'one-step-copy');
+		expect(one.steps, `the backup of ${one.pages} pages took ${one.steps} steps`).toBe(1);
+		// ⭑ And backupStore's own count: the steps leave no trace in the copy's bytes or its folder, so this reads what backupStore says of
+		// itself, counted from the progress calls the control shows are made.
+		const made = await backupStore(join(dir, 'demo.sqlite'), join(folder('one-step-store'), 'demo.sqlite'));
+		expect(made.steps, `backupStore copied ${made.pages} pages in ${made.steps} steps`).toBe(1);
+		// ⛔ And no rate copies more in a step: the next integer is refused (synchronously, hence the wrap).
+		const beyond = await Promise.resolve()
+			.then(() => backup(from, join(folder('one-step-limit'), 'demo.sqlite'), { rate: ONE_STEP_RATE + 1 }))
+			.then(
+				(pages) => `accepted, ${pages} pages copied`,
+				(refused: unknown) => (refused instanceof Error ? refused.message : String(refused))
+			);
+		expect(beyond, 'ONE_STEP_RATE is not the largest rate node:sqlite takes').toContain('must be an integer');
 	});
 });
 

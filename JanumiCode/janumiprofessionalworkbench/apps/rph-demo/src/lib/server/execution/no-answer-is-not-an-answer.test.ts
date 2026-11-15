@@ -78,6 +78,8 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		undertaking: undefined,
 		// ⭐⭐ Package L15 — D69 — no accepted work, SAID: the field is required.
 		acceptedWork: [],
+		// ⭐⭐ Package L16 — D70 — no governing declared policy, SAID: the field is required.
+		reviewCriteria: [],
 		binding: { kind: 'NONE' as const },
 		...over
 	};

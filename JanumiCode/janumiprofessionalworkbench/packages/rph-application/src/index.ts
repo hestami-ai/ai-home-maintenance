@@ -50,6 +50,8 @@ export {
 	resolveInvocationSubject,
 	resolvePwuTypeFacts,
 	resolveUndertakingStatement,
+	REVIEW_CRITERIA_SECTION_HEADING,
+	reviewCriteriaSection,
 	UNDERTAKING_SECTION_HEADING,
 	undertakingSection,
 	unitPromptRefusal,
@@ -59,6 +61,8 @@ export {
 } from './execution-invocation.js';
 export type {
 	AcceptedWorkDependency,
+	ReviewCriteriaPolicy,
+	ReviewCriterion,
 	ContextAssembly,
 	InvocationPlan,
 	InvocationSubject,

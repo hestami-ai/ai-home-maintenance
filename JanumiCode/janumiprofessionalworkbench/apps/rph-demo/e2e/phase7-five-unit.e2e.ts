@@ -33,6 +33,7 @@ import {
 	PHASE7_ROOT,
 	promptMarkers,
 	renderedPrompt,
+	renderedPromptToTheContract,
 	type Phase7PwaDeclaration,
 	type Phase7TypeDeclaration
 } from '../../../scripts/phase7/pwa-content';
@@ -485,8 +486,10 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 				promptMarkers(t.prompt ?? '').filter((m) => !PHASE7_MARKERS.includes(m)),
 				`${t.name}'s prompt uses a marker no work unit fills, which refuses its step at render (REG-F-507)`
 			).toEqual([]);
+			// ⭐⭐ Package L16 — D70 (`REG-D-163` (1)): ~~the instruction~~ its part to the output contract is held under what the reviewer is
+			// shown (`PROMPT-LENGTH`); D70's section follows it, shown as far as it fits.
 			expect(
-				renderedPrompt(t, UNDERTAKING).length,
+				renderedPromptToTheContract(t, UNDERTAKING).length,
 				`${t.name}'s prompt renders past what the reviewer is shown (§3.2)`
 			).toBeLessThan(PHASE7_INSTRUCTION_BUDGET);
 		}

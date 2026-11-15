@@ -660,6 +660,11 @@ function halfBLane(script: HalfBScript) {
 			if (outcome === undefined) throw new Error('nothing re-runs its declared reviews here');
 			return outcome;
 		},
+		// ⭐⭐ Package L16 — D71 — the row's offer of re-running the work its declared reviews rejected: none, its read not logged; never pressed.
+		rejectedRerunOffered: async () => false,
+		rerunRejectedWork: async () => {
+			throw new Error('nothing re-runs rejected work here');
+		},
 		markSatisfied: async (unit) => {
 			calls.push(`markSatisfied ${unit.slug}`);
 			// ⭐ Package M (D6) — and Mark Satisfied ACCEPTS it: the units that wait for it are offered next.

@@ -43,14 +43,17 @@ describe('REG-F-045 — the vocab\'s provenance survives generation', () => {
 				vocabReconstructed: vrows.filter((t) => /RECONSTRUCT/i.test(t.note ?? '')).length
 			},
 			'REG-F-045 recorded 180 noted / 120 RECONSTRUCTED; unchanged since 2026-08-06'
-		).toEqual({ vocabRows: 215, vocabNoted: 184, vocabReconstructed: 120 });
+			// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)): ~~215 / 184~~ 218 / 187 — canon's one way back, three rows, each noted (AUTHORED and
+			// RATIFIED by the sponsor; no note reads RECONSTRUCTED, so that count stands).
+		).toEqual({ vocabRows: 218, vocabNoted: 187, vocabReconstructed: 120 });
 
 		const grows = Object.values(generated).flatMap((m) => m.transitions);
 		expect({
 			generatedArrows: grows.length,
 			generatedNoted: grows.filter((t) => t.note).length,
 			generatedReconstructed: grows.filter((t) => /RECONSTRUCT/i.test(t.note ?? '')).length
-		}).toEqual({ generatedArrows: 308, generatedNoted: 277, generatedReconstructed: 180 });
+			// ⭐⭐ Package L16 — D71: ~~308 / 277~~ 311 / 280, the three rows generated with their notes.
+		}).toEqual({ generatedArrows: 311, generatedNoted: 280, generatedReconstructed: 180 });
 	});
 
 	// The remedy's own words: every row the vocab marks RECONSTRUCTED must still say so downstream.

@@ -49,18 +49,22 @@ import type { PromptTemplate } from '@janumipwb/rph-contracts';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { REASONING_REVIEW_BUDGET } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+// ⭐⭐ Package L16 — D70 — the CATALOG's policies, as the store is seeded from them: what each phase's governing declared policies hold.
+import { getSeedPolicy, seedPolicies } from '@janumipwb/rph-product-realization-pwa';
 // ⭐⭐ Package L7 — D61 — the lane's Undertaking, whose statement every phase's instruction now carries.
 import { PHASE7_UNDERTAKING } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import {
 	PHASE7_E2E,
 	PHASE7_INSTRUCTION_BUDGET,
 	PHASE7_MARKERS,
+	PHASE7_POLICY_CRITERIA,
 	PHASE7_PHASES,
 	PHASE7_PWA,
 	PHASE7_ROOT,
 	PRODUCT_BRIEF,
 	promptMarkers,
 	renderedPrompt,
+	renderedPromptToTheContract,
 	type Phase7TypeDeclaration,
 	type Phase7Undertaking
 } from '../scripts/phase7/pwa-content.js';
@@ -148,20 +152,40 @@ function engineInstructionFor(t: Phase7TypeDeclaration, undertaking: Phase7Under
 		storedTemplate(t),
 		{ policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY, alsoAssembles: [] },
 		// The action trims each value before it stores it (`routes/undertakings/+page.server.ts`).
-		undertaking && { intendedOutputProduct: undertaking.product.trim(), objective: undertaking.objective.trim() }, []
+		undertaking && { intendedOutputProduct: undertaking.product.trim(), objective: undertaking.objective.trim() }, [],
+		// ⭐⭐ Package L16 — D70 (`REG-D-163` (1)) — and the criteria of the type's declared policies, as the CATALOG seeds them: every one §3.2
+		// names is ACTIVE and governs its kind, so they are the unit's governing declared policies, in the order its selection holds them
+		// (`catalogCriteria`; the route's own is held in the gate: the rehearsal pins the sent bytes to `renderedPrompt`).
+		catalogCriteria(t)
 	);
 	return plan.ready ? plan.prompt : `REFUSED: ${plan.reason}`;
+}
+
+/**
+ * ⭐⭐ Package L16 — D70 — the type's declared policies as the catalog holds them, each its name and its criteria in its order — ⚠ IN THE
+ * CATALOG'S ORDER (`seedPolicies`), never the order §3.2 names them in: the designer lists, and so stores, a type's policies in the store's
+ * seed order, and a unit's governing selection keeps its type's order (D70: the selection's order; measured in package L16's Stage 0 lane).
+ */
+function catalogCriteria(t: Phase7TypeDeclaration) {
+	const declared = new Set(t.policyIds ?? []);
+	const held = seedPolicies.filter((p) => declared.has(p.policyId));
+	if (held.length !== declared.size) throw new Error(`arrangement: the catalog holds not every policy ${t.name} declares`);
+	return held.map((p) => ({ name: p.name, criteria: p.criteria.map((c) => ({ id: c.id, name: c.name, description: c.description })) }));
 }
 
 /** The model types whose instruction, as this module renders it, is not the engine's, by name. */
 const notTheEngines = (types: readonly Phase7TypeDeclaration[]): string[] =>
 	types.filter((t) => renderedPrompt(t, PHASE7_UNDERTAKING) !== engineInstruction(t)).map((t) => t.name);
 
-/** The model types whose instruction is not UNDER the budget, each with its length. */
+/**
+ * The model types whose instruction is not UNDER the budget, each with its length. ⭐⭐ Package L16 — D70 (`REG-D-163` (1)): ~~the
+ * instruction~~ its part to the output contract (`renderedPromptToTheContract`) — the work, the Undertaking's statement and the contract,
+ * which the candidate checks hold to the 4,000 a reviewer is shown (`PROMPT-LENGTH`); D70's section follows it, shown as far as it fits.
+ */
 const pastTheBudget = (types: readonly Phase7TypeDeclaration[]): string[] =>
 	types
-		.filter((t) => renderedPrompt(t, PHASE7_UNDERTAKING).length >= PHASE7_INSTRUCTION_BUDGET)
-		.map((t) => `${t.name}: ${renderedPrompt(t, PHASE7_UNDERTAKING).length}`);
+		.filter((t) => renderedPromptToTheContract(t, PHASE7_UNDERTAKING).length >= PHASE7_INSTRUCTION_BUDGET)
+		.map((t) => `${t.name}: ${renderedPromptToTheContract(t, PHASE7_UNDERTAKING).length}`);
 
 /**
  * The markers each type's prompt uses that no work unit fills — read by the ENGINE's own reading of the text
@@ -301,19 +325,20 @@ describe('JAN-EXEC Phase 7 — each phase’s instruction is the engine’s, and
 	});
 
 	it('⛔ CONTROL — an instruction of 4,000 characters exactly is refused, one of 3,999 is not, and the output contract counts', () => {
-		const room = PHASE7_INSTRUCTION_BUDGET - renderedPrompt(PHASE7_E2E, PHASE7_UNDERTAKING).length;
+		// ⭐⭐ Package L16 — D70: ~~the instruction~~ its part to the contract is what the budget holds, as `pastTheBudget` measures it.
+		const room = PHASE7_INSTRUCTION_BUDGET - renderedPromptToTheContract(PHASE7_E2E, PHASE7_UNDERTAKING).length;
 		expect(room, 'arrangement: the end-to-end instruction has room to pad').toBeGreaterThan(1);
 		const padded = (n: number): Phase7TypeDeclaration => ({
 			...PHASE7_E2E,
 			prompt: `${PHASE7_E2E.prompt}${'x'.repeat(n)}`
 		});
-		expect(renderedPrompt(padded(room), PHASE7_UNDERTAKING)).toHaveLength(PHASE7_INSTRUCTION_BUDGET);
+		expect(renderedPromptToTheContract(padded(room), PHASE7_UNDERTAKING)).toHaveLength(PHASE7_INSTRUCTION_BUDGET);
 		expect(pastTheBudget([padded(room)])).toEqual([
 			`${PHASE7_E2E.name}: ${PHASE7_INSTRUCTION_BUDGET}`
 		]);
 		expect(pastTheBudget([padded(room - 1)])).toEqual([]);
 		// The template alone is under the budget: the contract the engine appends is what reaches it.
-		expect(renderedPrompt({ ...padded(room), outputContract: undefined }, PHASE7_UNDERTAKING).length).toBeLessThan(
+		expect(renderedPromptToTheContract({ ...padded(room), outputContract: undefined }, PHASE7_UNDERTAKING).length).toBeLessThan(
 			PHASE7_INSTRUCTION_BUDGET
 		);
 	});
@@ -385,5 +410,37 @@ describe('JAN-EXEC Phase 7 — the content module is pure', () => {
 		expect(loadsOf("export const x = require('node:fs');")).toEqual(["'node:fs'"]);
 		expect(loadsOf("export const x = await import('node:fs');")).toEqual(["'node:fs'"]);
 		expect(loadsOf("export { a } from './other.js';")).toEqual(['./other.js']);
+	});
+});
+
+describe('⭐⭐ L16 (D70) — each phase is told the criteria its declared reviews will judge it by, after its output contract', () => {
+	it('⛔ RED FIRST — the restated criteria are the catalog’s, policy by policy and criterion by criterion, each id, name and description, in the catalog’s order', () => {
+		const named = new Set(MODEL_TYPES.flatMap((t) => t.policyIds ?? []));
+		expect(
+			Object.keys(PHASE7_POLICY_CRITERIA ?? {}),
+			'a policy §3.2 names is not restated, one it names not is, or they are not in the catalog’s order'
+		).toEqual(seedPolicies.map((p) => p.policyId).filter((id) => named.has(id)));
+		for (const id of named) {
+			const p = getSeedPolicy(id)!;
+			expect(PHASE7_POLICY_CRITERIA[id], id).toEqual({
+				name: p.name,
+				criteria: p.criteria.map((c) => ({ id: c.id, name: c.name, description: c.description }))
+			});
+		}
+	});
+
+	it('⛔ RED FIRST — each phase’s instruction ends, after its output contract, with its policies’ criteria, in the order its unit’s selection holds them (the catalog’s)', () => {
+		for (const t of MODEL_TYPES) {
+			const toTheContract = renderedPromptToTheContract(t, PHASE7_UNDERTAKING);
+			const section = [
+				'This work will be reviewed against the criteria below, under the policies named. Make the work meet each one.',
+				...catalogCriteria(t).flatMap((p) => [
+					`${p.name}:`,
+					...p.criteria.map((c) => `- ${c.id}: ${c.description.trim() === '' ? c.name : c.description.trim()}`)
+				])
+			].join('\n');
+			expect(renderedPrompt(t, PHASE7_UNDERTAKING), t.name).toBe(`${toTheContract}\n\n${section}`);
+			expect(toTheContract.endsWith(`The output this work requires:\n${t.outputContract!.trim()}`), t.name).toBe(true);
+		}
 	});
 });

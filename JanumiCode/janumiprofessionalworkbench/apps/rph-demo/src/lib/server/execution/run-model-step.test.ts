@@ -76,6 +76,8 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		undertaking: undefined,
 		// ⭐⭐ Package L15 — D69 — no accepted work, SAID: the field is required, so a caller cannot skip it by omission.
 		acceptedWork: [],
+		// ⭐⭐ Package L16 — D70 — no governing declared policy, SAID: the field is required, so a caller cannot skip it by omission.
+		reviewCriteria: [],
 		// ⛔ SAID, NOT OMITTED. `binding` is required with an explicit NONE so that skipping the capability
 		// check cannot be expressed by leaving a field out — the dodge shape `REG-F-364` records.
 		binding: { kind: 'NONE' as const },
@@ -1352,6 +1354,61 @@ describe('⭐⭐ L15 (D69) — the step hands the accepted work its unit depends
 				}),
 				acceptedWork: [],
 				contextPolicy: BEFORE_L15
+			}).input
+		);
+		expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
+		expect(seen).toBe(WORK);
+	});
+});
+
+describe('⭐⭐ L16 (D70) — the step hands the criteria its declared reviews will judge it by to the instruction, and declares nothing more', () => {
+	const DISCLOSURE = {
+		name: 'Assumption Disclosure',
+		criteria: [{ id: 'AD-04', name: 'Materiality classified', description: 'Materiality is classified.' }]
+	};
+	const SECTION =
+		'This work will be reviewed against the criteria below, under the policies named. Make the work meet each one.\n' +
+		'Assumption Disclosure:\n- AD-04: Materiality is classified.';
+	const SPEC = { title: 'Requirements Specification', unitId: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5XSP' };
+	const ACCEPTED =
+		"This work depends on the accepted work of other units of this Undertaking. Before you begin, read each file below. Each holds one unit's accepted work product, exactly as its reviews judged it. The workbench writes these files; do not change them.\n" +
+		'- Requirements Specification: .jpwb/accepted/requirements-specification--pwu_01ARZ3NDEKTSV4RRFFQ69G5XSP.txt';
+	const WORK = 'Assess Route Assessment. Deliver Decide whether the route is viable.';
+	/** The rendered instruction alone: D70's section needs nothing more (the lead's reading, as D61's). */
+	const INSTRUCTION_ONLY: ContextAssemblyPolicyContent = {
+		policyId: 'ctx-instruction-only',
+		permittedSources: [{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' }]
+	};
+
+	it('⛔ REG-F-640 — the model is sent the criteria after the contract and before D69’s section, and the reviewers’ prompt carries them', async () => {
+		let seen = '';
+		const { input } = harness({
+			session: oneShotSession(async (p: string) => {
+				seen = p;
+				return ANSWER;
+			}),
+			reviewCriteria: [DISCLOSURE],
+			acceptedWork: [SPEC]
+		});
+		const out = await runModelInvocationStep(input);
+		expect(seen, 'the model was not sent the criteria').toBe(`${WORK}\n\n${SECTION}\n\n${ACCEPTED}`);
+		expect(out.ran && out.prompt, 'the reviewers’ instruction does not carry them').toBe(`${WORK}\n\n${SECTION}\n\n${ACCEPTED}`);
+	});
+
+	it('⭑ CONTROL — they are part of the rendered instruction: a step naming them runs under a policy permitting the instruction alone', async () => {
+		const out = await runModelInvocationStep(harness({ reviewCriteria: [DISCLOSURE], contextPolicy: INSTRUCTION_ONLY }).input);
+		expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
+	});
+
+	it('⭑ CONTROL — a step whose unit has no governing declared policy is sent its instruction byte for byte as before', async () => {
+		let seen = '';
+		const out = await runModelInvocationStep(
+			harness({
+				session: oneShotSession(async (p: string) => {
+					seen = p;
+					return ANSWER;
+				}),
+				reviewCriteria: []
 			}).input
 		);
 		expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);

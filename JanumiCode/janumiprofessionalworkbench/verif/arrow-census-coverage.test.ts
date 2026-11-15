@@ -142,7 +142,8 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			// on exactly that. A reader seeing the percentage rise must read it as a denominator repaired.
 			machinesDeclared: 25,
 			machinesSeen: 16,
-			arrowsRatified: 299,
+			// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)): ~~299~~ 302 — canon's one way back, three rows, one per axis.
+			arrowsRatified: 302,
 			// ⚠ 178 -> 174 and 175 -> 171 AT REG-F-124, AND THE DROP IS THE INSTRUMENT CEASING TO FABRICATE.
 			// `validator-registry.ts`'s `statusChange` factory is called four times declaring FIVE arrows between
 			// them; the census resolved its `target` and `from` parameters INDEPENDENTLY, flattened each into a
@@ -153,8 +154,9 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			// `SupersedeIntent` declares the machine's six ratified in-arrows to SUPERSEDED, so Intent.intentStatus
 			// goes 6/15 -> 12/15 — the honest ceiling, because the three WITHDRAWN arrows have no ratified event and
 			// are deliberately left uncovered.
-			declarationRows: 185,
-			distinctArrowsDeclared: 182,
+			// ⭐⭐ Package L16 — D71: ~~185~~ 186 and ~~182~~ 183 — the generic setter's PLANNED declares UNDER_ASSURANCE -> PLANNED.
+			declarationRows: 186,
+			distinctArrowsDeclared: 183,
 			// ⚠ UNMOVED AT 156 ACROSS BOTH REG-F-122 AND REG-F-124, which is the point of pinning it SEPARATELY
 			// (REG-F-121). Two fabrication defects have now been removed from this instrument and neither cost a
 			// single ratified arrow — because a fabricated arrow was, by construction, one no machine ratified.
@@ -163,7 +165,9 @@ describe('REG-F-087 — how much of the ratified arrow surface the census actual
 			// note beside it said that if a fabrication-removal ever moved it, that removal took truth with it.
 			// This movement is the OTHER direction and the other cause: six arrows a command can now really
 			// perform. The invariant it guards is intact — removals must not move it; additions must.
-			ratifiedArrowsCovered: 167
+			// ⭐⭐ Package L16 — D71: ~~167~~ 168 — the work lifecycle's row, which the generic setter performs; the two sub-axis rows are
+			// unseen by this census's idiom, as every sub-axis arrow is (the census walks the work lifecycle's declarations).
+			ratifiedArrowsCovered: 168
 		});
 	});
 

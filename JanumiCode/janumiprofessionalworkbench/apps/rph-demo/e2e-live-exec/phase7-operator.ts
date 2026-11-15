@@ -1347,6 +1347,25 @@ export async function rerunDeclared(page: Page, row: Locator, decode: Decode, ti
  * forbids. ⛔ `runTheLane` presses this only after an ACCEPTED Record Assurance ⭐ — or, `E12F` F3, after the rule's ACCEPTED
  * re-run of the declared reviews a refused one left inconclusive (`REG-D-112` (a)), whose row offers no Record Assurance.
  */
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — WHETHER THE UNIT'S ROW OFFERS RE-RUNNING THE WORK ITS DECLARED REVIEWS
+ * REJECTED, by the page's own test id, the row waited for first. ⭑ The page offers exactly what the server accepts (`rejectedRerunOffer`).
+ */
+export async function rejectedRerunOffered(row: Locator): Promise<boolean> {
+	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
+	return (await row.getByTestId('rerun-rejected-work').count()) > 0;
+}
+
+/**
+ * ⭐⭐ Package L16 — D71 — THE RULE'S RE-RUN OF THE WORK A UNIT'S DECLARED REVIEWS REJECTED: its rationale typed into its own field, its own
+ * button pressed, waited for up to ONE PHASE'S ALLOWANCE (D4), as the rule's re-run of a stopped unit's work is (`recover`): it runs the
+ * unit's work again. Each fill and click bounded by `PHASE7_UI_MS`.
+ */
+export async function rerunRejectedWork(page: Page, row: Locator, decode: Decode): Promise<ActionOutcome> {
+	await row.getByTestId('rerun-rejected-work-rationale').fill(REJECTED_RERUN_RATIONALE, { timeout: PHASE7_UI_MS });
+	return pressFormAction(page, 'rerunRejectedWork', row.getByTestId('rerun-rejected-work'), PHASE7_UNIT_ALLOWANCE_MS, decode);
+}
+
 export async function markSatisfied(
 	page: Page,
 	row: Locator,
@@ -1585,12 +1604,25 @@ export interface SignOffRecord {
 	readonly rerunLimitCheck: LimitCheck | null;
 	readonly markSatisfied: SignOffAct | null;
 	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — the limit read before the rule's re-run of the work the unit's declared
+	 * reviews rejected, that press's whole worst case counted (`REG-D-135` (4)). ⚠ ABSENT where none was read, so the record of a unit its
+	 * declared reviews never rejected is the one it was before, field for field.
+	 */
+	readonly rejectedRerunLimitCheck?: LimitCheck;
+	/** ⭐⭐ Package L16 — D71 — the rule's re-run of the work its declared reviews rejected, at most ONCE per unit; absent where none was pressed. */
+	readonly rejectedRerun?: SignOffAct;
+	/**
+	 * ⭐⭐ Package L16 — D71 — the unit's sign-off after that re-run: its declared reviews asked again, of the new work, and that act never again
+	 * (a second rejection leaves the unit as found, and the run ends `withheld`, as today); absent where no re-run ran.
+	 */
+	readonly afterRerun?: SignOffRecord;
+	/**
 	 * ⭐ E12's re-review F4 — THE REFUSAL THAT STANDS: the last act pressed, when it was refused or got no answer — what left
 	 * the sign-off unfinished. null when none does: nothing was pressed, or the sign-off was accepted, a Record Assurance the
 	 * rule's accepted re-run stood in for included (its own reason stays on its act, `SignOffAct.refusal`).
 	 */
 	readonly refused: {
-		readonly act: 'Record Assurance' | 'Re-run the declared reviews' | 'Mark Satisfied';
+		readonly act: 'Record Assurance' | 'Re-run the declared reviews' | 'Mark Satisfied' | typeof REJECTED_RERUN_ACT;
 		readonly reason: string;
 	} | null;
 	/**
@@ -1636,6 +1668,19 @@ export const rootHeldOverAbandoned = (titles: readonly string[]): string =>
  */
 export const DECLARED_RERUN_RATIONALE =
 	'The run plan’s rule, REG-D-105 (4), as REG-D-112 (a) extends it to the declared reviews: a declared review that did not conclude is re-run once.';
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — WHAT THE RULE TYPES BEFORE IT RE-RUNS THE WORK A UNIT'S DECLARED REVIEWS
+ * REJECTED: the run plan's rule, naming itself and the ruling that amends it (the live-run design's rule (2), as amended 2026-11-14).
+ */
+export const REJECTED_RERUN_RATIONALE =
+	'The run plan’s rule, REG-D-105 (4), as REG-D-163 (2) amends it: a unit its declared reviews reject at its sign-off has its work re-run once, with their findings.';
+
+/** ⭐⭐ Package L16 — D71 — the act's name, as the lane's record and the report name it. */
+export const REJECTED_RERUN_ACT = 'Re-run the work with the reviews’ findings';
+
+/** ⭐⭐ Package L16 — D71 — the suffix of the action files of the unit's sign-off after that re-run (`markSatisfiedAfterRerun`, …). */
+export const AFTER_RERUN = 'AfterRerun';
 
 /** `lane/actions/…`'s body: the unit, the action, and what came back, raw and decoded. */
 export const actionRecordOf = (unit: RunUnit, action: string, o: ActionOutcome) => ({
@@ -2367,6 +2412,9 @@ export interface LaneHands {
 	 * to `timeoutMs`, as Record Assurance is.
 	 */
 	readonly rerunDeclared: (unit: RunUnit, timeoutMs: number) => Promise<ActionOutcome>;
+	/** ⭐⭐ Package L16 — D71 — the row's offer of re-running the work its declared reviews rejected, and the act (`REG-D-163` (2)). */
+	readonly rejectedRerunOffered: (unit: RunUnit) => Promise<boolean>;
+	readonly rerunRejectedWork: (unit: RunUnit) => Promise<ActionOutcome>;
 	/** Mark Satisfied on the unit's row, once Record Assurance has left it (`markSatisfied`). */
 	readonly markSatisfied: (unit: RunUnit) => Promise<ActionOutcome>;
 	/** ⭐ P7-6R R-1f — what the unit's row offers after a stop (`recoveryOffers`). */
@@ -2759,6 +2807,17 @@ export async function runTheLane(r: {
 			notPressed: null
 		} as const;
 		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 — ONE ROUND OF A UNIT'S SIGN-OFF: the first, which may press the rule's re-run of work its
+		 * declared reviews rejected; or the one after that re-run, which never does (`rejectedRerun: false`), its action files suffixed
+		 * (`AFTER_RERUN`), its record kept inside the first's (`wrap`).
+		 */
+		interface SignOffRound {
+			readonly rejectedRerun: boolean;
+			readonly suffix: string;
+			readonly wrap: (r: SignOffRecord) => SignOffRecord;
+		}
+		const FIRST_SIGN_OFF: SignOffRound = { rejectedRerun: true, suffix: '', wrap: (r) => r };
+		/**
 		 * ⭐ `E12F` F2 — the limit, read from the store now, with `unit`'s sign-off worst case counted (D8). ⭐ The merge of E12
 		 * and E3 (J1) — in half B that worst case is the policies the PUBLISHED PWA's units declare, read from the same store
 		 * (`declaredPolicyIdsOf`): the agent's units are no types of §3.2's PWA. ⭐⭐ AND THE BOUND THE PRESS IS WAITED FOR
@@ -2787,14 +2846,18 @@ export async function runTheLane(r: {
 		 */
 		const satisfy = async (
 			unit: RunUnit,
-			before: SignOffRecord
+			before: SignOffRecord,
+			round: SignOffRound
 		): Promise<{ act: SignOffAct; refused: SignOffRecord['refused'] }> => {
 			const green = await hands.markSatisfied(unit);
-			writeOnce(actionFile(lane, unit, 'markSatisfied'), actionRecordOf(unit, 'markSatisfied', green));
+			writeOnce(
+				actionFile(lane, unit, `markSatisfied${round.suffix}`),
+				actionRecordOf(unit, `markSatisfied${round.suffix}`, green)
+			);
 			reached.end = unansweredEnd(unit.title, green, 'Mark Satisfied');
 			const refused: SignOffRecord['refused'] =
 				green.envelopeType === 'success' ? null : { act: 'Mark Satisfied', reason: refusalOf(green) };
-			return { act: await actOf(unit, green, (act) => ({ ...before, markSatisfied: act, refused })), refused };
+			return { act: await actOf(unit, green, (act) => round.wrap({ ...before, markSatisfied: act, refused })), refused };
 		};
 		/**
 		 * ⭐ Record Assurance, then — only if it was ACCEPTED — Mark Satisfied, asserting neither (D5). ⭐ `E12F` F1 — DRY, the
@@ -2804,7 +2867,7 @@ export async function runTheLane(r: {
 		 * accepted, Mark Satisfied; refused, left as found. ⛔ E12's re-review F1 — an act with NO ANSWER sets the run's end
 		 * (`reached`) before the store is read, and nothing more is pressed (the loop below then ends the run).
 		 */
-		const signOff = async (unit: RunUnit): Promise<SignOffRecord> => {
+		const signOff = async (unit: RunUnit, round: SignOffRound = FIRST_SIGN_OFF): Promise<SignOffRecord> => {
 			const { check, pressMs } = await signOffLimit(unit);
 			if (!check.allowed) {
 				const offered = await hands.recordAssuranceOffered(unit);
@@ -2813,8 +2876,8 @@ export async function runTheLane(r: {
 			const assured = await hands.recordAssurance(unit, pressMs);
 			if (assured === null) return { ...none, offered: false, limitCheck: check };
 			writeOnce(
-				actionFile(lane, unit, 'recordAssurance'),
-				actionRecordOf(unit, 'recordAssurance', assured)
+				actionFile(lane, unit, `recordAssurance${round.suffix}`),
+				actionRecordOf(unit, `recordAssurance${round.suffix}`, assured)
 			);
 			const refusedAssurance = { act: 'Record Assurance' as const, reason: refusalOf(assured) };
 			/** ⭐ E12's polish — the sign-off as it stands with Record Assurance: kept on the unit before each store read after it. */
@@ -2829,9 +2892,9 @@ export async function runTheLane(r: {
 			// still be running on the server, and each records its calls only when it finishes, so a press beside them would run
 			// two units' reviews at once against a limit read short of their calls.
 			reached.end = unansweredEnd(unit.title, assured, 'Record Assurance');
-			const assuredAct = await actOf(unit, assured, assuredRecord);
+			const assuredAct = await actOf(unit, assured, (act) => round.wrap(assuredRecord(act)));
 			if (assured.envelopeType === 'success') {
-				const green = await satisfy(unit, assuredRecord(assuredAct));
+				const green = await satisfy(unit, assuredRecord(assuredAct), round);
 				return { ...none, offered: true, limitCheck: check, recordAssurance: assuredAct, markSatisfied: green.act, refused: green.refused };
 			}
 			const asRefused = assuredRecord(assuredAct);
@@ -2841,14 +2904,21 @@ export async function runTheLane(r: {
 			// ⭐ `E12F` F3 — THE RULE (`REG-D-105` (4), `REG-D-112` (a)): ⚠ the page loaded afresh, as the rule's own reads are —
 			// a refusal leaves it stale. A row offering no declared re-run is left as found.
 			await hands.showOverview();
-			if (!(await hands.declaredRerunOffered(unit))) return asRefused;
+			if (!(await hands.declaredRerunOffered(unit))) {
+				// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — A UNIT ITS DECLARED REVIEWS REJECTED: its work re-run ONCE by the
+				// rule, with their findings, the press's whole worst case counted first (`REG-D-135` (4)); then its sign-off again, which never
+				// presses this act again — a second rejection leaves it as found, and the run ends `withheld`, as today (P7-6's rule (3), which
+				// abandons, is not extended).
+				if (!round.rejectedRerun || !(await hands.rejectedRerunOffered(unit))) return asRefused;
+				return rerunRejected(unit, asRefused, round);
+			}
 			const rerun = await signOffLimit(unit);
 			const rerunCheck = rerun.check;
 			if (!rerunCheck.allowed) return { ...asRefused, rerunLimitCheck: rerunCheck, notPressed: overLimit(rerunCheck) };
 			const again = await hands.rerunDeclared(unit, rerun.pressMs);
 			writeOnce(
-				actionFile(lane, unit, 'rerunDeclaredReviews'),
-				actionRecordOf(unit, 'rerunDeclaredReviews', again)
+				actionFile(lane, unit, `rerunDeclaredReviews${round.suffix}`),
+				actionRecordOf(unit, `rerunDeclaredReviews${round.suffix}`, again)
 			);
 			/** ⭐ E12's polish — and as it stands with the rule's re-run: kept on the unit before each store read after it. */
 			const rerunRecord = (act: SignOffAct): SignOffRecord => ({
@@ -2859,15 +2929,64 @@ export async function runTheLane(r: {
 			});
 			// ⛔ E12's re-review F1 (D4) — the rule's re-run with no answer ends the run too: its reviews may still be running.
 			reached.end = unansweredEnd(unit.title, again, 'Re-run the declared reviews');
-			const againAct = await actOf(unit, again, rerunRecord);
+			const againAct = await actOf(unit, again, (act) => round.wrap(rerunRecord(act)));
 			if (again.envelopeType !== 'success') return rerunRecord(againAct);
-			const green = await satisfy(unit, rerunRecord(againAct));
+			const green = await satisfy(unit, rerunRecord(againAct), round);
 			return {
 				...rerunRecord(againAct),
 				markSatisfied: green.act,
 				refused: green.refused
 			};
 		};
+		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2); the live-run design's rule (2), as amended 2026-11-14) — THE RULE'S RE-RUN
+		 * OF THE WORK A UNIT'S DECLARED REVIEWS REJECTED, ONCE: the limit read first, the re-run's WHOLE press counted (`REG-D-135` (4); it runs
+		 * the unit's work again, `PHASE7_UNIT_REVIEWER_CALLS`); the act pressed and kept; answered with success — the work ran again and its
+		 * step completed — the unit's sign-off again (`signOff`, its round `rejectedRerun: false`, so never this act again), the page loaded
+		 * afresh; answered otherwise, left as found (a re-run stopped at its floor included: no rule is extended to it — the builder's reading).
+		 * ⛔ A press with no answer sets the run's end (D4), and nothing more is pressed.
+		 */
+		const rerunRejected = async (unit: RunUnit, asRefused: SignOffRecord, round: SignOffRound): Promise<SignOffRecord> => {
+			const { snapshot } = await hands.read();
+			const check = limitCheck(
+				boot.prior as number,
+				recordedReviewerCalls(snapshot),
+				PHASE7_UNIT_REVIEWER_CALLS,
+				COUNTED_AHEAD.wholePress
+			);
+			if (!check.allowed)
+				return {
+					...asRefused,
+					rejectedRerunLimitCheck: check,
+					notPressed: `the limit: ${check.total} of ${check.limit} reviewer calls, the re-run's whole press counted (D8; REG-D-135 (4); REG-D-163 (2))`
+				};
+			const again = await hands.rerunRejectedWork(unit);
+			writeOnce(actionFile(lane, unit, 'rerunRejectedWork'), actionRecordOf(unit, 'rerunRejectedWork', again));
+			const pressedRecord = (act: SignOffAct): SignOffRecord => ({
+				...asRefused,
+				rejectedRerunLimitCheck: check,
+				rejectedRerun: act,
+				refused: again.envelopeType === 'success' ? null : { act: REJECTED_RERUN_ACT, reason: refusalOf(again) }
+			});
+			reached.end = unansweredEnd(unit.title, again, REJECTED_RERUN_ACT);
+			const againAct = await actOf(unit, again, (act) => round.wrap(pressedRecord(act)));
+			if (again.envelopeType !== 'success' || reached.end !== null) return pressedRecord(againAct);
+			// ⭐ ITS SIGN-OFF AGAIN — the declared reviews asked again, of the new work — and never this act again. ⚠ LOADED AFRESH.
+			await hands.showOverview();
+			const after = await signOff(unit, {
+				rejectedRerun: false,
+				suffix: AFTER_RERUN,
+				wrap: (r) => round.wrap({ ...pressedRecord(againAct), afterRerun: r })
+			});
+			return { ...pressedRecord(againAct), afterRerun: after };
+		};
+		/** ⭐⭐ Package L16 — D71 — whether a limit check refused a press of this sign-off, or of the one after its re-run (D8). */
+		const limitStopped = (r: SignOffRecord | undefined): boolean =>
+			r !== undefined &&
+			(r.limitCheck?.allowed === false ||
+				r.rerunLimitCheck?.allowed === false ||
+				r.rejectedRerunLimitCheck?.allowed === false ||
+				limitStopped(r.afterRerun));
 		// ── 3. ⭐⭐ THE ORDER — ONLY WHAT THE PAGE OFFERS, ONE UNIT AT A TIME (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2); design
 		// D4-D7) ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 		// The page offers Begin & Execute where the engine would start the unit — every unit it waits for ACCEPTED~~, nothing it
@@ -2991,7 +3110,8 @@ export async function runTheLane(r: {
 			if (reached.end !== null) break;
 			// ⛔ `E12F` F2 — THE LIMIT REFUSED THIS SIGN-OFF, OR THE RULE'S RE-RUN IN IT: the run ends `paid-limit`, and nothing
 			// later is pressed (D8).
-			if (next.signOff.limitCheck?.allowed === false || next.signOff.rerunLimitCheck?.allowed === false) {
+			// ⭐⭐ Package L16 — D71 — or the rule's re-run of its rejected work, or a press of its sign-off after that re-run.
+			if (limitStopped(next.signOff)) {
 				reason = 'paid-limit';
 				break;
 			}

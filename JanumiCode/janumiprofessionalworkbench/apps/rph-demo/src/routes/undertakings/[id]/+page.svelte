@@ -366,6 +366,28 @@
 													>
 												</form>
 											{/if}
+											<!-- ⭐⭐ JAN-EXEC Phase 7, package L16 — D71 (REG-D-163 (2); REG-F-640) — A UNIT ITS DECLARED REVIEWS REJECTED AT ITS
+											     SIGN-OFF. Offered ONLY in that state, as the server reads it (`rejectedRerunOffer`): its work re-run, in place, with each
+											     rejecting verdict's failed criteria — canon's one way back, whose guard the kernel enforces. The choice is the
+											     person's Decision, so it asks for their rationale. -->
+											{#if data.rejectedRerunByPwu[p.id]}
+												<form method="POST" action="?/rerunRejectedWork" use:enhance class="findingform">
+													<span class="hint" data-testid="rerun-rejected-work-policies"
+														>Rejected by its declared reviews: {data.rejectedRerunByPwu[p.id].policies.join(', ')}; findings a re-run
+														carries: {data.rejectedRerunByPwu[p.id].findings}.</span
+													>
+													<input type="hidden" name="pwuId" value={p.id} />
+													<input
+														name="rationale"
+														placeholder="Why re-run the work?"
+														required
+														data-testid="rerun-rejected-work-rationale"
+													/>
+													<button class="mini" type="submit" data-testid="rerun-rejected-work"
+														>Re-run the work with the reviews’ findings</button
+													>
+												</form>
+											{/if}
 											<!-- REJECTION IS OFFERED ONLY WHERE A BLOCKING FINDING ACTUALLY STANDS (S-1b / B-3).
 											     The predicate is the SAME question the engine's `hasBlockingObservationFor` asks —
 											     a BLOCKING/CRITICAL observation whose subjectObjectIds include this PWU — so the

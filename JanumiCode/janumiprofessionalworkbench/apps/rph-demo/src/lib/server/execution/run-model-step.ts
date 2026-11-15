@@ -15,6 +15,7 @@ import {
 	type AcceptedWorkDependency,
 	type ContextAssemblyPolicyContent,
 	type InvocationSubject,
+	type ReviewCriteriaPolicy,
 	type UndertakingStatement
 } from '@janumipwb/rph-application';
 import type {
@@ -64,6 +65,14 @@ export interface RunModelStepInput {
 	 * SAID where there is none: an optional field would let a caller skip it by omission.
 	 */
 	readonly acceptedWork: readonly AcceptedWorkDependency[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D70 (`REG-D-163` (1); `REG-F-640`) — THE CRITERIA THE UNIT'S DECLARED REVIEWS WILL JUDGE IT
+	 * BY: the governing declared policies its sign-off will select, each its name and its criteria, which the instruction states after its
+	 * output contract and before D69's section (`prepareModelInvocation`), so the model is sent them and every review of the step reads them
+	 * in `prompt`. ⚠ Nothing more is declared: they are part of the instruction rendered for this try (`RENDERED_INSTRUCTION` at `THIS_TRY`),
+	 * a governed policy's own words (the lead's reading, as D61's). ⛔ REQUIRED, `[]` SAID where there is none.
+	 */
+	readonly reviewCriteria: readonly ReviewCriteriaPolicy[];
 	/**
 	 * The producer's SESSION, held across the work unit's tries (`JAN-EXECSESS`).
 	 *
@@ -344,7 +353,9 @@ export async function runModelInvocationStep(
 		},
 		input.undertaking,
 		// ⭐⭐ Package L15 — D69 — the units whose accepted work the instruction names, last.
-		input.acceptedWork
+		input.acceptedWork,
+		// ⭐⭐ Package L16 — D70 — and the criteria its declared reviews will judge it by, between the contract and D69's section.
+		input.reviewCriteria
 	);
 	if (!plan.ready) return { ran: false, refusedBecause: plan.reason };
 

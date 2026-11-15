@@ -402,6 +402,18 @@ async function viewedFilesOf(pwuId: string): Promise<readonly string[] | undefin
 	return read.ok ? read.view.deliverable.files.map((f) => f.path) : undefined;
 }
 
+/**
+ * ⭐⭐ Package L16 — D70 — the section that tells a unit its declared policies' criteria, restated from the stored policies (D70's heading, the
+ * lead's words, byte for byte; `<name>:` per policy; `- <id>: <description>` per criterion), never the product's renderer.
+ */
+const criteriaSectionOf = (ids: readonly string[]): string =>
+	[
+		'This work will be reviewed against the criteria below, under the policies named. Make the work meet each one.',
+		...ids.flatMap((id) => {
+			const p = getObject(getEngine(), id) as unknown as { name: string; criteria: { id: string; name: string; description: string }[] };
+			return [`${p.name}:`, ...p.criteria.map((c) => `- ${c.id}: ${c.description.trim() === '' ? c.name : c.description.trim()}`)];
+		})
+	].join('\n');
 /** `.jpwb/accepted/<slug>--<unit id>.txt`, spelled here by hand for the fixture's titles. */
 const fileOf = (slug: string, unitId: string): string => `.jpwb/accepted/${slug}--${unitId}.txt`;
 const sha256 = (text: string): string => `sha256:${createHash('sha256').update(text, 'utf8').digest('hex')}`;
@@ -436,8 +448,12 @@ async function designReady(policies: readonly string[] = []) {
 			? `- Requirements Specification: ${fileOf('requirements-specification', spec!.id)}`
 			: `- Glossary: ${fileOf('glossary', glossary!.id)}`;
 	const section = [HEADING, ...order.map(lineOf)].join('\n');
+	// ⭐⭐ Package L16 — D70 (`REG-D-163` (1)): a Technical Design that declares a governing policy is told its criteria too, between its output
+	// contract and D69's section, which stays last — restated from the stored policy, never the product's renderer. One that declares none is
+	// given its instruction as before, byte for byte (this file's every other case).
+	const criteria = policies.length === 0 ? '' : `${criteriaSectionOf(policies)}\n\n`;
 	const instruction =
-		`Write the Technical Design.\n\n${UNDERTAKING_SECTION}\n\nThe output this work requires:\n${DESIGN_CONTRACT}\n\n${section}`;
+		`Write the Technical Design.\n\n${UNDERTAKING_SECTION}\n\nThe output this work requires:\n${DESIGN_CONTRACT}\n\n${criteria}${section}`;
 	return { u, spec: spec!, glossary: glossary!, survey: survey!, design: design!, section, instruction };
 }
 

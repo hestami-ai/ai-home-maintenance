@@ -172,8 +172,13 @@ import {
 	RERUN_REVIEW_CITATION,
 	rerunWorkCitation,
 	RERUN_DECLARED_REVIEWS_CITATION,
-	DECLARED_RERUN_RATIONALE_REQUIRED
+	DECLARED_RERUN_RATIONALE_REQUIRED,
+	// ⭐⭐ Package L16 — D71 — what authorises a re-run of the work a unit's declared reviews rejected, and what the person must type.
+	REJECTED_RERUN_RATIONALE_REQUIRED,
+	RERUN_REJECTED_WORK_CITATION
 } from '$lib/server/execution/recovery-authority';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — a unit its declared reviews rejected: what the page offers, and the findings.
+import { RERUN_REJECTED_WORK, rejectedRerunOffer } from '$lib/server/execution/rejected-rerun';
 import { runProcessResultFloor } from '$lib/server/execution/process-result-floor';
 import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer';
 // ⭐ `JAN-NOANS`: the `resolveJudgeModel` import is GONE from this route, and its absence is the check. It was
@@ -188,6 +193,7 @@ import {
 	resolveUndertakingStatement,
 	withUndertakingSection,
 	type AcceptedWorkDependency,
+	type ReviewCriteriaPolicy,
 	type UndertakingStatement
 } from '@janumipwb/rph-application';
 // ⭐ `PromptTemplate` IS NO LONGER IMPORTED HERE, and its absence is the check. Its only use in this route was
@@ -699,6 +705,15 @@ export const load: PageServerLoad = ({ params }) => {
 		const offer = declaredRerunOffer(engine, p.id);
 		if (!('refusedBecause' in offer)) declaredRerunByPwu[p.id] = { policies: offer.policies.map((x) => x.policyId) };
 	}
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — each unit its declared reviews REJECTED at its sign-off: the policies whose
+	// verdicts rejected it, and how many findings a re-run of its work would carry. Read from the record (`rejectedRerunOffer`), so the page
+	// offers exactly what `rerunRejectedWork` accepts — and the kernel's guard refuses the move without what it reads.
+	const rejectedRerunByPwu: Record<string, { readonly policies: readonly string[]; readonly findings: number }> = {};
+	for (const p of pwus) {
+		const offer = rejectedRerunOffer(engine, p.id);
+		if (!('refusedBecause' in offer))
+			rejectedRerunByPwu[p.id] = { policies: offer.rejected.map((v) => v.policyId), findings: offer.findings.length };
+	}
 
 	// Tier-2 execution SEQUENCE (JAN-EXECPLAN DWP-04, fork C): arrange the Undertaking's PWU INSTANCES by their TYPES'
 	// hand-off dependency (reuse buildPwaExport — version-scoped to the bound (pwaId, pwaVersion) — then layerHandoff),
@@ -745,6 +760,7 @@ export const load: PageServerLoad = ({ params }) => {
 		recoveryByPwu,
 		awaitingChoiceStepIds,
 		declaredRerunByPwu,
+		rejectedRerunByPwu,
 		sequence,
 		assessments,
 		disclosures,
@@ -1231,6 +1247,8 @@ async function rebuildForReview(
 		undertaking: undertakingStatementOf(s.pwuId),
 		// ⭐⭐ Package L15 — D69 — and the accepted work it named, last, read from the record as its step was given it.
 		acceptedWork: acceptedWorkNamedBy(s.pwuId),
+		// ⭐⭐ Package L16 — D70 — and the criteria it stated, between its contract and D69's section, by the sign-off's own reader.
+		reviewCriteria: reviewCriteriaOf(s.pwuId),
 		...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {}),
 		...(pwuType?.contextSpecification
 			? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
@@ -1406,6 +1424,26 @@ function acceptedWorkOf(pwuId: string): readonly AcceptedWork[] {
 /** ⭐⭐ Package L15 — D69 — the units a unit's instruction names, title and id each, read from the record as its step was given them. */
 function acceptedWorkNamedBy(pwuId: string): readonly AcceptedWorkDependency[] {
 	return acceptedWorkOf(pwuId).map(({ title, unitId }) => ({ title, unitId }));
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D70 (`REG-D-163` (1); `REG-F-640`) — THE CRITERIA A UNIT'S DECLARED REVIEWS WILL JUDGE IT BY:
+ * the governing declared policies its sign-off will select, read from the stored policies by the sign-off's own reader
+ * (`governingDeclaredPolicies`, over the engine's `selectGoverningPolicies`: the unit's own declared policies joined with its type's, each
+ * ACTIVE and applicable), in the selection's order, each its name and its criteria in the policy's own order. ONE READER where the
+ * instruction is rendered — Begin & Execute, a work re-run — and where it is rebuilt — a re-review, a declared review — so a review is shown
+ * the instruction its producer was given (the lead's). ⚠ A policy revised between a unit's step and a rebuild would be rendered as revised; a
+ * run revises no policy (named in D70). ⚠ A stored criterion's absent name or description reads as its id, or empty, never a throw.
+ */
+function reviewCriteriaOf(pwuId: string): readonly ReviewCriteriaPolicy[] {
+	return governingDeclaredPolicies(getEngine(), pwuId).policies.map((p) => ({
+		name: p.name,
+		criteria: p.criteria.map((c) => ({
+			id: c.id,
+			name: typeof c.name === 'string' ? c.name : c.id,
+			description: typeof c.description === 'string' ? c.description : ''
+		}))
+	}));
 }
 
 /**
@@ -1586,6 +1624,8 @@ async function unitWorkOf(
 		undertaking,
 		// ⭐⭐ Package L15 — D69 — and the accepted work it named, last, read from the record as its step was given it.
 		acceptedWork: acceptedWorkNamedBy(pwuId),
+		// ⭐⭐ Package L16 — D70 — and the criteria it stated, between its contract and D69's section, by the sign-off's own reader.
+		reviewCriteria: reviewCriteriaOf(pwuId),
 		...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {}),
 		...(pwuType?.contextSpecification
 			? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
@@ -1982,6 +2022,82 @@ function planRevision(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D71 (`REG-D-163` (2)) — THE NEW PLAN AFTER THE ONE WAY BACK, IN THE BATCH THAT MAKES IT: plan B
+ * proposed with its one producer step; the unit's ACTIVE plan superseded citing B (RD5's edge: one plan per unit may be ACTIVE, RPH-EXE-001);
+ * B's binding requested and authorized; B approved and activated; the unit `PLANNED` → `EXECUTING` and B's step started, then RUNNING — the
+ * existing edges, as Begin & Execute takes them. ⚠ Unlike a work re-run's revision (`planRevision`), no step of the superseded plan is
+ * cancelled — its step SUCCEEDED, a terminal state — and the unit does not resume from WAITING: it starts again from planning.
+ */
+function reworkPlan(
+	pwuId: string,
+	activePlanIds: readonly string[],
+	planB: string,
+	step: {
+		readonly id: string;
+		readonly purpose: string;
+		readonly binding?: NonNullable<ReturnType<typeof stepBindingFor>>;
+	}
+): Step[] {
+	const bindingId = step.binding?.request.runtimeBindingId;
+	const proposeB: Step = [
+		'ProposeExecutionPlan',
+		'EXECUTION_PLAN',
+		planB,
+		{
+			executionPlanId: planB,
+			workUnitId: pwuId,
+			steps: [
+				{
+					id: step.id,
+					executionPlanId: planB,
+					stepType: 'MODEL_INVOCATION',
+					...(bindingId ? { runtimeBindingId: bindingId } : {}),
+					purpose: step.purpose,
+					inputBindings: [],
+					outputBindings: [],
+					preconditions: [],
+					postconditions: [],
+					stepState: 'QUEUED'
+				}
+			],
+			transitions: [],
+			retryPolicy: {},
+			tacticalChangePolicy: {},
+			escalationPolicy: {},
+			terminationPolicy: {}
+		}
+	];
+	const supersede: Step[] = activePlanIds.map((planA): Step => [
+		'SupersedeExecutionPlan',
+		'EXECUTION_PLAN',
+		planA,
+		{ supersedingExecutionPlanId: planB }
+	]);
+	const bindB: Step[] =
+		step.binding && bindingId
+			? [
+					['RequestRuntimeBinding', 'RUNTIME_BINDING', bindingId, step.binding.request],
+					[
+						'AuthorizeRuntimeBinding',
+						'RUNTIME_BINDING',
+						bindingId,
+						{ grantedCapabilities: [...step.binding.request.requestedCapabilities] }
+					]
+				]
+			: [];
+	return [
+		proposeB,
+		...supersede,
+		...bindB,
+		['ApproveExecutionPlan', 'EXECUTION_PLAN', planB, {}],
+		['ActivateExecutionPlan', 'EXECUTION_PLAN', planB, { authorizedRuntimeBindingIds: bindingId ? [bindingId] : [] }],
+		chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED', [planB]),
+		['StartExecutionStep', 'EXECUTION_PLAN', planB, { stepId: step.id }],
+		chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED', [planB])
+	];
+}
+
+/**
  * ⛔ THE MODEL IS THE EXECUTOR of a model step's result — Begin & Execute's completion, a re-run's, and a re-review's,
  * which names the work product the model made in the refused attempt. ⭑ ONE LITERAL, because the run report reads a
  * completion's shape by it (`scripts/phase7/run-report-core.ts`, `MODEL_EXECUTOR_NAME`), and its control holds the page
@@ -2022,6 +2138,11 @@ interface ModelUnitRun {
 	 * from the record before the step began (`handOverAcceptedWork`). ⛔ Required, `[]` said where there is none.
 	 */
 	readonly acceptedWork: readonly AcceptedWorkDependency[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D70 — the criteria its declared reviews will judge it by, stated in its instruction between
+	 * the output contract and D69's section (`reviewCriteriaOf`). ⛔ Required, `[]` said where there is none.
+	 */
+	readonly reviewCriteria: readonly ReviewCriteriaPolicy[];
 	/**
 	 * ⭐ P7-6R RD8 — a refused attempt's SUBJECT findings, carried by a person's re-run of the work into this run's FRESH
 	 * session, on its first turn only. Absent for Begin & Execute.
@@ -2295,6 +2416,8 @@ async function runModelUnit(u: ModelUnitRun) {
 				undertaking,
 				// ⭐⭐ Package L15 — D69 — the units whose accepted work the instruction names, last, after its output contract.
 				acceptedWork: u.acceptedWork,
+				// ⭐⭐ Package L16 — D70 — and the criteria its declared reviews will judge it by, between the contract and D69's section.
+				reviewCriteria: u.reviewCriteria,
 				store: getArtifactStore(),
 				tenantPrefix: EXECUTION_TENANT_PREFIX,
 				dispatchExchange: (payload, aggregateId) =>
@@ -3001,7 +3124,9 @@ export const actions: Actions = {
 				pwuTypeId,
 				typeFacts,
 				// ⭐⭐ Package L15 — D69 — the units whose accepted work its instruction names, their files written above.
-				acceptedWork: handOver.acceptedWork
+				acceptedWork: handOver.acceptedWork,
+				// ⭐⭐ Package L16 — D70 — and the criteria its declared reviews will judge it by, read by the sign-off's own reader.
+				reviewCriteria: reviewCriteriaOf(pwuId)
 			});
 
 		const legacy = runSteps([
@@ -3959,9 +4084,101 @@ export const actions: Actions = {
 			typeFacts,
 			// ⭐⭐ Package L15 — D69 — the units whose accepted work its instruction names, their files written above.
 			acceptedWork: handOver.acceptedWork,
+			// ⭐⭐ Package L16 — D70 — and the criteria its declared reviews will judge it by, read by the sign-off's own reader.
+			reviewCriteria: reviewCriteriaOf(pwuId),
 			carriedFindings: s.findings
 		});
 		return 'advanced' in ran ? { advanced: 'work-rerun' } : ran;
+	},
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D71 (`REG-D-163` (2); `REG-F-640`; `REG-Q-034`) — RE-RUN THE WORK WITH THE REVIEWS'
+	// FINDINGS, AFTER ITS DECLARED REVIEWS REJECTED IT ──────────────────────────────────────────────────────────────────────────────────
+	//
+	// ⛔ `REG-F-640`: a unit its declared reviews reject had no second try — the page re-ran work only from a unit stopped mid-execution, and
+	// the contracted transition table had no edge from a rejected declared assurance back to work. The sponsor ratified one into canon
+	// (`REG-D-163` (2)): one move, out of a rejected declared assurance back to planning, recorded on each of the three axes canon tracks
+	// (`UNDER_ASSURANCE` → `PLANNED`, `SUCCEEDED` → `PLANNED`, `REJECTED` → `UNASSESSED`), its guard enforced by the KERNEL (`changePwuState`,
+	// `rejectUnauthorizedRework`): the unit's assurance REJECTED, concluded by its declared policies' verdicts at its sign-off, and a person's
+	// Decision (`REPLAN`) naming those verdicts.
+	// ⭑ IN ONE BATCH (the lead's): the person's Decision, their words then `REG-D-163` (2) cited, its subjects the unit, its last completed
+	// plan, that plan's work product and the rejecting verdicts (RD4's order, the verdicts in the evidence's place); the unit's move back to
+	// planning, citing the Decision and the verdicts; then a new plan by the existing edges — proposed, the unit's ACTIVE plan superseded
+	// citing it (RD5's edge: one plan per unit may be ACTIVE, RPH-EXE-001 — the builder's reading, named), its binding requested and
+	// authorized, approved and activated, the unit `PLANNED` → `EXECUTING` and its step started. Then the step runs as a work re-run does
+	// (`runModelUnit`): D69's files written again first, a fresh session, its first turn the instruction, with D70's section, then the
+	// rejecting verdicts' findings (RD8's form).
+	// ⛔ Refused before any model or reviewer call on the work re-run's own grounds — the reviewer not ready, no executor, a hand-over that
+	// fails — and when the unit is in no such state (`rejectedRerunOffer`), with nothing dispatched.
+	rerunRejectedWork: async ({ request }) => {
+		const f = await request.formData();
+		const pwuId = str(f, 'pwuId');
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const rationale = str(f, 'rationale');
+		if (!rationale) return fail(400, { error: REJECTED_RERUN_RATIONALE_REQUIRED });
+		const offer = rejectedRerunOffer(getEngine(), pwuId);
+		if ('refusedBecause' in offer)
+			return fail(400, { error: `Re-running the work its declared reviews rejected refused: ${offer.refusedBecause}` });
+		const { pwu, pwuType, pwuTypeId, typeFacts } = unitTypeOf(pwuId);
+		// ⚠ Unreachable after the offer, which refuses a unit a model does not work (`rejectedRerunOffer`): kept as the narrowing the
+		// type-checker needs (named in package L16's facts; no mutant is owed it).
+		if (pwuType?.workDischarge !== 'MODEL')
+			return fail(400, {
+				error: `Re-running the work its declared reviews rejected refused: work unit ${pwuId}’s type does not say a model does its work.`
+			});
+		const reviewerReady = assurancePreflight({ testMode: isTestMode() });
+		if (!reviewerReady.ready) return fail(400, { error: reviewerReady.guidance });
+		const chosen = selectExecutor({ testMode: isTestMode() });
+		if (chosen.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(chosen) });
+		// ⭐⭐ Package L15 — D69 — the accepted work this unit depends on, written again from the record before anything is dispatched.
+		const handOver = await handOverAcceptedWork(pwuId);
+		if (!handOver.ok)
+			return fail(400, { error: `Re-running the work its declared reviews rejected refused: ${handOver.refusedBecause}` });
+
+		const decisionId = mintUiId('dec');
+		const planB = mintUiId('plan');
+		const stepB = mintUiId('step');
+		const bindB = mintUiId('bind');
+		const binding = stepBindingFor('MODEL_INVOCATION', pwuType.workDischarge as string, bindB, stepB);
+		const completion = lastCompletionOf(pwuId);
+		const workProductId = acceptedWorkProductOf(pwuId);
+		const verdictIds = offer.rejected.map((v) => v.assessmentId);
+		const revised = runSteps([
+			...personsDecision(
+				decisionId,
+				'REPLAN',
+				RERUN_REJECTED_WORK,
+				[pwuId, ...(completion ? [completion.planId] : []), ...(workProductId ? [workProductId] : []), ...verdictIds],
+				offer.consideredObservationIds,
+				// ⭐ The person's words, then the ruling that ratifies the one way back (`recovery-authority.ts`).
+				decisionRationale(rationale, RERUN_REJECTED_WORK_CITATION)
+			),
+			// ⭐ THE ONE WAY BACK, on its three axes in one command, citing the Decision and the verdicts it names: the kernel's guard reads both.
+			chg(pwuId, 'UNDER_ASSURANCE', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED', [decisionId, ...verdictIds]),
+			...reworkPlan(pwuId, offer.activePlanIds, planB, {
+				id: stepB,
+				purpose: `Re-attempt the work in a fresh session, with the findings of the declared reviews that rejected it (Decision ${decisionId})`,
+				...(binding ? { binding } : {})
+			})
+		]);
+		if (revised) return fail(400, { error: `Re-running the work its declared reviews rejected refused: ${revised}` });
+		const ran = await runModelUnit({
+			pwuId,
+			planId: planB,
+			stepId: stepB,
+			attemptId: mintUiId('attempt'),
+			binding,
+			bindingId: bindB,
+			executor: chosen,
+			pwu,
+			pwuType,
+			pwuTypeId,
+			typeFacts,
+			acceptedWork: handOver.acceptedWork,
+			reviewCriteria: reviewCriteriaOf(pwuId),
+			// ⭐ D71 — each rejecting verdict's failed criteria, on the fresh session's first turn, after the instruction (RD8's form).
+			carriedFindings: offer.findings
+		});
+		return 'advanced' in ran ? { advanced: 'rejected-work-rerun' } : ran;
 	},
 
 	// ── ABANDON — S-1 of ROADMAP-decision-subject-scope (REG-F-077) ──────────────────────────────────────────

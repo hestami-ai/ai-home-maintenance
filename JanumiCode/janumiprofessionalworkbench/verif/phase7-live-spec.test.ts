@@ -37,6 +37,7 @@ import {
 	PHASE7_PRIOR_CALLS_VARIABLE,
 	PHASE7_RECORD_ASSURANCE_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
+	PHASE7_UNIT_REVIEWER_CALLS,
 	REVIEWER_MODEL_VARIABLE
 } from '../apps/rph-demo/e2e-live-exec/lane-config.js';
 import {
@@ -50,7 +51,10 @@ import {
 	actionOfUrl,
 	beginExecute,
 	bootOf,
+	COUNTED_AHEAD,
 	DECLARED_RERUN_RATIONALE,
+	REJECTED_RERUN_ACT,
+	REJECTED_RERUN_RATIONALE,
 	declaredRerunOffered,
 	DRY_PRESS_NOT_REACHED,
 	execFileRunner,
@@ -73,6 +77,8 @@ import {
 	refusalOf,
 	refusedReviewsOf,
 	rerunDeclared,
+	rejectedRerunOffered,
+	rerunRejectedWork,
 	reviewerReadiness,
 	reviewerUnderTest,
 	runTheLane,
@@ -320,6 +326,12 @@ describe('⛔ the spec, from source: Playwright’s own `test`, its own timeout,
 		expect(callsTo(sf, 'rerunDeclared'), 'rerunDeclared').toEqual([
 			['page', 'unitRowById(page, unit.unitId!)', 'actionFields', 'timeoutMs']
 		]);
+		// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)) — and the rule's re-run of the work a unit's declared reviews rejected: its offer read, and the
+		// act pressed, on the unit's own row, by its id.
+		expect(callsTo(sf, 'rejectedRerunOffered'), 'rejectedRerunOffered').toEqual([['unitRowById(page, unit.unitId!)']]);
+		expect(callsTo(sf, 'rerunRejectedWork'), 'rerunRejectedWork').toEqual([
+			['page', 'unitRowById(page, unit.unitId!)', 'actionFields']
+		]);
 		expect(anyMethodCalls(sf, 'waitForResponse')).toEqual([]);
 		expect(callsTo(sf, 'pressAction')).toEqual([]);
 		expect(callsTo(sf, 'pressFormAction')).toEqual([]);
@@ -395,6 +407,9 @@ describe('⛔ D4 — the operator bounds every Begin & Execute by one phase’s 
 			// ⭐ `E12F` F3 — the rule's re-run of the declared reviews that did not conclude: bounded as Record Assurance is, its
 			// act and a review of each declared policy.
 			['rerunDeclared', "'rerunDeclaredReviews'", 'timeoutMs'],
+			// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)) — the rule's re-run of the work a unit's declared reviews rejected: bounded as the rule's
+			// re-run of a stopped unit's work is, one phase's allowance (it runs the unit's work again).
+			['rerunRejectedWork', "'rerunRejectedWork'", 'PHASE7_UNIT_ALLOWANCE_MS'],
 			['markSatisfied', "'markSatisfied'", 'PHASE7_SIGN_OFF_MS'],
 			// ⭐ P7-6R R-1f — the rule's acts: an abandonment, bounded as a sign-off act; a re-run, as a phase (a re-run of the
 			// work runs the phase again).
@@ -739,7 +754,7 @@ function recoveryRow(offered: readonly string[]) {
 		off: () => undefined,
 		waitForResponse: (predicate: (r: unknown) => boolean, options?: { timeout?: number }) => {
 			asked.push({
-				action: ['rerunReview', 'rerunWork', 'abandonPwu', 'rerunDeclaredReviews'].find((a) =>
+				action: ['rerunReview', 'rerunWork', 'abandonPwu', 'rerunDeclaredReviews', 'rerunRejectedWork'].find((a) =>
 					predicate(response(`${PAGE_URL}?/${a}`, 'POST'))
 				),
 				timeout: options?.timeout
@@ -1555,6 +1570,13 @@ interface Script {
 				msAfter?: UnitState;
 				calls?: number;
 				/**
+				 * ⭐⭐ Package L16 — D71 (`REG-D-163` (2)) — after a refused Record Assurance with no declared re-run offered: whether the row
+				 * offers re-running the work its declared reviews rejected (absent: no such offer, its read not logged, so a script written
+				 * before D71 reads its calls as before), what the act came to — its answer, the store after it, the reviewer calls it recorded —
+				 * and `again`, the sign-off after it, read as this one is.
+				 */
+				rejected?: RejectedScript;
+				/**
 				 * ⭐ `E12F` F3 — after a refused Record Assurance: whether the row offers re-running the declared reviews that did
 				 * not conclude, and what the re-run came to — its answer, the store after it, the reviewer calls it recorded.
 				 */
@@ -1713,7 +1735,14 @@ function laneOf(script: Script) {
 			// ⭐ D16 — each named unit's stopped attempt: its work product, its command evidence, and their floors, refused.
 			...refusedStore(script.refusedReviews ?? {})
 		}) as unknown as EngineSnapshot;
-	const signOffOf = (unit: RunUnit) => script.signOffs?.[unit.slug] ?? { ra: null };
+	/** ⭐⭐ Package L16 — D71 — how many times each unit's work was re-run after its declared reviews rejected it. */
+	const rejectedRounds = new Map<string, number>();
+	/** A unit's sign-off script — ⭐ D71: the round after each re-run of its rejected work, where the script gives one. */
+	const signOffOf = (unit: RunUnit): SignOffScript => {
+		let s: SignOffScript = script.signOffs?.[unit.slug] ?? { ra: null };
+		for (let n = rejectedRounds.get(unit.slug) ?? 0; n > 0 && s.rejected?.again !== undefined; n--) s = s.rejected.again;
+		return s;
+	};
 	const hands: LaneHands = {
 		setUp: async (note) => {
 			calls.push('setUp');
@@ -1802,6 +1831,24 @@ function laneOf(script: Script) {
 			if (r?.outcome === undefined) throw new Error(`the script re-runs no declared review of ${unit.slug}`);
 			if (r.after) store.set(unit.unitId!, r.after);
 			reviewerCallCount += r.calls ?? 0;
+			return r.outcome;
+		},
+		// ⭐⭐ Package L16 — D71 — the row's offer of re-running the work its declared reviews rejected, and the act: offered where the script
+		// says so, its read logged only then — so a script written before D71 reads its calls as before; the act's re-run makes a new plan B.
+		rejectedRerunOffered: async (unit) => {
+			const r = signOffOf(unit).rejected;
+			if (r === undefined) return false;
+			calls.push(`offersRejectedRerun ${unit.slug}`);
+			return r.offered;
+		},
+		rerunRejectedWork: async (unit) => {
+			calls.push(`rerunRejectedWork ${unit.slug}`);
+			const r = signOffOf(unit).rejected;
+			if (r?.outcome === undefined) throw new Error(`the script re-runs no rejected work of ${unit.slug}`);
+			plans.set(unit.unitId!, (plans.get(unit.unitId!) ?? 1) + 1);
+			if (r.after) store.set(unit.unitId!, r.after);
+			reviewerCallCount += r.calls ?? 0;
+			rejectedRounds.set(unit.slug, (rejectedRounds.get(unit.slug) ?? 0) + 1);
 			return r.outcome;
 		},
 		markSatisfied: async (unit) => {
@@ -3722,5 +3769,169 @@ describe('⭐⭐ L7 (D61) — the lane’s Undertaking states the product brief,
 	it('⛔ its objective is PRODUCT_BRIEF, verbatim — what every unit’s instruction states; its name and intended product unchanged', () => {
 		expect(PHASE7_UNDERTAKING.objective, 'the lane’s objective is not the brief').toBe(PRODUCT_BRIEF);
 		expect([PHASE7_UNDERTAKING.name, PHASE7_UNDERTAKING.product]).toEqual(['wordfreq realization', 'wordfreq']);
+	});
+});
+
+/**
+ * ⭐⭐ Package L16 — D71 (`REG-D-163` (2)) — one round of a unit's sign-off as the fake hands read it: Record Assurance, Mark Satisfied, the store
+ * after each, the reviewer calls, the declared re-run and the re-run of its rejected work.
+ */
+interface SignOffScript {
+	ra: ActionOutcome | null;
+	raAfter?: UnitState;
+	ms?: ActionOutcome;
+	msAfter?: UnitState;
+	calls?: number;
+	rerun?: { offered: boolean; outcome?: ActionOutcome; after?: UnitState; calls?: number };
+	rejected?: RejectedScript;
+}
+/** ⭐⭐ Package L16 — D71 — the row's offer of re-running the work its declared reviews rejected, what the act came to, and the round after. */
+interface RejectedScript {
+	offered: boolean;
+	outcome?: ActionOutcome;
+	after?: UnitState;
+	calls?: number;
+	again?: SignOffScript;
+}
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D71 (`REG-D-163` (2); the live-run design's rule (2), as amended 2026-11-14): a unit its declared
+// reviews reject at its sign-off has its work re-run ONCE by the rule, with their findings, the press's whole worst case counted first
+// (`REG-D-135` (4)); then its sign-off again, which never presses that act again — a second rejection leaves it as found, and the run ends
+// `withheld`, as today (P7-6's rule (3), which abandons, is not extended).
+/** ⭐ D71 — a unit its declared reviews rejected at its sign-off: under assurance, its execution SUCCEEDED, its assurance REJECTED. */
+const REJECTED = unitState('UNDER_ASSURANCE', 'SUCCEEDED', 'REJECTED', 'SUCCEEDED');
+
+describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declared reviews rejected: once, its whole press counted first', () => {
+	it('⛔ RED FIRST — PAID: a Record Assurance its declared reviews REJECT, whose row offers re-running the work with their findings, has it re-run ONCE by the rule, its whole press counted; its sign-off again, accepted, Mark Satisfied follows', async () => {
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					calls: 12,
+					rejected: { offered: true, outcome: answered('success'), after: COMPLETED, calls: 6, again: GREEN }
+				}
+			}
+		});
+		const record = await l.run();
+
+		const design = record.units[2]!.signOff!;
+		expect(l.only('rerunRejectedWork', 'offersRejectedRerun'), 'the rule did not re-run the rejected work once').toEqual([
+			'offersRejectedRerun design',
+			'rerunRejectedWork design'
+		]);
+		expect(
+			[design.rejectedRerun?.envelopeType, design.rejectedRerunLimitCheck?.ahead, design.rejectedRerunLimitCheck?.counted],
+			'the re-run was not pressed after its whole press was counted'
+		).toEqual(['success', PHASE7_UNIT_REVIEWER_CALLS, COUNTED_AHEAD.wholePress]);
+		expect(
+			[design.afterRerun?.recordAssurance?.envelopeType, design.afterRerun?.markSatisfied?.after, design.afterRerun?.refused],
+			'the sign-off after the re-run did not accept the unit'
+		).toEqual(['success', SATISFIED, null]);
+		expect(
+			['03-design-rerunRejectedWork', '03-design-recordAssuranceAfterRerun', '03-design-markSatisfiedAfterRerun'].map((a) => l.action(a)),
+			'the acts after the re-run kept no record of their own'
+		).toEqual([true, true, true]);
+	});
+
+	it('⛔ RED FIRST — rejected again, it is LEFT AS FOUND: the act is never pressed twice, nor its offer read again, and no Mark Satisfied follows', async () => {
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					rejected: {
+						offered: true,
+						outcome: answered('success'),
+						after: COMPLETED,
+						again: {
+							ra: answered('failure'),
+							raAfter: REJECTED,
+							rejected: { offered: true, outcome: answered('success'), after: COMPLETED, again: GREEN }
+						}
+					}
+				}
+			}
+		});
+		const record = await l.run();
+
+		const design = record.units[2]!.signOff!;
+		expect(l.only('rerunRejectedWork', 'offersRejectedRerun'), 'the rule re-ran the rejected work more than once').toEqual([
+			'offersRejectedRerun design',
+			'rerunRejectedWork design'
+		]);
+		expect(
+			[design.afterRerun?.refused?.act, design.afterRerun?.rejectedRerun, design.afterRerun?.markSatisfied, design.markSatisfied],
+			'a unit rejected again was pressed on'
+		).toEqual(['Record Assurance', undefined, null, null]);
+	});
+
+	it('⛔ RED FIRST — the limit refuses the re-run, its whole press counted: not pressed, recorded, and the run ends paid-limit', async () => {
+		// ⭐ The arithmetic: design's press fits (prior + 0 recorded + 4 + 210 = limit − 6), its sign-off fits (prior + 4 + 24), and its
+		// Record Assurance records 12 calls, so the re-run's whole press does not (prior + 12 + 4 + 210 = limit + 6).
+		const l = laneOf({
+			paid: true,
+			prior: PHASE7_PAID_LIMIT - 220,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					calls: 12,
+					rejected: { offered: true, outcome: answered('success'), after: COMPLETED }
+				}
+			}
+		});
+		const record = await l.run();
+
+		const design = record.units[2]!.signOff!;
+		expect(
+			[design.rejectedRerunLimitCheck?.allowed, design.rejectedRerun, l.only('rerunRejectedWork')],
+			'the re-run was pressed past the limit'
+		).toEqual([false, undefined, []]);
+		// The lane's own spelling, as its other limit notes have it (`the sign-off's own … counted`): an ASCII apostrophe.
+		expect(design.notPressed ?? '').toContain("the re-run's whole press counted");
+		expect(record.end?.reason).toBe('paid-limit');
+	});
+
+	it('⭑ CONTROL — a Record Assurance refused whose row offers no such act is left as found, its record as before', async () => {
+		const record = await laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, design: { ra: answered('failure'), raAfter: REJECTED, rejected: { offered: false } } }
+		}).run();
+
+		const design = record.units[2]!.signOff!;
+		expect([design.refused?.act, 'rejectedRerun' in design, 'afterRerun' in design, 'rejectedRerunLimitCheck' in design]).toEqual([
+			'Record Assurance',
+			false,
+			false,
+			false
+		]);
+	});
+
+	it('⛔ RED FIRST — the act on the page: offered by the row’s own test id; the rule’s rationale typed into its own field, its own button pressed, waited for one phase’s allowance', async () => {
+		const offering = recoveryRow(['rerun-rejected-work']);
+		expect(await rejectedRerunOffered(offering.row), 'the row’s offer was not read by its own test id').toBe(true);
+		expect(await rejectedRerunOffered(recoveryRow(['rerun-work']).row), 'another offer read as this act').toBe(false);
+		const pressed = recoveryRow(['rerun-rejected-work']);
+
+		expect((await rerunRejectedWork(pressed.page, pressed.row, decode)).envelopeType).toBe('success');
+
+		expect([pressed.log, pressed.asked]).toEqual([
+			[`fill rerun-rejected-work-rationale: ${REJECTED_RERUN_RATIONALE} (${PHASE7_UI_MS})`, `click rerun-rejected-work (${PHASE7_UI_MS})`],
+			[{ action: 'rerunRejectedWork', timeout: PHASE7_UNIT_ALLOWANCE_MS }]
+		]);
+		expect(REJECTED_RERUN_RATIONALE, 'the rationale does not name the rule and the ruling').toBe(
+			'The run plan’s rule, REG-D-105 (4), as REG-D-163 (2) amends it: a unit its declared reviews reject at its sign-off has its work re-run once, with their findings.'
+		);
+		expect(REJECTED_RERUN_ACT).toBe('Re-run the work with the reviews’ findings');
 	});
 });

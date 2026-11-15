@@ -164,6 +164,12 @@
 			"functions": 0,
 			"lines": 3
 		},
+		"packages/rph-application/src/handlers/rework-authorization.ts": {
+			"statements": 3,
+			"branches": 4,
+			"functions": 1,
+			"lines": 2
+		},
 		"packages/rph-application/src/handlers/runtime-binding.ts": {
 			"statements": 0,
 			"branches": 2,

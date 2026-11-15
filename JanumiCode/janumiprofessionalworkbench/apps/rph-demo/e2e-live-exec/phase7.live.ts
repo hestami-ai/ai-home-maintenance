@@ -37,6 +37,8 @@ import {
 	recover,
 	recoveryOffers,
 	rerunDeclared,
+	rejectedRerunOffered,
+	rerunRejectedWork,
 	runTheLane,
 	screenshot,
 	startOfferOf,
@@ -232,6 +234,10 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 				rerunDeclared: (unit, timeoutMs) =>
 					rerunDeclared(page, unitRowById(page, unit.unitId!), actionFields, timeoutMs),
 				markSatisfied: (unit) => markSatisfied(page, unitRowById(page, unit.unitId!), actionFields),
+				// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)) — the rule's re-run of the work a unit's declared reviews rejected: the row's offer, and
+				// the act.
+				rejectedRerunOffered: (unit) => rejectedRerunOffered(unitRowById(page, unit.unitId!)),
+				rerunRejectedWork: (unit) => rerunRejectedWork(page, unitRowById(page, unit.unitId!), actionFields),
 				// ⭐ P7-6R R-1f — the run plan's rule's two hands: the row's offers, and one act on the row (`REG-D-105` (4)).
 				recoveryOffers: (unit) => recoveryOffers(unitRowById(page, unit.unitId!)),
 				recover: (unit, act) => recover(page, unitRowById(page, unit.unitId!), act, actionFields),

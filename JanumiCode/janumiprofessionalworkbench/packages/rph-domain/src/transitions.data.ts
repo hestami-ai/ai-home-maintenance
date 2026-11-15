@@ -602,6 +602,14 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 				trigger: 'Replacement PWU created (supersedePwu; PwuSuperseded)',
 				guard: 'Not already BASELINED',
 				note: "§8.2 umbrella source — 'Any non-baselined' = every state except BASELINED; kept verbatim."
+			},
+			{
+				from: 'UNDER_ASSURANCE',
+				to: 'PLANNED',
+				trigger: 'Rework after a rejected declared assurance',
+				guard:
+					"ENFORCED BY THE KERNEL (fail closed): the unit's assurance REJECTED, concluded by its declared policies' verdicts at its sign-off, and a person's Decision (REPLAN) naming them (REG-D-163 (2); changePwuState, rejectUnauthorizedRework)",
+				note: 'AUTHORED 2026-11-14 and RATIFIED by the sponsor’s ruling REG-D-163 (2) (design D71): canon’s one way back, out of a rejected declared assurance back to planning, ONE move recorded on each of the three axes canon tracks — this row is its work lifecycle axis; PWU.executionState SUCCEEDED -> PLANNED and PWU.assuranceState REJECTED -> UNASSESSED are its other two, taken in the same command or not at all. REG-Q-034 forbade inventing such an edge; the sponsor ratified this one alone.'
 			}
 		],
 		illegal: [
@@ -749,6 +757,14 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 				to: 'SUPERSEDED',
 				trigger: 'ExecutionPlanSuperseded',
 				note: "RECONSTRUCTED; superseded plan cannot create new attempts (§20.2). 'Any active' = any non-terminal state."
+			},
+			{
+				from: 'SUCCEEDED',
+				to: 'PLANNED',
+				trigger: 'Rework after a rejected declared assurance',
+				guard:
+					"ENFORCED BY THE KERNEL (fail closed): the unit's assurance REJECTED, concluded by its declared policies' verdicts at its sign-off, and a person's Decision (REPLAN) naming them (REG-D-163 (2); changePwuState, rejectUnauthorizedRework)",
+				note: 'AUTHORED 2026-11-14 and RATIFIED by the sponsor’s ruling REG-D-163 (2) (design D71): canon’s one way back, out of a rejected declared assurance back to planning, ONE move recorded on each of the three axes canon tracks — this row is its execution axis; PWU.workLifecycleState UNDER_ASSURANCE -> PLANNED and PWU.assuranceState REJECTED -> UNASSESSED are its other two, taken in the same command or not at all. REG-Q-034 forbade inventing such an edge; the sponsor ratified this one alone.'
 			}
 		],
 		illegal: [],
@@ -859,6 +875,14 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 					'applicability determination returns NOT_APPLICABLE for every candidate policy (§5.2 ApplicabilityOutcome)',
 				guard: 'no assurance policy applies to this PWU',
 				note: "AUTHORED 2026-08-05 under the delegated authoring grant, on ratified ground. DOC-004 §5.2 ratifies ApplicabilityOutcome = REQUIRED | RECOMMENDED | OPTIONAL | NOT_APPLICABLE | REQUIRES_HUMAN_DETERMINATION, and §7.4 ratifies NOT_REQUIRED as a state meaning assurance does not apply. The corpus defines both and never connects them, leaving NOT_REQUIRED with no way in. THE AUTHORED PART is that a §5.2 determination should drive this axis at all — the outcome vocabulary and the state vocabulary are joined here, not in the corpus. Direction is deliberate: a PWU begins UNASSESSED (assurance is presumed to apply) and moves to NOT_REQUIRED only on a determination that nothing applies. The reverse default — begin NOT_REQUIRED and opt in — would make silence mean 'no assurance needed', which is the fail-open reading."
+			},
+			{
+				from: 'REJECTED',
+				to: 'UNASSESSED',
+				trigger: 'Rework after a rejected declared assurance',
+				guard:
+					"ENFORCED BY THE KERNEL (fail closed): the unit's assurance REJECTED, concluded by its declared policies' verdicts at its sign-off, and a person's Decision (REPLAN) naming them (REG-D-163 (2); changePwuState, rejectUnauthorizedRework)",
+				note: 'AUTHORED 2026-11-14 and RATIFIED by the sponsor’s ruling REG-D-163 (2) (design D71): canon’s one way back, out of a rejected declared assurance back to planning, ONE move recorded on each of the three axes canon tracks — this row is its assurance axis; PWU.workLifecycleState UNDER_ASSURANCE -> PLANNED and PWU.executionState SUCCEEDED -> PLANNED are its other two, taken in the same command or not at all. REG-Q-034 forbade inventing such an edge; the sponsor ratified this one alone.'
 			}
 		],
 		illegal: [],

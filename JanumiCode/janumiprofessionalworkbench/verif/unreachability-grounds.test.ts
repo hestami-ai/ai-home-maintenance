@@ -49,6 +49,9 @@ import { guardedArrows } from './guard-enforcement-ledger.js';
 import { GUARD_LEDGER } from './guard-enforcement-ledger.data.js';
 
 type Row = { kind: string; why?: string };
+/** ⭐⭐ Package L16 — D71 (`REG-D-163` (2)) — the guard canon's one way back carries, on each of its three rows, restated. */
+const D71_GUARD =
+	"ENFORCED BY THE KERNEL (fail closed): the unit's assurance REJECTED, concluded by its declared policies' verdicts at its sign-off, and a person's Decision (REPLAN) naming them (REG-D-163 (2); changePwuState, rejectUnauthorizedRework)";
 type LedgerRow = { disposition: string };
 const REGISTER = ENFORCEMENT_REGISTER as unknown as Record<string, Row>;
 const MACHINES = STATE_MACHINES as unknown as Record<
@@ -154,7 +157,8 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 			// Zero-covered: the ground these two rest on is intact today, and this is what an unexpired arm-3 row
 			// looks like — which is the comparison that makes the two above legible.
 			'RPH-GOV-004': ['AssuranceObservation.disposition=0/5'],
-			'RPH-PER-013': ['PWU.executionState=0/20']
+			// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)): ~~0/20~~ 0/21 — SUCCEEDED -> PLANNED, canon's one way back on the execution axis.
+			'RPH-PER-013': ['PWU.executionState=0/21']
 		});
 	});
 
@@ -208,7 +212,17 @@ describe('REG-F-133 — the register arm that nothing gates', () => {
 		expect(
 			conflicts,
 			`arm-3 rows contradicted by the guard ledger:\n${conflicts.join('\n')}`
-		).toEqual([]);
+			// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)): ~~`[]`~~ — canon's one way back puts an ENFORCED guard (the kernel's,
+			// `rejectUnauthorizedRework`) on `PWU.executionState`'s SUCCEEDED -> PLANNED, so this join, a machine's name, now pairs that
+			// machine with RPH-PER-013, the one arm-3 row that names it. RE-READ, AS THIS GATE ASKS: RPH-PER-013 names `PWU.executionState`
+			// for its WAITING member — its rule is "A SURVIVAL PROPERTY ("the pending decision remains available"), not a refusal" — never
+			// for its emptiness; the new guard refuses a move back to planning, on which no pending decision's survival rests. So the row is
+			// not contradicted, and the pair is pinned here BY NAME: any other pair still reddens, and the old promise is held below where
+			// D71's guard is not (the control after this test still discriminates).
+		).toEqual(['RPH-PER-013 rests on `PWU.executionState`, but C-0b records an ENFORCED guard on that machine']);
+		// ⭑ The old promise, where D71's guard is not: with its row left out of the ledger, no arm-3 row is paired at all.
+		const { [D71_GUARD]: _wayBack, ...withoutTheWayBack } = GUARD_LEDGER;
+		expect(registerLedgerConflicts(REGISTER, withoutTheWayBack)).toEqual([]);
 	});
 
 	// CONTROL — `[]` is also what this returns when the join key silently stops matching, which is the failure it

@@ -49,6 +49,8 @@
 				"resolveInvocationSubject",
 				"resolvePwuTypeFacts",
 				"resolveUndertakingStatement",
+				"REVIEW_CRITERIA_SECTION_HEADING",
+				"reviewCriteriaSection",
 				"UNDERTAKING_SECTION_HEADING",
 				"undertakingSection",
 				"unitPromptRefusal",
@@ -65,6 +67,8 @@
 				"resolveInvocationSubject",
 				"resolvePwuTypeFacts",
 				"resolveUndertakingStatement",
+				"REVIEW_CRITERIA_SECTION_HEADING",
+				"reviewCriteriaSection",
 				"UNDERTAKING_SECTION_HEADING",
 				"undertakingSection",
 				"unitPromptRefusal",
@@ -72,7 +76,7 @@
 				"withUndertakingSection",
 				"WORK_UNIT_MARKERS"
 			],
-			"unattributedMutants": 5
+			"unattributedMutants": 6
 		},
 		"packages/rph-application/src/handlers/abandon-authorization.ts": {
 			"consumedExports": [
@@ -495,7 +499,7 @@
 				"supersedePwu",
 				"unblockPwu"
 			],
-			"unattributedMutants": 4
+			"unattributedMutants": 7
 		},
 		"packages/rph-application/src/handlers/registry.ts": {
 			"consumedExports": [
@@ -516,6 +520,15 @@
 				"resolveRejectAuthorization"
 			],
 			"unattributedMutants": 0
+		},
+		"packages/rph-application/src/handlers/rework-authorization.ts": {
+			"consumedExports": [
+				"resolveReworkAuthorization"
+			],
+			"guardedExports": [
+				"resolveReworkAuthorization"
+			],
+			"unattributedMutants": 5
 		},
 		"packages/rph-application/src/handlers/runtime-binding.ts": {
 			"consumedExports": [

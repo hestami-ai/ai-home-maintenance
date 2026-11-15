@@ -108,6 +108,18 @@ export const DECLARED_RERUN_RATIONALE_REQUIRED =
 	'Re-running the declared reviews that did not conclude is recorded as your Decision: say why, in your own words — the rationale is required (REG-D-112 (a); DESIGN-the-stopped-unit-recovery.md RD4).';
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D71 (`REG-D-163` (2); `REG-F-640`) — WHAT AUTHORISES A PERSON'S RE-RUN OF THE WORK A UNIT'S
+ * DECLARED REVIEWS REJECTED: the sponsor's ruling, which ratifies canon's one way back; cited after the person's own words.
+ */
+export const RERUN_REJECTED_WORK_CITATION =
+	'Authority: the sponsor’s ruling REG-D-163 (2) — a unit its declared reviews reject can have its work re-run, in place, with their findings, by the one way back canon gains: out of a rejected declared assurance back to planning (UNDER_ASSURANCE -> PLANNED, SUCCEEDED -> PLANNED, REJECTED -> UNASSESSED), this Decision naming the rejecting verdicts. ' +
+	'No policy object authorises a person’s re-run, and none is cited: the ruling is the authority (design D71).';
+
+/** ⭐⭐ Package L16 — D71 — what the person must type: the re-run is their Decision, and its rationale the one part that says why. */
+export const REJECTED_RERUN_RATIONALE_REQUIRED =
+	'Re-running the work its declared reviews rejected is recorded as your Decision: say why, in your own words — the rationale is required (REG-D-163 (2); DESIGN-the-stopped-unit-recovery.md RD4).';
+
+/**
  * ⭐ THE DECISION'S RATIONALE: the person's typed text, VERBATIM, a blank line, then the act's citation. ⛔ Nothing in the
  * typed text is altered — not its line breaks, not its punctuation — so the reason a person gave is the reason recorded.
  */

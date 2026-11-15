@@ -94,7 +94,8 @@ describe('which PWU axes actually gate a lifecycle transition', () => {
 	// set it walks must be the real one.
 	it('CONTROL — the same harness detects influence where influence exists', () => {
 		const inf = influence();
-		expect(M['PWU.workLifecycleState']!.transitions.length, 'the arrow set must be real').toBe(61);
+		// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)): ~~61~~ 62 — canon's one way back, UNDER_ASSURANCE -> PLANNED.
+		expect(M['PWU.workLifecycleState']!.transitions.length, 'the arrow set must be real').toBe(62);
 		expect(M['PWU.shapeIntegrityState']!.states.length, 'the varied value set must be real').toBe(7);
 		expect(
 			inf.executionState!.length + inf.assuranceState!.length,

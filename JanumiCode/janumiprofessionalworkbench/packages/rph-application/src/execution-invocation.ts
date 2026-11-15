@@ -255,6 +255,59 @@ function withAcceptedWorkSection(text: string, dependencies: readonly AcceptedWo
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D70 (`REG-D-163` (1); `REG-F-640`) — ONE CRITERION A DECLARED REVIEW WILL JUDGE THE WORK BY:
+ * its id, its name and its description, as the governing policy stores them (`AssessmentCriterion`). ⛔ `REG-F-640`: P6 again's eighth run's
+ * Requirements Specification was rejected by its declared assumption-disclosure review for AD-04, *"Materiality is classified."*, a
+ * criterion its instruction never named — the authoring agent declares policies on a type by id, and nothing carried what they check
+ * into the unit's instruction.
+ */
+export interface ReviewCriterion {
+	readonly id: string;
+	readonly name: string;
+	readonly description: string;
+}
+
+/** ⭐⭐ Package L16 — D70 — a governing declared policy as the section names it: its name, and its criteria in the policy's own order. */
+export interface ReviewCriteriaPolicy {
+	readonly name: string;
+	readonly criteria: readonly ReviewCriterion[];
+}
+
+/** ⭐⭐ Package L16 — D70 — the section's first line, spelled ONCE, here: the lead's words, byte for byte. */
+export const REVIEW_CRITERIA_SECTION_HEADING =
+	'This work will be reviewed against the criteria below, under the policies named. Make the work meet each one.';
+
+/**
+ * ⭐⭐ Package L16 — D70 — THE SECTION THAT TELLS A UNIT THE CRITERIA ITS DECLARED REVIEWS WILL JUDGE IT BY, AND ITS ONE RENDERER: the
+ * heading line (`REVIEW_CRITERIA_SECTION_HEADING`), then for each policy, in the order given — the sign-off's own selection
+ * (`governingDeclaredPolicies`) — a line `<its name>:` and one line per criterion, in the policy's own order: `- <its id>: <its description>`,
+ * its name where it has no description (the lead's words). ⚠ ABSENT MEANS ABSENT, as D61's and D69's sections hold: with no policy there is
+ * no section (`undefined`), so a unit with no governing declared policy is given the instruction it was given before, byte for byte. ⚠ A
+ * description is trimmed, and one empty after the trim counts as none — the builder's reading, named in package L16's facts.
+ */
+export function reviewCriteriaSection(policies: readonly ReviewCriteriaPolicy[]): string | undefined {
+	if (policies.length === 0) return undefined;
+	return [
+		REVIEW_CRITERIA_SECTION_HEADING,
+		...policies.flatMap((p) => [
+			`${p.name}:`,
+			...p.criteria.map((c) => `- ${c.id}: ${c.description.trim() === '' ? c.name : c.description.trim()}`)
+		])
+	].join('\n');
+}
+
+/**
+ * ⭐⭐ Package L16 — D70 — `text`, a blank line, then the section; `text` alone where there is none. ⚠ AFTER THE OUTPUT CONTRACT AND BEFORE
+ * D69's SECTION (the lead's seat), so D69's stays last: the candidate checks measure the type's text, the Undertaking's statement and the
+ * output contract against the 4,000 characters a reviewer is shown of an instruction (`PROMPT-LENGTH`; `USER_INTENT_MAX`), so that part is
+ * shown as before, and what follows it as far as it fits.
+ */
+function withReviewCriteriaSection(text: string, policies: readonly ReviewCriteriaPolicy[]): string {
+	const section = reviewCriteriaSection(policies);
+	return section === undefined ? text : `${text}\n\n${section}`;
+}
+
+/**
  * ⭐⭐ Package L7 — D61 — THE STATEMENT OF THE UNDERTAKING `undertakingId` NAMES, BY **PARSING** THE STORED OBJECT (`R30`, as
  * `resolveInvocationSubject` reads a work unit), never by asserting it: its two fields, and nothing else. ⛔ Refused when it does
  * not resolve, or does not parse as an UNDERTAKING — anything the engine persisted parses (`handlers/kit.ts`), so a refusal means
@@ -459,7 +512,14 @@ export function prepareModelInvocation(
 	 * LAST, after its output contract (`acceptedWorkSection`). ⛔ REQUIRED, `[]` where there is none, for D61's reason: an optional
 	 * list would let a caller skip it by omission — a rebuild a review is shown above all — and the type-checker would name no caller.
 	 */
-	acceptedWork: readonly AcceptedWorkDependency[]
+	acceptedWork: readonly AcceptedWorkDependency[],
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D70 (`REG-D-163` (1); `REG-F-640`) — the governing declared policies the unit's sign-off
+	 * will review it under, each its name and its criteria, in the selection's order: the instruction states them after its output contract
+	 * and before D69's section (`reviewCriteriaSection`). ⛔ REQUIRED, `[]` where there is none, for D61's and D69's reason: an optional list
+	 * would let a caller skip it by omission — a rebuild a review is shown above all — and the type-checker would name no caller.
+	 */
+	reviewCriteria: readonly ReviewCriteriaPolicy[]
 ): InvocationPlan {
 	// ⛔ NO DEFAULT PROMPT. A type without a template declares no agent behaviour — TRUE of every type that
 	// existed before REG-D-058 — and inventing one would be the seeded-policy-as-projection defect this
@@ -565,8 +625,15 @@ export function prepareModelInvocation(
 		// work this unit depends on (`withAcceptedWorkSection`): a step whose instruction carries it declares PRIOR_WORK_PRODUCT at
 		// THIS_UNDERTAKING (`run-model-step.ts`), which the seeded `ctx-default` permits (`context-assembly.ts`). With none, the
 		// instruction is the one it was before, byte for byte.
+		// ⭐⭐ Package L16 — D70 (`REG-D-163` (1)) — and between the contract and D69's section, which stays last, the criteria of the governing
+		// declared policies the unit's sign-off will review it under (`withReviewCriteriaSection`). Still the RENDERED_INSTRUCTION at THIS_TRY:
+		// a governed policy's own words, not another unit's material, so `ctx-default` is unchanged (the lead's reading, as D61's). With none,
+		// the instruction is the one it was before, byte for byte.
 		prompt: withAcceptedWorkSection(
-			withOutputContract(withUndertakingSection(rendered.text, undertaking), template.outputContract),
+			withReviewCriteriaSection(
+				withOutputContract(withUndertakingSection(rendered.text, undertaking), template.outputContract),
+				reviewCriteria
+			),
 			acceptedWork
 		),
 		fingerprint: promptTemplateFingerprint(pwuTypeId, template)

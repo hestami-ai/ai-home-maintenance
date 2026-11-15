@@ -89,7 +89,10 @@ import {
 	CELL_VALUES,
 	contentVerdict,
 	declaredWorkShown,
+	AFTER_RERUN_SUFFIX,
 	DECLARED_RERUN_OPTION,
+	REJECTED_RERUN_NOTE,
+	REJECTED_RERUN_OPTION,
 	DECLARED_REVIEW_VALIDATORS,
 	DECLARED_SIGNOFF_VALIDATOR,
 	DEMO_FINDING_CODE,
@@ -1603,8 +1606,10 @@ describe('JAN-EXEC P7-2 D9 — the audit of hand acts (P7-3)', () => {
 		expect(refused.posted).toBe(1);
 		// ⛔ E12’s re-review F6 — AND THE PRINTED NOTE SAYS WHAT IS COUNTED: since `E12F` F3 an accepted re-run of the declared
 		// reviews is assurance too, so a Mark Satisfied after a REFUSED Record Assurance is no longer counted by itself.
+		// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)): and after the rule's re-run of the work a unit's declared reviews rejected, a Mark Satisfied is
+		// read against an assurance accepted after that re-run — so the note says so too.
 		expect(accepted.note, 'the note describes a count it no longer makes').toBe(
-			'POSTs counted from lane/actions: a Mark Satisfied pressed on a unit with no accepted Record Assurance and no accepted re-run of its declared reviews (REG-D-112 (a))'
+			'POSTs counted from lane/actions: a Mark Satisfied pressed on a unit with no accepted Record Assurance and no accepted re-run of its declared reviews (REG-D-112 (a)) — after the rule’s re-run of the work its declared reviews rejected, none accepted after that re-run (REG-D-163 (2))'
 		);
 	});
 
@@ -5320,4 +5325,171 @@ describe('⭐⭐ package L5 — D57 — the run report says what was not sent, a
 		},
 		120_000
 	);
+});
+
+describe('⭐⭐ L16 (D71) — the report and its audit know the re-run of the work a unit’s declared reviews rejected (REG-D-163 (2))', () => {
+	const ev = (eventType: string, aggregateId: string, commandId: string, payload: Record<string, unknown> = {}) => ({
+		eventType,
+		aggregateType: 'X',
+		aggregateId,
+		commandId,
+		payload
+	});
+	const byModel = { actorId: 'model:fixture-executor', actorType: 'AGENT', displayName: MODEL_EXECUTOR_NAME };
+	/**
+	 * A run whose DESIGN phase was rejected by its declared reviews at its sign-off, then had its work re-run by a person's Decision through
+	 * canon's one way back, as the route writes it (D71): the REJECTED hop; the Decision; the move back to planning; plan B proposed, plan A
+	 * superseded by it, B approved and activated; the unit PLANNED → EXECUTING; B started, the unit RUNNING; B completed by the model, the unit
+	 * SUCCEEDED; then its sign-off again — the SATISFIED hop, and Mark Satisfied. `hopBeforeOnly`: a SATISFIED hop before the re-run, and none
+	 * after it. `actions`: the lane's action files.
+	 */
+	function aReworkedRun(o: { readonly hopBeforeOnly?: boolean; readonly actions?: LaneRows['actions'] } = {}) {
+		const run = aRun(
+			{ design: { signedOff: false, unit: { lifecycle: 'SATISFIED', execution: 'SUCCEEDED', assurance: 'SATISFIED' } } },
+			{
+				extraEvents: [
+					...(o.hopBeforeOnly
+						? [
+								ev('PwuStateChanged', 'pwu_design', 'ui-890', {
+									previousState: 'UNDER_ASSURANCE',
+									newState: 'UNDER_ASSURANCE',
+									assuranceState: 'SATISFIED',
+									supportingObjectIds: ['asm_design_before']
+								})
+							]
+						: []),
+					ev('PwuStateChanged', 'pwu_design', 'ui-900', {
+						previousState: 'UNDER_ASSURANCE',
+						newState: 'UNDER_ASSURANCE',
+						executionState: 'SUCCEEDED',
+						assuranceState: 'REJECTED',
+						supportingObjectIds: ['asm_design_0']
+					}),
+					ev('DecisionEffective', 'dec_rework', 'ui-911', {
+						decisionType: 'REPLAN',
+						selectedOption: 'RERUN_REJECTED_WORK',
+						subjectObjectIds: ['pwu_design', 'plan_design', 'art_design', 'asm_design_0']
+					}),
+					ev('PwuStateChanged', 'pwu_design', 'ui-912', {
+						previousState: 'UNDER_ASSURANCE',
+						newState: 'PLANNED',
+						executionState: 'PLANNED',
+						assuranceState: 'UNASSESSED',
+						supportingObjectIds: ['dec_rework', 'asm_design_0']
+					}),
+					ev('ExecutionPlanProposed', 'plan_design_b', 'ui-913', { executionPlanId: 'plan_design_b', workUnitId: 'pwu_design' }),
+					ev('ExecutionPlanSuperseded', 'plan_design', 'ui-914', { supersedingExecutionPlanId: 'plan_design_b', status: 'SUPERSEDED' }),
+					ev('ExecutionPlanApproved', 'plan_design_b', 'ui-915'),
+					ev('ExecutionPlanActivated', 'plan_design_b', 'ui-916'),
+					ev('PwuStateChanged', 'pwu_design', 'ui-917', {
+						previousState: 'PLANNED',
+						newState: 'EXECUTING',
+						executionState: 'QUEUED',
+						supportingObjectIds: ['plan_design_b']
+					}),
+					ev('ExecutionStepStarted', 'plan_design_b', 'ui-918', { stepId: 'step_design_b' }),
+					ev('PwuStateChanged', 'pwu_design', 'ui-919', {
+						previousState: 'EXECUTING',
+						newState: 'EXECUTING',
+						executionState: 'RUNNING',
+						supportingObjectIds: ['plan_design_b']
+					}),
+					ev('ExecutionStepSucceeded', 'plan_design_b', 'ui-930', {
+						outputArtifactIds: ['art_design'],
+						proposedEvidenceIds: [],
+						executionProvenance: { executedBy: byModel }
+					}),
+					ev('PwuStateChanged', 'pwu_design', 'ui-931', {
+						previousState: 'EXECUTING',
+						newState: 'EXECUTING',
+						executionState: 'SUCCEEDED',
+						supportingObjectIds: ['plan_design_b']
+					}),
+					...(o.hopBeforeOnly
+						? []
+						: [
+								ev('PwuStateChanged', 'pwu_design', 'ui-950', {
+									previousState: 'UNDER_ASSURANCE',
+									newState: 'UNDER_ASSURANCE',
+									assuranceState: 'SATISFIED',
+									supportingObjectIds: ['asm_design_1']
+								})
+							]),
+					ev('PwuStateChanged', 'pwu_design', 'ui-951', { previousState: 'UNDER_ASSURANCE', newState: 'SATISFIED', assuranceState: 'SATISFIED' })
+				],
+				...(o.actions === undefined ? {} : { lane: { actions: o.actions } })
+			}
+		);
+		const planB: StoredObject = {
+			id: 'plan_design_b',
+			objectType: 'EXECUTION_PLAN',
+			state: { workUnitId: 'pwu_design', status: 'ACTIVE', steps: [{ id: 'step_design_b', stepState: 'SUCCEEDED' }] },
+			firstSequence: Number.MAX_SAFE_INTEGER - 1
+		};
+		const objects = run.store.objects.map((x) =>
+			x.id === 'plan_design'
+				? { ...x, state: { workUnitId: 'pwu_design', status: 'SUPERSEDED', steps: [{ id: 'step_design', stepState: 'SUCCEEDED' }] } }
+				: x
+		);
+		return { store: { ...run.store, objects: [...objects, planB] }, lane: run.lane };
+	}
+	const NOT_FIRST =
+		'its work was re-run after its declared reviews rejected it (Decision dec_rework; REG-D-163 (2)): its sign-off is the one after that re-run, not its first try';
+
+	it('⛔ RED FIRST — each such re-run is listed BESIDE the Decision that made it, as allowed by the run plan’s rule alone; and the unit is not “begun more than once”', () => {
+		const r = reportOf(aReworkedRun()).report;
+
+		const act = actOf(r, 'rerunRejectedWork');
+		expect([act.forbidden, act.found.map((f) => [f.aggregateId, f.unit, f.why]), act.note]).toEqual([
+			false,
+			[['dec_rework', 'design', 'a person’s re-run of the work its declared reviews rejected: plan plan_design_b, superseding plan plan_design']],
+			'allowed by the run plan’s rule alone (REG-D-105 (4), as REG-D-163 (2) amends it): once per unit its declared reviews reject at its sign-off, each listed beside the Decision that made it'
+		]);
+		expect(r.problems, 'the re-run was read as a second Begin & Execute').toEqual([]);
+		expect(r.audit.forbiddenFound, 'the re-run’s own acts were read as forbidden ones').toBe(0);
+	});
+
+	it('⛔ RED FIRST — a unit accepted after one is never shown accepted at its first try', () => {
+		const c = cellOf(reportOf(aReworkedRun()).report, '7', 'design');
+
+		expect([c.value, c.basis.includes(NOT_FIRST)], 'the unit is shown accepted at its first try').toEqual(['as intended', true]);
+	});
+
+	it('⭑ CONTROL — a unit accepted at its first sign-off says nothing of a re-run', () => {
+		const c = cellOf(reportOf(aRun()).report, '7', 'design');
+
+		expect([c.value, c.basis.some((b) => b.includes('re-run after its declared reviews rejected'))]).toEqual(['as intended', false]);
+	});
+
+	it('⛔ RED FIRST — a Mark Satisfied after it is read against a Record Assurance made AFTER it: in the store, and in the lane’s presses', () => {
+		const hopBefore = reportOf(aReworkedRun({ hopBeforeOnly: true })).report;
+		expect(
+			actOf(hopBefore, 'markSatisfied without recordAssurance').found.map((f) => [f.unit, f.why]),
+			'a SATISFIED after the re-run was read against a hop before it'
+		).toEqual([['design', 'SATISFIED with no Record Assurance hop before it']]);
+		const pressed = (afterRerun: 'success' | 'failure') =>
+			actOf(
+				reportOf(
+					aReworkedRun({
+						actions: [
+							{ file: '03-design-recordAssurance.json', action: 'recordAssurance', envelopeType: 'failure' },
+							{ file: '03-design-rerunRejectedWork.json', action: 'rerunRejectedWork', envelopeType: 'success' },
+							{ file: '03-design-recordAssuranceAfterRerun.json', action: 'recordAssuranceAfterRerun', envelopeType: afterRerun },
+							{ file: '03-design-markSatisfiedAfterRerun.json', action: 'markSatisfiedAfterRerun', envelopeType: 'success' }
+						]
+					})
+				).report,
+				'markSatisfied without recordAssurance'
+			).posted;
+		expect([pressed('failure'), pressed('success')], 'a Mark Satisfied after the re-run was not read against its own Record Assurance').toEqual([1, 0]);
+	});
+
+	it('⛔ RED FIRST — the option, the files’ suffix and the note the report states are the product’s and the lane’s own', () => {
+		const source = (file: string) => readFileSync(join(ROOT, file), 'utf8');
+		expect(source('apps/rph-demo/src/lib/server/execution/rejected-rerun.ts')).toContain(
+			`export const RERUN_REJECTED_WORK = '${REJECTED_RERUN_OPTION}';`
+		);
+		expect(source('apps/rph-demo/e2e-live-exec/phase7-operator.ts')).toContain(`export const AFTER_RERUN = '${AFTER_RERUN_SUFFIX}';`);
+		expect(REJECTED_RERUN_NOTE).toContain('REG-D-163 (2)');
+	});
 });

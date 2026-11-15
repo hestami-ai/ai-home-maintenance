@@ -27,9 +27,11 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 	// census (115 of 304 arrows read, behind a control that could only detect total death). Stated as a number
 	// so a change in what the extractor understands cannot pass as a change in what the corpus says.
 	it('PINNED — how much of the ratified trigger surface yields a claim at all', () => {
+		// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)): ~~308 / 308~~ 311 / 311 — canon's one way back, three rows, each with its trigger, which
+		// names no command (so the claims stand).
 		expect(triggerCoverage()).toEqual({
-			transitions: 308,
-			withTrigger: 308,
+			transitions: 311,
+			withTrigger: 311,
 			namingAKnownCommand: 68,
 			claims: 70
 		});
@@ -133,9 +135,12 @@ describe('C-0d — every arrow the ratified trigger text assigns to a command', 
 		const byArrow: Record<string, number> = { VERBATIM: 0, RECONSTRUCTED: 0, OTHER: 0 };
 		for (const [name, m] of Object.entries(M))
 			for (const t of m.transitions) byArrow[provenanceOfArrow(name, t.from, t.to)]! += 1;
+		// ⭐⭐ Package L16 — D71: ~~101 / 182~~ 102 / 184 — the three rows' notes say AUTHORED and RATIFIED and cite no §, so each takes its
+		// machine's sourceSection, as this classifier reads every such note: the work lifecycle's VERBATIM, the other two's RECONSTRUCTED
+		// (the classifier's rule, unchanged; named in package L16's facts).
 		expect(byArrow, 'arrow-level, from each transition note').toEqual({
-			VERBATIM: 101,
-			RECONSTRUCTED: 182,
+			VERBATIM: 102,
+			RECONSTRUCTED: 184,
 			OTHER: 25
 		});
 	});

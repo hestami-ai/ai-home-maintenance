@@ -48,6 +48,7 @@ import {
 	resolveInvocationSubject,
 	type AcceptedWorkDependency,
 	type ResolvableExchange,
+	type ReviewCriteriaPolicy,
 	type UndertakingStatement
 } from '@janumipwb/rph-application';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
@@ -773,6 +774,13 @@ export async function rebuildProducingTurn(
 		 * not given.
 		 */
 		readonly acceptedWork: readonly AcceptedWorkDependency[];
+		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D70 (`REG-D-163` (1)) — the criteria the producing prompt stated, between its output
+		 * contract and D69's section, as Begin & Execute rendered it. ⛔ REQUIRED, `[]` where there is none, for the statement's reason above:
+		 * the fingerprint is the template's alone, so a rebuild that left the section out would pass it and show a review a prompt its producer
+		 * was not given.
+		 */
+		readonly reviewCriteria: readonly ReviewCriteriaPolicy[];
 	}
 ): Promise<Rebuilt<RebuiltProducingTurn>> {
 	const refuse = (why: string): Rebuilt<RebuiltProducingTurn> => ({
@@ -900,6 +908,8 @@ function rerenderedInstruction(
 		readonly undertaking: UndertakingStatement | undefined;
 		/** ⭐⭐ Package L15 — D69 — the units whose accepted work the prompt names (`rebuildProducingTurn`). */
 		readonly acceptedWork: readonly AcceptedWorkDependency[];
+		/** ⭐⭐ Package L16 — D70 — the criteria the prompt states (`rebuildProducingTurn`). */
+		readonly reviewCriteria: readonly ReviewCriteriaPolicy[];
 	}
 ): Rebuilt<{ readonly prompt: string; readonly fingerprint: string }> {
 	let policy;
@@ -933,7 +943,9 @@ function rerenderedInstruction(
 		// ⭐⭐ Package L15 — D69 — and the accepted work it named, last, so the prompt a review is shown is the one its producer was
 		// given. ⚠ Nothing more is declared here: a rebuild invokes no model, and a step whose instruction named accepted work was
 		// refused before its render unless its policy permitted the pair (`run-model-step.ts`).
-		args.acceptedWork
+		args.acceptedWork,
+		// ⭐⭐ Package L16 — D70 — and the criteria it stated, between the contract and D69's section, as its producer was given them.
+		args.reviewCriteria
 	);
 	if (!plan.ready)
 		return {

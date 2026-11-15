@@ -92,6 +92,8 @@ import { readinessUnitOf, startReadiness, startRefusal } from '@janumipwb/rph-pr
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
 import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-authorization.js';
 import { resolveWaiverAuthorization } from './waiver-authorization.js';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D71 (`REG-D-163` (2)) — what authorizes canon's one way back.
+import { resolveReworkAuthorization } from './rework-authorization.js';
 
 const PWU = 'PROFESSIONAL_WORK_UNIT';
 
@@ -1699,6 +1701,59 @@ function rejectUnbackedExecutionSuccess(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D71 (`REG-D-163` (2); `REG-F-640`; `REG-Q-034`) — CANON'S ONE WAY BACK, AND THE KERNEL'S GUARD ON
+ * IT. The sponsor ratified into canon one move out of a rejected declared assurance back to planning, recorded on each of the three axes canon
+ * tracks: `UNDER_ASSURANCE` → `PLANNED`, `SUCCEEDED` → `PLANNED`, `REJECTED` → `UNASSESSED` (`transitions.data.ts`, each row citing
+ * `REG-D-163`). ⛔ FAIL CLOSED, KEYED ON ANY OF THE THREE: each axis checks its own machine alone (`checkTransition`, above), so either
+ * sub-axis row would otherwise open under every work state — an execution SUCCEEDED moved back while the unit holds UNDER_ASSURANCE, then
+ * SATISFIED over a FAILED step. So a command that takes one of the three takes all three, as the one move, or is refused; and the move needs
+ * (1) the unit's assurance REJECTED concluded by its declared policies' verdicts and (2) a person's EFFECTIVE `REPLAN` Decision naming the unit
+ * and those verdicts, cited (`resolveReworkAuthorization`). No other edge is added: nothing else leaves REJECTED, and RESHAPING and CHALLENGED
+ * keep no re-entry. The unit's shape stays write-once (`REG-F-109`): this moves no shape field.
+ */
+function rejectUnauthorizedRework(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	id: string,
+	p: ChangePwuStatePayload,
+	current: PwuAxes,
+	currentSemanticVersion: number
+): CommandResult | undefined {
+	const onWork = current.workLifecycleState === 'UNDER_ASSURANCE' && p.newState === 'PLANNED';
+	const onExecution = current.executionState === 'SUCCEEDED' && p.executionState === 'PLANNED';
+	const onAssurance = current.assuranceState === 'REJECTED' && p.assuranceState === 'UNASSESSED';
+	if (!onWork && !onExecution && !onAssurance) return undefined;
+	if (!(onWork && onExecution && onAssurance))
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`ChangePwuState may not take PART of canon's one way back (REG-D-163 (2)): PWU ${id} ${current.workLifecycleState} -> ` +
+				`${p.newState}, execution ${current.executionState} -> ${p.executionState}, assurance ${current.assuranceState} -> ` +
+				`${p.assuranceState}. Its three rows are one move, out of a rejected declared assurance back to planning — UNDER_ASSURANCE -> ` +
+				'PLANNED, SUCCEEDED -> PLANNED and REJECTED -> UNASSESSED — taken in one command, or not at all.',
+			[id]
+		);
+	// The contract requires the list (`ChangePwuStatePayloadSchema`, validated before any handler runs), so it is read as given: a default
+	// here would be a branch no validated command can take (package L16's facts §8.2).
+	const cited = p.supportingObjectIds;
+	const authorized = resolveReworkAuthorization(ctx, {
+		pwuId: id,
+		pwuSemanticVersion: currentSemanticVersion,
+		cited
+	});
+	if (authorized.ok) return undefined;
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`ChangePwuState would take PWU ${id} back to planning out of a rejected declared assurance, and nothing authorizes it: ` +
+			`${authorized.reason}. Canon's one way back (REG-D-163 (2)) needs the unit's assurance REJECTED, concluded by its declared ` +
+			"policies' verdicts at its sign-off, and a person's EFFECTIVE REPLAN Decision naming the unit and those verdicts, cited in " +
+			`supportingObjectIds. Supplied: [${cited.join(', ') || 'nothing'}].`,
+		[id, ...cited]
+	);
+}
+
+/**
  * ⚠ TWO GUARDS USED TO LIVE HERE AND ARE GONE — deleted, not disabled (JAN-PWUWP W-1).
  *
  * `rejectUnauthorizedAbandonment` (REG-F-070) and `rejectUnauthorizedRejection` (REG-F-078) were authority
@@ -1863,7 +1918,9 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState) ??
 		rejectUnsupportedDeclaredSatisfaction(ctx, command, id, p, current, loaded.semanticVersion) ??
 		rejectUnauthorizedWaiver(ctx, command, id, p, current.assuranceState, loaded.semanticVersion) ??
-		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState);
+		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState) ??
+		// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)) — and canon's one way back: all three axes together, authorized, or none.
+		rejectUnauthorizedRework(ctx, command, id, p, current, loaded.semanticVersion);
 	if (unearned) return unearned;
 	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or
 	// holds (a no-op move that only advances the orthogonal sub-axes) — and a hold must still not park the PWU in

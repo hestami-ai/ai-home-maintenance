@@ -1,8 +1,8 @@
 // ⭐ `REG-F-501` — THE HARNESS'S KEEP-ALIVE PLUGIN: WHAT IT CHANGES, WHERE, AND THAT `vite.config.ts` CARRIES IT.
 //
-// `harness-keep-alive-connection.test.ts` drives the reset and its remedy over a real connection. This file holds the
-// plugin to its mode: in harness mode it raises `keepAliveTimeout` and nothing else; outside it, a dev server keeps
-// Node's defaults; it asks `harnessExposed()`'s question; and the app's Vite config carries it.
+// `harness-keep-alive-connection.test.ts` drives ~~the reset~~ Node's close (`REG-F-639`) and its remedy over a real connection.
+// This file holds the plugin to its mode: in harness mode it raises `keepAliveTimeout` and nothing else; outside it, a
+// dev server keeps Node's defaults; it asks `harnessExposed()`'s question; and the app's Vite config carries it.
 //
 // ⚠ `@sveltejs/kit/vite` IS STOOD IN FOR, so `vite.config.ts` can be imported here: its `sveltekit()` loads a SvelteKit
 // config from the working directory when called, and this file reads only the plugin list.

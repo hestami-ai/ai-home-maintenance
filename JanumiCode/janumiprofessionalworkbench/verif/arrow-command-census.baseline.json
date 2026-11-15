@@ -88,6 +88,7 @@
 		"PWU.assuranceState  EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT",
 		"PWU.assuranceState  EVIDENCE_REQUIRED -> WAIVED",
 		"PWU.assuranceState  READY_FOR_ASSESSMENT -> ASSESSING",
+		"PWU.assuranceState  REJECTED -> UNASSESSED",
 		"PWU.assuranceState  SATISFIED -> INVALIDATED",
 		"PWU.assuranceState  UNASSESSED -> EVIDENCE_REQUIRED",
 		"PWU.assuranceState  UNASSESSED -> NOT_REQUIRED",
@@ -108,6 +109,7 @@
 		"PWU.executionState  RUNNING -> SUCCEEDED",
 		"PWU.executionState  RUNNING -> SUPERSEDED",
 		"PWU.executionState  RUNNING -> WAITING",
+		"PWU.executionState  SUCCEEDED -> PLANNED",
 		"PWU.executionState  WAITING -> CANCELLED",
 		"PWU.executionState  WAITING -> RUNNING",
 		"PWU.executionState  WAITING -> SUPERSEDED",
@@ -144,7 +146,7 @@
 		"PwuType.status",
 		"Undertaking.status"
 	],
-	"total": 299,
+	"total": 302,
 	"dead": [
 		"AssuranceAssessment.state  REQUESTED -> CANCELLED",
 		"ExecutionPlan.status  PROPOSED -> SUPERSEDED"

@@ -203,6 +203,10 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 		// reddened when they arrived (gate:fast, after B6), which is its job.
 		'rerunReview',
 		'rerunWork',
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)): the person's re-run of the work of a unit its declared reviews
+		// rejected — canon's one way back. It records the person's Decision, the move back to planning and a new plan in one batch, and the
+		// server refuses it unless the unit is in that state (`rejectedRerunOffer`); the kernel refuses the move without its Decision.
+		'rerunRejectedWork',
 		// S-1a (REG-F-104): abandonment is one of the three acts DOC-001 §5.2 reserves to Governance, and it
 		// had no caller from any surface. This census reddened on arrival, which is its job.
 		'abandonPwu',

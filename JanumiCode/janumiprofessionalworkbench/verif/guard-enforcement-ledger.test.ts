@@ -38,8 +38,9 @@ const COVERED: ReadonlySet<string> = new Set(
  * ⚠ BOTH NUMBERS, and the arrow count is the load-bearing one. Pinning only the TEXT count would let someone
  * delete fifteen of the seventeen `-> ABANDONED` arrows without moving it, because they share one text.
  */
-const ARROWS = 146;
-const TEXTS = 82;
+// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)): ~~146~~ 149 and ~~82~~ 83 — canon's one way back, three arrows sharing one guard text.
+const ARROWS = 149;
+const TEXTS = 83;
 
 /**
  * The disposition census, pinned so any movement is deliberate.
@@ -57,7 +58,8 @@ const COUNTS = {
 	// next increment then ENFORCED the guard and re-drove the row (45->44, 14->15) — *"the way to move it is to
 	// enforce a guard and re-drive its row, never to reclassify one"*, done in that order rather than claimed.
 	ARROW_UNREACHABLE: 20,
-	ENFORCED: 18,
+	// ⭐⭐ Package L16 — D71: ~~18~~ 19 — the one way back's guard, the kernel's (`changePwuState`, `rejectUnauthorizedRework`).
+	ENFORCED: 19,
 	REDUNDANT_WITH_MACHINE: 2,
 	UNENFORCED: 42
 };

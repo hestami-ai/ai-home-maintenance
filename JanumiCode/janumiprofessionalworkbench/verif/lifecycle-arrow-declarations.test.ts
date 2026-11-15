@@ -223,7 +223,8 @@ describe('A-1 — every ratified PWU work-lifecycle arrow is accounted for', () 
 		// between tables, and WHICH table owns an arrow is exactly what REG-F-072 is about.
 		expect(Object.keys(PWU_RECOVERY_COMMAND_SPECS).length, 'recovery specs').toBe(1);
 		expect(recoveryArrows().length, 'arrows claimed by the recovery command').toBe(4);
-		expect(allClaimedArrows().length, 'arrows claimed across all three tables').toBe(61);
+		// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)): ~~61~~ 62 — canon's one way back, UNDER_ASSURANCE -> PLANNED, which the generic setter claims.
+		expect(allClaimedArrows().length, 'arrows claimed across all three tables').toBe(62);
 	});
 
 	// CONTROL 1 — THE POPULATION IS REAL. Every assertion above is satisfied by a reader that returns nothing:
@@ -233,7 +234,9 @@ describe('A-1 — every ratified PWU work-lifecycle arrow is accounted for', () 
 		// 57 -> 61 under W-5.5: BLOCKED -> {SHAPING, PLANNED, EXECUTING} and ESCALATED -> EVIDENCE_PENDING,
 		// derived from §8.2 reversed. The target count is UNCHANGED at 19 — every recovery target was already
 		// reachable — which is the arithmetic showing this increment adds no new destination, only new ways in.
-		expect(arrows.length, 'ratified arrows on PWU.workLifecycleState').toBe(61);
+		// ⭐⭐ 61 -> 62 under package L16 (D71; `REG-D-163` (2)): UNDER_ASSURANCE -> PLANNED, canon's one way back, ratified by the sponsor.
+		// The target count is UNCHANGED at 19 — PLANNED was already a target — so D71 too adds no new destination, only one way in.
+		expect(arrows.length, 'ratified arrows on PWU.workLifecycleState').toBe(62);
 		expect(new Set(arrows.map((a) => a.split('->')[1])).size, 'distinct targets').toBe(19);
 		// ⚠ THE DISCRIMINATING ABSENCE. BLOCKED -> READY is NOT a ratified in-arrow and W-5.5 deliberately did
 		// not add one: READY is the state a caller would most naturally want to resume at, so it is exactly what
@@ -263,7 +266,8 @@ describe('A-1 — every ratified PWU work-lifecycle arrow is accounted for', () 
 			},
 			'the split this slice is sized against'
 			// 49/8 -> 51/6 (REG-D-044 S-1b). Same two arrows, other side of the ownership line; the three
-			// numbers still sum to 61.
-		).toEqual({ semantic: 51, genericSetter: 6, recovery: 4 });
+			// numbers ~~still sum to 61~~ ⭐ sum to 62 since package L16 (D71; `REG-D-163` (2)): the generic setter's 6 -> 7, its PLANNED
+			// claiming UNDER_ASSURANCE -> PLANNED, canon's one way back.
+		).toEqual({ semantic: 51, genericSetter: 7, recovery: 4 });
 	});
 });

@@ -186,12 +186,29 @@ export function readOnlyOpenWritesNothing(file: string): boolean {
 
 export interface StoreBackup {
 	readonly pages: number;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — `REG-F-641` (the toolchain session's measured code, handed over) — the steps `node:sqlite`'s backup
+	 * took: one, and one more for each `progress` call it made with pages still to copy. 1 at `ONE_STEP_RATE`, so each archive's `checks.json`
+	 * shows its stores copied in one step.
+	 */
+	readonly steps: number;
 	readonly bytes: number;
 	readonly sha256: string;
 	/** What `PRAGMA journal_mode = DELETE` answered on the copy. */
 	readonly journalMode: string;
 	readonly readOnlyOpenWritesNothing: boolean;
 }
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — `REG-F-641` (the toolchain session's measured code, handed over) — THE RATE `backupStore` ASKS OF
+ * `node:sqlite`'s `backup()`: the most pages one step may copy, so a store is copied in ONE step (2 ** 31 - 1 pages of 4,096 bytes would be
+ * 8 TiB) — the value package L15 wrote inline (`REG-F-638`), named. ⛔ NOT -1, SQLite's own word for "every page": `node:sqlite` passed it
+ * through until Node 24.21.0 and from there refuses it, as it refuses 0 (*"The "options.rate" argument must be a positive integer."*); every
+ * Node the toolchain session measured refuses 2 ** 31 or more as not an integer. `verif/phase7-run-archive.test.ts` holds both on the Node it
+ * runs on: one step at this rate, the next integer refused. ⭑ Measured by the toolchain session (2026-11-13, on Node 22.23.5, 24.0.0,
+ * 24.11.1, 24.15.0 and 24.22.3): a store of 3,344 pages copied at this rate with no progress call, where Node's default of 100 made 33.
+ */
+export const ONE_STEP_RATE = 2 ** 31 - 1;
 
 /**
  * ⭐ D6 — back `source` up to `destination` through SQLite's backup, convert the copy to a rollback journal, and prove
@@ -212,8 +229,15 @@ export async function backupStore(source: string, destination: string): Promise<
 		);
 	const from = new DatabaseSync(source, { readOnly: true, timeout: 5_000 });
 	let pages: number;
+	// ⭐⭐ Package L16 — `REG-F-641` — Node calls `progress` between two steps, while pages remain; a call with none remaining is not a step.
+	let steps = 1;
 	try {
-		pages = await backup(from, destination, { rate: 2147483647 });
+		pages = await backup(from, destination, {
+			rate: ONE_STEP_RATE,
+			progress: ({ remainingPages }) => {
+				if (remainingPages > 0) steps += 1;
+			}
+		});
 	} finally {
 		from.close();
 	}
@@ -240,6 +264,7 @@ export async function backupStore(source: string, destination: string): Promise<
 	const bytes = readFileSync(destination);
 	return {
 		pages,
+		steps,
 		bytes: bytes.length,
 		sha256: createHash('sha256').update(bytes).digest('hex'),
 		journalMode,

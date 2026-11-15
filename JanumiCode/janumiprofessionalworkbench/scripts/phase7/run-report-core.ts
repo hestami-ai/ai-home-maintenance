@@ -1488,21 +1488,28 @@ const RECOVERY_READ: Readonly<Record<string, string>> = {
 /** ⭐ E12's polish — what a sign-off's hold, and its limit check, was read before. */
 const BEFORE_RECORD_ASSURANCE = 'Record Assurance';
 const BEFORE_DECLARED_RERUN = 'the rule’s re-run of its declared reviews';
+/** ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — and the rule's re-run of the work its declared reviews rejected. */
+const BEFORE_REJECTED_RERUN = 'the rule’s re-run of the work its declared reviews rejected';
 
 /** ⭐ E12's re-review F1 — the sign-off's acts, by the field the lane records each in and the button's name. */
 const SIGN_OFF_ACTS = [
 	['recordAssurance', 'Record Assurance'],
 	['rerunDeclared', 'Re-run the declared reviews'],
-	['markSatisfied', 'Mark Satisfied']
+	['markSatisfied', 'Mark Satisfied'],
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — and the rule's re-run of the work its declared reviews rejected.
+	['rejectedRerun', 'Re-run the work with the reviews’ findings']
 ] as const;
 
-/** The sign-off act that outlasted its bound, and the bound, or null (`LaneUnit.signOffOutlasted`). */
+/**
+ * The sign-off act that outlasted its bound, and the bound, or null (`LaneUnit.signOffOutlasted`). ⭐⭐ Package L16 — D71 — and in the unit's
+ * sign-off after the rule's re-run of its rejected work (`afterRerun`), where one ran.
+ */
 function signOffOutlasted(signOff: Record<string, unknown>): LaneUnit['signOffOutlasted'] {
 	for (const [field, act] of SIGN_OFF_ACTS) {
 		const ms = int(rec(signOff[field]).timedOutAfterMs);
 		if (ms !== null) return { act, ms };
 	}
-	return null;
+	return signOff.afterRerun === null || signOff.afterRerun === undefined ? null : signOffOutlasted(rec(signOff.afterRerun));
 }
 
 /**
@@ -1601,6 +1608,9 @@ function laneUnits(run: unknown): LaneUnit[] {
 function heldBackOf(slug: string, signOff: Record<string, unknown>): LaneUnit['signOffHeldBack'] {
 	const reason = str(signOff.notPressed);
 	if (reason === '') return null;
+	// ⭐⭐ Package L16 — D71 — the rule's re-run of the work its declared reviews rejected, held back at its limit check.
+	if ((signOff.rejectedRerunLimitCheck ?? null) !== null)
+		return { before: BEFORE_REJECTED_RERUN, reason, check: laneLimitCheck(slug, BEFORE_REJECTED_RERUN, signOff.rejectedRerunLimitCheck) };
 	if ((signOff.recordAssurance ?? null) !== null)
 		return { before: BEFORE_DECLARED_RERUN, reason, check: laneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.rerunLimitCheck) };
 	return { before: BEFORE_RECORD_ASSURANCE, reason, check: laneLimitCheck(slug, 'its sign-off', signOff.limitCheck) };
@@ -1613,7 +1623,15 @@ function limitChecksOf(slug: string, r: Record<string, unknown>, signOff: Record
 		laneLimitCheck(slug, 'its Begin & Execute', r.limitCheck),
 		...recovery.map((x) => laneLimitCheck(slug, RECOVERY_READ[str(rec(x).act)] ?? `the rule’s ${str(rec(x).act)}`, rec(x).limitCheck)),
 		laneLimitCheck(slug, 'its sign-off', signOff.limitCheck),
-		laneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.rerunLimitCheck)
+		laneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.rerunLimitCheck),
+		// ⭐⭐ Package L16 — D71 — the rule's re-run of the work its declared reviews rejected, and the sign-off after it.
+		laneLimitCheck(slug, BEFORE_REJECTED_RERUN, signOff.rejectedRerunLimitCheck),
+		...(signOff.afterRerun === null || signOff.afterRerun === undefined
+			? []
+			: [
+					laneLimitCheck(slug, 'its sign-off after that re-run', rec(signOff.afterRerun).limitCheck),
+					laneLimitCheck(slug, BEFORE_DECLARED_RERUN, rec(signOff.afterRerun).rerunLimitCheck)
+				])
 	].filter((c): c is LaneLimitCheck => c !== null);
 }
 
@@ -2544,8 +2562,17 @@ function handCompletions(v: AuditView): AuditFinding[] {
 	return found;
 }
 
-/** 5. Every SATISFIED that no Record Assurance hop on its unit came before: Mark Satisfied without Record Assurance. */
+/**
+ * 5. Every SATISFIED that no Record Assurance hop on its unit came before: Mark Satisfied without Record Assurance. ⭐⭐ `JAN-EXEC` Phase 7,
+ * package L16 — D71 (`REG-D-163` (2)) — AND AFTER CANON'S ONE WAY BACK, A HOP MADE AFTER IT: a SATISFIED is read against the hops since the
+ * unit's last move back to planning out of a rejected declared assurance (`UNDER_ASSURANCE` → `PLANNED`), never against one before it.
+ */
 function unassuredSatisfactions(v: AuditView): AuditFinding[] {
+	const reworks = v.ix
+		.eventsOfType('PwuStateChanged')
+		.filter((r) => str(r.payload.previousState) === 'UNDER_ASSURANCE' && str(r.payload.newState) === 'PLANNED');
+	const lastReworkBefore = (e: StoredEvent): number =>
+		reworks.filter((w) => w.aggregateId === e.aggregateId && w.sequence < e.sequence).at(-1)?.sequence ?? -1;
 	const hops = v.ix
 		.eventsOfType('PwuStateChanged')
 		.filter(
@@ -2558,7 +2585,7 @@ function unassuredSatisfactions(v: AuditView): AuditFinding[] {
 	return v.ix
 		.eventsOfType('PwuStateChanged')
 		.filter((e) => str(e.payload.newState) === 'SATISFIED')
-		.filter((e) => !hops.some((r) => r.sequence < e.sequence && r.aggregateId === e.aggregateId))
+		.filter((e) => !hops.some((r) => r.sequence < e.sequence && r.sequence > lastReworkBefore(e) && r.aggregateId === e.aggregateId))
 		.map((e) => findingOf(e, v.unitOfObject(e.aggregateId), 'SATISFIED with no Record Assurance hop before it'));
 }
 
@@ -2656,6 +2683,20 @@ function handEventsOf(v: AuditView, type: string): StoredEvent[] {
 export const DECLARED_RERUN_OPTION = 'RERUN_DECLARED_REVIEWS';
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — THE OPTION A PERSON'S RE-RUN OF THE WORK ITS DECLARED REVIEWS REJECTED SELECTS
+ * (`rejected-rerun.ts` `RERUN_REJECTED_WORK`), restated — this report loads no product module — and held to its source by the restatement test.
+ */
+export const REJECTED_RERUN_OPTION = 'RERUN_REJECTED_WORK';
+
+/** ⭐⭐ Package L16 — D71 — the suffix of the lane's action files of a unit's sign-off after that re-run (`phase7-operator.ts`, `AFTER_RERUN`). */
+export const AFTER_RERUN_SUFFIX = 'AfterRerun';
+
+/** ⭐⭐ Package L16 — D71 — why the act is listed and not forbidden: the run plan's rule alone allows it, once per unit. */
+export const REJECTED_RERUN_NOTE =
+	'allowed by the run plan’s rule alone (REG-D-105 (4), as REG-D-163 (2) amends it): once per unit its declared reviews reject at its ' +
+	'sign-off, each listed beside the Decision that made it';
+
+/**
  * ⭐ `E12F` F3 (`REG-D-112` (a)) — EACH RE-RUN OF A UNIT'S DECLARED REVIEWS THAT DID NOT CONCLUDE, by its Decision: the unit, and
  * the INCONCLUSIVE assessments it re-ran. ⚠ No plan is revised (`reruns` reads one): each re-run is a new assessment.
  */
@@ -2722,12 +2763,23 @@ function forbiddenActs(v: AuditView, undertakingId: string | null, lane: LaneRow
 	const waiverPosts = [posted(lane, ['recordWaiver']), posted(lane, ['grant', 'deny'], '/decisions')];
 	// ⭐ `E12F` F3 — AND THE RULE'S ACCEPTED RE-RUN OF THE DECLARED REVIEWS THAT DID NOT CONCLUDE (`REG-D-112` (a)): the
 	// assurance a Mark Satisfied may follow when Record Assurance was refused and its reviews then concluded.
-	const assured = new Set(
-		lane.actions
-			.filter((a) => (a.action === 'recordAssurance' || a.action === 'rerunDeclaredReviews') && a.envelopeType === 'success')
-			.map((a) => actionUnit(a.file))
-	);
-	const unassuredPresses = lane.actions.filter((a) => a.action === 'markSatisfied' && !assured.has(actionUnit(a.file)));
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — AND A MARK SATISFIED AFTER THE RULE'S RE-RUN OF THE WORK ITS DECLARED REVIEWS
+	// REJECTED IS READ AGAINST A RECORD ASSURANCE MADE AFTER IT: the sign-off after that re-run keeps its acts in files of their own
+	// (`AfterRerun`), so each Mark Satisfied is paired with the Record Assurance of its own round, never the refused one before the re-run.
+	const assuredIn = (suffix: string) =>
+		new Set(
+			lane.actions
+				.filter(
+					(a) =>
+						(a.action === `recordAssurance${suffix}` || a.action === `rerunDeclaredReviews${suffix}`) &&
+						a.envelopeType === 'success'
+				)
+				.map((a) => actionUnit(a.file))
+		);
+	const unassuredPresses = ['', AFTER_RERUN_SUFFIX].flatMap((suffix) => {
+		const assured = assuredIn(suffix);
+		return lane.actions.filter((a) => a.action === `markSatisfied${suffix}` && !assured.has(actionUnit(a.file)));
+	});
 	const abandons = v.ix.eventsOfType('PwuAbandoned');
 	return [
 		act('completeStep', true, handCompletions(v), posted(lane, ['completeStep'])),
@@ -2739,7 +2791,8 @@ function forbiddenActs(v: AuditView, undertakingId: string | null, lane: LaneRow
 			// is the assurance a Mark Satisfied may follow too.
 			note:
 				'POSTs counted from lane/actions: a Mark Satisfied pressed on a unit with no accepted Record Assurance and no ' +
-				'accepted re-run of its declared reviews (REG-D-112 (a))'
+				'accepted re-run of its declared reviews (REG-D-112 (a)) — after the rule’s re-run of the work its declared reviews ' +
+				'rejected, none accepted after that re-run (REG-D-163 (2))'
 		}),
 		act(
 			'abandon followed by re-proposing',
@@ -2777,6 +2830,15 @@ function otherActs(v: AuditView, undertakingId: string | null, lane: LaneRows): 
 		act('rerunWork', false, reruns(v, 'RERUN_WORK', 'a person’s re-run of the work'), posted(lane, ['rerunWork'])),
 		// ⭐ `E12F` F3 — the rule's re-run of a unit's declared reviews that did not conclude (`REG-D-112` (a)).
 		act('rerunDeclaredReviews', false, declaredReruns(v), posted(lane, ['rerunDeclaredReviews'])),
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — the rule's re-run of the work a unit's declared reviews rejected, beside
+		// the Decision that made it: allowed by the run plan's rule alone.
+		act(
+			'rerunRejectedWork',
+			false,
+			reruns(v, REJECTED_RERUN_OPTION, 'a person’s re-run of the work its declared reviews rejected'),
+			posted(lane, ['rerunRejectedWork']),
+			{ note: REJECTED_RERUN_NOTE }
+		),
 		...PAGE_ONLY_ACTS.map(([name, type]) =>
 			act(name, false, handEventsOf(v, type).map((e) => findingOf(e, onPlan(e), type)), posted(lane, [name]))
 		),
@@ -3241,6 +3303,11 @@ interface UnitView {
 	readonly signOffAttempted: boolean;
 	/** ⭐ E12's polish (fix2's F8) — what the lane held back of its sign-off, and why (`LaneUnit.signOffHeldBack`). */
 	readonly heldBack: LaneUnit['signOffHeldBack'];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — each EFFECTIVE Decision that re-ran the unit's work after its declared reviews
+	 * rejected it, by id: a unit accepted after one is never shown accepted at its first try.
+	 */
+	readonly rejectedReruns: readonly string[];
 	/** Its exchanges, both planes, by what a person can read of each (`exchangeReading`). */
 	readonly exchanges: { readonly total: number; readonly broken: number; readonly unretained: number };
 	readonly contentStore: boolean;
@@ -3294,7 +3361,7 @@ function completion(v: UnitView, row: string): MatrixCell {
 	const line = seenLine(v);
 	const seen = line === null ? [] : [line];
 	if (s?.lifecycle === 'SATISFIED' && s.assurance === 'SATISFIED' && v.stepState === 'SUCCEEDED')
-		return cell('7', row, 'as intended', [], [facts, ...seen]);
+		return cell('7', row, 'as intended', [], [facts, ...reworkedLine(v), ...seen]);
 	// ⚠ THE UNIT'S OWN EXECUTION, NOT ONLY ITS STEP: a step completed by hand leaves the unit EXECUTING, as stopped as before.
 	if (v.stepState !== 'SUCCEEDED' || s?.execution !== 'SUCCEEDED')
 		return cell('7', row, 'broke', ['REG-F-511'], [
@@ -3321,7 +3388,19 @@ function completion(v: UnitView, row: string): MatrixCell {
 			{ unregistered: true }
 		);
 	if (!v.signOffAttempted) return cell('7', row, 'not reached', [], [facts, ...heldBackOr(v, 'its sign-off was never attempted')]);
-	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED', ...heldBackOr(v), ...seen]);
+	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED', ...reworkedLine(v), ...heldBackOr(v), ...seen]);
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — A UNIT WHOSE WORK WAS RE-RUN AFTER ITS DECLARED REVIEWS REJECTED IT SAYS SO, beside
+ * the Decision that re-ran it: accepted after one, it is never shown accepted at its first try.
+ */
+function reworkedLine(v: UnitView): string[] {
+	if (v.rejectedReruns.length === 0) return [];
+	return [
+		`its work was re-run after its declared reviews rejected it (Decision ${v.rejectedReruns.join(', ')}; REG-D-163 (2)): ` +
+			'its sign-off is the one after that re-run, not its first try'
+	];
 }
 
 /**
@@ -4459,6 +4538,18 @@ function unitView(
 			u.lane?.signOffAttempted === true ||
 			actions.some((a) => a.action === 'recordAssurance' || a.action === 'markSatisfied'),
 		heldBack: u.lane?.signOffHeldBack ?? null,
+		rejectedReruns:
+			u.object === null
+				? []
+				: ix
+						.eventsOfType('DecisionEffective')
+						.filter(
+							(e) =>
+								str(e.payload.decisionType) === 'REPLAN' &&
+								str(e.payload.selectedOption) === REJECTED_RERUN_OPTION &&
+								strs(e.payload.subjectObjectIds)[0] === u.object!.id
+						)
+						.map((e) => e.aggregateId),
 		exchanges: {
 			total: exchanges.length,
 			broken: readings.filter((r) => r === 'does not hold what it claims').length,

@@ -285,7 +285,351 @@ export function renderedPrompt(t: Phase7TypeDeclaration, undertaking: Phase7Unde
 	const section = undertakingSectionOf(undertaking);
 	const rendered = section === undefined ? work : `${work}\n\n${section}`;
 	const contract = t.outputContract?.trim();
-	return contract ? `${rendered}\n\nThe output this work requires:\n${contract}` : rendered;
+	const toTheContract = contract ? `${rendered}\n\nThe output this work requires:\n${contract}` : rendered;
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D70 (`REG-D-163` (1)) — then, after the contract, the criteria its declared reviews will judge it
+	// by (`reviewCriteriaSectionOf`); §3.2's units depend on no accepted work, so no D69 section follows it.
+	const criteria = reviewCriteriaSectionOf(t);
+	return criteria === undefined ? toTheContract : `${toTheContract}\n\n${criteria}`;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D70 (`REG-D-163` (1)) — THE PART OF A TYPE'S INSTRUCTION THE 4,000 CHARACTERS A REVIEWER IS SHOWN
+ * MUST HOLD: the work, the Undertaking's section and the output contract — `renderedPrompt` up to D70's section. D70 seats its section after
+ * the contract for this reason (`PROMPT-LENGTH`; `USER_INTENT_MAX`): that part is shown as before, and the section after it as far as it fits.
+ */
+export function renderedPromptToTheContract(t: Phase7TypeDeclaration, undertaking: Phase7Undertaking | undefined): string {
+	const full = renderedPrompt(t, undertaking);
+	const criteria = reviewCriteriaSectionOf(t);
+	return criteria === undefined ? full : full.slice(0, full.length - criteria.length - 2);
+}
+
+/** ⭐⭐ Package L16 — D70 — one declared policy §3.2's types name, as the catalog seeds it: its name, and its criteria in its order. */
+export interface Phase7PolicyCriteria {
+	readonly name: string;
+	readonly criteria: readonly { readonly id: string; readonly name: string; readonly description: string }[];
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D70 (`REG-D-163` (1)) — EACH DECLARED POLICY §3.2's TYPES NAME, AS THE CATALOG SEEDS IT: its name
+ * and its criteria, each its id, its name and its description, in the policy's order — RESTATED AS LITERALS, never imported (this module loads
+ * no module); `verif/phase7-pwa-content.test.ts` holds them equal to the catalog's (`packages/rph-product-realization-pwa`), criterion by
+ * criterion, and in the catalog's order (`seedPolicies`), which is the order the designer lists a type's policies in, and so stores them.
+ */
+export const PHASE7_POLICY_CRITERIA: Readonly<Record<string, Phase7PolicyCriteria>> = {
+	pol_assumption_disclosure: {
+		name: 'Assumption Disclosure',
+		criteria: [
+			{
+				id: 'AD-01',
+				name: 'AD-01',
+				description: 'Material assumptions have been surfaced.'
+			},
+			{
+				id: 'AD-02',
+				name: 'AD-02',
+				description: 'Assumptions are distinguished from facts.'
+			},
+			{
+				id: 'AD-03',
+				name: 'AD-03',
+				description: 'Affected objects are identified.'
+			},
+			{
+				id: 'AD-04',
+				name: 'AD-04',
+				description: 'Materiality is classified.'
+			},
+			{
+				id: 'AD-05',
+				name: 'AD-05',
+				description: 'Verification or acceptance needs are identified.'
+			},
+			{
+				id: 'AD-06',
+				name: 'AD-06',
+				description: 'Critical assumptions do not silently authorize irreversible work.'
+			}
+		]
+	},
+	pol_requirement_coverage: {
+		name: 'Requirement Coverage',
+		criteria: [
+			{
+				id: 'RC-01',
+				name: 'RC-01',
+				description: 'Each mandatory outcome is represented.'
+			},
+			{
+				id: 'RC-02',
+				name: 'RC-02',
+				description: 'Each critical journey has applicable requirements.'
+			},
+			{
+				id: 'RC-03',
+				name: 'RC-03',
+				description: 'Each mandatory constraint creates enforceable obligations.'
+			},
+			{
+				id: 'RC-04',
+				name: 'RC-04',
+				description: 'Important failure paths are addressed.'
+			},
+			{
+				id: 'RC-05',
+				name: 'RC-05',
+				description: 'Requirements without an authoritative source are identified.'
+			},
+			{
+				id: 'RC-06',
+				name: 'RC-06',
+				description: 'Explicit exclusions are recorded.'
+			}
+		]
+	},
+	pol_decomposition_coverage: {
+		name: 'Decomposition Coverage',
+		criteria: [
+			{
+				id: 'DC-01',
+				name: 'Obligation coverage',
+				description: 'No mandatory obligation silently disappears.'
+			},
+			{
+				id: 'DC-02',
+				name: 'Constraint preservation',
+				description: 'Applicable constraints are propagated or retained.'
+			},
+			{
+				id: 'DC-03',
+				name: 'Cohesion',
+				description: 'Each child represents coherent work.'
+			},
+			{
+				id: 'DC-04',
+				name: 'Boundary clarity',
+				description: 'Child responsibilities are distinguishable.'
+			},
+			{
+				id: 'DC-05',
+				name: 'Dependency completeness',
+				description: 'Material sibling dependencies are explicit.'
+			},
+			{
+				id: 'DC-06',
+				name: 'Recomposition feasibility',
+				description: 'A credible parent-level integration strategy exists.'
+			},
+			{
+				id: 'DC-07',
+				name: 'Intent continuity',
+				description: 'Child objectives remain subordinate to parent intent.'
+			}
+		]
+	},
+	pol_architecture_coverage: {
+		name: 'Architecture Coverage',
+		criteria: [
+			{
+				id: 'AC-01',
+				name: 'AC-01',
+				description: 'Applicable requirements are allocated.'
+			},
+			{
+				id: 'AC-02',
+				name: 'AC-02',
+				description: 'System boundaries are explicit.'
+			},
+			{
+				id: 'AC-03',
+				name: 'AC-03',
+				description: 'Major components have coherent responsibilities.'
+			},
+			{
+				id: 'AC-04',
+				name: 'AC-04',
+				description: 'Interfaces are sufficiently defined.'
+			},
+			{
+				id: 'AC-05',
+				name: 'AC-05',
+				description: 'Data ownership is explicit.'
+			},
+			{
+				id: 'AC-06',
+				name: 'AC-06',
+				description: 'Security boundaries are represented.'
+			},
+			{
+				id: 'AC-07',
+				name: 'AC-07',
+				description: 'Operational and deployment concerns are proportionate.'
+			},
+			{
+				id: 'AC-08',
+				name: 'AC-08',
+				description: 'Mandatory constraints are preserved.'
+			},
+			{
+				id: 'AC-09',
+				name: 'AC-09',
+				description: 'Known architecture risks and assumptions are explicit.'
+			},
+			{
+				id: 'AC-10',
+				name: 'AC-10',
+				description: 'Architecture is feasible.'
+			}
+		]
+	},
+	pol_intent_preservation: {
+		name: 'Intent Preservation',
+		criteria: [
+			{
+				id: 'IP-01',
+				name: 'IP-01',
+				description: 'Desired outcomes remain represented.'
+			},
+			{
+				id: 'IP-02',
+				name: 'IP-02',
+				description: 'Scope has not expanded or contracted without authority.'
+			},
+			{
+				id: 'IP-03',
+				name: 'IP-03',
+				description: 'Mandatory constraints remain active.'
+			},
+			{
+				id: 'IP-04',
+				name: 'IP-04',
+				description: 'Descendant work continues to serve the parent objective.'
+			},
+			{
+				id: 'IP-05',
+				name: 'IP-05',
+				description: 'Implementation choices have not replaced product need.'
+			},
+			{
+				id: 'IP-06',
+				name: 'IP-06',
+				description: 'Local success contributes to global success.'
+			},
+			{
+				id: 'IP-07',
+				name: 'IP-07',
+				description: 'Authorized intent revisions are properly recorded.'
+			}
+		]
+	},
+	pol_test_adequacy: {
+		name: 'Test Adequacy',
+		criteria: [
+			{
+				id: 'TA-01',
+				name: 'TA-01',
+				description: 'Tests trace to requirements or risks.'
+			},
+			{
+				id: 'TA-02',
+				name: 'TA-02',
+				description: 'Critical journeys are covered.'
+			},
+			{
+				id: 'TA-03',
+				name: 'TA-03',
+				description: 'Failure and alternate paths are proportionately covered.'
+			},
+			{
+				id: 'TA-04',
+				name: 'TA-04',
+				description: 'Integrations are tested at appropriate boundaries.'
+			},
+			{
+				id: 'TA-05',
+				name: 'TA-05',
+				description: 'Regression scope is justified.'
+			},
+			{
+				id: 'TA-06',
+				name: 'TA-06',
+				description: 'Test environments are sufficiently representative.'
+			},
+			{
+				id: 'TA-07',
+				name: 'TA-07',
+				description: 'Results are current and reproducible where required.'
+			},
+			{
+				id: 'TA-08',
+				name: 'TA-08',
+				description: 'Passing tests are not overclaimed.'
+			}
+		]
+	},
+	pol_fitness_for_purpose: {
+		name: 'Fitness For Purpose',
+		criteria: [
+			{
+				id: 'FP-01',
+				name: 'FP-01',
+				description: 'Intended actors can achieve critical outcomes.'
+			},
+			{
+				id: 'FP-02',
+				name: 'FP-02',
+				description: 'Major journeys function coherently.'
+			},
+			{
+				id: 'FP-03',
+				name: 'FP-03',
+				description: 'The product addresses the originating problem.'
+			},
+			{
+				id: 'FP-04',
+				name: 'FP-04',
+				description: 'Technical correctness has not obscured product failure.'
+			},
+			{
+				id: 'FP-05',
+				name: 'FP-05',
+				description: 'Known limitations are compatible with declared use.'
+			},
+			{
+				id: 'FP-06',
+				name: 'FP-06',
+				description: 'Residual uncertainty is acceptable.'
+			},
+			{
+				id: 'FP-07',
+				name: 'FP-07',
+				description: 'Critical operational conditions are represented.'
+			}
+		]
+	}
+};
+/**
+ * ⭐⭐ Package L16 — D70 — THE SECTION THAT TELLS A TYPE'S UNIT THE CRITERIA ITS DECLARED REVIEWS WILL JUDGE IT BY, RESTATED AS A LITERAL OF THE
+ * ENGINE'S (`packages/rph-application/src/execution-invocation.ts`, `reviewCriteriaSection`): its heading line, then for each policy the type
+ * declares, `<its name>:` and `- <id>: <description>` per criterion (its name where it has none). ⚠ The type's declared policies stand for the
+ * unit's governing ones — every one §3.2 names is ACTIVE and governs its kind — ⚠ IN THE ORDER THE UNIT'S SELECTION HOLDS THEM, never the
+ * order §3.2 names them in: the designer stores a type's policies in its list's order, the catalog's (`PHASE7_POLICY_CRITERIA`'s), and a unit's
+ * selection keeps its type's order (`declaredAssurancePolicyIds`), so the implementation phase is told Assumption Disclosure, Intent
+ * Preservation, Test Adequacy, and the end-to-end phase Intent Preservation, Test Adequacy, Fitness For Purpose. The gate's rehearsal holds
+ * the route's sent bytes to this (`e2e/phase7-five-unit.e2e.ts`). None declared: no section.
+ */
+function reviewCriteriaSectionOf(t: Phase7TypeDeclaration): string | undefined {
+	const declared = new Set(t.policyIds ?? []);
+	const policies = Object.entries(PHASE7_POLICY_CRITERIA)
+		.filter(([id]) => declared.has(id))
+		.map(([, p]) => p);
+	if (policies.length === 0) return undefined;
+	return [
+		'This work will be reviewed against the criteria below, under the policies named. Make the work meet each one.',
+		...policies.flatMap((p) => [
+			`${p.name}:`,
+			...p.criteria.map((c) => `- ${c.id}: ${c.description.trim() === '' ? c.name : c.description.trim()}`)
+		])
+	].join('\n');
 }
 
 /** Every `{marker}` a prompt holds, by the designer's own reading of the text (`routes/pwa/[id]/+page.svelte`). */

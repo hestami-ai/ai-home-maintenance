@@ -41,7 +41,7 @@ import {
 	type NegativeControlCliDeps,
 	type NegativeControlResult
 } from '../scripts/phase7/negative-control.js';
-import { PHASE7_E2E, PRODUCT_BRIEF, renderedPrompt } from '../scripts/phase7/pwa-content.js';
+import { PHASE7_E2E, PRODUCT_BRIEF, renderedPrompt, renderedPromptToTheContract } from '../scripts/phase7/pwa-content.js';
 // ⭐⭐ Package L7 — D61 — the run's Undertaking, whose statement the end-to-end phase's instruction now carries.
 import { PHASE7_UNDERTAKING } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import { NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
@@ -127,7 +127,10 @@ describe('JAN-EXEC P7-4e — the negative control’s case', () => {
 		expect(c.input.producingPrompt).toContain(PRODUCT_BRIEF);
 		expect(c.input.producingPrompt).toContain('Write end-to-end tests in test/e2e/ that start the real tool');
 		expect(c.input.producingPrompt).toContain('Run the whole suite with node --test');
-		expect(c.input.producingPrompt.length).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.USER_INTENT_MAX);
+		// ⭐⭐ Package L16 — D70 (`REG-D-163` (1)): ~~the instruction~~ its part to the output contract fits the slice whole — the work, its
+		// request for the end-to-end tests the run never ran, the Undertaking and the contract; D70's criteria follow it, shown as far as
+		// they fit (the instruction is 5,187 characters with them, measured in package L16's Stage 0).
+		expect(renderedPromptToTheContract(PHASE7_E2E, PHASE7_UNDERTAKING).length).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.USER_INTENT_MAX);
 		expect(c.input.observedToolCalls?.calls?.map((k) => k.toolName)).toEqual(['run_command']);
 	});
 
@@ -155,8 +158,9 @@ describe('JAN-EXEC P7-4e — the negative control’s case', () => {
 		expect(independent).toContain('["node","--test","test/unit/*.test.js"]');
 		expect(independent).toMatch(/exit 0 in \d+ms/);
 		expect(independent).toContain('fully verified and fit for release');
-		// ⭐ And the reviewer is shown the run's instruction WHOLE — the very bytes a command of that phase is judged against.
-		expect(independent).toContain(c.input.producingPrompt);
+		// ⭐ And the reviewer is shown the run's instruction ~~WHOLE~~ — the very bytes a command of that phase is judged against. ⭐⭐ Package
+		// L16 — D70: its part to the contract whole, the criteria after it cut where the slice ends.
+		expect(independent).toContain(renderedPromptToTheContract(PHASE7_E2E, PHASE7_UNDERTAKING));
 	});
 });
 

@@ -64,6 +64,8 @@ async function stepRecording(
 		undertaking: undefined,
 		// ⭐⭐ Package L15 — D69 — no accepted work, SAID: the field is required.
 		acceptedWork: [],
+		// ⭐⭐ Package L16 — D70 — no governing declared policy, SAID: the field is required.
+		reviewCriteria: [],
 		binding: { kind: 'NONE' as const }
 	});
 	// ⛔ NOT `dispatched[0]` WITH A NON-NULL ASSERTION. A path that dispatched NOTHING is the failure mode this

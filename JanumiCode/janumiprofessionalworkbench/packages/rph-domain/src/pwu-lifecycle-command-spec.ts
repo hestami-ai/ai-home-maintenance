@@ -266,7 +266,9 @@ export const PWU_GENERIC_SETTER_SPECS: Readonly<Record<string, PwuLifecycleComma
 		commandType: 'ChangePwuState',
 		target: 'PLANNED',
 		eventType: 'PwuStateChanged',
-		sourceStates: ['READY']
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D71 (`REG-D-163` (2)) — and canon's one way back, out of a rejected declared assurance:
+		// the setter performs it, as the one move on all three axes, under the kernel's guard (`changePwuState`, `rejectUnauthorizedRework`).
+		sourceStates: ['READY', 'UNDER_ASSURANCE']
 	},
 	EXECUTING: {
 		commandType: 'ChangePwuState',
