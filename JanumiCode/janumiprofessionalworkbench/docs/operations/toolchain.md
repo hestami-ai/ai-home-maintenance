@@ -36,7 +36,7 @@ design governs.
 
 | Component | Group | Pin | Declared → locked | Nested copies | Blockers |
 | --- | --- | --- | --- | --- | --- |
-| Node | Node/native | floor and day to day | `>=22`; day to day 24.22.3 | — | Node 26: no stable Electron, and so no VS Code, runs it (F-5); the planned extension's host decides (D-2). |
+| Node | Node/native | floor and day to day | `>=24.15.0`; day to day 24.22.3 | — | Node 26: no stable Electron, and so no VS Code, runs it (F-5); the planned extension's host decides (D-2). |
 | Bun | runtime (G0) | exact | 1.3.14 | — | Bun 1.4: evaluated as its own package after T1-T3 (QT2, ruled; F-15). |
 | svelte | Svelte/Vite | caret | apps/rph-demo: `^5.0.0` → 5.56.4 | — | SvelteKit 3 needs svelte 5.57.1 (D-12 T3). |
 | @sveltejs/kit | Svelte/Vite | caret | apps/rph-demo: `^2.22.0` → 2.69.2 | — | SvelteKit 3 needs vite 8, vite-plugin-svelte 7, TypeScript 6 and adapter-auto 8 (D-12 T3); T3a moves to the newest 2.x first. |
@@ -52,7 +52,7 @@ design governs.
 | globals | lint | caret | .: `^15.0.0` → 15.15.0 | @eslint/eslintrc/globals 14.0.0 | two majors behind (17.x); moves with the lint group in T2. |
 | typescript | TypeScript | exact | .: `5.9.3`, apps/rph-demo: `5.9.3` → 5.9.3 | — | 6.0.3 waits for dependency-cruiser 18 (T1b, D-4); 7: no compiler API, and typescript-eslint and dependency-cruiser cap it (F-6). |
 | dependency-cruiser | TypeScript | caret | .: `^16.0.0` → 16.10.4 | — | 16.x admits TypeScript "<6": under 6 it cruises no package module (F-7), which the boundary population guard now fails; T1b moves it to 18 before TypeScript moves (D-4). |
-| @types/node | Node/native | caret | .: `^24.0.0` → 24.13.3 | — | must not run ahead of the Node floor (D-8): a caret lets bun update take types for APIs above the floor. |
+| @types/node | Node/native | exact | .: `24.13.6` → 24.13.6 | — | must not run ahead of the Node floor (D-8): a types release whose minor is above the floor's describes APIs the floor lacks, so it moves only with the floor. |
 | better-sqlite3 | Node/native | caret | packages/rph-persistence: `^12.8.0` → 12.11.1 | — | a native addon on Node 24's ABI 137, which does not load under Bun; inside Electron it must match Electron's ABI, which 13's N-API builds may settle (D-2, left to the extension's design). |
 | @types/better-sqlite3 | Node/native | caret | packages/rph-persistence: `^7.6.13` → 7.6.13 | — | moves with better-sqlite3. |
 | @earendil-works/pi-ai | Pi SDK | exact | apps/rph-demo: `0.80.6` → 0.80.6 | — | breaking changes in patches after 0.80.6: 0.80.7, 0.80.8, 0.84.3, 1.0.3, 1.5.1 (F-13); a move needs a sponsor ruling. |
@@ -112,7 +112,7 @@ matrix records Node).
 
 **Floor-lane mode.** Set `JPWB_TOOLCHAIN_FLOOR_LANE=1` to run the unchanged `bun run gate:fast` on the floor Node (a
 portable official zip first on PATH). Condition 1 then compares the Node on PATH with the recorded floor. The floor
-lane runs from T1a on; T0 keeps today's floor, which the code already needs more than.
+lane runs from T1a on, which raised the floor from `>=22` (which the code already needed more than) to 24.15.0.
 
 **When it fails.** Read the condition and the line under it; each names what disagrees with what.
 

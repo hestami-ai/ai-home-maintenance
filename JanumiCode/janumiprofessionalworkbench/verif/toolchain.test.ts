@@ -8,6 +8,9 @@
 // ⚠ THE CONTROL COMES FIRST. The unmodified tree must pass every condition; without it a red could be the check failing
 // on everything. It reads this machine (the Node on PATH, the running Bun, the Edge major, the SonarLint version), so a
 // machine that drifted reddens it — and `toolchain:check`, the gate's first step, has already failed for the same cause.
+// ⭐ (package T1a) In the gate's own mode: in the floor lane (`JPWB_TOOLCHAIN_FLOOR_LANE=1`, the floor Node first on
+// PATH) every check here runs in floor-lane mode, as the gate's first step does. T0 forced normal mode, so T1a's first
+// floor lane failed condition 1 in all ten tests that spawn the check: the Node on PATH, 24.15.0, is not the day-to-day.
 //
 // Spawned under bun, as the gate runs them: the check reads peer ranges with Bun.semver and compares the running Bun.
 
@@ -77,7 +80,8 @@ function check(overrides: Record<string, string>): { status: number | null; out:
 	return run(
 		'check.ts',
 		Object.entries(overrides).map(([rel, file]) => `--override=${rel}=${file}`),
-		{ JPWB_TOOLCHAIN_FLOOR_LANE: '' }
+		// The gate's own mode, read as `check.ts` reads it (only '1' is floor-lane mode): never forced to normal mode.
+		{ JPWB_TOOLCHAIN_FLOOR_LANE: process.env.JPWB_TOOLCHAIN_FLOOR_LANE === '1' ? '1' : '' }
 	);
 }
 

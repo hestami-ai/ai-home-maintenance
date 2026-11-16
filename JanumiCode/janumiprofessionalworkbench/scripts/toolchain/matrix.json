@@ -3,8 +3,8 @@
 	"$comment": "JPWB's compatibility matrix (JAN-TOOLCUR D-7; roadmap T0). Generated fields (declared, locked, nested, node.dayToDay) are rewritten by `bun run scripts/toolchain/generate.ts`; observed fields record the machine with their dates; every other field is a hand-written judgment that `bun run toolchain:check` enforces, and weakening, rewriting or removing one is a separately authorized act (I7). docs/operations/toolchain.md explains each field and the procedure.",
 	"node": {
 		"group": "Node/native",
-		"floor": "22",
-		"floorReason": "Today's engines.node \">=22\", kept by T0, which upgrades nothing (roadmap T0). The code needs more: keepAliveTimeoutBuffer is \"Added in: v24.6.0, v22.19.0\" (F-2). T1a raises the floor to 24.15.0 under the sponsor's ruling (D-1).",
+		"floor": "24.15.0",
+		"floorReason": "D-1 (the sponsor's ruling R1): the oldest Node JPWB promises to run on, raised by T1a (2026-11-16) from \">=22\" (which the code already needed more than: keepAliveTimeoutBuffer is \"Added in: v24.6.0, v22.19.0\", F-2) to 24.15.0, the Node of VS Code 1.123.0, the planned extension's floor (D-2; the vscode row). The floor lane runs the unchanged gate on the official 24.15.0 zip, its SHA-256 checked against Node's published SHASUMS256.txt, first on PATH, with JPWB_TOOLCHAIN_FLOOR_LANE=1.",
 		"dayToDay": "24.22.3",
 		"supportWindow": "Node 24: LTS from 2025-10-28, maintenance from 2026-10-20, end of life 2028-04-30 (F-4, Node's schedule.json).",
 		"bundled": {
@@ -289,18 +289,18 @@
 		{
 			"component": "@types/node",
 			"group": "Node/native",
-			"pin": "caret",
-			"reason": "Everything else (D-8) until T1a, which makes it exact at the newest 24.x types release whose minor is not above the floor's.",
+			"pin": "exact",
+			"reason": "D-8: exact at the newest 24.x types release whose minor is not above the Node floor's (24.15). The registry's @types/node releases 24.0.0 through 24.15.x, listed by T1a on 2026-11-16 (docs/operations/toolchain-reviews/2026-11-types-node.json), end at 24.13.6: there is no 24.14 or 24.15 release (the next is 24.19.0), and npm marks none of the 69 deprecated.",
 			"blockers": [
-				"must not run ahead of the Node floor (D-8): a caret lets bun update take types for APIs above the floor."
+				"must not run ahead of the Node floor (D-8): a types release whose minor is above the floor's describes APIs the floor lacks, so it moves only with the floor."
 			],
 			"moves": [
 				"check-types (which Node APIs type-check)"
 			],
 			"declared": {
-				".": "^24.0.0"
+				".": "24.13.6"
 			},
-			"locked": "24.13.3",
+			"locked": "24.13.6",
 			"nested": {}
 		},
 		{
