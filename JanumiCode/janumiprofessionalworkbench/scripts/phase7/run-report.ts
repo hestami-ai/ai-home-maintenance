@@ -140,9 +140,9 @@ export function readStores(archive: string): StoreRows {
 			const e = JSON.parse(r.payload) as Record<string, unknown>;
 			return {
 				sequence: r.sequence,
-				eventType: String(e.eventType ?? ''),
-				aggregateType: String(e.aggregateType ?? ''),
-				aggregateId: String(e.aggregateId ?? ''),
+				eventType: String((e.eventType ?? '') as string),
+				aggregateType: String((e.aggregateType ?? '') as string),
+				aggregateId: String((e.aggregateId ?? '') as string),
 				commandId: typeof e.commandId === 'string' ? e.commandId : null,
 				// ⭐ P7-6 B7 — a floor run's token, on its assessments' events: the pairing's key (`REG-F-433`).
 				correlationId: typeof e.correlationId === 'string' ? e.correlationId : null,
@@ -195,6 +195,18 @@ function readJson(file: string, name: string, problems: string[]): unknown {
 	}
 }
 
+/**
+ * The folder names under an archive's `process-output/captures/`: none when its `process-output/` holds no `captures/`,
+ * and null when it holds no `process-output/`.
+ */
+function captureFolders(captures: string, output: string): string[] | null {
+	if (isDirectory(captures))
+		return readdirSync(captures)
+			.filter((c) => isDirectory(join(captures, c)))
+			.sort((a, b) => Number(a > b) - Number(a < b));
+	return isDirectory(output) ? [] : null;
+}
+
 /** The lane's own files, and what each archive holds. */
 export function readLane(run: string, archiveRead: string): LaneRows {
 	const problems: string[] = [];
@@ -218,7 +230,7 @@ export function readLane(run: string, archiveRead: string): LaneRows {
 	const actions: ActionRecord[] = isDirectory(actionsDir)
 		? readdirSync(actionsDir)
 				.filter((f) => f.endsWith('.json'))
-				.sort()
+				.sort((a, b) => Number(a > b) - Number(a < b))
 				.map((file) => {
 					const a = readJson(join(actionsDir, file), `lane/actions/${file}`, problems) as
 						| { action?: unknown; envelopeType?: unknown }
@@ -231,7 +243,7 @@ export function readLane(run: string, archiveRead: string): LaneRows {
 				})
 		: [];
 	const archiveDir = join(lane, 'archive');
-	const archives: ArchiveFacts[] = (isDirectory(archiveDir) ? readdirSync(archiveDir).sort() : [])
+	const archives: ArchiveFacts[] = (isDirectory(archiveDir) ? readdirSync(archiveDir).sort((a, b) => Number(a > b) - Number(a < b)) : [])
 		.filter((name) => isDirectory(join(archiveDir, name)))
 		.map((name) => {
 			const workspace = join(archiveDir, name, 'workspace');
@@ -248,14 +260,10 @@ export function readLane(run: string, archiveRead: string): LaneRows {
 			return {
 				name,
 				workspaceTree: isDirectory(workspace) ? workspaceTreeSha256(workspace) : null,
-				captures: isDirectory(captures)
-					? readdirSync(captures).filter((c) => isDirectory(join(captures, c))).sort()
-					: isDirectory(output)
-						? []
-						: null,
+				captures: captureFolders(captures, output),
 				processOutputRecorded: typeof present === 'boolean' ? present : null,
 				k5Causes: Array.isArray(causes)
-					? causes.map((c: { cause?: unknown; possible?: unknown }) => ({ cause: String(c?.cause ?? ''), possible: c?.possible === true }))
+					? causes.map((c: { cause?: unknown; possible?: unknown }) => ({ cause: String((c?.cause ?? '') as string), possible: c?.possible === true }))
 					: null
 			};
 		});
@@ -276,7 +284,7 @@ export function archiveToRead(run: string): string | undefined {
 	if (!isDirectory(archiveDir)) return undefined;
 	const withStore = readdirSync(archiveDir)
 		.filter((name) => existsSync(join(archiveDir, name, RECORD_STORE)))
-		.sort();
+		.sort((a, b) => Number(a > b) - Number(a < b));
 	return withStore.includes(FINAL_ARCHIVE) ? FINAL_ARCHIVE : withStore.at(-1);
 }
 

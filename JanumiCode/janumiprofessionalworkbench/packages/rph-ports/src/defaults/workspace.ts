@@ -92,7 +92,10 @@ export function createInMemoryWorkspace(input: InMemoryWorkspaceInput): Workspac
 					// FILESYSTEM adapter hard-coding the same 1 without asking the filesystem (`B-6`).
 					nameCount: 1
 				}))
-				.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+				.sort((a, b) => {
+					if (a.path < b.path) return -1;
+					return a.path > b.path ? 1 : 0;
+				});
 		},
 
 		async purge(path: string): Promise<PurgeOutcome> {

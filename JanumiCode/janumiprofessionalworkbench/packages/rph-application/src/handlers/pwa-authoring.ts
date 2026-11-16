@@ -1125,10 +1125,10 @@ function pwaFloorFailure(
 	const blocking = pwaPartsFloorBlock(ctx, pwaId, { aiProduced, pwaVersion: version, parts });
 	if (!blocking) return null;
 	const detail = blocking
-		.map(
-			(b) =>
-				`${b.policyId}${b.subjectId === undefined ? '' : ` of ${b.subjectId}`}=${b.disposition}`
-		)
+		.map((b) => {
+			const ofSubject = b.subjectId === undefined ? '' : ` of ${b.subjectId}`;
+			return `${b.policyId}${ofSubject}=${b.disposition}`;
+		})
 		.join(', ');
 	return { version, detail };
 }

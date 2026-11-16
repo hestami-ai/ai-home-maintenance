@@ -21,11 +21,10 @@ import { SIGNAL_SHAPE, ToolCallKilled, type KilledCallFacts } from './killed-cal
 import {
 	FREE_TIER_REFUSALS_OPENING,
 	freeTierRefusalsFigures,
-	freeTierRefusalsOf,
 	withFreeTierRefusals,
 	type FreeTierRefusals
 } from './free-tier-refusals.js';
-export { freeTierRefusalsOf, type FreeTierRefusals };
+export { freeTierRefusalsOf, type FreeTierRefusals } from './free-tier-refusals.js';
 
 const run = promisify(execFile);
 
@@ -46,7 +45,7 @@ export function resolveAssuranceModel(
 	configured = process.env.JPWB_ASSURANCE_MODEL
 ): string | undefined {
 	const trimmed = configured?.trim();
-	return trimmed ? trimmed : undefined;
+	return trimmed || undefined;
 }
 
 export function assuranceModel(): string {

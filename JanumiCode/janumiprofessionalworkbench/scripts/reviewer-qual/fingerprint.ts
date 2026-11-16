@@ -314,7 +314,8 @@ async function probePrompt(
 	});
 	try {
 		await validator.evaluate(subject, { reasoningReview: input });
-	} catch (refusal) {
+	} catch (error_) {
+		const refusal = error_;
 		if (sent.length > 0) throw refusal;
 		return [REFUSED, refusal instanceof Error ? refusal.message : String(refusal), input.content].join('\n');
 	}

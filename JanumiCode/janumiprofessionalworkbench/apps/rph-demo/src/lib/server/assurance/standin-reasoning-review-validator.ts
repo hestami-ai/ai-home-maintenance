@@ -75,9 +75,7 @@ export function standinJudgement(
 	// Rule 6 — derived, never copied from the checker's constant.
 	const recommendation: ReasoningReviewJudgement['recommendation'] = faulted
 		? checker.recommendation
-		: stipulated.length === remainder.length
-			? 'SATISFIED'
-			: 'INCONCLUSIVE';
+		: unfaultedRecommendation(stipulated.length === remainder.length);
 	const disclosure =
 		stipulated.length > 0
 			? `Declared stand-in (test mode): ${judged.size} criteria evaluated by the structural checker; ${stipulated.length} stipulated CLEAN by the test and NOT reviewed (REG-D-071).`
@@ -88,6 +86,11 @@ export function standinJudgement(
 		recommendation,
 		limitations: [...(checker.limitations ?? []), disclosure]
 	};
+}
+
+/** Rule 6, no fault found: SATISFIED if the whole remainder is stipulated, else INCONCLUSIVE. */
+function unfaultedRecommendation(wholeRemainderStipulated: boolean): 'SATISFIED' | 'INCONCLUSIVE' {
+	return wholeRemainderStipulated ? 'SATISFIED' : 'INCONCLUSIVE';
 }
 
 export function createStandinReasoningReviewValidator(opts: { stipulationFor: StipulationLookup }): Validator {

@@ -515,6 +515,15 @@ function batchTargetReached(
 	const directories = carriesAPath
 		? [cwd]
 		: [cwd, ...(env.PATH ?? '').split(delimiter).filter((directory) => directory !== '')];
+	return firstBatchCandidate(program, directories, extensions);
+}
+
+/** The FILE NAME of the first existing batch candidate over every directory and extension, or `undefined`. */
+function firstBatchCandidate(
+	program: string,
+	directories: readonly string[],
+	extensions: readonly string[]
+): string | undefined {
 	for (const directory of directories)
 		for (const extension of extensions) {
 			let candidate: string;

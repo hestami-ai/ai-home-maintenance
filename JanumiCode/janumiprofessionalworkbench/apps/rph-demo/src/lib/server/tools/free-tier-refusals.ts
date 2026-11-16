@@ -56,8 +56,10 @@ export function freeTierRefusalsFigures(r: FreeTierRefusals): string {
  * ⭐ Z3 (Q5) — what `freeTierRefusalsFigures` writes, as a pattern: the count, the refused attempts' run time and the waits.
  * ⭑ The reader lives with the recording that needs it (`replay/recording.ts`, `freeTierRefusalsIn`): every function this folder
  * exports is reached by production code (`verif/tool-adapter-exports-reachable.test.ts`, AI-01b), and only the recorder reads it.
+ * ⭑ S8786: `(?<!\d)` starts the count only at its run's first digit, so a long run of digits the phrase does not follow is
+ * read once, not once from each digit. It changes no match: a match starting inside a run implies one starting a digit earlier.
  */
-export const FREE_TIER_REFUSALS_FIGURES = /(\d+) free-tier refusals?: (-?\d+) ms of refused attempts and (\d+) ms of waits/;
+export const FREE_TIER_REFUSALS_FIGURES = /(?<!\d)(\d+) free-tier refusals?: (-?\d+) ms of refused attempts and (\d+) ms of waits/;
 
 /**
  * ⭐⭐ Z3 (the lead's ruling on the second follow-up: the recorder reads only the product's own sentence) — THE WORDS EACH OF THE

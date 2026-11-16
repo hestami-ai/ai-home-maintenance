@@ -21,7 +21,8 @@ import { test as base, expect, type APIRequestContext, type Page } from '@playwr
 export const test = base.extend<{ laneControl: void }>({
 	laneControl: [
 		async ({ request }, use, testInfo) => {
-			const name = `${testInfo.titlePath.join(' › ')}${testInfo.retry > 0 ? ` (retry ${testInfo.retry})` : ''}`;
+			let name = testInfo.titlePath.join(' › ');
+			if (testInfo.retry > 0) name = `${name} (retry ${testInfo.retry})`;
 			const announced = await request.post('/test-api/lane-control', { data: { announce: name } });
 			expect(announced.ok(), `the lane control did not take the test's name: ${await announced.text()}`).toBeTruthy();
 			await use();

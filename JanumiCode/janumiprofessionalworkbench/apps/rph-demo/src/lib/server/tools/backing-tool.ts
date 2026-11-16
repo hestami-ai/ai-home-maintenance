@@ -387,10 +387,10 @@ export function isToolInvocationResult(v: string | ToolInvocationResult): v is T
 
 export function resolveExecutorToolId(configured = process.env.JPWB_EXECUTOR): string | undefined {
 	const trimmed = configured?.trim();
-	return trimmed ? trimmed : undefined;
+	return trimmed || undefined;
 }
 
 export function resolveExecutorModel(configured = process.env.JPWB_EXECUTOR_MODEL): string | undefined {
 	const trimmed = configured?.trim();
-	return trimmed ? trimmed : undefined;
+	return trimmed || undefined;
 }
