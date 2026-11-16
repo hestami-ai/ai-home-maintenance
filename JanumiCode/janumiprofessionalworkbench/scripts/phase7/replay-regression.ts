@@ -53,6 +53,12 @@ export function observedMatrix(store: StoreRows, lane: LaneRows): RecordedCell[]
 
 const cellKey = (c: RecordedCell): string => `${c.stage} ${c.row}`;
 
+const partLabel = (part: 'executor' | 'commands' | 'reviewer'): string => {
+	if (part === 'executor') return 'executor tries';
+	if (part === 'commands') return 'commands';
+	return 'reviewer calls';
+};
+
 /** ⭐ THE REGRESSION'S VERDICT: every way the replay differs from its recording, each named. Empty means it reproduced it. */
 export function replayRegressionProblems(recording: Recording, o: ReplayObservation): string[] {
 	const problems: string[] = [];
@@ -86,7 +92,7 @@ export function replayRegressionProblems(recording: Recording, o: ReplayObservat
 	for (const part of ['executor', 'commands', 'reviewer'] as const)
 		if (o.consumed[part] !== recorded[part])
 			problems.push(
-				`the replay served ${o.consumed[part]} of the recording's ${recorded[part]} ${part === 'executor' ? 'executor tries' : part === 'commands' ? 'commands' : 'reviewer calls'}`
+				`the replay served ${o.consumed[part]} of the recording's ${recorded[part]} ${partLabel(part)}`
 			);
 	return problems;
 }

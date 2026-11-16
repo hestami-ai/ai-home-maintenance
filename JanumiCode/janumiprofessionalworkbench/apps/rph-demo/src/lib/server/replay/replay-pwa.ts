@@ -95,7 +95,8 @@ export function recreateRecordedPwa(run: ReplayRun, host: PwaHost): string {
 		if (result.status !== 'ACCEPTED')
 			throw run.stale(
 				`the recorded PWA could not be re-created: ${commandType} on ${aggregateId} was ${result.status}` +
-					`${result.error?.message ? ` — ${result.error.message}` : ''}.`
+					(result.error?.message ? ` — ${result.error.message}` : '') +
+					'.'
 			);
 	}
 	const rows: PwaObjectRow[] = [PWA, 'PWU_TYPE'].flatMap((objectType) =>

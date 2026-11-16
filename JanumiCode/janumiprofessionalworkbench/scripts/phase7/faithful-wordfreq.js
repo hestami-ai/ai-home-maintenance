@@ -59,7 +59,7 @@ async function readStdin() {
 
 /** A positive integer in decimal digits, or undefined. */
 function positiveInteger(value) {
-	if (value === undefined || !/^[0-9]+$/.test(value)) return undefined;
+	if (value === undefined || !/^\d+$/.test(value)) return undefined;
 	const n = Number(value);
 	return Number.isSafeInteger(n) && n >= 1 ? n : undefined;
 }
@@ -102,6 +102,7 @@ function parse(argv) {
 /** Most frequent first; a tie goes to the word, ascending (code-unit order). */
 function byFrequency([wordA, countA], [wordB, countB]) {
 	if (countA !== countB) return countB - countA;
+	// S3358: kept nested - it is TIES_UNSORTED's find in `seeded-faults.ts`; a rewrite makes that variant NOT_APPLIED
 	return wordA < wordB ? -1 : wordA > wordB ? 1 : 0;
 }
 

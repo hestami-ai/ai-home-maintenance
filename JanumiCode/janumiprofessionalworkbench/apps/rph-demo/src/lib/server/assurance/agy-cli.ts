@@ -155,8 +155,9 @@ async function agyCall(
 		// may not carry. ⭑ The ROLE changes only which prompt and which record the sentence names, so each is true.
 		const code = (e as { code?: unknown })?.code;
 		const withheld = WITHHELD_FROM[role];
+		const exitNote = typeof code === 'number' ? ` (exit ${code})` : '';
 		throw new Error(
-			`agy invocation failed${typeof code === 'number' ? ` (exit ${code})` : ''}. ` +
+			`agy invocation failed${exitNote}. ` +
 				'Its diagnostic is WITHHELD from the record plane: execFile embeds the full argv — which carries the ' +
 				`${withheld.prompt} — and the full stderr into its error message, and that message is written ` +
 				`${withheld.record}. PER-12 forbids that content ` +

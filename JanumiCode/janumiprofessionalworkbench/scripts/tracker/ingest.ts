@@ -60,8 +60,149 @@ function mentionRefs(fromId: string, text: string): RefRecord[] {
 	for (const m of stripCode(text).matchAll(/\bREG-[A-Z]-\d+\b/g)) seen.add(m[0]);
 	seen.delete(fromId.replace(/^reg:/, '').replace(/@\d+$/, ''));
 	return [...seen]
-		.sort()
+		.sort((a, b) => Number(a > b) - Number(a < b))
 		.map((to) => ({ type: 'ref', from_id: fromId, to_id: `reg:${to}`, kind: 'mentions' }));
+}
+
+/** The register parse's accumulators, shared by its per-block and per-line helpers. */
+interface RegisterAcc {
+	readonly path: string;
+	readonly items: ItemRecord[];
+	readonly attrs: AttrRecord[];
+	readonly refs: RefRecord[];
+	readonly eSeen: Map<string, number>;
+	eSection: string;
+}
+
+/** Grammar 1 — one `### ` block of the register. */
+function ingestHeadingBlock(block: string, acc: RegisterAcc): void {
+	const { path, items, attrs, refs } = acc;
+	const heading = block.split('\n', 1)[0] ?? '';
+	const m = /^(~~)?(REG-[A-Z]-\d+)(~~)?\s*—\s*((?:\S.*)?)$/.exec(heading);
+	if (!m) return;
+	const id = `reg:${m[2]!}`;
+	const struck = m[1] !== undefined;
+	const title = (m[4] ?? '').replaceAll('~~', '').trim() || m[2]!;
+	// Date: the fused `- **Date:** YYYY-MM-DD · **Type:** X` form (246 entries), the REG-F-196
+	// `**Raised:**` variant, or absent (section-defaulted REG-Q entries — attributed below).
+	const dateMatch = /\*\*(?:Date|Raised):\*\*\s*(\d{4}-\d{2}-\d{2})/.exec(stripCode(block));
+	items.push(
+		item(
+			id,
+			'register-entry',
+			title.slice(0, 200),
+			path,
+			dateMatch?.[1] ?? 'undated',
+			path,
+			`### ${m[2]!} — ${title.slice(0, 120)}`
+		)
+	);
+	attrs.push({ item_id: id, key: 'grammar', value: 'heading' });
+	if (struck) attrs.push({ item_id: id, key: 'struck', value: 'true' });
+	const typeMatch = /\*\*Type:\*\*\s*([^·\n]*)/.exec(stripCode(block));
+	if (typeMatch)
+		attrs.push({ item_id: id, key: 'type', value: typeMatch[1]!.trim().slice(0, 160) });
+	// Live status = the gate's own rule: code-stripped, not opened `- ~~`. Multiple/zero live
+	// lines are themselves facts (the 63 grandfathered) — record what IS, count included.
+	const liveStatuses = block
+		.split('\n')
+		.map(stripCode)
+		.filter((l) => l.includes('**Status:**') && !l.trimStart().startsWith('- ~~'));
+	attrs.push({ item_id: id, key: 'live_status_lines', value: String(liveStatuses.length) });
+	const statusValue =
+		liveStatuses[0] === undefined
+			? undefined
+			: /\*\*Status:\*\*\s*((?:\S.*)?)$/.exec(liveStatuses[0]);
+	if (statusValue)
+		attrs.push({ item_id: id, key: 'status', value: statusValue[1]!.trim().slice(0, 200) });
+	refs.push(...mentionRefs(id, block));
+}
+
+/** Grammar 2 — a REG-E definition bullet (`- **REG-E-NNN** — …`). */
+function ingestEDefinition(definition: RegExpExecArray, line: string, acc: RegisterAcc): void {
+	const { path, items, attrs, refs, eSeen } = acc;
+	const bare = definition[2]!;
+	const count = (eSeen.get(bare) ?? 0) + 1;
+	eSeen.set(bare, count);
+	const id = count === 1 ? `reg:${bare}` : `reg:${bare}@${count}`;
+	// ### grammar already ingested E-032/033; a bullet re-defining a heading id would be a
+	// register defect, not an ingest choice — refuse loudly rather than merge silently.
+	if (items.some((existing) => existing.id === id))
+		throw new Error(`tracker: register E-bullet re-defines ${id}`);
+	items.push(
+		item(
+			id,
+			'register-entry',
+			stripCode(definition[4] ?? '').slice(0, 200),
+			path,
+			'undated',
+			path,
+			line.slice(0, 160)
+		)
+	);
+	attrs.push({ item_id: id, key: 'grammar', value: 'bullet' });
+	if (definition[1] !== undefined) attrs.push({ item_id: id, key: 'struck', value: 'true' });
+	if (acc.eSection !== '') attrs.push({ item_id: id, key: 'section', value: acc.eSection });
+	refs.push(...mentionRefs(id, line));
+}
+
+/** Grammar 2 — a REG-E bullet whose annotation sits INSIDE the bold (`- **REG-E-NNN — …`). */
+function ingestEAmendment(amendment: RegExpExecArray, line: string, acc: RegisterAcc): void {
+	const { path, items, attrs, refs, eSeen } = acc;
+	const bare = amendment[2]!;
+	// ⚠ ORDER-SENSITIVE, LEARNED FROM THE FIRST REAL BUILD: E-023 and E-024 were CLOSED by
+	// editing the annotation INTO the definition bullet's own bold — so a bullet of this shape
+	// with NO prior definition IS the definition, carrying its disposition inline. Reading it
+	// as an amendment created attrs on items that never existed (30 bullets, not 31, and refs
+	// pointing at nothing). An annotation is an amendment only when its item already exists.
+	if (eSeen.get(bare) === undefined) {
+		eSeen.set(bare, 1);
+		const id = `reg:${bare}`;
+		if (items.some((existing) => existing.id === id))
+			throw new Error(`tracker: register E-bullet re-defines ${id}`);
+		items.push(
+			item(
+				id,
+				'register-entry',
+				stripCode(amendment[3]!).trim().slice(0, 200),
+				path,
+				'undated',
+				path,
+				line.slice(0, 160)
+			)
+		);
+		attrs.push(
+			{ item_id: id, key: 'grammar', value: 'bullet' },
+			{
+				item_id: id,
+				key: 'annotation',
+				value: stripCode(amendment[3]!).trim().slice(0, 200)
+			}
+		);
+		if (acc.eSection !== '') attrs.push({ item_id: id, key: 'section', value: acc.eSection });
+		refs.push(...mentionRefs(id, line));
+		return;
+	}
+	const target = eSeen.get(bare) === 1 ? `reg:${bare}` : `reg:${bare}@${eSeen.get(bare)}`;
+	attrs.push({
+		item_id: target,
+		key: 'amendment',
+		value: stripCode(amendment[3]!).trim().slice(0, 200)
+	});
+}
+
+/** Grammar 2 — one line of the register, read for a section label and a REG-E bullet. */
+function ingestEBulletLine(line: string, acc: RegisterAcc): void {
+	const section = /^\*\*([^*]+):\*\*\s*$/.exec(line.trim());
+	if (section) acc.eSection = section[1]!.trim();
+	const definition = /^- \*\*(~~)?(REG-E-\d{3})(~~)?\*\*\s*—\s*((?:\S.*)?)$/.exec(line);
+	if (definition) {
+		ingestEDefinition(definition, line, acc);
+		return;
+	}
+	// \s alone matches a blank annotation (`— **`) on its last whitespace, as \s*([^*]+?) did.
+	const amendment = /^- \*\*(~~)?(REG-E-\d{3})\s*—\s*([^*\s][^*]*?|\s):?\*\*/.exec(line);
+	if (amendment) ingestEAmendment(amendment, line, acc);
 }
 
 /** ── The register: grammar 1 (### entries) + grammar 2 (REG-E bullets) ─────────────────────── */
@@ -69,127 +210,24 @@ export function parseRegister(text: string, path: string): IngestResult {
 	const items: ItemRecord[] = [];
 	const attrs: AttrRecord[] = [];
 	const refs: RefRecord[] = [];
+	const acc: RegisterAcc = {
+		path,
+		items,
+		attrs,
+		refs,
+		eSeen: new Map<string, number>(),
+		eSection: ''
+	};
 
 	// Grammar 1 — the same split the register-status gate uses, so the two parsers can disagree
 	// ONLY about fields, never about the population. The verif cross-check asserts exactly that.
-	for (const block of text.split(/^### /m).slice(1)) {
-		const heading = block.split('\n', 1)[0] ?? '';
-		const m = /^(~~)?(REG-[A-Z]-\d+)(~~)?\s*—\s*(.*)$/.exec(heading);
-		if (!m) continue;
-		const id = `reg:${m[2]!}`;
-		const struck = m[1] !== undefined;
-		const title = (m[4] ?? '').replace(/~~/g, '').trim() || m[2]!;
-		// Date: the fused `- **Date:** YYYY-MM-DD · **Type:** X` form (246 entries), the REG-F-196
-		// `**Raised:**` variant, or absent (section-defaulted REG-Q entries — attributed below).
-		const dateMatch = /\*\*(?:Date|Raised):\*\*\s*(\d{4}-\d{2}-\d{2})/.exec(stripCode(block));
-		items.push(
-			item(
-				id,
-				'register-entry',
-				title.slice(0, 200),
-				path,
-				dateMatch?.[1] ?? 'undated',
-				path,
-				`### ${m[2]!} — ${title.slice(0, 120)}`
-			)
-		);
-		attrs.push({ item_id: id, key: 'grammar', value: 'heading' });
-		if (struck) attrs.push({ item_id: id, key: 'struck', value: 'true' });
-		const typeMatch = /\*\*Type:\*\*\s*([^·\n]*)/.exec(stripCode(block));
-		if (typeMatch)
-			attrs.push({ item_id: id, key: 'type', value: typeMatch[1]!.trim().slice(0, 160) });
-		// Live status = the gate's own rule: code-stripped, not opened `- ~~`. Multiple/zero live
-		// lines are themselves facts (the 63 grandfathered) — record what IS, count included.
-		const liveStatuses = block
-			.split('\n')
-			.map(stripCode)
-			.filter((l) => l.includes('**Status:**') && !l.trimStart().startsWith('- ~~'));
-		attrs.push({ item_id: id, key: 'live_status_lines', value: String(liveStatuses.length) });
-		const statusValue =
-			liveStatuses[0] === undefined ? undefined : /\*\*Status:\*\*\s*(.*)$/.exec(liveStatuses[0]);
-		if (statusValue)
-			attrs.push({ item_id: id, key: 'status', value: statusValue[1]!.trim().slice(0, 200) });
-		refs.push(...mentionRefs(id, block));
-	}
+	for (const block of text.split(/^### /m).slice(1)) ingestHeadingBlock(block, acc);
 
 	// Grammar 2 — REG-E bullets. Definition: `- **REG-E-NNN** — …` (bold closes right after the
 	// id). Amendment: `- **REG-E-NNN — annotation…` (annotation INSIDE the bold) — an attr on the
 	// item, never a new item. REG-E-022 collides (two definitions): occurrence ordinal suffixes
 	// the second, and both carry their section context as an attr for a human to disambiguate.
-	const eSeen = new Map<string, number>();
-	let eSection = '';
-	for (const line of text.split('\n')) {
-		const section = /^\*\*([^*]+):\*\*\s*$/.exec(line.trim());
-		if (section) eSection = section[1]!.trim();
-		const definition = /^- \*\*(~~)?(REG-E-\d{3})(~~)?\*\*\s*—\s*(.*)$/.exec(line);
-		if (definition) {
-			const bare = definition[2]!;
-			const count = (eSeen.get(bare) ?? 0) + 1;
-			eSeen.set(bare, count);
-			const id = count === 1 ? `reg:${bare}` : `reg:${bare}@${count}`;
-			// ### grammar already ingested E-032/033; a bullet re-defining a heading id would be a
-			// register defect, not an ingest choice — refuse loudly rather than merge silently.
-			if (items.some((existing) => existing.id === id))
-				throw new Error(`tracker: register E-bullet re-defines ${id}`);
-			items.push(
-				item(
-					id,
-					'register-entry',
-					stripCode(definition[4] ?? '').slice(0, 200),
-					path,
-					'undated',
-					path,
-					line.slice(0, 160)
-				)
-			);
-			attrs.push({ item_id: id, key: 'grammar', value: 'bullet' });
-			if (definition[1] !== undefined) attrs.push({ item_id: id, key: 'struck', value: 'true' });
-			if (eSection !== '') attrs.push({ item_id: id, key: 'section', value: eSection });
-			refs.push(...mentionRefs(id, line));
-			continue;
-		}
-		const amendment = /^- \*\*(~~)?(REG-E-\d{3})\s*—\s*([^*]+?):?\*\*/.exec(line);
-		if (amendment) {
-			const bare = amendment[2]!;
-			// ⚠ ORDER-SENSITIVE, LEARNED FROM THE FIRST REAL BUILD: E-023 and E-024 were CLOSED by
-			// editing the annotation INTO the definition bullet's own bold — so a bullet of this shape
-			// with NO prior definition IS the definition, carrying its disposition inline. Reading it
-			// as an amendment created attrs on items that never existed (30 bullets, not 31, and refs
-			// pointing at nothing). An annotation is an amendment only when its item already exists.
-			if (eSeen.get(bare) === undefined) {
-				eSeen.set(bare, 1);
-				const id = `reg:${bare}`;
-				if (items.some((existing) => existing.id === id))
-					throw new Error(`tracker: register E-bullet re-defines ${id}`);
-				items.push(
-					item(
-						id,
-						'register-entry',
-						stripCode(amendment[3]!).trim().slice(0, 200),
-						path,
-						'undated',
-						path,
-						line.slice(0, 160)
-					)
-				);
-				attrs.push({ item_id: id, key: 'grammar', value: 'bullet' });
-				attrs.push({
-					item_id: id,
-					key: 'annotation',
-					value: stripCode(amendment[3]!).trim().slice(0, 200)
-				});
-				if (eSection !== '') attrs.push({ item_id: id, key: 'section', value: eSection });
-				refs.push(...mentionRefs(id, line));
-				continue;
-			}
-			const target = eSeen.get(bare) === 1 ? `reg:${bare}` : `reg:${bare}@${eSeen.get(bare)}`;
-			attrs.push({
-				item_id: target,
-				key: 'amendment',
-				value: stripCode(amendment[3]!).trim().slice(0, 200)
-			});
-		}
-	}
+	for (const line of text.split('\n')) ingestEBulletLine(line, acc);
 	return { items, verdicts: [], attrs, refs, parsers: new Map([[path, 'register:w1']]) };
 }
 
@@ -247,7 +285,7 @@ export function parseSheet(
 			item(
 				id,
 				kind,
-				cells.slice(1, 3).join(' — ').replace(/~~/g, '').slice(0, 200) ||
+				cells.slice(1, 3).join(' — ').replaceAll('~~', '').slice(0, 200) ||
 					`${sheet} row ${rowIndex}`,
 				path,
 				'undated',
@@ -313,7 +351,7 @@ export function parseAuditRoster(text: string, path: string): IngestResult {
 			)
 		)
 			continue;
-		const schema = (cells[1] ?? '').replace(/\\/g, '');
+		const schema = (cells[1] ?? '').replaceAll('\\', '');
 		const id = `audit:shape-survivorship:${doc}:${createHash('sha256').update(schema).digest('hex').slice(0, 8)}`;
 		items.push(
 			item(

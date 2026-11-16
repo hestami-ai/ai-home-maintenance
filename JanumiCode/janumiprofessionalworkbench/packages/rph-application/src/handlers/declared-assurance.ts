@@ -264,6 +264,10 @@ export function unsupportedSatisfaction(
 	return { composed, blocking };
 }
 
+/** A silent row's pointer to the assessment it names, or nothing when it names none. */
+const mostRecentClause = (verdict: DeclaredPolicyVerdict): string =>
+	verdict.assessmentId ? ` (most recent: ${verdict.assessmentId})` : '';
+
 /**
  * The refusal text. Built here rather than at the call site so the marker the enforcement register pins lives
  * beside the rule that produces it.
@@ -297,7 +301,7 @@ export function unsupportedSatisfactionMessage(
 	const rows = result.blocking
 		.map((b) =>
 			b.silence
-				? `${b.policyId} ${SILENCE_TEXT[b.silence]}${b.assessmentId ? ` (most recent: ${b.assessmentId})` : ''}`
+				? `${b.policyId} ${SILENCE_TEXT[b.silence]}${mostRecentClause(b)}`
 				: `${b.policyId} is ${b.disposition} (assessment ${b.assessmentId})`
 		)
 		.join('; ');

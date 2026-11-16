@@ -656,17 +656,23 @@ const SCORE_READ = /^answers\.([^.\s]+)\.noul read: (\S+)$/;
 function indicationOf(row: StoredObject, n: number, x: Extraction): RecordedIndication | undefined {
 	const where = `decision-model request ${n + 1} (${row.id})`;
 	const body = contentOf(row.state.materializedInputRef, x.input.content);
-	if (body === undefined) return void x.problems.push(`${where}: its body is not retained, so it cannot be keyed`);
+	if (body === undefined) {
+		x.problems.push(`${where}: its body is not retained, so it cannot be keyed`);
+		return undefined;
+	}
 	let parsed: { readonly model?: unknown; readonly questions?: unknown };
 	try {
 		parsed = JSON.parse(body) as typeof parsed;
 	} catch {
-		return void x.problems.push(`${where}: its body is no decision-model request (D51), so it cannot be keyed`);
+		x.problems.push(`${where}: its body is no decision-model request (D51), so it cannot be keyed`);
+		return undefined;
 	}
 	const model = parsed.model;
 	const keys = typeof parsed.questions === 'object' && parsed.questions !== null ? Object.keys(parsed.questions) : [];
-	if (typeof model !== 'string' || keys.length !== 1)
-		return void x.problems.push(`${where}: its body is no decision-model request (D51), so it cannot be keyed`);
+	if (typeof model !== 'string' || keys.length !== 1) {
+		x.problems.push(`${where}: its body is no decision-model request (D51), so it cannot be keyed`);
+		return undefined;
+	}
 	if (body === unloadBody(model)) return undefined;
 	const key = keys[0]!;
 	const parse = rec(row.state.parseOutcome);
@@ -674,8 +680,12 @@ function indicationOf(row: StoredObject, n: number, x: Extraction): RecordedIndi
 	if (parse.outcome !== 'PARSED') return { key, model, bodySha256, outcome: { kind: 'FAILED', reason: str(parse.detail) } };
 	const read = SCORE_READ.exec(str(parse.detail));
 	const score = read === null ? Number.NaN : Number(read[2]);
-	if (read?.[1] !== key || !Number.isFinite(score) || score < 0 || score > 1)
-		return void x.problems.push(`${where}: its record names no score read for ${key}, so its review cannot be replayed`);
+	if (read?.[1] !== key || !Number.isFinite(score) || score < 0 || score > 1) {
+		x.problems.push(
+			`${where}: its record names no score read for ${key}, so its review cannot be replayed`
+		);
+		return undefined;
+	}
 	return { key, model, bodySha256, outcome: { kind: 'SCORED', score } };
 }
 

@@ -219,7 +219,7 @@ export function scanText(text: string, file: string, names: readonly string[]): 
 }
 
 /** A plain JSON key, shown as `.key` in a hit's place; any other is shown by its ordinal, never its text. */
-const PLAIN_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const PLAIN_KEY = /^[A-Za-z_]\w*$/;
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 8 (the review of E4, finding 3) — EVERY PLACE A JSON TEXT'S DECODED VALUES NAME THE ACCOUNT OR AN

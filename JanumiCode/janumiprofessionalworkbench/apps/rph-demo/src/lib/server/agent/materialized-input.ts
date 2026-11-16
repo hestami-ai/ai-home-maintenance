@@ -35,11 +35,11 @@ export interface ResolvedModelRef {
 	readonly provider: string;
 }
 
-/** Pi's payload hook, structurally. Returning `undefined` keeps the payload unchanged. */
-export type PayloadHook = (
-	payload: unknown,
-	model: ResolvedModelRef
-) => unknown | undefined | Promise<unknown | undefined>;
+/**
+ * Pi's payload hook, structurally. Returning `undefined` keeps the payload unchanged. The hook may return a
+ * replacement payload, `undefined`, or a promise of either: `unknown` covers all three, so it is the return type.
+ */
+export type PayloadHook = (payload: unknown, model: ResolvedModelRef) => unknown;
 
 /** Anything carrying Pi's `onPayload` seam — in production, `AgentSession.agent`. */
 export interface PayloadHookHost {

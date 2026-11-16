@@ -69,7 +69,7 @@ function toPiTools(descriptors: AuthoringToolDescriptor[]) {
  * (Never hardcode a provider — a plain modelRegistry.find() would return a keyless catalog entry that fails at
  * session time, and assuming "anthropic" is wrong when the user is on, e.g., OpenAI/Codex.)
  */
-async function resolveModel(modelRegistry: ModelRegistry, settingsManager: SettingsManager) {
+function resolveModel(modelRegistry: ModelRegistry, settingsManager: SettingsManager) {
 	const override = process.env.JPWB_AGENT_MODEL;
 	if (override) {
 		const r = resolveCliModel({ cliModel: override, modelRegistry });
@@ -129,7 +129,7 @@ export class PiAuthoringAgent implements AuthoringAgent {
 			const settingsManager = SettingsManager.create(process.cwd(), getAgentDir(), {
 				projectTrusted: false
 			});
-			const model = await resolveModel(modelRegistry, settingsManager);
+			const model = resolveModel(modelRegistry, settingsManager);
 			// §8.12 checks independence against the ACTUAL model/provider, never a role label — so emit the
 			// resolved identity structurally rather than only as display text, and let the floor bind to it.
 			emit({

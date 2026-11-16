@@ -509,7 +509,7 @@ export function sourceFiles(workspace: string): string[] {
 		return readdirSync(join(workspace, 'src'), { withFileTypes: true })
 			.filter((e) => e.isFile() && e.name.endsWith('.js'))
 			.map((e) => `src/${e.name}`)
-			.sort();
+			.sort((a, b) => Number(a > b) - Number(a < b));
 	} catch {
 		return [];
 	}

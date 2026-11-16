@@ -369,6 +369,44 @@ function listed(items: readonly string[]): string {
 	return items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)!}`;
 }
 
+/** What withholds a unit, as `startReadiness` collects it: the kinds and the reasons are both read from it. */
+type WithheldDependencies = Pick<StartReadiness, 'waitingFor' | 'abandoned' | 'unknown' | 'loop'>;
+
+/** The kinds of what withholds a unit, in the page's order (`StartReadiness.kinds`). */
+function withheldKinds({ waitingFor, abandoned, unknown, loop }: WithheldDependencies): WithheldKind[] {
+	const kinds: WithheldKind[] = [
+		...(waitingFor.length > 0 ? (['waiting'] as const) : []),
+		...(abandoned.length > 0 ? (['abandoned'] as const) : []),
+		...(unknown.length > 0 ? (['unknown'] as const) : []),
+		// ~~...(unproduced.length > 0 ? (['unproduced'] as const) : []),~~ ⛔ D21.
+		...(loop !== null ? (['loop'] as const) : [])
+	];
+	return kinds;
+}
+
+/** The reasons in words, one per kind, in the same order (`StartReadiness.reason`, before they are joined). */
+function withheldReasons({ waitingFor, abandoned, unknown, loop }: WithheldDependencies): string[] {
+	const quoted = (title: string): string => `"${title}"`;
+	const quotedWithState = (w: { readonly title: string; readonly state: string }): string =>
+		`${quoted(w.title)} (${w.state})`;
+	const reasons = [
+		...(waitingFor.length > 0
+			? [`it waits for ${listed(waitingFor.map((w) => quotedWithState(w)))} to be accepted`]
+			: []),
+		...(abandoned.length > 0
+			? [`its producer${abandoned.length > 1 ? 's' : ''} ${listed(abandoned.map((a) => quoted(a.title)))} ${abandoned.length > 1 ? 'were' : 'was'} ABANDONED`]
+			: []),
+		...(unknown.length > 0
+			? [`${listed(unknown)} name${unknown.length > 1 ? '' : 's'} no unit of this Undertaking`]
+			: []),
+		// ~~"nothing in this Undertaking produces its input(s) …"~~ ⛔ D21: no reason — the page names it apart (`expectedFromOutside`).
+		...(loop !== null
+			? [`it sits in a loop: ${[...loop, loop[0]!].map((l) => quoted(l.title)).join(' → ')}`]
+			: [])
+	];
+	return reasons;
+}
+
 /**
  * ⭐⭐ D2 — MAY THIS UNIT START? Only when every unit it depends on is a unit of its own Undertaking and ACCEPTED
  * (`ACCEPTED_UNIT_STATES`) ~~, and no input it requires is unproduced~~ (⛔ struck 2026-10-26, package O, D21: an input no unit
@@ -385,7 +423,7 @@ export function startReadiness(
 	const unknown: string[] = [];
 	for (const id of new Set(unit?.dependencyIds ?? [])) {
 		const d = lookup(id);
-		if (d === undefined || d.undertakingId === undefined || d.undertakingId !== unit?.undertakingId) unknown.push(id);
+		if (d?.undertakingId === undefined || d.undertakingId !== unit?.undertakingId) unknown.push(id);
 		else if (d.workLifecycleState === 'ABANDONED') abandoned.push({ id, title: d.title });
 		else if (!ACCEPTED_UNIT_STATES.includes(d.workLifecycleState))
 			waitingFor.push({ id, title: d.title, state: d.workLifecycleState });
@@ -394,29 +432,9 @@ export function startReadiness(
 	const outside = [...new Set(unit?.outsideInputs ?? [])];
 	const cycle = unit === undefined ? null : loopThrough(unitId, lookup);
 	const loop = cycle?.map((id) => ({ id, title: lookup(id)?.title ?? id })) ?? null;
-	const kinds: WithheldKind[] = [
-		...(waitingFor.length > 0 ? (['waiting'] as const) : []),
-		...(abandoned.length > 0 ? (['abandoned'] as const) : []),
-		...(unknown.length > 0 ? (['unknown'] as const) : []),
-		// ~~...(unproduced.length > 0 ? (['unproduced'] as const) : []),~~ ⛔ D21.
-		...(loop !== null ? (['loop'] as const) : [])
-	];
-	const quoted = (title: string): string => `"${title}"`;
-	const reasons = [
-		...(waitingFor.length > 0
-			? [`it waits for ${listed(waitingFor.map((w) => `${quoted(w.title)} (${w.state})`))} to be accepted`]
-			: []),
-		...(abandoned.length > 0
-			? [`its producer${abandoned.length > 1 ? 's' : ''} ${listed(abandoned.map((a) => quoted(a.title)))} ${abandoned.length > 1 ? 'were' : 'was'} ABANDONED`]
-			: []),
-		...(unknown.length > 0
-			? [`${listed(unknown)} name${unknown.length > 1 ? '' : 's'} no unit of this Undertaking`]
-			: []),
-		// ~~"nothing in this Undertaking produces its input(s) …"~~ ⛔ D21: no reason — the page names it apart (`expectedFromOutside`).
-		...(loop !== null
-			? [`it sits in a loop: ${[...loop, loop[0]!].map((l) => quoted(l.title)).join(' → ')}`]
-			: [])
-	];
+	const withheld = { waitingFor, abandoned, unknown, loop };
+	const kinds = withheldKinds(withheld);
+	const reasons = withheldReasons(withheld);
 	return {
 		startable: kinds.length === 0,
 		waitingFor,
@@ -434,7 +452,8 @@ export function startReadiness(
  * "a" and "b" from outside this Undertaking`; null for a unit that expects nothing from outside.
  */
 export function expectedFromOutside(outside: readonly string[]): string | null {
-	return outside.length === 0 ? null : `expects ${listed(outside.map((name) => `"${name}"`))} from outside this Undertaking`;
+	const quoted = (name: string): string => `"${name}"`;
+	return outside.length === 0 ? null : `expects ${listed(outside.map((name) => quoted(name)))} from outside this Undertaking`;
 }
 
 /**

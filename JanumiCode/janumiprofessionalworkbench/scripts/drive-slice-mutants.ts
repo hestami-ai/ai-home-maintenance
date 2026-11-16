@@ -144,7 +144,7 @@ const results: Record<string, unknown>[] = [];
 const notDrivenHere = undrivenSurfaceSlices();
 
 for (const abs of sliceFiles(join(ROOT, 'packages'))) {
-	const rel = abs.slice(ROOT.length).replace(/\\/g, '/');
+	const rel = abs.slice(ROOT.length).replaceAll('\\', '/');
 	const parsed = parseSliceSource(readFileSync(abs, 'utf8'), rel);
 	const sliceId = String(parsed.declaration['id']);
 	const mutants = (parsed.declaration['mutants'] ?? []) as Mutant[];
@@ -172,19 +172,15 @@ for (const abs of sliceFiles(join(ROOT, 'packages'))) {
 		const named = new Set(m.expectRed);
 		const unexpected = red.failed.filter((t) => ![...named].some((c) => t.startsWith(c)));
 		const missing = [...named].filter((c) => !red.failed.some((t) => t.startsWith(c)));
+		let verdict: string;
+		if (red.failed.length === 0) verdict = superstring ? 'INERT_SUPERSTRING' : 'INERT';
+		else if (unexpected.length > 0) verdict = 'TOO_WIDE';
+		else if (missing.length > 0) verdict = 'PARTIAL';
+		else verdict = 'SOUND';
 		results.push({
 			sliceId,
 			mutant: m.id,
-			verdict:
-				red.failed.length === 0
-					? superstring
-						? 'INERT_SUPERSTRING'
-						: 'INERT'
-					: unexpected.length > 0
-						? 'TOO_WIDE'
-						: missing.length > 0
-							? 'PARTIAL'
-							: 'SOUND',
+			verdict,
 			redCount: red.failed.length,
 			totalTests: red.total,
 			expectRed: m.expectRed,

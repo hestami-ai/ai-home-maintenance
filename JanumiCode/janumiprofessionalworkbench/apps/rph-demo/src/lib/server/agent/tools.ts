@@ -19,6 +19,8 @@ import { buildPwuBehaviorProjection } from '@janumipwb/rph-projections';
 import type { RationaleSink } from './rationale.js';
 import type { AuthoringToolDescriptor, ToolRunResult } from './types.js';
 
+type WorkDischarge = 'MODEL' | 'HUMAN' | 'UNDECLARED';
+
 const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
 const EXECUTION_BOUNDARY_CODES: ReadonlySet<ExecutionBoundary> = new Set([
 	'INTERNAL',
@@ -69,10 +71,10 @@ function executionBoundaryError(a: Record<string, unknown>): string | null {
  * render guard that refuses an unsupplied marker would then be checking the agent's claim about its own text.
  */
 function dischargeInput(a: Record<string, unknown>): {
-	workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED';
+	workDischarge?: WorkDischarge;
 	promptTemplate?: PromptTemplate;
 } {
-	const out: { workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED'; promptTemplate?: PromptTemplate } =
+	const out: { workDischarge?: WorkDischarge; promptTemplate?: PromptTemplate } =
 		{};
 	if (
 		a.workDischarge === 'MODEL' ||
@@ -124,7 +126,7 @@ function dischargeInput(a: Record<string, unknown>): {
 function editedDischargeInput(
 	a: Record<string, unknown>,
 	stored: () => PromptTemplate | undefined
-): { workDischarge?: 'MODEL' | 'HUMAN' | 'UNDECLARED'; promptTemplate?: PromptTemplate } {
+): { workDischarge?: WorkDischarge; promptTemplate?: PromptTemplate } {
 	const created = dischargeInput(a);
 	const text = str(a.promptTemplateText).trim();
 	const contractPassed = 'promptOutputContract' in a;

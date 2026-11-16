@@ -235,7 +235,7 @@ function outcomes(stdout: string, cwd: string): { tests: TestOutcome[]; skipped:
 		}
 		tests.push({
 			file: workspaceRelative(typeof e.file === 'string' ? e.file : null, cwd),
-			name: String(e.name),
+			name: String(e.name as string),
 			passed: e.outcome === 'pass'
 		});
 	}
@@ -315,7 +315,8 @@ export function testFiles(workspace: string, kind: 'unit' | 'e2e'): string[] {
 	} catch {
 		return [];
 	}
-	return names.sort().map((name) => `test/${kind}/${name}`);
+	names.sort((a, b) => Number(a > b) - Number(a < b));
+	return names.map((name) => `test/${kind}/${name}`);
 }
 
 /** A private copy of `workspace` in the OS temp folder — everything but `.git`. */
