@@ -69,8 +69,8 @@ describe('containedWorkspacePath — what may not leave the workspace', () => {
 //   3. A WIN32 DEVICE NAME IS NOT A LOCATION. Under bun, `writeFileSync(<dir>/NUL, …)` reported success and the
 //      path did not exist afterwards: `existsSync` false, `readdirSync` empty, read-back ENOENT. Under node the
 //      same call created a real file, because libuv reaches the filesystem through the `\?\` prefix that
-//      bypasses device translation. ⚠ THE RUNTIME DECIDES, and this repository runs both — vitest under bun and
-//      the SvelteKit server under node — so the predicate cannot be right on one and silent on the other.
+//      bypasses device translation. ⚠ THE RUNTIME DECIDES, and this repository runs both — its scripts under bun,
+//      vitest and the SvelteKit server under node (TOOLCUR F-3) — so the predicate cannot be right on one and silent on the other.
 //
 // ⛔ THE COST IS AN OVER-REFUSAL ON POSIX, AND IT IS THE PORT'S OWN PRECEDENT. `a.` and `aux.log` are lawful
 // filenames on Linux and are refused here anyway, exactly as BOTH separator spellings are refused on both

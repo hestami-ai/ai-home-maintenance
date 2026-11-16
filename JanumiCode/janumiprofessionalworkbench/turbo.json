@@ -1,6 +1,7 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalDependencies": ["scripts/toolchain/matrix.json", ".node-version"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

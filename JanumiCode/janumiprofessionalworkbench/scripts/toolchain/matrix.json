@@ -1,0 +1,746 @@
+{
+	"schema": "jpwb-toolchain-matrix/1",
+	"$comment": "JPWB's compatibility matrix (JAN-TOOLCUR D-7; roadmap T0). Generated fields (declared, locked, nested, node.dayToDay) are rewritten by `bun run scripts/toolchain/generate.ts`; observed fields record the machine with their dates; every other field is a hand-written judgment that `bun run toolchain:check` enforces, and weakening, rewriting or removing one is a separately authorized act (I7). docs/operations/toolchain.md explains each field and the procedure.",
+	"node": {
+		"group": "Node/native",
+		"floor": "22",
+		"floorReason": "Today's engines.node \">=22\", kept by T0, which upgrades nothing (roadmap T0). The code needs more: keepAliveTimeoutBuffer is \"Added in: v24.6.0, v22.19.0\" (F-2). T1a raises the floor to 24.15.0 under the sponsor's ruling (D-1).",
+		"dayToDay": "24.22.3",
+		"supportWindow": "Node 24: LTS from 2025-10-28, maintenance from 2026-10-20, end of life 2028-04-30 (F-4, Node's schedule.json).",
+		"bundled": {
+			"v8": "13.6.233.17-node.63",
+			"sqlite": "3.54.1",
+			"modules": "137",
+			"observed": "2026-11-16, node -p process.versions on 24.22.3"
+		},
+		"blockers": [
+			"Node 26: no stable Electron, and so no VS Code, runs it (F-5); the planned extension's host decides (D-2)."
+		],
+		"moves": [
+			"V8's coverage counts (coverage thresholds and the per-file floor, I04, I05)",
+			"node:sqlite's SQLite (scripts/phase7/run-archive.ts)",
+			"better-sqlite3's native ABI (137 on Node 24)",
+			"Bun-Node agreement checks: the reviewer fingerprint, the fence digest, the case-set freshness check (F-3)"
+		]
+	},
+	"bun": {
+		"group": "runtime (G0)",
+		"version": "1.3.14",
+		"reason": "Runtimes (D-8): Bun exact. Bun reads none of packageManager, engines or devEngines (F-2), so toolchain:check enforces the pin.",
+		"blockers": [
+			"Bun 1.4: evaluated as its own package after T1-T3 (QT2, ruled; F-15)."
+		],
+		"moves": [
+			"every `bun run scripts/*.ts` step, the generators, gate:tail and reviewer:qual:check (F-3)",
+			"the Bun-Node agreement checks: the reviewer fingerprint, the fence digest, the case-set freshness check (F-3)"
+		]
+	},
+	"packages": [
+		{
+			"component": "svelte",
+			"group": "Svelte/Vite",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"SvelteKit 3 needs svelte 5.57.1 (D-12 T3)."
+			],
+			"moves": [
+				"the app's check step (svelte-check)",
+				"the app's build and the e2e suite"
+			],
+			"declared": {
+				"apps/rph-demo": "^5.0.0"
+			},
+			"locked": "5.56.4",
+			"nested": {}
+		},
+		{
+			"component": "@sveltejs/kit",
+			"group": "Svelte/Vite",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"SvelteKit 3 needs vite 8, vite-plugin-svelte 7, TypeScript 6 and adapter-auto 8 (D-12 T3); T3a moves to the newest 2.x first."
+			],
+			"moves": [
+				"the app's build and dev server",
+				"the e2e suite",
+				"the app's check step (svelte-kit sync)"
+			],
+			"declared": {
+				"apps/rph-demo": "^2.22.0"
+			},
+			"locked": "2.69.2",
+			"nested": {}
+		},
+		{
+			"component": "@sveltejs/vite-plugin-svelte",
+			"group": "Svelte/Vite",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"6.x peers vite \"^6.3.0 || ^7.0.0\", so the app stays on vite 7 while vitest runs its own vite 8: the split of F-14, which T3a ends."
+			],
+			"moves": [
+				"the app's build and dev server",
+				"the app's vitest suite (the only one that loads the SvelteKit plugin, F-10)"
+			],
+			"declared": {
+				"apps/rph-demo": "^6.0.0"
+			},
+			"locked": "6.2.4",
+			"nested": {}
+		},
+		{
+			"component": "@sveltejs/adapter-auto",
+			"group": "Svelte/Vite",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"8 needs SvelteKit 3."
+			],
+			"moves": [
+				"the app's build"
+			],
+			"declared": {
+				"apps/rph-demo": "^6.0.0"
+			},
+			"locked": "6.1.1",
+			"nested": {}
+		},
+		{
+			"component": "svelte-check",
+			"group": "Svelte/Vite",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"4.7.2 peers TypeScript \">=5.0.0\"; \"^5 || ^6\" from 4.7.4; TypeScript 7 only through --tsgo."
+			],
+			"moves": [
+				"the app's check step and its diagnostic counts"
+			],
+			"declared": {
+				"apps/rph-demo": "^4.0.0"
+			},
+			"locked": "4.7.2",
+			"nested": {}
+		},
+		{
+			"component": "vite",
+			"group": "Svelte/Vite",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item. The nested vitest/vite is vitest's own dependency, not a peer resolution (roadmap T0).",
+			"blockers": [
+				"vite-plugin-svelte 6.x admits vite \"^6.3.0 || ^7.0.0\" (F-14)."
+			],
+			"moves": [
+				"the app's build output",
+				"the dev server the e2e suite runs against"
+			],
+			"declared": {
+				"apps/rph-demo": "^7.0.0"
+			},
+			"locked": "7.3.6",
+			"nested": {
+				"vitest/vite": "8.1.4"
+			}
+		},
+		{
+			"component": "vitest",
+			"group": "vitest",
+			"pin": "exact",
+			"reason": "Tools whose output an instrument pins, by count (D-8): the global coverage thresholds and the per-file uncovered-count floor (F-11, I04, I05). Made exact at its locked version by T0, which moves no version.",
+			"blockers": [],
+			"moves": [
+				"test counts",
+				"the coverage thresholds and coverage:floor's per-file counts",
+				"the mutation runner's reading of its summary (scripts/mutants/run.ts)"
+			],
+			"declared": {
+				".": "4.1.10"
+			},
+			"locked": "4.1.10",
+			"nested": {}
+		},
+		{
+			"component": "@vitest/coverage-v8",
+			"group": "vitest",
+			"pin": "exact",
+			"reason": "Tools whose output an instrument pins, by count (D-8; F-11, I04, I05); it also peers vitest exactly. Made exact at its locked version by T0, which moves no version.",
+			"blockers": [
+				"moves with vitest: its peer range on vitest is exact."
+			],
+			"moves": [
+				"the coverage thresholds and coverage:floor's per-file counts"
+			],
+			"declared": {
+				".": "4.1.10"
+			},
+			"locked": "4.1.10",
+			"nested": {}
+		},
+		{
+			"component": "eslint",
+			"group": "lint",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"ESLint 9 reached end of life on 2026-08-06, and npm marks every 9.x version deprecated (F-13); T2 moves the lint group to 10."
+			],
+			"moves": [
+				"the lint step"
+			],
+			"declared": {
+				".": "^9.37.0"
+			},
+			"locked": "9.39.5",
+			"nested": {}
+		},
+		{
+			"component": "@eslint/js",
+			"group": "lint",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"Skip 10.0.0, which npm marks deprecated: \"This version should not be used.\" (F-13)."
+			],
+			"moves": [
+				"the lint step"
+			],
+			"declared": {
+				".": "^9.37.0"
+			},
+			"locked": "9.39.5",
+			"nested": {}
+		},
+		{
+			"component": "typescript-eslint",
+			"group": "lint",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"8.x peers TypeScript \"<6.1.0\"."
+			],
+			"moves": [
+				"the lint step"
+			],
+			"declared": {
+				".": "^8.0.0"
+			},
+			"locked": "8.63.0",
+			"nested": {}
+		},
+		{
+			"component": "globals",
+			"group": "lint",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"two majors behind (17.x); moves with the lint group in T2."
+			],
+			"moves": [
+				"the lint step"
+			],
+			"declared": {
+				".": "^15.0.0"
+			},
+			"locked": "15.15.0",
+			"nested": {
+				"@eslint/eslintrc/globals": "14.0.0"
+			}
+		},
+		{
+			"component": "typescript",
+			"group": "TypeScript",
+			"pin": "exact",
+			"reason": "The compiler (D-8): exact (F-6).",
+			"blockers": [
+				"6.0.3 waits for dependency-cruiser 18 (T1b, D-4); 7: no compiler API, and typescript-eslint and dependency-cruiser cap it (F-6)."
+			],
+			"moves": [
+				"check-types",
+				"the build's dist bytes (compare-builds.ts)",
+				"the seeded-fault instrument, which parses at ts.ScriptTarget.Latest (F-11)"
+			],
+			"declared": {
+				".": "5.9.3",
+				"apps/rph-demo": "5.9.3"
+			},
+			"locked": "5.9.3",
+			"nested": {}
+		},
+		{
+			"component": "dependency-cruiser",
+			"group": "TypeScript",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"16.x admits TypeScript \"<6\": under 6 it cruises no package module (F-7), which the boundary population guard now fails; T1b moves it to 18 before TypeScript moves (D-4)."
+			],
+			"moves": [
+				"the boundary step and its population guard"
+			],
+			"declared": {
+				".": "^16.0.0"
+			},
+			"locked": "16.10.4",
+			"nested": {}
+		},
+		{
+			"component": "@types/node",
+			"group": "Node/native",
+			"pin": "caret",
+			"reason": "Everything else (D-8) until T1a, which makes it exact at the newest 24.x types release whose minor is not above the floor's.",
+			"blockers": [
+				"must not run ahead of the Node floor (D-8): a caret lets bun update take types for APIs above the floor."
+			],
+			"moves": [
+				"check-types (which Node APIs type-check)"
+			],
+			"declared": {
+				".": "^24.0.0"
+			},
+			"locked": "24.13.3",
+			"nested": {}
+		},
+		{
+			"component": "better-sqlite3",
+			"group": "Node/native",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"a native addon on Node 24's ABI 137, which does not load under Bun; inside Electron it must match Electron's ABI, which 13's N-API builds may settle (D-2, left to the extension's design)."
+			],
+			"moves": [
+				"the persistence tests and the app's store"
+			],
+			"declared": {
+				"packages/rph-persistence": "^12.8.0"
+			},
+			"locked": "12.11.1",
+			"nested": {}
+		},
+		{
+			"component": "@types/better-sqlite3",
+			"group": "Node/native",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"moves with better-sqlite3."
+			],
+			"moves": [
+				"check-types"
+			],
+			"declared": {
+				"packages/rph-persistence": "^7.6.13"
+			},
+			"locked": "7.6.13",
+			"nested": {}
+		},
+		{
+			"component": "@earendil-works/pi-ai",
+			"group": "Pi SDK",
+			"pin": "exact",
+			"reason": "Packages that put breaking changes in patch releases (D-8); governed: the Pi pins move only after a sponsor ruling (REG-D-114 (19), I3).",
+			"blockers": [
+				"breaking changes in patches after 0.80.6: 0.80.7, 0.80.8, 0.84.3, 1.0.3, 1.5.1 (F-13); a move needs a sponsor ruling."
+			],
+			"moves": [
+				"the live lanes' agent behaviour"
+			],
+			"declared": {
+				"apps/rph-demo": "0.80.6"
+			},
+			"locked": "0.80.6",
+			"nested": {}
+		},
+		{
+			"component": "@earendil-works/pi-coding-agent",
+			"group": "Pi SDK",
+			"pin": "exact",
+			"reason": "Packages that put breaking changes in patch releases (D-8); governed: the Pi pins move only after a sponsor ruling (REG-D-114 (19), I3).",
+			"blockers": [
+				"breaking changes in patches after 0.80.6: 0.80.7, 0.80.8, 0.84.3, 1.0.3, 1.5.1 (F-13); a move needs a sponsor ruling."
+			],
+			"moves": [
+				"the live lanes' agent behaviour"
+			],
+			"declared": {
+				"apps/rph-demo": "0.80.6"
+			},
+			"locked": "0.80.6",
+			"nested": {}
+		},
+		{
+			"component": "@earendil-works/pi-agent-core",
+			"group": "Pi SDK",
+			"pin": "exact",
+			"reason": "Packages that put breaking changes in patch releases (D-8); governed: the Pi pins move only after a sponsor ruling (REG-D-114 (19), I3).",
+			"blockers": [
+				"moves with pi-coding-agent; a move needs a sponsor ruling."
+			],
+			"moves": [
+				"the live lanes' agent behaviour"
+			],
+			"declared": {
+				"apps/rph-demo": "0.80.6"
+			},
+			"locked": "0.80.6",
+			"nested": {}
+		},
+		{
+			"component": "typebox",
+			"group": "Pi SDK",
+			"pin": "exact",
+			"reason": "Must equal Pi's exact pin (F-13: bun.lock records Pi's \"typebox\": \"1.1.38\").",
+			"blockers": [
+				"moves with Pi."
+			],
+			"moves": [
+				"the live lanes' tool schemas"
+			],
+			"declared": {
+				"apps/rph-demo": "1.1.38"
+			},
+			"locked": "1.1.38",
+			"nested": {}
+		},
+		{
+			"component": "@playwright/test",
+			"group": "e2e",
+			"pin": "exact",
+			"reason": "Packages that put breaking changes in minor releases (D-8): Playwright 1.63, 1.64 and 1.65 (F-13).",
+			"blockers": [
+				"T6 moves the e2e browser from the system Edge to Playwright's bundled Chromium."
+			],
+			"moves": [
+				"the e2e suite in gate:tail",
+				"the live lanes"
+			],
+			"declared": {
+				"apps/rph-demo": "1.61.1"
+			},
+			"locked": "1.61.1",
+			"nested": {}
+		},
+		{
+			"component": "elkjs",
+			"group": "graph layout",
+			"pin": "exact",
+			"reason": "A dependency that is exact today stays exact until a decision loosens it (D-8). Its reason: it is tied to 0.11's entry layout (apps/rph-demo/vite.config.ts:19-22; TOOLCUR D-8).",
+			"blockers": [
+				"Skip 0.13.0, which npm marks deprecated; 0.12.0 \"adds GPL-3.0 as a secondary license\" (F-13)."
+			],
+			"moves": [
+				"the PWA designer's layout"
+			],
+			"declared": {
+				"apps/rph-demo": "0.11.1"
+			},
+			"locked": "0.11.1",
+			"nested": {}
+		},
+		{
+			"component": "@dagrejs/dagre",
+			"group": "graph layout",
+			"pin": "exact",
+			"reason": "A dependency that is exact today stays exact until a decision loosens it (D-8). No reason recorded: `git log -S` on apps/rph-demo/package.json finds it added exact by 249ce380 (2026-07-15), whose message says only \"Adds @dagrejs/dagre (pure JS, SSR-safe)\"; the docs and code comments give none.",
+			"blockers": [],
+			"moves": [
+				"the PWA designer's tree layout"
+			],
+			"declared": {
+				"apps/rph-demo": "3.0.0"
+			},
+			"locked": "3.0.0",
+			"nested": {}
+		},
+		{
+			"component": "@statelyai/graph",
+			"group": "graph layout",
+			"pin": "exact",
+			"reason": "A dependency that is exact today stays exact until a decision loosens it (D-8). No reason recorded: `git log -S` on apps/rph-demo/package.json finds it added exact by 1668c85a (2026-07-18) with elkjs, xstate and @xstate/svelte, and that commit's message gives none; the docs and code comments give none.",
+			"blockers": [],
+			"moves": [
+				"the PWA designer's graph"
+			],
+			"declared": {
+				"apps/rph-demo": "2.1.0"
+			},
+			"locked": "2.1.0",
+			"nested": {}
+		},
+		{
+			"component": "@xyflow/svelte",
+			"group": "graph layout",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [],
+			"moves": [
+				"the PWA designer's rendering"
+			],
+			"declared": {
+				"apps/rph-demo": "^1.4.0"
+			},
+			"locked": "1.6.2",
+			"nested": {}
+		},
+		{
+			"component": "xstate",
+			"group": "xstate",
+			"pin": "exact",
+			"reason": "A dependency that is exact today stays exact until a decision loosens it (D-8). No reason recorded: `git log -S` on apps/rph-demo/package.json finds it added exact by 1668c85a (2026-07-18), whose message gives none; the docs and code comments give none.",
+			"blockers": [],
+			"moves": [
+				"the app's state machines"
+			],
+			"declared": {
+				"apps/rph-demo": "5.32.5"
+			},
+			"locked": "5.32.5",
+			"nested": {}
+		},
+		{
+			"component": "@xstate/svelte",
+			"group": "xstate",
+			"pin": "exact",
+			"reason": "A dependency that is exact today stays exact until a decision loosens it (D-8). No reason recorded: `git log -S` on apps/rph-demo/package.json finds it added exact by 1668c85a (2026-07-18), whose message gives none; the docs and code comments give none.",
+			"blockers": [
+				"moves with xstate."
+			],
+			"moves": [
+				"the app's state machines"
+			],
+			"declared": {
+				"apps/rph-demo": "5.0.0"
+			},
+			"locked": "5.0.0",
+			"nested": {}
+		},
+		{
+			"component": "zod",
+			"group": "codegen",
+			"pin": "exact",
+			"reason": "Tools whose output an instrument pins, byte for byte (D-8): the 120 committed JSON Schemas (F-11, I02). Made exact at its locked version by T0, which moves no version.",
+			"blockers": [],
+			"moves": [
+				"the committed JSON Schemas and gen:check"
+			],
+			"declared": {
+				"packages/rph-application": "4.4.3",
+				"packages/rph-contracts": "4.4.3",
+				"packages/rph-domain": "4.4.3"
+			},
+			"locked": "4.4.3",
+			"nested": {}
+		},
+		{
+			"component": "prettier",
+			"group": "codegen",
+			"pin": "exact",
+			"reason": "Tools whose output an instrument pins, byte for byte (D-8): gen:check compares its output (F-11, I01). Made exact at its locked version by T0, which moves no version.",
+			"blockers": [],
+			"moves": [
+				"gen:check's bytes"
+			],
+			"declared": {
+				".": "3.9.5"
+			},
+			"locked": "3.9.5",
+			"nested": {}
+		},
+		{
+			"component": "ajv",
+			"group": "codegen",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [],
+			"moves": [
+				"rph-contracts' schema tests"
+			],
+			"declared": {
+				"packages/rph-contracts": "^8.17.0"
+			},
+			"locked": "8.20.0",
+			"nested": {
+				"@eslint/eslintrc/ajv": "6.15.0",
+				"eslint/ajv": "6.15.0"
+			}
+		},
+		{
+			"component": "ajv-formats",
+			"group": "codegen",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [
+				"moves with ajv."
+			],
+			"moves": [
+				"rph-contracts' schema tests"
+			],
+			"declared": {
+				"packages/rph-contracts": "^3.0.0"
+			},
+			"locked": "3.0.1",
+			"nested": {}
+		},
+		{
+			"component": "turbo",
+			"group": "standalone",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [],
+			"moves": [
+				"the task cache: globalDependencies on this matrix and .node-version make a runtime change change the hash (F-10)"
+			],
+			"declared": {
+				".": "^2.10.4"
+			},
+			"locked": "2.10.4",
+			"nested": {}
+		},
+		{
+			"component": "ulid",
+			"group": "standalone",
+			"pin": "caret",
+			"reason": "Everything else (D-8): a caret range, with bun.lock as the configuration item.",
+			"blockers": [],
+			"moves": [],
+			"declared": {
+				"apps/rph-demo": "^2.3.0",
+				"packages/rph-authoring": "^2.3.0",
+				"packages/rph-contracts": "^2.3.0"
+			},
+			"locked": "2.4.0",
+			"nested": {}
+		},
+		{
+			"component": "fast-check",
+			"group": "standalone (tests)",
+			"pin": "exact",
+			"reason": "A dependency that is exact today stays exact until a decision loosens it (D-8). No reason recorded: it came with the property tests' first install (docs/_working/OPEN-QUESTIONS.md:188 records only that it was added), and `git log -S` on packages/rph-domain/package.json finds it in the import commit 19a1b20f, whose message gives none.",
+			"blockers": [],
+			"moves": [
+				"the property tests P1-P8 (300 runs each)"
+			],
+			"declared": {
+				"packages/rph-domain": "4.9.0"
+			},
+			"locked": "4.9.0",
+			"nested": {}
+		}
+	],
+	"machine": [
+		{
+			"component": "edge",
+			"group": "e2e (machine)",
+			"check": "major",
+			"observed": "157",
+			"date": "2026-11-16",
+			"detail": "The system Edge, the only e2e browser (channel 'msedge' in all three Playwright configs), which updates itself: launcher 157.0.4341.42, with 157.0.4341.46 and 157.0.4341.60 staged. T6 replaces it with Playwright's bundled Chromium."
+		},
+		{
+			"component": "sonarlint",
+			"group": "Sonar runner (machine)",
+			"check": "version",
+			"observed": "6.3.0",
+			"date": "2026-11-16",
+			"detail": "The SonarLint extension the Sonar runner drives (~/.devin/extensions), bundling SonarJS 14.4.0.46458 and its JRE 21.0.12.1. It decides no gate:fast step today (D-9); JAN-SONARCM's runner checks it again at run time."
+		},
+		{
+			"component": "java",
+			"group": "host tools (G12)",
+			"check": "none",
+			"observed": "21.0.7",
+			"date": "2026-11-16",
+			"detail": "Java on PATH: Temurin 21.0.7.",
+			"probe": "java"
+		},
+		{
+			"component": "git",
+			"group": "host tools (G12)",
+			"check": "none",
+			"observed": "2.53.0.windows.1",
+			"date": "2026-11-16",
+			"detail": "git on PATH.",
+			"probe": "git"
+		},
+		{
+			"component": "python",
+			"group": "host tools (G12)",
+			"check": "none",
+			"observed": "3.14.0",
+			"date": "2026-11-16",
+			"detail": "Python on PATH.",
+			"probe": "python"
+		},
+		{
+			"component": "devin",
+			"group": "agent CLIs",
+			"check": "none",
+			"observed": "3000.11.234",
+			"date": "2026-11-16",
+			"detail": "The devin CLI, which updates itself.",
+			"probe": "devin"
+		},
+		{
+			"component": "pi",
+			"group": "agent CLIs",
+			"check": "none",
+			"observed": "1.4.0",
+			"date": "2026-11-16",
+			"detail": "The pi CLI, beside the in-process SDK the app pins (0.80.6).",
+			"probe": "pi"
+		},
+		{
+			"component": "ollama",
+			"group": "agent CLIs",
+			"check": "none",
+			"observed": "0.40.16",
+			"date": "2026-11-16",
+			"detail": "The Ollama server, which updates itself; its version is governed at run time by REG-D-152 (0.40.16 accepted beside the recorded 0.40.15).",
+			"probe": "ollama"
+		}
+	],
+	"vscode": {
+		"group": "VS Code (new)",
+		"floor": "1.123.0",
+		"floorElectron": "42.3.0",
+		"floorNode": "24.15.0",
+		"floorChromium": "148.0.7778.180",
+		"source": "F-5's table from each VS Code tag's .npmrc target= and Electron's release list; 1.123.0 is the first VS Code on Node 24, and engines.vscode becomes \">=1.123.0\" when the extension's manifest exists (D-2).",
+		"observed": [
+			{
+				"product": "VS Code",
+				"version": "1.146.0",
+				"node": "",
+				"date": "2026-11-16"
+			},
+			{
+				"product": "Devin",
+				"version": "1.141.2",
+				"node": "24.22.0",
+				"date": "2026-11-13"
+			}
+		]
+	},
+	"browserFloor": null,
+	"gateSteps": {
+		"bun run toolchain:check": "bun",
+		"bun run slices:ledger:check": "bun",
+		"bun run guards:export:check": "bun",
+		"bun run gen:check": "bun",
+		"bun run tracker:build": "bun",
+		"bun run check-types": "node",
+		"bun run lint": "node",
+		"bun run boundary": "node+bun",
+		"bun run build": "node",
+		"bun run test": "node",
+		"bun run test:coverage": "node",
+		"bun run coverage:floor:check": "bun",
+		"cd apps/rph-demo": "none",
+		"bun run check": "node",
+		"cd ../..": "none",
+		"bun run gate:tail": "bun"
+	}
+}

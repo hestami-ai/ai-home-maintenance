@@ -718,7 +718,7 @@ kind 2, record kinds 1 and 3 as exceptions.
 - **SPONSOR RULING** (2026-11-13, *"The other corrections you mentioned are agreeable as well"*), on the findLast
   group, the 11 open S7750 findings. 3 of the 11 fixes sit inside live mutation-ledger anchors and re-anchor them in
   the same commit: `packages/rph-ports/src/ports/process-runner.ts:252` (P2B-a), `scripts/phase7/half-b.ts:453`
-  (E3-M21), `scripts/phase7/run-report-core.ts:3132` (P6X-M-M15). The fix at `scripts/reviewer-qual/run.ts:276` gets
+  (E3-M21), `scripts/phase7/run-report-core.ts:3194` (~~`:3132`~~ in cycle 6's tree; P6X-M-M15). The fix at `scripts/reviewer-qual/run.ts:276` gets
   a guard, because `findLast` would stop rejecting a malformed results file (a null line before the last SELECTION).
 - The group rests on the same ruling's other sentence, *"update to Typescript 6.0+ ... which should allow us to
   update to ES2025"* (§0): it waits for `JAN-TOOLCUR` to raise `lib`, because `findLast` is ES2023 and the shared base
@@ -967,7 +967,7 @@ The ESLint name is the rule a marker would name (D-5); names come from SonarJS 1
 | `scripts/census/derive-invariant-limbs.ts:54` | S8786 | `sonarjs/super-linear-regex` |
 | `scripts/reviewer-qual/record.ts:595` | S6582 | `@typescript-eslint/prefer-optional-chain` |
 | `apps/rph-demo/src/lib/server/authoring-turn.ts:913` | S7747 | `unicorn/no-useless-spread` |
-| `scripts/phase7/run-report-core.ts:4995` | S8786 | `sonarjs/super-linear-regex` |
+| `scripts/phase7/run-report-core.ts:4995` (`:5086` at M0's second merge, after L16) | S8786 | `sonarjs/super-linear-regex` |
 | `scripts/reviewer-qual/decision-model-pointer.ts:96` | S7780 | `unicorn/prefer-string-raw` |
 | `scripts/reviewer-qual/decision-model-live-check.ts:79` | S6582 | `@typescript-eslint/prefer-optional-chain` |
 | `scripts/phase7/faithful-wordfreq.js:105` | S3358 | `sonarjs/no-nested-conditional` |

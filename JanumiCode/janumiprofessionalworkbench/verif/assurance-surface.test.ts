@@ -123,8 +123,13 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * eleven files had landed since the last raise and nothing prompted one, which is the stale-low floor the note above
  * warns about, found by the act of raising it. This increment adds three: `verif/reviewer-qualification-fingerprint`,
  * `verif/reviewer-qualification-check` and `verif/gate-tail` (`.test.ts` each). The floor is set to the population.
+ *
+ * ⚠ 79 -> 119 (2026-11-16, JAN-TOOLCUR T0): measured before this increment the population was 118, not 79 — thirty-nine
+ * files had landed since the last raise and nothing prompted one, the stale-low floor this note warns of, found again
+ * by the act of raising it (the roadmap asks for "the measured population, as its comment asks"). This increment adds
+ * `verif/toolchain.test.ts`. The floor is set to the population.
  */
-const VERIF_TEST_FLOOR = 79;
+const VERIF_TEST_FLOOR = 119;
 
 /**
  * The root commands JPWB owns, salvaged from `assertJpwbRequiredRootCommands`. ⚠ That list has 34 names and
@@ -157,7 +162,12 @@ const REQUIRED_ROOT_COMMANDS = [
 	// gate's tail beside the browser tests (DESIGN-what-the-tests-prove.md §5.6). Either vanishing makes `gate:fast`
 	// run a shorter gate — and the sequencing pin resolves the check through `gate:tail`'s exported steps.
 	'reviewer:qual:check',
-	'gate:tail'
+	'gate:tail',
+	// JAN-TOOLCUR T0 (2026-11-16): 12 -> 13. The gate's first step, which checks the machine and the tree against the
+	// compatibility matrix (`scripts/toolchain/check.ts`, TOOLCUR D-9). Named for the reason this list exists: a vanished
+	// `toolchain:check` makes `gate:fast` run on a runtime nobody recorded, with no other symptom.
+	// ⚠ `toolchain:review` is deliberately NOT listed: it writes the monthly report and gates nothing (TOOLCUR D-10).
+	'toolchain:check'
 ] as const;
 
 /** Counted from DISK, not from git: vitest collects what is on disk, and that is the population at risk. */
@@ -201,7 +211,7 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 		// ⚠ THE RESIDUAL IS STATED RATHER THAN CLAIMED AWAY: someone who removes a command AND decrements this
 		// number has made a deliberate, reviewable edit. That is the most a population pin can buy, and it is
 		// the same bargain `COLLAPSE_FLOOR` strikes in `verif/dependency-boundary-rules.test.ts`.
-		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(12);
+		expect(REQUIRED_ROOT_COMMANDS).toHaveLength(13);
 	});
 
 	// ── S1D / S4 — THE GATE'S OWN COMPOSITION, PINNED FROM JPWB FOR THE FIRST TIME ───────────────────────────
@@ -218,6 +228,15 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 	it('gate:fast runs JPWB steps only, in order, with no csaa step anywhere in it', () => {
 		const steps = (rootScripts()['gate:fast'] ?? '').split(' && ').map((step) => step.trim());
 		expect(steps).toEqual([
+			// ⭐⭐ JAN-TOOLCUR T0 (2026-11-16): 15 STEPS -> 16, THE PIN UPDATED WITH ITS REASON. `toolchain:check` checks
+			// the Node on PATH, the running Bun, the installed tree, the lock, the manifests, the peer ranges and the
+			// machine tools against the compatibility matrix (`scripts/toolchain/check.ts`, TOOLCUR D-9).
+			//
+			// ⛔ IT SITS FIRST, AND THE POSITION IS AN ARGUMENT. Every other step stands on what it checks: each runs on
+			// that Node or that Bun, with those packages. Placed later, the steps before it would already have measured on
+			// a runtime nobody recorded, and a cached step could replay a result from another runtime (TOOLCUR F-10). First,
+			// it fails in seconds, before any of that has happened.
+			'bun run toolchain:check',
 			'bun run slices:ledger:check',
 			// JAN-PFA R3 (2026-09-12): the export-guard ratchet. It sits SECOND because it is a static census
 			// over source and the ledger — it needs no build, no tests and no coverage — so a lost guard fails
@@ -266,6 +285,10 @@ describe('JAN-CSAAEXT S1 — JPWB watches its own assurance surface', () => {
 		// cruise on purpose — but it does mean the disappearance of the CSAA half was watched by nothing until
 		// this line. The two are complementary: that one owns the cruise, this one owns the absence.
 		const boundary = rootScripts().boundary ?? '';
-		expect(boundary).toBe('depcruise packages --config .dependency-cruiser.cjs');
+		// JAN-TOOLCUR T0 (2026-11-16): RE-BASELINED WITH ITS REASON. The rules' cruise is unchanged and still first, so its
+		// sibling's prefix pin holds; the population guard follows it (`scripts/toolchain/boundary.ts`, TOOLCUR D-4). A
+		// cruise of zero package modules, or one that misses or adds a tracked source file, now fails instead of printing
+		// its green line over nothing (F-7). Still no csaa script: the absence this pin was written to watch.
+		expect(boundary).toBe('depcruise packages --config .dependency-cruiser.cjs && bun run scripts/toolchain/boundary.ts');
 	});
 });

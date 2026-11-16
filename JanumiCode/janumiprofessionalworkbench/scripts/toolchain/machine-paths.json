@@ -1,0 +1,21 @@
+{
+	"$comment": "Where toolchain:check finds the machine tools (JAN-TOOLCUR D-9 condition 7, D-13; roadmap T0). Roots start with ~ (the profile) or %VAR% (an environment variable), never a path that names a user. JAN-SONARCM S1 extends this file.",
+	"edge": {
+		"roots": ["%ProgramFiles(x86)%/Microsoft/Edge/Application", "%ProgramFiles%/Microsoft/Edge/Application"],
+		"versionDir": "^\\d+\\.\\d+\\.\\d+\\.\\d+$"
+	},
+	"sonarlint": {
+		"roots": ["~/.devin/extensions"],
+		"extensionDir": "^sonarsource\\.sonarlint-vscode-\\d+\\.\\d+\\.\\d+(?:-[a-z0-9-]+)?$"
+	},
+	"executables": {
+		"node": { "command": "node", "args": ["--version"], "version": "v(\\d+\\.\\d+\\.\\d+)" },
+		"java": { "command": "java", "args": ["-version"], "version": "version \"(\\d+\\.\\d+\\.\\d+)" },
+		"git": { "command": "git", "args": ["--version"], "version": "git version (\\S+)" },
+		"python": { "command": "python", "args": ["--version"], "version": "Python (\\S+)" },
+		"devin": { "command": "devin", "args": ["--version"], "version": "devin (\\S+)" },
+		"pi": { "command": "pi", "args": ["--version"], "version": "^(\\d+\\.\\d+\\.\\d+)" },
+		"ollama": { "command": "ollama", "args": ["--version"], "version": "ollama version is (\\S+)" },
+		"code": { "command": "code", "args": ["--version"], "version": "^(\\d+\\.\\d+\\.\\d+)" }
+	}
+}

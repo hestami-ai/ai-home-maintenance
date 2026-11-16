@@ -310,7 +310,7 @@ and the order of the first upgrades, as a preview for the roadmap.
   (`scripts/mutants/ledger.ts:8214`, `:8225`).
 - The raise lets the 11 open S7750 `findLast` fixes land. 3 of the 11 sit inside live mutant anchors:
   `packages/rph-ports/src/ports/process-runner.ts:252` (P2B-a, `ledger.ts:7881`), `scripts/phase7/half-b.ts:453`
-  (E3-M21, `:28374`) and `scripts/phase7/run-report-core.ts:3132` (P6X-M-M15, `:37254`). At
+  (E3-M21, `:28374`) and `scripts/phase7/run-report-core.ts:3194` (~~`:3132`~~ in cycle 6's tree; P6X-M-M15, `:37254`). At
   `scripts/reviewer-qual/run.ts:276`, `findLast` would stop rejecting a results file that has a `null` line before
   the last SELECTION (refuter, K15).
 
@@ -917,7 +917,7 @@ and the order of the first upgrades, as a preview for the roadmap.
 | `apps/rph-demo/svelte.config.js` | `kit.typescript.config`: lib ES2025 + DOM + DOM.Iterable, target ES2025 | D-5 (T1c) |
 | `apps/rph-demo/vite.config.ts` | `build.target` = the browser floor | D-6 (T1c) |
 | `scripts/tsconfig.json:8-9`, `scripts/mutants/run.ts:1016`, `apps/rph-demo/e2e-live-exec/phase7-operator.ts:970`, roadmap `:69` | restated | D-5 (T1c) |
-| the 11 S7750 sites: `apps/rph-demo/src/lib/server/tools/devin-reviewer.ts:503`, `packages/rph-engine/src/replay.ts:107`, `:108`, `packages/rph-ports/src/ports/process-runner.ts:252`, `scripts/mutants/run.ts:1031`, `scripts/phase7/half-b.ts:453`, `scripts/phase7/run-archive.ts:883` (~~`:879`~~ in cycle 6's tree, before L15 changed the lines above it; restated at M0's merge), `scripts/phase7/run-report-core.ts:1854`, `:3132`, `:3730`, `scripts/reviewer-qual/run.ts:276` (with its guard); the 2 S4043 sites `apps/rph-demo/src/lib/server/assurance/review-fence.ts:291`, `:309` | `findLast` and `toReversed` (ES-level sites review) | D-12 (T4) |
+| the 11 S7750 sites: `apps/rph-demo/src/lib/server/tools/devin-reviewer.ts:503`, `packages/rph-engine/src/replay.ts:107`, `:108`, `packages/rph-ports/src/ports/process-runner.ts:252`, `scripts/mutants/run.ts:1031`, `scripts/phase7/half-b.ts:453`, `scripts/phase7/run-archive.ts:908` (~~`:879`~~ in cycle 6's tree, before L15 changed the lines above it; ~~`:883`~~ at M0's merge into `dd23ebba`; restated at its second merge, into `5c8a2d35`, after L16 changed them again), `scripts/phase7/run-report-core.ts:1872`, `:3194`, `:3809` (~~`:1854`~~, ~~`:3132`~~, ~~`:3730`~~ in cycle 6's tree and at M0's first merge; restated at its second, after L16), `scripts/reviewer-qual/run.ts:276` (with its guard); the 2 S4043 sites `apps/rph-demo/src/lib/server/assurance/review-fence.ts:291`, `:309` | `findLast` and `toReversed` (ES-level sites review) | D-12 (T4) |
 | `scripts/mutants/ledger.ts` | 3 + 5 re-anchors | D-12 (T4) |
 | the three Playwright configs | the bundled Chromium | D-12 (T6) |
 | the register | DECISION entries, filed when each package lands | §1.1 |
