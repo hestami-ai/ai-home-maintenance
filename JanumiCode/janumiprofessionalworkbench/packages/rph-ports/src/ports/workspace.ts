@@ -177,8 +177,8 @@ const WIN32_DEVICE_STEM = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
  *   3. A WIN32 DEVICE NAME IS NOT A LOCATION. Under bun, `writeFileSync(<dir>/NUL, …)` returned normally and
  *      the path did not exist afterwards (`existsSync` false, `readdir` empty, read-back ENOENT); under node
  *      the same call created a real file, because libuv reaches the filesystem through the long-path prefix
- *      that bypasses device translation. This repository runs BOTH runtimes — vitest under bun, the SvelteKit
- *      server under node — so a predicate that was right on one would be silently wrong on the other.
+ *      that bypasses device translation. This repository runs BOTH runtimes — its scripts under bun, vitest and
+ *      the SvelteKit server under node (TOOLCUR F-3) — so a predicate right on one would be silently wrong on the other.
  *
  * ⛔ ALL THREE ARE REFUSED ON EVERY PLATFORM, AND THE OVER-REFUSAL ON POSIX IS DELIBERATE: it is the rule this
  * predicate already follows for separators — "BOTH separator spellings are refused: a Windows host accepts

@@ -298,7 +298,7 @@ describe('⛔ the filesystem realities, driven through the adapter that touches 
 	});
 
 	it('⛔ B3 — `NUL` is REFUSED: no write is reported that cannot be read back', async () => {
-		// ⭑⭑ MEASURED UNDER BUN, THE RUNTIME THIS REPOSITORY'S OWN SUITES RUN ON: `writeFileSync(<dir>/NUL, …)`
+		// ⭑⭑ MEASURED UNDER BUN, WHICH RUNS THIS REPOSITORY'S SCRIPTS (ITS SUITES RUN UNDER NODE, TOOLCUR F-3): `writeFileSync(<dir>/NUL, …)`
 		// returns normally and the bytes are GONE — `existsSync` false, `readdirSync` empty, read-back ENOENT.
 		// `writeFile` answered `{written: true, byteSize: 18}` for bytes that went to the null device, which
 		// defeats the union's whole purpose from inside: a caller may not read `path` off a write that never

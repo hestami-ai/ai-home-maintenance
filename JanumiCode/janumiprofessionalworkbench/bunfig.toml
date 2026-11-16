@@ -5,3 +5,9 @@
 # (which already trusts esbuild/prisma/etc.) and breaks native postinstalls.
 [install]
 linker = "hoisted"
+# JAN-TOOLCUR D-8 (T0): a release-age cooldown of 7 days, in seconds. Shown on Bun 1.3.14 before it was set here: a
+# version 2 days old was refused ("blocked by minimum-release-age: 604800 seconds"), one 10 days old installed. A
+# security fix released this week is installed by naming its package in `minimumReleaseAgeExcludes` for that one
+# install (Bun 1.3.14 has the setting; shown the same day), restored in the same commit and recorded in the monthly
+# review (D-10). The cooldown is never left off.
+minimumReleaseAge = 604800

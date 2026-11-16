@@ -34,7 +34,7 @@
     "@janumipwb/rph-domain": "workspace:*",
     "@janumipwb/rph-ports": "workspace:*",
     "@janumipwb/rph-projections": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@janumipwb/rph-persistence": "workspace:*",

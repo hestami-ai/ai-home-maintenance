@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "ulid": "^2.3.0",
-    "zod": "^4.4.3"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@janumipwb/typescript-config": "workspace:*",
