@@ -458,6 +458,8 @@ the thing that makes an Undertaking's deliverable findable and its accidents leg
 adapter stays. It is permission to stop pretending — and to stop adding one more string comparison per
 adversary, which is what §4.8 exists to end.
 
+⭑ **2026-11-16 (`REG-D-168`; `DESIGN-data-flow-order-and-deliverable-review.md` D88).** The local development and test environment will stand in for the platform tier with Docker and Compose, in stages built after P6 again's tenth run, a model's commands in Linux containers behind these two ports first; security-constraining requirements are levied on the Janumi Platform.
+
 
 ---
 
