@@ -158,6 +158,15 @@ function parseArgs(argv: readonly string[]): Args | string {
 	}
 	return argsProblem(out) ?? out;
 }
+/** What is wrong with `--mode` and the flags it would ignore, or undefined. */
+function modeProblem(args: Args): string | undefined {
+	if (args.mode !== undefined && args.mode !== 'run' && args.mode !== 'rederive') return '--mode is run or rederive';
+	if (args.mode === 'rederive' && args.transport !== 'devin')
+		return '--mode rederive is D53’s pass before its devin runs: --transport devin';
+	const runOnly = args.mode === 'rederive' ? RUN_ONLY.find((f) => args[f] !== undefined) : undefined;
+	if (runOnly) return `--${runOnly} is a run’s: --mode rederive calls no reviewer and appends nothing`;
+	return undefined;
+}
 /** What is wrong with a complete set of flags, or undefined. */
 function argsProblem(args: Args): string | undefined {
 	for (const required of ['transport', 'model', 'out'])
@@ -174,11 +183,8 @@ function argsProblem(args: Args): string | undefined {
 	if (ignored)
 		return `--${ignored} is an ollama option: the ${args.transport} transport would ignore it`;
 	// ⭐ Z3 — the re-derivation pass is D53's, before its devin runs; nothing it would ignore is taken in silence.
-	if (args.mode !== undefined && args.mode !== 'run' && args.mode !== 'rederive') return '--mode is run or rederive';
-	if (args.mode === 'rederive' && args.transport !== 'devin')
-		return '--mode rederive is D53’s pass before its devin runs: --transport devin';
-	const runOnly = args.mode === 'rederive' ? RUN_ONLY.find((f) => args[f] !== undefined) : undefined;
-	if (runOnly) return `--${runOnly} is a run’s: --mode rederive calls no reviewer and appends nothing`;
+	const modeFlagProblem = modeProblem(args);
+	if (modeFlagProblem) return modeFlagProblem;
 	return Object.keys(NUMBERS)
 		.map((flag) => (args[flag] === undefined ? undefined : numberProblem(flag, args[flag])))
 		.find((problem) => problem !== undefined);
@@ -291,7 +297,8 @@ async function d53Prechecks(
 	if (refusedCases.length > 0)
 		return `REFUSED (D53): D54’s records hold a refusal, not a review, for ${refusedCases.length} of the ${cases.length} current cases: ${refusedCases.join('; ')}. Nothing was run.`;
 	// ⭐ Z3 phase 2 — and what the records hold, said: every current case, none refused, and the files read by their sha256.
-	say(`D53 — D54’s records hold ${cases.length} of the ${cases.length} current cases, none refused (${onFile.files.map((f) => `${f.name} sha256 ${f.sha256}`).join(', ')})`);
+	const recordFiles = onFile.files.map((f) => `${f.name} sha256 ${f.sha256}`).join(', ');
+	say(`D53 — D54’s records hold ${cases.length} of the ${cases.length} current cases, none refused (${recordFiles})`);
 	// D53 — the decision model, for the live re-derivation.
 	const { configuredIndications } = await import('../../apps/rph-demo/src/lib/server/assurance/decision-model.js');
 	// ⭐⭐ Package L8 — D63 (`REG-D-152`; the lead's decision (A)): held to the records' version alone, `[]` — though the product's
@@ -349,19 +356,32 @@ async function rederivationPass(
 	return 0;
 }
 
-export async function main(argv: readonly string[], deps: CliDeps): Promise<number> {
-	const say = (s: string) => deps.write(`reviewer-qual — ${s}\n`);
+/** D11 and D12, before anything that reaches the product is loaded: true when the run is refused, its refusal said. */
+function preflightRefused(deps: CliDeps, say: (s: string) => void): boolean {
 	const d11 = sourceResolutionProblem(deps.resolve(SOURCE_PROBE));
 	if (d11) {
 		say(d11);
-		return 2;
+		return true;
 	}
 	try {
 		refuseProgramOverrides(deps.env);
 	} catch (e) {
 		say((e as Error).message);
-		return 2;
+		return true;
 	}
+	return false;
+}
+
+/** A HARNESS refusal is reported, never recorded against the candidate. Anything else is a defect, and throws. */
+function harnessRefusalExit(e: unknown, appended: number, say: (s: string) => void): number {
+	if (!isHarnessRefusal(e)) throw e;
+	say(e.message);
+	return appended === 0 ? 2 : 4;
+}
+
+export async function main(argv: readonly string[], deps: CliDeps): Promise<number> {
+	const say = (s: string) => deps.write(`reviewer-qual — ${s}\n`);
+	if (preflightRefused(deps, say)) return 2;
 	const args = parseArgs(argv);
 	if (typeof args === 'string') {
 		say(`usage: ${args}`);
@@ -463,10 +483,7 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 			}
 		});
 	} catch (e) {
-		// A HARNESS refusal is reported, never recorded against the candidate. Anything else is a defect, and throws.
-		if (!isHarnessRefusal(e)) throw e;
-		say(e.message);
-		return appended === 0 ? 2 : 4;
+		return harnessRefusalExit(e, appended, say);
 	}
 	say(runSummary(args.out!, replies));
 	return 0;

@@ -46,10 +46,17 @@ export interface OllamaTransportOptions {
 
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 
+/** The address less every slash it ends with, read back from its end: no regular expression, so no backtracking (S8786). */
+const withoutTrailingSlashes = (address: string): string => {
+	let end = address.length;
+	while (end > 0 && address[end - 1] === '/') end -= 1;
+	return address.slice(0, end);
+};
+
 export function createOllamaTransport(
 	o: OllamaTransportOptions
 ): Transport & { unload(): Promise<void> } {
-	const base = o.baseUrl.replace(/\/+$/, '');
+	const base = withoutTrailingSlashes(o.baseUrl);
 	const boundMs = o.boundMs ?? OLLAMA_BOUND_MS;
 	const now = o.now ?? (() => performance.now());
 	const post = (path: string, body: unknown, signal?: AbortSignal) =>

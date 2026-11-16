@@ -376,6 +376,7 @@ export function headOf(text: string, units: number): string {
 	if (
 		end > 0 &&
 		end < text.length &&
+		// S7758: kept charCodeAt - codePointAt reads a high-low surrogate pair as one code point, so isHigh would miss the pair
 		isHigh(text.charCodeAt(end - 1)) &&
 		isLow(text.charCodeAt(end))
 	)
@@ -390,6 +391,7 @@ export function tailOf(text: string, units: number): string {
 		start > 0 &&
 		start < text.length &&
 		isLow(text.charCodeAt(start)) &&
+		// S7758: kept charCodeAt - codePointAt reads a high-low surrogate pair as one code point, so isHigh would miss the pair
 		isHigh(text.charCodeAt(start - 1))
 	)
 		start += 1;

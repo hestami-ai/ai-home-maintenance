@@ -1157,6 +1157,7 @@ export function census(): { uncovered: string[]; orphans: string[]; total: numbe
 		for (const t of def.transitions) {
 			total += 1;
 			const k = arrowKey(machine, t.from, t.to);
+			// S4158: kept - EXEMPT is a deliberately empty governed extension point; an entry needs a register id.
 			if (!covered.has(k) && !EXEMPT.has(k)) uncovered.push(k);
 		}
 	}

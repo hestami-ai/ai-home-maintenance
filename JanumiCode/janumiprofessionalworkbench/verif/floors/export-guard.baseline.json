@@ -1323,7 +1323,7 @@
 			"guardedExports": [
 				"containedWorkspacePath"
 			],
-			"unattributedMutants": 0
+			"unattributedMutants": 3
 		},
 		"packages/rph-ports/src/scan-context.ts": {
 			"consumedExports": [
@@ -1520,7 +1520,7 @@
 				"startReadiness",
 				"unitDependencies"
 			],
-			"unattributedMutants": 2
+			"unattributedMutants": 3
 		},
 		"packages/rph-projections/src/unit-supersession.ts": {
 			"consumedExports": [

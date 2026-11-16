@@ -113,15 +113,20 @@ export function discover(root: string, files: readonly string[]): string[] {
 	for (const f of files) {
 		if (!isSource(f) || hits.has(f)) continue; // D-3 marker
 		if (PREDICATE_SELF.includes(f)) continue; // the searcher is not the searched-for
-		let text: string;
-		try {
-			text = readFileSync(`${root}/${f}`, 'utf8');
-		} catch {
-			continue; // a working-set entry that vanished mid-run is not a Slice
-		}
-		if (text.includes('export const SLICE')) hits.add(f);
+		if (hasSliceMarker(root, f)) hits.add(f);
 	}
 	return [...hits].sort(byCodeUnit);
+}
+
+/** Discovery's D-3 marker limb for one working-set entry, split out to keep `discover` within budget. */
+function hasSliceMarker(root: string, f: string): boolean {
+	let text: string;
+	try {
+		text = readFileSync(`${root}/${f}`, 'utf8');
+	} catch {
+		return false; // a working-set entry that vanished mid-run is not a Slice
+	}
+	return text.includes('export const SLICE');
 }
 
 function refuse(message: string): never {
@@ -376,6 +381,11 @@ export function sha256(text: string): string {
 export const BEGIN = '<!-- JAN-SLICE:GENERATED-LEDGER:BEGIN -->';
 export const END = '<!-- JAN-SLICE:GENERATED-LEDGER:END -->';
 
+/** One value as Markdown inline code: the value between two backticks. */
+function inlineCode(value: string): string {
+	return `\`${value}\``;
+}
+
 /**
  * The predicate statement. It MUST appear in the ledger, and it MUST say what the ledger does not buy.
  *
@@ -385,65 +395,59 @@ export const END = '<!-- JAN-SLICE:GENERATED-LEDGER:END -->';
  */
 export function renderRegion(ledger: Ledger): string {
 	const lines: string[] = [];
-	lines.push(BEGIN);
-	lines.push('');
-	lines.push('> **GENERATED — DO NOT EDIT.** Written by `verif/slice-ledger.ts` via `bun run slices:ledger`.');
-	lines.push('> A hand edit is reverted by the next write and fails `slices:ledger:check` in the meantime.');
-	lines.push('');
-	lines.push('### The predicate');
-	lines.push('');
 	lines.push(
+		BEGIN,
+		'',
+		'> **GENERATED — DO NOT EDIT.** Written by `verif/slice-ledger.ts` via `bun run slices:ledger`.',
+		'> A hand edit is reverted by the next write and fails `slices:ledger:check` in the meantime.',
+		'',
+		'### The predicate',
+		'',
 		'This ledger is built from every file matching one of these four patterns, and from nothing else: ' +
 			'`packages/*/src/**/*.slice.test.ts`, `apps/*/src/**/*.slice.test.ts`, `verif/**/*.slice.test.ts`, ' +
 			'`apps/*/e2e/**/*.slice.e2e.ts` — matched against the gitignore-aware working set ' +
 			'(`git ls-files -co --exclude-standard`). **A Slice placed anywhere else is NOT in this ledger, and ' +
-			'its absence here is not evidence that it does not exist.**'
-	);
-	lines.push('');
-	lines.push(
+			'its absence here is not evidence that it does not exist.**',
+		'',
 		'⚠ **No working-set FILE COUNT is printed here, and that is deliberate.** A first draft printed one, and ' +
 			'driving `--write` then `--check` immediately reported the ledger stale: writing the two products ' +
 			'added two files to the very set the header counted. The same defect would have reddened this gate ' +
 			'for anyone holding an untracked scratch file — a generator whose output changes the input it ' +
 			'measures produces false positives, and a gate that cries wolf is weakened within a week. Volatile ' +
 			'counts are asserted live in `verif/slice-ledger.test.ts`, where both sides are computed in the same ' +
-			'run, and never baked into a committed artifact.'
-	);
-	lines.push('');
-	lines.push('### The control on that predicate');
-	lines.push('');
-	lines.push(
+			'run, and never baked into a committed artifact.',
+		'',
+		'### The control on that predicate',
+		'',
 		'A wider sweep — every `.ts` and `.svelte` in the same working set whose name contains `.slice.`, or ' +
 			'which lies under a `slices/` path segment, or which contains the byte sequence `export const SLICE` ' +
 			'— runs on every gate run and FAILS when its result differs from the recognised set by anything other ' +
 			`than the single permanent canary at \`${CANARY}\`. That canary is committed UNREACHABLE ON PURPOSE: ` +
-			'it is the only reason a green here means the sweep RAN, rather than that the sweep returned nothing.'
-	);
-	lines.push('');
-	lines.push('### What this does not buy');
-	lines.push('');
-	lines.push(
+			'it is the only reason a green here means the sweep RAN, rather than that the sweep returned nothing.',
+		'',
+		'### What this does not buy',
+		'',
 		'Both layers key on the word "slice". They catch a Slice that was **MOVED**. They do **not** catch a ' +
 			'Slice-shaped substrate **INVENTED** under a different vocabulary — which is exactly what ' +
 			'`docs/tracking/w3b/` was to the tracker index: 614 records typed `"limb"`, a type that index\'s ' +
-			'loader throws on, invisible to it from one day after it was built. Nothing here closes that.'
-	);
-	lines.push('');
-	lines.push('### What a row claims');
-	lines.push('');
-	lines.push(
+			'loader throws on, invisible to it from one day after it was built. Nothing here closes that.',
+		'',
+		'### What a row claims',
+		'',
 		'`citedRules` is a **claim by the Slice\'s author** about what the Slice asserts. This generator checks ' +
 			'only that each id exists in the ratified M12 catalog — it does **not** check that the Slice asserts ' +
 			'it. Only the per-clause mutants, and the messages they predict, make that claim true. See ' +
 			'`JAN-SLICE-DR-001` F-3: the conformance gate checks that a cited file EXISTS and never that it ' +
-			'asserts anything, 125 of 125.'
+			'asserts anything, 125 of 125.',
+		'',
+		'### Slices',
+		''
 	);
-	lines.push('');
-	lines.push('### Slices');
-	lines.push('');
 	if (ledger.rows.length === 0) {
-		lines.push('**None.** No file matches the recognition predicate. This is the true state, not an error —');
-		lines.push('`SWP-02` admits the first Slice.');
+		lines.push(
+			'**None.** No file matches the recognition predicate. This is the true state, not an error —',
+			'`SWP-02` admits the first Slice.'
+		);
 	} else {
 		// ⚠ `presupposes` IS RENDERED, AND IT WAS NOT UNTIL THE FIRST SURFACE SLICE EXISTED (JAN-SLICE-SWP-06).
 		// The field was parsed into every SURFACE row and written to the JSON baseline, and the human-readable
@@ -451,19 +455,18 @@ export function renderRegion(ledger: Ledger): string {
 		// tell a browser failure from a domain failure, which requires seeing WHICH ENGINE Slice a SURFACE Slice
 		// stands on. A column that exists only in the machine projection is a citation nobody is told about.
 		lines.push(
-			'| id | plane | scenario class | cited rules | mutants | presupposes | discharges | source |'
+			'| id | plane | scenario class | cited rules | mutants | presupposes | discharges | source |',
+			'|---|---|---|---|---|---|---|---|'
 		);
-		lines.push('|---|---|---|---|---|---|---|---|');
 		for (const r of ledger.rows)
 			lines.push(
-				`| \`${r.id}\` | ${r.plane} | ${r.scenarioClass} | ${r.citedRules.map((x) => `\`${x}\``).join(', ')} ` +
-					`| ${String(r.mutantCount)} | ${r.presupposes ? `\`${r.presupposes}\`` : '—'} ` +
-					`| ${r.dischargesRegisterEntries.map((x) => `\`${x}\``).join(', ') || '—'} ` +
+				`| \`${r.id}\` | ${r.plane} | ${r.scenarioClass} | ${r.citedRules.map((x) => inlineCode(x)).join(', ')} ` +
+					`| ${String(r.mutantCount)} | ${r.presupposes ? inlineCode(r.presupposes) : '—'} ` +
+					`| ${r.dischargesRegisterEntries.map((x) => inlineCode(x)).join(', ') || '—'} ` +
 					`| \`${r.path}\` |`
 			);
 	}
-	lines.push('');
-	lines.push(END);
+	lines.push('', END);
 	return lines.join('\n');
 }
 
@@ -476,7 +479,7 @@ export function renderRegion(ledger: Ledger): string {
  */
 export function replaceRegion(document: string, region: string): string {
 	const eol = document.includes('\r\n') ? '\r\n' : '\n';
-	const flat = document.replace(/\r\n/g, '\n');
+	const flat = document.replaceAll('\r\n', '\n');
 	const begins = flat.split(BEGIN).length - 1;
 	const ends = flat.split(END).length - 1;
 	if (begins !== 1 || ends !== 1)
@@ -485,5 +488,5 @@ export function replaceRegion(document: string, region: string): string {
 	const stop = flat.indexOf(END) + END.length;
 	if (stop < start) refuse('the END marker precedes the BEGIN marker');
 	const out = `${flat.slice(0, start)}${region}${flat.slice(stop)}`;
-	return eol === '\r\n' ? out.replace(/\n/g, '\r\n') : out;
+	return eol === '\r\n' ? out.replaceAll('\n', '\r\n') : out;
 }

@@ -1,0 +1,119 @@
+findings: 179 | anchors not exactly once: 0
+
+tier AB        total   64  inside anchored text   43  outside   21
+    S3358   inside  16  outside   0
+    S7780   inside   1  outside   9
+    S4624   inside   6  outside   0
+    S3735   inside   1  outside   4
+    S6582   inside   2  outside   2
+    S2871   inside   4  outside   0
+    S8786   inside   3  outside   1
+    S7718   inside   2  outside   1
+    S6353   inside   1  outside   1
+    S107    inside   0  outside   2
+    S3863   inside   1  outside   1
+    S4043   inside   2  outside   0
+    S7781   inside   1  outside   0
+    S6557   inside   1  outside   0
+    S4323   inside   1  outside   0
+    S1121   inside   1  outside   0
+
+tier C         total   12  inside anchored text    0  outside   12
+    S3776   inside   0  outside  12
+
+tier family    total   79  inside anchored text   14  outside   65
+    S9382   inside  13  outside  41
+    S7750   inside   1  outside  11
+    S4036   inside   0  outside   7
+    S7503   inside   0  outside   4
+    S5332   inside   0  outside   1
+    S7784   inside   0  outside   1
+
+tier recorded  total   24  inside anchored text    1  outside   23
+    S2925   inside   0  outside   6
+    S7758   inside   0  outside   5
+    S6582   inside   1  outside   3
+    S8786   inside   0  outside   4
+    S4138   inside   0  outside   1
+    S7780   inside   0  outside   1
+    S3358   inside   0  outside   1
+    S4158   inside   0  outside   1
+    S7747   inside   0  outside   1
+
+--- open findings (tiers AB, C, gen):
+  [AB] S7718 apps/rph-demo/e2e-live-exec/phase7-operator.ts:2230  INSIDE E3-M37-a-throw-mid-authoring-is-not-archived | The catch parameter `failed` should be named `error_`.
+  [AB] S7718 apps/rph-demo/e2e-live-exec/phase7-operator.ts:2240  outside | The catch parameter `failed` should be named `error_`.
+  [C] S3776 apps/rph-demo/e2e-live-exec/phase7-operator.ts:2445  outside | Refactor this function to reduce its Cognitive Complexity from 60 to the 15 allowed. [+36 locations]
+  [AB] S3358 apps/rph-demo/src/lib/server/agent/tools.ts:146  INSIDE P6X-L10-M3-the-armed-states-fallback-to-its-stored-value-is-removed | Extract this nested ternary operation into an independent statement.
+  [AB] S3735 apps/rph-demo/src/lib/server/agent/types.ts:59  outside | Remove this use of the "void" operator.
+  [AB] S3735 apps/rph-demo/src/lib/server/agent/types.ts:60  outside | Remove this use of the "void" operator.
+  [AB] S7780 apps/rph-demo/src/lib/server/assurance/decision-model-request.ts:124  outside | `String.raw` should be used to avoid escaping `\`.
+  [AB] S7780 apps/rph-demo/src/lib/server/assurance/decision-model-request.ts:125  outside | `String.raw` should be used to avoid escaping `\`.
+  [AB] S4624 apps/rph-demo/src/lib/server/assurance/decision-model-request.ts:148  INSIDE P6X-Z2-M2-the-separators-are-compact | Refactor this code to not use nested template literals.
+  [AB] S3358 apps/rph-demo/src/lib/server/assurance/index.ts:143  INSIDE SR1-M13-a-devin-selection-runs-agy | Extract this nested ternary operation into an independent statement.
+  [AB] S3358 apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:617  INSIDE P6X-O2-M1-a-first-step-reads-the-re-run-s-subject,P6X-O2-M2-a-re-run-reads-the-first-step-s-subject | Extract this nested ternary operation into an independent statement.
+  [AB] S3358 apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:995  INSIDE P6X-X-M13-the-marked-heading-drops-its-clause | Extract this nested ternary operation into an independent statement.
+  [AB] S3358 apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:1637  INSIDE PQ1-M27-the-absent-account-is-put-inside-a-fence,ARP-A2-M2-every-framing-gets-the-part-s-account-heading | Extract this nested ternary operation into an independent statement.
+  [AB] S3358 apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:1641  INSIDE PQ1-M22-the-narration-is-left-unfenced,PQ1-V504-a-cut-narration-is-left-unfenced | Extract this nested ternary operation into an independent statement.
+  [AB] S7718 apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:2142  INSIDE P6X-L9-M2-the-branch-is-taken-within-the-bounds-too | The catch parameter `refusal` should be named `error_`.
+  [AB] S107 apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:2816  outside | Arrow function has too many parameters (9). Maximum allowed is 7.
+  [AB] S7780 apps/rph-demo/src/lib/server/assurance/review-cuts.ts:279  outside | `String.raw` should be used to avoid escaping `\`.
+  [AB] S4043 apps/rph-demo/src/lib/server/assurance/review-fence.ts:291  INSIDE PQ1-M1107-the-runs-keep-their-logical-order | Move this array "reverse" operation to a separate statement or replace it with "toReversed".
+  [AB] S4043 apps/rph-demo/src/lib/server/assurance/review-fence.ts:309  INSIDE PQ1-V1001-only-the-first-bidi-line-is-read-reversed-and-no-probe-sees-it,PQ1-V1003-a-line-is-reversed-only-from-its-first-code-point-and-no-probe-sees-it,PQ1-V902-only-the-first-line-holding-a-bidi-control-is-read-reversed,PQ1-M1292-evidence-a-laid-out-line-is-read-with-its-runs-reversed-alone | Move this array "reverse" operation to a separate statement or replace it with "toReversed".
+  [AB] S7780 apps/rph-demo/src/lib/server/assurance/review-fence.ts:342  outside | `String.raw` should be used to avoid escaping `\`.
+  [AB] S3863 apps/rph-demo/src/lib/server/execution/evidence-join.ts:40  INSIDE ER1-V303-the-execution-plane-restates-the-recommendation-code | 'E:\Projects\hestami-sonar\JanumiCode\janumiprofessionalworkbench\node_modules\@janumipwb\rph-assura
+  [AB] S3863 apps/rph-demo/src/lib/server/execution/evidence-join.ts:44  outside | 'E:\Projects\hestami-sonar\JanumiCode\janumiprofessionalworkbench\node_modules\@janumipwb\rph-assura
+  [AB] S3358 apps/rph-demo/src/lib/server/execution/producer-session.ts:178  INSIDE E4-M26-a-replayed-session-reads-as-the-hosts-default | Extract this nested ternary operation into an independent statement.
+  [AB] S3735 apps/rph-demo/src/lib/server/execution/step-binding.ts:249  outside | Remove this use of the "void" operator.
+  [AB] S3735 apps/rph-demo/src/lib/server/execution/step-binding.ts:250  outside | Remove this use of the "void" operator.
+  [AB] S6582 apps/rph-demo/src/lib/server/replay/recording.ts:998  INSIDE P6X-Z3-M50-a-statement-that-does-not-read-is-read-as-none,P6X-Z3-M51-the-figures-read-anywhere-after-the-opening | Prefer using an optional chain expression instead, as it's more concise and easier to read.
+  [C] S3776 apps/rph-demo/src/lib/server/tools/devin-reviewer.ts:304  outside | Refactor this function to reduce its Cognitive Complexity from 25 to the 15 allowed. [+16 locations]
+  [C] S3776 apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1925  outside | Refactor this function to reduce its Cognitive Complexity from 86 to the 15 allowed. [+45 locations]
+  [AB] S3358 apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:2589  INSIDE ER1-M150-the-satisfied-arm-drops-the-command-evidence,ER1-V150-the-satisfied-arm-describes-only-an-escalated-command-result,ER1-V155-the-satisfied-arm-loses-its-full-stop,ER1-V204-the-satisfied-arm-drops-a-refused-result-that-observed-nothing | Extract this nested ternary operation into an independent statement.
+  [AB] S4624 apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:2589  INSIDE ER1-M150-the-satisfied-arm-drops-the-command-evidence,ER1-V150-the-satisfied-arm-describes-only-an-escalated-command-result,ER1-V155-the-satisfied-arm-loses-its-full-stop,ER1-V204-the-satisfied-arm-drops-a-refused-result-that-observed-nothing | Refactor this code to not use nested template literals.
+  [AB] S3358 apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:2611  INSIDE RS3-M9-the-try-count-is-one-too-many-again,RS3-M10-one-try-reads-as-tries,RS3-M14-the-substituted-reviewer-count-is-one-too-many-again,RS3-M23-the-try-count-is-capped-at-two,ER1-M68-the-model-step-drops-the-sentence,ER1-M301-the-work-product-arm-names-no-incomplete-review,ER1-V302-the-work-product-arm-tells-a-rejected-review-it-holds-no-finding | Extract this nested ternary operation into an independent statement.
+  [AB] S3358 packages/rph-application/src/command-bus.ts:680  INSIDE P6c-a-every-command-is-stamped-from-the-composing-session | Extract this nested ternary operation into an independent statement.
+  [C] S3776 packages/rph-application/src/command-bus.ts:834  outside | Refactor this function to reduce its Cognitive Complexity from 39 to the 15 allowed. [+17 locations]
+  [AB] S3358 packages/rph-application/src/command-bus.ts:864  INSIDE DD2-M10-a-type-mismatch-reads-as-readable | Extract this nested ternary operation into an independent statement.
+  [C] S3776 packages/rph-application/src/handlers/assurance.ts:2288  outside | Refactor this function to reduce its Cognitive Complexity from 21 to the 15 allowed. [+16 locations]
+  [AB] S4323 packages/rph-application/src/handlers/decomposition.ts:547  INSIDE FI-c-the-event-stops-recording-what-it-supersedes | Replace this union type with a type alias. [+2 locations]
+  [AB] S6582 packages/rph-application/src/handlers/floor-gate.ts:368  outside | Prefer using an optional chain expression instead, as it's more concise and easier to read.
+  [C] S3776 packages/rph-application/src/handlers/model-exchange.ts:113  outside | Refactor this function to reduce its Cognitive Complexity from 98 to the 15 allowed. [+63 locations]
+  [AB] S6353 packages/rph-application/src/prompt-render.ts:28  INSIDE MU-PFA-AF3-markersIn | Use concise character class syntax '\w' instead of '[A-Za-z0-9_]'.
+  [AB] S3358 packages/rph-assurance/src/validators.ts:534  INSIDE MU-PFA-BD2-02-found-failure-class-scores-met,P7b-c-the-disclosure-is-quietly-blessed | Extract this nested ternary operation into an independent statement.
+  [AB] S6582 packages/rph-domain/src/execution.ts:320  INSIDE X1-a-binding-granting-nothing-authorizes-a-start,X2-an-absent-grant-is-read-as-an-empty-one | Prefer using an optional chain expression instead, as it's more concise and easier to read.
+  [AB] S8786 packages/rph-ports/src/ports/process-runner.ts:325  INSIDE P2B-u-a-trailing-dot-spells-a-batch-target-past-the-port-predicate | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to ba
+  [AB] S8786 packages/rph-ports/src/ports/workspace.ts:227  INSIDE P2-w-a-component-win32-rewrites-is-admitted | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to ba
+  [AB] S8786 packages/rph-ports/src/ports/workspace.ts:230  INSIDE P2-u-a-win32-device-name-is-a-workspace-location | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to ba
+  [AB] S7780 scripts/census/derive-invariant-limbs.ts:114  outside | `String.raw` should be used to avoid escaping `\`.
+  [AB] S2871 scripts/coverage-floor.ts:169  INSIDE MU-PFA-R1-B-blind-the-population-limb-to-new-files | Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabe
+  [AB] S2871 scripts/coverage-floor.ts:170  INSIDE MU-PFA-R1-C-blind-the-population-limb-to-vanished-files | Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabe
+  [C] S3776 scripts/export-guard-core.ts:92  outside | Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. [+12 locations]
+  [AB] S2871 scripts/fence-skeleton/core.ts:739  INSIDE PQ1-M918-the-generator-keeps-one-reading-a-code-point | Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabe
+  [AB] S3358 scripts/fence-skeleton/core.ts:749  INSIDE PQ1-M917-a-code-point-no-input-names-takes-no-class-reading | Extract this nested ternary operation into an independent statement.
+  [AB] S2871 scripts/fence-skeleton/core.ts:749  INSIDE PQ1-M917-a-code-point-no-input-names-takes-no-class-reading | Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabe
+  [AB] S7780 scripts/mutants/run.ts:1034  outside | `String.raw` should be used to avoid escaping `\`.
+  [C] S3776 scripts/phase7/faithful-wordfreq.js:68  outside | Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed. [+13 locations]
+  [C] S3776 scripts/phase7/faithful-wordfreq.js:109  outside | Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. [+13 locations]
+  [AB] S7780 scripts/phase7/rerun-commands.ts:343  outside | `String.raw` should be used to avoid escaping `\`.
+  [AB] S4624 scripts/phase7/run-archive.ts:786  INSIDE PQ7-M210b-a-pi-file-at-the-workspace-root-ends-the-run | Refactor this code to not use nested template literals.
+  [AB] S3358 scripts/phase7/run-report-core.ts:2066  INSIDE P6X-L-M25-the-report-reads-a-criterion-repair-from-the-first-reply-alone | Extract this nested ternary operation into an independent statement.
+  [AB] S3358 scripts/phase7/run-report-core.ts:3377  INSIDE R4-M10-the-report-says-nothing-of-what-a-read-counted,R4-M11-a-read-of-none-says-nothing-of-it | Extract this nested ternary operation into an independent statement.
+  [AB] S4624 scripts/phase7/run-report-core.ts:3863  INSIDE E12-M127-5b-lists-no-history | Refactor this code to not use nested template literals.
+  [AB] S3358 scripts/phase7/run-report-core.ts:4632  INSIDE P6X-N-M23-a-command-s-adjudication-row-points-at-the-last-try-s-account | Extract this nested ternary operation into an independent statement.
+  [AB] S4624 scripts/phase7/run-report-core.ts:4933  INSIDE PQ7-M263-the-markdown-prints-an-unregistered-break-bare | Refactor this code to not use nested template literals.
+  [AB] S7780 scripts/reviewer-qual/check-core.ts:231  outside | `String.raw` should be used to avoid escaping `\`.
+  [AB] S7780 scripts/reviewer-qual/check-core.ts:233  outside | `String.raw` should be used to avoid escaping `\`.
+  [AB] S6582 scripts/reviewer-qual/check-core.ts:309  outside | Prefer using an optional chain expression instead, as it's more concise and easier to read.
+  [AB] S3735 scripts/reviewer-qual/check-core.ts:337  INSIDE SR4-M17-a-selection-line-is-read-and-dropped | Remove this use of the "void" operator.
+  [C] S3776 scripts/reviewer-qual/decision-model-records.ts:201  outside | Refactor this function to reduce its Cognitive Complexity from 59 to the 15 allowed. [+30 locations]
+  [AB] S1121 scripts/reviewer-qual/fingerprint.ts:537  INSIDE PQ1-M818-the-skeleton-is-not-hashed | Extract the assignment of "skeletonDigest" from this expression.
+  [C] S3776 scripts/reviewer-qual/malformations.ts:112  outside | Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed. [+11 locations]
+  [AB] S7781 scripts/reviewer-qual/preflight.ts:75  INSIDE J22-M29-the-CLI-runs-on-dist | Use `replaceAll()` with a string literal instead of this global regex.
+  [AB] S6557 scripts/reviewer-qual/preflight.ts:75  INSIDE J22-M29-the-CLI-runs-on-dist | Use the 'String#endsWith' method instead.
+  [AB] S4624 scripts/reviewer-qual/probes.ts:459  INSIDE ARP-B7-M23-the-part-its-builder-cut-holds-no-candidate | Refactor this code to not use nested template literals.
+  [AB] S7780 scripts/reviewer-qual/record.ts:449  INSIDE J22-M36-a-backtick-reaches-the-retained-form | `String.raw` should be used to avoid escaping `\`.
+  [AB] S107 scripts/reviewer-qual/runner.ts:347  outside | Async function 'scoreDeclared' has too many parameters (8). Maximum allowed is 7.
+  [AB] S8786 scripts/tracker/ingest.ts:244  outside | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to ba
+  [AB] S6353 verif/fixtures/phase7/reference/src/options.js:31  outside | Use concise character class syntax '\d' instead of '[0-9]'.
+  [C] S3776 verif/fixtures/phase7/reference/src/options.js:40  outside | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. [+12 locations]

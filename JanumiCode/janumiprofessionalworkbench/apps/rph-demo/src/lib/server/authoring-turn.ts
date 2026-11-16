@@ -910,5 +910,6 @@ export function resumeHintText(
 
 /** Test/reset seam: abandon every process-local overlay before replacing the canonical engine. */
 export function clearAuthoringTurns(): void {
+	// S7747: the spread is a deliberate snapshot - the loop body deletes from the map it iterates (ruled 2026-07-20).
 	for (const pwaId of [...turnsByPwa.keys()]) discardAuthoringTurn(pwaId);
 }

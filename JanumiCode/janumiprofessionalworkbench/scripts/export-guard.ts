@@ -61,7 +61,7 @@ import { anchorRange } from './mutants/scope-core.js';
 // walk normalises its results — so a barrel path built from a backslash ROOT and a file path from the walk are
 // the SAME FILE SPELLED TWO WAYS. The map lookup then misses silently and the file reports ZERO consumed
 // exports. Observed: `governance.ts` showed an empty surface while nine production modules import from it.
-const ROOT = fileURLToPath(new URL('../', import.meta.url)).split('\\').join('/');
+const ROOT = fileURLToPath(new URL('../', import.meta.url)).replaceAll('\\', '/');
 const DEFAULT_BASELINE = `${ROOT}verif/floors/export-guard.baseline.json`;
 
 const flags = process.argv.slice(2);
@@ -79,7 +79,7 @@ const valueOf = (name: string): string | undefined => {
 // `verif/export-guard.test.ts`). The measured side is always this repository.
 const BASELINE = valueOf('--baseline') ?? DEFAULT_BASELINE;
 
-const fwd = (p: string) => p.split('\\').join('/');
+const fwd = (p: string) => p.replaceAll('\\', '/');
 // A path outside the repository (a test's temporary census) is shown whole rather than cut at ROOT's length.
 const rel = (p: string) => (fwd(p).startsWith(fwd(ROOT)) ? fwd(p).slice(fwd(ROOT).length) : fwd(p));
 
@@ -130,26 +130,29 @@ function exportedValueSpans(file: string): ExportSpan[] {
 		spans.push({ name, startLine: lineOf(node.getStart(sf)), endLine: lineOf(node.getEnd()) });
 	};
 	for (const st of sf.statements) {
-		if (ts.isFunctionDeclaration(st) && isExported(st) && st.name) push(st.name.text, st);
-		else if (ts.isClassDeclaration(st) && isExported(st) && st.name) push(st.name.text, st);
-		else if (ts.isEnumDeclaration(st) && isExported(st)) push(st.name.text, st);
-		else if (ts.isVariableStatement(st) && isExported(st)) {
-			// Several names can share one statement (`export const a = 1, b = 2`); each owns the whole span.
-			for (const d of st.declarationList.declarations) {
-				if (ts.isIdentifier(d.name)) push(d.name.text, st);
-			}
-		} else if (
-			ts.isExportDeclaration(st) &&
-			!st.moduleSpecifier &&
-			st.exportClause &&
-			ts.isNamedExports(st.exportClause)
-		) {
-			for (const el of st.exportClause.elements) {
-				if (!el.isTypeOnly && !st.isTypeOnly) push(el.name.text, st);
-			}
-		}
+		for (const name of exportedNamesOf(st)) push(name, st);
 	}
 	return spans;
+}
+
+/** The value names one top-level statement exports, in declaration order; each owns the statement's whole span. */
+function exportedNamesOf(st: ts.Statement): string[] {
+	if (ts.isFunctionDeclaration(st) && isExported(st) && st.name) return [st.name.text];
+	if (ts.isClassDeclaration(st) && isExported(st) && st.name) return [st.name.text];
+	if (ts.isEnumDeclaration(st) && isExported(st)) return [st.name.text];
+	if (ts.isVariableStatement(st) && isExported(st)) {
+		// Several names can share one statement (`export const a = 1, b = 2`); each owns the whole span.
+		return st.declarationList.declarations.flatMap((d) => (ts.isIdentifier(d.name) ? [d.name.text] : []));
+	}
+	if (
+		ts.isExportDeclaration(st) &&
+		!st.moduleSpecifier &&
+		st.exportClause &&
+		ts.isNamedExports(st.exportClause)
+	) {
+		return st.exportClause.elements.filter((el) => !el.isTypeOnly && !st.isTypeOnly).map((el) => el.name.text);
+	}
+	return [];
 }
 
 const exportedValues = (file: string): string[] => exportedValueSpans(file).map((e) => e.name);
@@ -290,7 +293,7 @@ for (const file of walk(`${ROOT}packages`)) {
 }
 
 const sorted: GuardCensus = Object.fromEntries(
-	Object.entries(census).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+	Object.entries(census).sort(([a], [b]) => Number(a > b) - Number(a < b))
 );
 
 if (mode[0] === '--write') {

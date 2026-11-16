@@ -166,7 +166,7 @@ const design = (over: { modules?: typeof MODULES; extra?: Record<string, unknown
 		modules: over.modules ?? MODULES,
 		dataFlow: 'cli → read → tokenize → count → rank → format; every error is raised to cli, which owns the exit code.',
 		boundaries: 'one process; reads only the file named on the command line; writes only standard output and standard error.',
-		...(over.extra ?? {})
+		...over.extra
 	});
 const DESIGN_ACCOUNT = account(
 	'Six modules, each owning one step of the data flow; every requirement R1–R7 is served by a named module, and cli alone owns the exit codes.',
@@ -266,9 +266,11 @@ const ARCHITECTURE_CASES: PolicyCases = {
 				{
 					unit: 'Design',
 					answer: design({
-						modules: MODULES.map((m) =>
-							m.name === 'cli' ? { ...m, owns: 'argument parsing and the usage exit code', serves: ['R2', 'R6'] } : m.name === 'read' ? { ...m, serves: [] } : m
-						)
+						modules: MODULES.map((m) => {
+							if (m.name === 'cli') return { ...m, owns: 'argument parsing and the usage exit code', serves: ['R2', 'R6'] };
+							if (m.name === 'read') return { ...m, serves: [] };
+							return m;
+						})
 					})
 				}
 			],

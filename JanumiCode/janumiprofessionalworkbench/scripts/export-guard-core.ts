@@ -94,7 +94,7 @@ export function compareGuardCensus(recorded: GuardCensus, measured: GuardCensus)
 	const populationChanged: string[] = [];
 	const censusStale: string[] = [];
 
-	for (const file of Object.keys(measured).sort()) {
+	for (const file of Object.keys(measured).sort((a, b) => Number(a > b) - Number(a < b))) {
 		const before = recorded[file];
 		if (before === undefined) {
 			populationChanged.push(`${file} is measured but absent from the baseline`);
@@ -103,7 +103,7 @@ export function compareGuardCensus(recorded: GuardCensus, measured: GuardCensus)
 		const now = measured[file]!;
 		const nowGuarded = new Set(now.guardedExports);
 		const stillPresent = new Set(now.consumedExports);
-		for (const exported of [...before.guardedExports].sort())
+		for (const exported of [...before.guardedExports].sort((a, b) => Number(a > b) - Number(a < b)))
 			if (stillPresent.has(exported) && !nowGuarded.has(exported))
 				guardLost.push(`${file}#${exported} was guarded at baseline and is not guarded now`);
 
@@ -117,15 +117,15 @@ export function compareGuardCensus(recorded: GuardCensus, measured: GuardCensus)
 				`${file}: mutants crediting no export moved (${before.unattributedMutants} -> ${now.unattributedMutants})`
 			);
 
-		const was = [...before.consumedExports].sort().join(',');
-		const is = [...now.consumedExports].sort().join(',');
+		const was = [...before.consumedExports].sort((a, b) => Number(a > b) - Number(a < b)).join(',');
+		const is = [...now.consumedExports].sort((a, b) => Number(a > b) - Number(a < b)).join(',');
 		if (was !== is)
 			populationChanged.push(
 				`${file}: its production-consumed exports moved (${before.consumedExports.length} -> ${now.consumedExports.length})`
 			);
 	}
 
-	for (const file of Object.keys(recorded).sort())
+	for (const file of Object.keys(recorded).sort((a, b) => Number(a > b) - Number(a < b)))
 		if (measured[file] === undefined)
 			populationChanged.push(`${file} is in the baseline but is no longer measured`);
 

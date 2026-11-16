@@ -166,6 +166,17 @@ function factsOf(
 	};
 }
 
+/** The MODEL-LEAF finding's words for a type's prompt: none, or one of its status. */
+const promptWords = (status: string | null): string =>
+	status === null ? 'no prompt' : `a ${status} prompt`;
+
+/** Markers as a prompt writes them, each in braces, joined as the SUPPLIED-MARKERS finding lists them. */
+const markerList = (markers: readonly string[]): string => markers.map((m) => `{${m}}`).join(', ');
+
+/** The POLICY-GOVERNS finding's words for a policy that fails it: absent or not ACTIVE, or not governing `kind`. */
+const ungoverned = (governance: Governance, kind: string): string =>
+	governance === 'NOT_AVAILABLE' ? 'is absent or not ACTIVE' : `does not govern its kind, ${kind}`;
+
 /**
  * What the four checks find on one type's facts. ⭐⭐ (package L7, the lead's decision of 2026-11-11) `counted`: its length counts an
  * Undertaking's statement, which its PROMPT-LENGTH finding then names.
@@ -183,7 +194,7 @@ function findingsOf(f: CandidateTypeFacts, counted: boolean): CandidateFinding[]
 		found.push(
 			finding(
 				'model-leaf',
-				`a leaf of the tree declares ${f.workDischarge} with ${f.promptStatus === null ? 'no prompt' : `a ${f.promptStatus} prompt`}: ` +
+				`a leaf of the tree declares ${f.workDischarge} with ${promptWords(f.promptStatus)}: ` +
 					'a model runs it only when it declares MODEL with an ACTIVE prompt'
 			)
 		);
@@ -192,8 +203,8 @@ function findingsOf(f: CandidateTypeFacts, counted: boolean): CandidateFinding[]
 		found.push(
 			finding(
 				'supplied-markers',
-				`its prompt uses ${unsupplied.map((m) => `{${m}}`).join(', ')}, which no work unit supplies (it supplies ` +
-					`${PHASE7_MARKERS.map((m) => `{${m}}`).join(', ')}): its step is refused at render`
+				`its prompt uses ${markerList(unsupplied)}, which no work unit supplies (it supplies ` +
+					`${markerList(PHASE7_MARKERS)}): its step is refused at render`
 			)
 		);
 	if (f.renderedLength > PHASE7_INSTRUCTION_BUDGET)
@@ -212,7 +223,7 @@ function findingsOf(f: CandidateTypeFacts, counted: boolean): CandidateFinding[]
 			found.push(
 				finding(
 					'policy-governs',
-					`it declares ${p.policyId}, which ${p.governance === 'NOT_AVAILABLE' ? 'is absent or not ACTIVE' : `does not govern its kind, ${f.pwuKind}`}` +
+					`it declares ${p.policyId}, which ${ungoverned(p.governance, f.pwuKind)}` +
 						(f.policies.every((q) => q.governance !== 'GOVERNS')
 							? ': and none of its declared policies governs it, so its unit can never be assured'
 							: '')

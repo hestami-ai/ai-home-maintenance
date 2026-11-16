@@ -283,6 +283,7 @@ function findVersionMismatches(
 	const reviewed = new Map(reviewedItems.map((i) => [i.objectId, i]));
 	for (const item of candidateItems) {
 		const r = reviewed.get(item.objectId);
+		// S6582: kept explicit - with r undefined and item.semanticVersion undefined at runtime (the case findMissingItemVersions checks), the optional chain gives undefined !== undefined (false), so the next limb would read r.contentHash of undefined and throw
 		if (!r || r.semanticVersion !== item.semanticVersion || r.contentHash !== item.contentHash)
 			findings.push({
 				code: 'BASELINE_VERSION_MISMATCH',

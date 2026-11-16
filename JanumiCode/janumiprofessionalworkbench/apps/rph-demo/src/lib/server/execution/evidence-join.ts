@@ -33,8 +33,7 @@
 // would pass would let a step complete as though the killed command never happened — which is what
 // `unassessableAiContentBlock` already forbids one plane over: *AI-produced content may not enter the governed
 // stream with nothing to assess.*
-import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
-import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
+import type { AssessmentCriterion, ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import {
 	REVIEWER_RECOMMENDED_ESCALATION,
 	type ProfessionalRationaleSummary
@@ -48,7 +47,11 @@ import type { FloorRemediationAction } from '../floor.js';
 import type { DeliverableViewRef } from './deliverable-view.js';
 import { commandLine, renderProcessResultEvidence } from '../assurance/process-result-render.js';
 import { escalatedReviewNote } from './floor-over-subject.js';
-import { processResultLimitations, runProcessResultFloor } from './process-result-floor.js';
+import {
+	processResultLimitations,
+	runProcessResultFloor,
+	type ProcessResultSubject
+} from './process-result-floor.js';
 
 /** One command's result, as it reached the record. */
 export interface JoinedProcessEvidence {
@@ -294,19 +297,7 @@ export async function joinProcessEvidence(
 		// completion REJECT, with all three policies MISSING.
 		const evidence = opts.getObject(evidenceId) ?? {};
 		const floor = await runProcessResultFloor(
-			{
-				evidenceId,
-				evidence,
-				exchange: input.exchange,
-				run,
-				producingPrompt: input.producingPrompt,
-				producerModelId: input.producerModelId,
-				producerProviderId: input.producerProviderId,
-				...(input.observedToolCalls ? { observedToolCalls: input.observedToolCalls } : {}),
-				...(input.rationale ? { rationale: input.rationale } : {}),
-				// ⭐ Package N — D12 — and its place in the step's sequence: this run's own number among the step's acts.
-				...(input.hostSequence ? { hostSequence: { ...input.hostSequence, subjectOrdinal: run.ordinal } } : {})
-			},
+			processResultSubjectOf(input, run, evidenceId, evidence),
 			engine,
 			opts
 		);
@@ -322,6 +313,28 @@ export async function joinProcessEvidence(
 		});
 	}
 	return { joined };
+}
+
+/** The subject one joined run's floor reviews: the recorded evidence, the run, and the producing model's account. */
+function processResultSubjectOf(
+	input: EvidenceJoinInput,
+	run: ObservedProcessRun,
+	evidenceId: string,
+	evidence: Record<string, unknown>
+): ProcessResultSubject {
+	return {
+		evidenceId,
+		evidence,
+		exchange: input.exchange,
+		run,
+		producingPrompt: input.producingPrompt,
+		producerModelId: input.producerModelId,
+		producerProviderId: input.producerProviderId,
+		...(input.observedToolCalls ? { observedToolCalls: input.observedToolCalls } : {}),
+		...(input.rationale ? { rationale: input.rationale } : {}),
+		// ⭐ Package N — D12 — and its place in the step's sequence: this run's own number among the step's acts.
+		...(input.hostSequence ? { hostSequence: { ...input.hostSequence, subjectOrdinal: run.ordinal } } : {})
+	};
 }
 
 /**

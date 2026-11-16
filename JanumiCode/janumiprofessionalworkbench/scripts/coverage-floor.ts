@@ -83,8 +83,8 @@ if (mode.length !== 1) die('coverage:floor — use exactly one of --write or --c
 
 /** Repo-relative, forward slashes, so the baseline is identical on every machine that generates it. */
 function normalise(key: string): string {
-	const forward = key.split('\\').join('/');
-	const rootForward = ROOT.split('\\').join('/');
+	const forward = key.replaceAll('\\', '/');
+	const rootForward = ROOT.replaceAll('\\', '/');
 	return forward.startsWith(rootForward) ? forward.slice(rootForward.length) : forward;
 }
 
@@ -129,7 +129,7 @@ function readMeasured(): Record<string, FloorEntry> {
 }
 
 const sortedByKey = (files: Record<string, FloorEntry>): Record<string, FloorEntry> =>
-	Object.fromEntries(Object.entries(files).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+	Object.fromEntries(Object.entries(files).sort(([a], [b]) => Number(a > b) - Number(a < b)));
 
 if (mode[0] === '--write') {
 	const files = sortedByKey(readMeasured());
@@ -171,7 +171,7 @@ const removed = Object.keys(recorded).filter((f) => !(f in measured)).sort();
 
 // LIMB 1 — RATCHET, over the files BOTH sides know about, so the two limbs stay independent.
 const regressions: string[] = [];
-for (const file of Object.keys(measured).sort()) {
+for (const file of Object.keys(measured).sort((a, b) => Number(a > b) - Number(a < b))) {
 	const before = recorded[file];
 	if (before === undefined) continue;
 	for (const metric of METRICS) {

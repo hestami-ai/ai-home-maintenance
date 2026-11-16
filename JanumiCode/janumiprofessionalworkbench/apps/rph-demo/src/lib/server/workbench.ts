@@ -19,7 +19,11 @@ import {
 } from '@janumipwb/rph-engine';
 import { ontology, validateOntology } from '@janumipwb/rph-product-realization-pwa';
 import { SqliteArtifactStore, SqliteStorageAdapter } from '@janumipwb/rph-persistence';
-import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
+import {
+	createInMemoryArtifactStore,
+	type ArtifactStore,
+	type Credential
+} from '@janumipwb/rph-ports';
 import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildPwaGraphExport, type PwaGraphExport, type PwaGraphNode } from '@janumipwb/rph-projections';
 import {
@@ -40,7 +44,6 @@ import {
 	SYSTEM_CREDENTIAL,
 	standaloneAuthenticator
 } from './identity.js';
-import type { Credential } from '@janumipwb/rph-ports';
 import { openDraftOn } from './open-drafts.js';
 import { clearStipulations } from './stipulations.js';
 import { markLaneSegment } from './lane-control.js';
