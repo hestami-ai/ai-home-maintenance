@@ -303,7 +303,7 @@ and the order of the first upgrades, as a preview for the roadmap.
 - `@types/node` 24.13.3 already loads `esnext.disposable` and `esnext.float16` into every base program
   (`node_modules/@types/node/index.d.ts:28-30`), so some post-ES2022 built-ins type-check today (ES-level critic).
 - The raise touches four texts that state ES2022: `scripts/tsconfig.json:8-9`, `scripts/mutants/run.ts:1016`,
-  `apps/rph-demo/e2e-live-exec/phase7-operator.ts:970` and the roadmap's `:69`. It does not touch the five
+  `apps/rph-demo/e2e-live-exec/phase7-operator.ts:985` (~~`:970`~~ until package L17a, `dae58ae3`, added lines above it) and the roadmap's `:69`. It does not touch the five
   `ts.ScriptTarget.ES2022` parser literals, which choose an AST parse, not a lib level: `verif/slice-ledger.ts:197`,
   `verif/arrow-command-census.ts:664` and `:885`, `verif/arrow-command-census.test.ts:194` and
   `verif/agy-stderr-unbound.test.ts:362`. The last is the find text of mutants P2B-ah and P2B-ai
@@ -916,7 +916,7 @@ and the order of the first upgrades, as a preview for the roadmap.
 | `packages/typescript-config/base.json:11`, `:21` | ES2025 | D-5 (T1c) |
 | `apps/rph-demo/svelte.config.js` | `kit.typescript.config`: lib ES2025 + DOM + DOM.Iterable, target ES2025 | D-5 (T1c) |
 | `apps/rph-demo/vite.config.ts` | `build.target` = the browser floor | D-6 (T1c) |
-| `scripts/tsconfig.json:8-9`, `scripts/mutants/run.ts:1016`, `apps/rph-demo/e2e-live-exec/phase7-operator.ts:970`, roadmap `:69` | restated | D-5 (T1c) |
+| `scripts/tsconfig.json:8-9`, `scripts/mutants/run.ts:1016`, `apps/rph-demo/e2e-live-exec/phase7-operator.ts:985` (~~`:970`~~ until L17a, `dae58ae3`), roadmap `:69` | restated | D-5 (T1c) |
 | the 11 S7750 sites: `apps/rph-demo/src/lib/server/tools/devin-reviewer.ts:503`, `packages/rph-engine/src/replay.ts:107`, `:108`, `packages/rph-ports/src/ports/process-runner.ts:252`, `scripts/mutants/run.ts:1031`, `scripts/phase7/half-b.ts:453`, `scripts/phase7/run-archive.ts:908` (~~`:879`~~ in cycle 6's tree, before L15 changed the lines above it; ~~`:883`~~ at M0's merge into `dd23ebba`; restated at its second merge, into `5c8a2d35`, after L16 changed them again), `scripts/phase7/run-report-core.ts:1872`, `:3194`, `:3809` (~~`:1854`~~, ~~`:3132`~~, ~~`:3730`~~ in cycle 6's tree and at M0's first merge; restated at its second, after L16), `scripts/reviewer-qual/run.ts:276` (with its guard); the 2 S4043 sites `apps/rph-demo/src/lib/server/assurance/review-fence.ts:291`, `:309` | `findLast` and `toReversed` (ES-level sites review) | D-12 (T4) |
 | `scripts/mutants/ledger.ts` | 3 + 5 re-anchors | D-12 (T4) |
 | the three Playwright configs | the bundled Chromium | D-12 (T6) |
