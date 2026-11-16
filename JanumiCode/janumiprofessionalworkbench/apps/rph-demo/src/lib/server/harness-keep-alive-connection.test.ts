@@ -1,5 +1,6 @@
 // ⭐⭐ `REG-F-501` — A CONNECTION LEFT IDLE PAST NODE'S CLOSE, THEN SENT ON: ~~RESET BY NODE'S DEFAULTS~~ ⭐ NOT RIDDEN BY NODE'S
-// DEFAULTS (RESET BEFORE v24.22.3; DROPPED FOR A NEW CONNECTION SINCE, `REG-F-639`), ANSWERED BY A SERVER BOOTED THROUGH
+// DEFAULTS (RESET BEFORE ~~v24.22.3~~ ⭐ v24.22.1 — AND v22.23.4, v26.12.1 ON THEIR LINES, `REG-D-165`; DROPPED FOR A NEW CONNECTION SINCE,
+// `REG-F-639`), ANSWERED BY A SERVER BOOTED THROUGH
 // `keepHarnessConnectionsOpen`, THE FUNCTION THE HARNESS'S VITE PLUGIN CALLS.
 //
 // ── THE MECHANISM, AS THE REGISTER RECORDS IT ──────────────────────────────────────────────────────────────────
@@ -28,6 +29,14 @@
 // on an earlier Node (v24.11.1) it is what made the reset reproducible. The CONTROL therefore asserts what this runtime shows: the control's
 // server closed the connection BEFORE the request went out, and the request rode a new connection. The harness's request still rides the
 // same one, so the test above it still tells the remedy from Node's defaults, by the connection.
+//
+// ── ⭐⭐ `REG-D-161` (the lead's proposal, measured 2026-11-15): ONE CONTROL FOR EVERY SUPPORTED NODE ──────────────────────────────
+// The pending-read check came in Node 24.22.1, 22.23.4 and 26.12.1 (CVE-2026-105481, *"http: ensure agent data guard works without
+// I/O"*); before it, the same arrangement resets the control's request on the connection the close reached. So the CONTROL asserts, on
+// whichever Node runs it: the control's server closed the connection BEFORE the requests went out; the connection was STILL in its
+// agent's pool as they did (its client had not read the close: what the held loop is for); and the request got the outcome this Node
+// gives, by its release line (`PENDING_READ_CHECK_SINCE`): reset on that connection before the check, answered on a new one from it.
+// A line not in the table is not measured, and the CONTROL refuses to guess its outcome.
 import { createServer, type RequestListener, type Server } from 'node:http';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
@@ -50,12 +59,14 @@ const { Agent, get } = require('node:http');
 const { parentPort, workerData } = require('node:worker_threads');
 const { ports, idleMs, lateCloseMs, controlClosed } = workerData;
 const agents = ports.map(() => new Agent({ keepAlive: true, maxSockets: 1 }));
+const firstSockets = [];
 const send = (i, path) =>
 	new Promise((resolve) => {
 		const req = get({ host: '127.0.0.1', port: ports[i], path, agent: agents[i] }, (res) => {
 			res.resume();
 			res.on('end', () => resolve({ answered: res.statusCode, sameConnection: req.reusedSocket }));
 		});
+		if (path === '/first') req.once('socket', (socket) => { firstSockets[i] = socket; });
 		req.on('error', (e) => resolve({ error: e.message, sameConnection: req.reusedSocket }));
 	});
 (async () => {
@@ -64,9 +75,10 @@ const send = (i, path) =>
 	await new Promise((resolve) => setImmediate(resolve));
 	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.max(0, answeredAt + idleMs - Date.now()));
 	Atomics.wait(new Int32Array(controlClosed), 0, 0, lateCloseMs);
+	const pooledAtTheSend = agents.map((agent, i) => Object.values(agent.freeSockets).some((free) => free.includes(firstSockets[i])));
 	const sendingAt = Date.now();
 	const second = await Promise.all(ports.map((_, i) => send(i, '/second')));
-	parentPort.postMessage({ answeredAt, sendingAt, sentAt: Date.now(), second });
+	parentPort.postMessage({ answeredAt, sendingAt, sentAt: Date.now(), second, pooledAtTheSend });
 	for (const agent of agents) agent.destroy();
 })();
 `;
@@ -77,12 +89,37 @@ interface Outcome {
 	readonly sameConnection: boolean;
 }
 
+/**
+ * ⭐⭐ (`REG-D-161`; the lead's proposal, measured 2026-11-15) Each supported release line's first release with the keep-alive agent's
+ * pending-read check, measured on both sides of it. Before it, Node hands the control's request the pooled connection its server has
+ * closed, and the request is reset there; from it, the agent drops that connection and the request is answered on a new one.
+ */
+const PENDING_READ_CHECK_SINCE: Readonly<Record<string, string>> = { '22': '22.23.4', '24': '24.22.1', '26': '26.12.1' };
+
+function atLeast(version: string, since: string): boolean {
+	const have = version.split('.').map(Number);
+	const want = since.split('.').map(Number);
+	for (let i = 0; i < 3; i++) if (have[i] !== want[i]) return have[i] > want[i];
+	return true;
+}
+
+/** The control's outcome with Node's defaults on this Node, by `PENDING_READ_CHECK_SINCE`; `undefined` on a line not measured. */
+function outcomeWithNodesDefaults(version: string = process.versions.node): Outcome | undefined {
+	const since = PENDING_READ_CHECK_SINCE[version.split('.')[0]];
+	if (since === undefined) return undefined;
+	return atLeast(version, since)
+		? { answered: 200, sameConnection: false }
+		: { error: 'read ECONNRESET', sameConnection: true };
+}
+
 const servers: Server[] = [];
 let harness: Outcome;
 let control: Outcome;
 /** ⭐⭐ (package L15) From the first answers to the moment the second requests went out — the client's send stamp, `sendingAt`. */
 let idledMs = 0;
 let controlClosedAfterMs: number | undefined;
+/** ⭐⭐ (`REG-D-161`) Whether the control's connection was still in its agent's pool as the second requests went out (the client's check). */
+let controlPooledAtTheSend: boolean | undefined;
 
 async function listening(server: Server): Promise<number> {
 	servers.push(server);
@@ -115,9 +152,10 @@ beforeAll(
 		});
 		try {
 			const [result] = (await once(client, 'message')) as [
-				{ answeredAt: number; sendingAt: number; sentAt: number; second: [Outcome, Outcome] }
+				{ answeredAt: number; sendingAt: number; sentAt: number; second: [Outcome, Outcome]; pooledAtTheSend: [boolean, boolean] }
 			];
 			[harness, control] = result.second;
+			controlPooledAtTheSend = result.pooledAtTheSend[1];
 			// ⭐⭐ (2026-11-13, package L15, `REG-F-639`; the lead's correction, the builder's call) ~~`result.sentAt`~~ — stamped once BOTH
 			// second requests were answered — ⭐ `result.sendingAt`, stamped as they went out: the idle both messages below name ("a request sent
 			// … ms after", "the request went out … ms after it"), and the moment the CONTROL's close is held against.
@@ -142,19 +180,25 @@ describe('⭐⭐ REG-F-501 — a pooled connection idle past Node’s close, its
 		// ⭐⭐ (2026-11-13, package L15, `REG-F-639`) its expectation unchanged; its message's ~~"is reset unless the server keeps that
 		// connection open"~~ restated to what Node v24.22.3 does with such a connection: it drops it for a new one (P6K-M1's mutation, the
 		// lead's probe's `harness-5000` row: `{ answered: 200, sameConnection: false }`).
+		// ⭐⭐ (2026-11-16, package L17a — design D83, `REG-D-165`) its title and expectation byte for byte; its message's ~~"before Node v24.22.3"~~
+		// said as the measured boundary, the release that brought the agent's pending-read check on each line (`control-facts.md` §5).
 		expect(
 			harness,
 			`a request sent ${idledMs} ms after the last answer rides the connection that answer rode only if the server keeps ` +
-				'that connection open (REG-F-501): with Node’s defaults it was reset before Node v24.22.3, and rides a new connection since (REG-F-639)'
+				'that connection open (REG-F-501): with Node’s defaults it was reset before Node v24.22.1 (v22.23.4, v26.12.1 on their lines), and rides a new connection since (REG-F-639; REG-D-165)'
 		).toEqual({ answered: 200, sameConnection: true });
 	});
 
 	// ⭐⭐ RESTATED 2026-11-13 (`JAN-EXEC` Phase 7, package L15 — `REG-F-639`, the lead's ruling): ~~'⛔ CONTROL — with Node’s defaults, the
-	// request sent on that connection is reset'~~, ~~`.toEqual({ error: 'read ECONNRESET', sameConnection: true })`~~ — before Node v24.22.3's
-	// pending-read check (Node v24.11.1), the same arrangement gave `{ error: 'read ECONNRESET', sameConnection: true }`. Under Node v24.22.3
+	// request sent on that connection is reset'~~, ~~`.toEqual({ error: 'read ECONNRESET', sameConnection: true })`~~ — before Node ~~v24.22.3's~~
+	// ⭐ v24.22.1's (v22.23.4's, v26.12.1's on their lines; `REG-D-165`, design D83) pending-read check (Node v24.11.1), the same arrangement gave
+	// `{ error: 'read ECONNRESET', sameConnection: true }`. Under Node v24.22.3
 	// the agent drops the connection the close reached, and the request rides a new one (the header's note). The promise kept: the
 	// arrangement reaches Node's close — the control's server closed the connection BEFORE the requests went out (the send stamp).
-	it('⛔ CONTROL — with Node’s defaults, the server closes that connection before the request goes out, and the request rides a NEW connection (REG-F-639)', () => {
+	// ⭐⭐ RESTATED 2026-11-15 (`REG-D-161`, the lead's proposal): ~~'… and the request rides a NEW connection (REG-F-639)'~~ — that outcome
+	// is Node's from its pending-read check on (24.22.1, 22.23.4, 26.12.1); before it the request is reset. The close before the send kept;
+	// the pool at the send added; and the outcome this Node gives, by its release line.
+	it('⛔ CONTROL — with Node’s defaults, the server closes that connection before the request goes out, while it is still pooled, and the request gets the outcome this Node gives (REG-F-639, REG-D-161)', () => {
 		// ⚠ Without this, the test above would pass in an arrangement that never reached Node's close at all.
 		const closedBeforeTheSend = controlClosedAfterMs !== undefined && controlClosedAfterMs < idledMs;
 		expect(
@@ -162,9 +206,15 @@ describe('⭐⭐ REG-F-501 — a pooled connection idle past Node’s close, its
 			`the control's server closed its connection ${controlClosedAfterMs ?? 'never'} ms after the last answer; the ` +
 				`request went out ${idledMs} ms after it`
 		).toBe(true);
-		expect(control, 'with Node’s defaults the request was not answered on a new connection').toEqual({
-			answered: 200,
-			sameConnection: false
-		});
+		expect(
+			controlPooledAtTheSend,
+			"the control's connection was not in its agent's pool when the request went out: its client had read the server's close"
+		).toBe(true);
+		const expected = outcomeWithNodesDefaults();
+		expect(
+			expected,
+			`Node ${process.version}: its release line is not in PENDING_READ_CHECK_SINCE, so its outcome is not measured; measure it, then add its row`
+		).toBeDefined();
+		expect(control, `with Node’s defaults, on Node ${process.version}`).toEqual(expected);
 	});
 });

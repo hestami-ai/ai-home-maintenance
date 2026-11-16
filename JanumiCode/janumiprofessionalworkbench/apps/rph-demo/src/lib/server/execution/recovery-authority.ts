@@ -120,6 +120,18 @@ export const REJECTED_RERUN_RATIONALE_REQUIRED =
 	'Re-running the work its declared reviews rejected is recorded as your Decision: say why, in your own words — the rationale is required (REG-D-163 (2); DESIGN-the-stopped-unit-recovery.md RD4).';
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1); `REG-F-643`) — WHAT AUTHORISES A PERSON'S SENDING OF THE WORK BACK TO AN
+ * EARLIER UNIT, BY REPLACEMENT: the sponsor's ruling; cited after the person's own words.
+ */
+export const REPLACE_REACHED_WORK_CITATION =
+	'Authority: the sponsor’s ruling REG-D-166 (1) — a defect a later check finds goes back to the unit that made it, by replacement: that unit and every started unit its work reached are replaced by new units of their types, each old one superseded and kept on record with a link to its successor (design D72). ' +
+	'No policy object authorises a person’s replacement, and none is cited: the ruling is the authority (design D72).';
+
+/** ⭐⭐ Package L17a — D72 — what the person must type: sending the work back is their Decision, and its rationale the one part that says why. */
+export const SEND_BACK_RATIONALE_REQUIRED =
+	'Sending the work back to an earlier unit is recorded as your Decision: say why, in your own words — the rationale is required (REG-D-166 (1); DESIGN-the-stopped-unit-recovery.md RD4).';
+
+/**
  * ⭐ THE DECISION'S RATIONALE: the person's typed text, VERBATIM, a blank line, then the act's citation. ⛔ Nothing in the
  * typed text is altered — not its line breaks, not its punctuation — so the reason a person gave is the reason recorded.
  */

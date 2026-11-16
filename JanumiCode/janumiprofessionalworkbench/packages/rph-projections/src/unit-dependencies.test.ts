@@ -361,3 +361,94 @@ describe('⭐⭐ D21 — an input no unit produces is EXPECTED FROM OUTSIDE this
 		expect(startReadiness('c', lookupOf({ c: state })).outside).toEqual(['market-study']);
 	});
 });
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — THE READINESS RULE READS WHAT A UNIT WAITS FOR THROUGH THE SUPERSESSION
+// LINKS: a recorded dependency a replacement superseded is waited for as its successor, so a unit not started follows the successors. The one
+// rule the kernel's `MarkPwuReady`, the execution guard on a step's start and the page's offer all read. ──────────────────────────────────
+
+/** `state`, superseded by `by`: SUPERSEDED, and its successor linked, as a supersession leaves it. */
+const supersededBy = (state: Record<string, unknown>, by: string): Record<string, unknown> => ({
+	...state,
+	workLifecycleState: 'SUPERSEDED',
+	supersedingWorkUnitId: by
+});
+
+describe('⭐⭐ L17a (D72) — start readiness follows the supersession links to the live end of each chain', () => {
+	it('⛔ RED FIRST — a consumer whose recorded producer was superseded by an ACCEPTED successor may start: the successor is what it waits for', () => {
+		const r = startReadiness(
+			'c',
+			lookupOf({
+				p: supersededBy(pwuState('Source', 'SATISFIED'), 'p2'),
+				p2: pwuState('Source', 'SATISFIED'),
+				c: pwuState('Tests', 'PROPOSED', ['p'])
+			})
+		);
+		expect([r.startable, r.kinds, r.reason]).toEqual([true, [], null]);
+	});
+
+	it('⛔ RED FIRST — and waits, the successor named, while the successor is not accepted — never the superseded unit', () => {
+		const r = startReadiness(
+			'c',
+			lookupOf({
+				p: supersededBy(pwuState('Source', 'SATISFIED'), 'p2'),
+				p2: pwuState('Source', 'PROPOSED'),
+				c: pwuState('Tests', 'PROPOSED', ['p'])
+			})
+		);
+		expect([r.startable, r.kinds, r.waitingFor]).toEqual([false, ['waiting'], [{ id: 'p2', title: 'Source', state: 'PROPOSED' }]]);
+		expect(r.reason).toBe('it waits for "Source" (PROPOSED) to be accepted');
+	});
+
+	it('⛔ RED FIRST — through a chain of replacements to its live end, and two recorded dependencies that resolve to one unit are waited for once', () => {
+		const r = startReadiness(
+			'c',
+			lookupOf({
+				p: supersededBy(pwuState('Source', 'SATISFIED'), 'p2'),
+				p2: supersededBy(pwuState('Source', 'SATISFIED'), 'p3'),
+				p3: pwuState('Source', 'EXECUTING'),
+				c: pwuState('Tests', 'PROPOSED', ['p', 'p2'])
+			})
+		);
+		expect(r.waitingFor).toEqual([{ id: 'p3', title: 'Source', state: 'EXECUTING' }]);
+	});
+
+	it('⛔ RED FIRST — a dependency whose links run in a cycle reaches no live unit: the unit is withheld, and the reason says why', () => {
+		const r = startReadiness(
+			'c',
+			lookupOf({
+				x: supersededBy(pwuState('X', 'SATISFIED'), 'y'),
+				y: supersededBy(pwuState('Y', 'SATISFIED'), 'x'),
+				c: pwuState('Tests', 'PROPOSED', ['x'])
+			})
+		);
+		expect([r.startable, r.kinds, r.unknown]).toEqual([false, ['unknown'], ['x']]);
+		expect(r.reason).toBe('x names no unit of this Undertaking; the supersession links of x run in a cycle and reach no live unit');
+	});
+
+	it('⛔ RED FIRST — a loop is read through the links too: a unit that waits for a superseded unit whose successor waits for it', () => {
+		const r = startReadiness(
+			'a',
+			lookupOf({
+				a: pwuState('A', 'PROPOSED', ['b']),
+				b: supersededBy(pwuState('B', 'SATISFIED'), 'b2'),
+				b2: pwuState('B', 'PROPOSED', ['a'])
+			})
+		);
+		expect([r.startable, r.kinds]).toEqual([false, ['waiting', 'loop']]);
+		expect(r.loop).toEqual([
+			{ id: 'a', title: 'A' },
+			{ id: 'b2', title: 'B' }
+		]);
+	});
+
+	it('⛔ RED FIRST — a unit’s readiness record carries its successor where a replacement superseded it', () => {
+		expect(readinessUnitOf('p', supersededBy(pwuState('P', 'SATISFIED'), 'p2'))?.supersedingWorkUnitId).toBe('p2');
+	});
+
+	it('⭑ CONTROL — a unit no replacement superseded reads as it always did: no successor on its record, its readiness unchanged', () => {
+		expect(readinessUnitOf('p', pwuState('P', 'SATISFIED'))).not.toHaveProperty('supersedingWorkUnitId');
+		expect(readinessUnitOf('p', { ...pwuState('P', 'SATISFIED'), supersedingWorkUnitId: '' })).not.toHaveProperty('supersedingWorkUnitId');
+		const r = startReadiness('c', lookupOf({ p: pwuState('P', 'EXECUTING'), c: pwuState('C', 'PROPOSED', ['p']) }));
+		expect([r.startable, r.waitingFor]).toEqual([false, [{ id: 'p', title: 'P', state: 'EXECUTING' }]]);
+	});
+});

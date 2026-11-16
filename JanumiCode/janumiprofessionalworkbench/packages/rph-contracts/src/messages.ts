@@ -474,7 +474,8 @@ export const InvalidatePwuPayloadSchema = z.strictObject({
 });
 export type InvalidatePwuPayload = z.infer<typeof InvalidatePwuPayloadSchema>;
 export const SupersedePwuPayloadSchema = z.strictObject({
-	supersedingWorkUnitId: z.string()
+	supersedingWorkUnitId: z.string(),
+	supersessionDecisionId: z.string()
 });
 export type SupersedePwuPayload = z.infer<typeof SupersedePwuPayloadSchema>;
 export const ProposeDecompositionPayloadSchema = z.strictObject({
@@ -1679,6 +1680,7 @@ export const PwuStateChangedPayloadSchema = z.strictObject({
 export type PwuStateChangedPayload = z.infer<typeof PwuStateChangedPayloadSchema>;
 export const PwuSupersededPayloadSchema = z.strictObject({
 	supersedingWorkUnitId: z.string(),
+	supersessionDecisionId: z.string().optional(),
 	workLifecycleState: WorkLifecycleStateSchema
 });
 export type PwuSupersededPayload = z.infer<typeof PwuSupersededPayloadSchema>;

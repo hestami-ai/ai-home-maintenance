@@ -62,6 +62,10 @@ import {
 	bootOf,
 	candidateOf,
 	COUNTED_AHEAD,
+	// ⭐⭐ Package L17a — design D72 — the lane's readers of the current composition.
+	currentUnitRows,
+	dependenciesBySlug,
+	discoveredUnits,
 	DESIGNER_ACTS,
 	laneVerdict,
 	openLane,
@@ -69,7 +73,10 @@ import {
 	PHASE7_UNDERTAKING,
 	producerOfStream,
 	runTheLane,
+	// ⭐⭐ Package L17a — design D72 — the run's units at its start, read over the current composition.
+	runUnitsOf,
 	typeUnreadableOf,
+	upstreamNotAssured,
 	withheldUnitsOf,
 	type ActionOutcome,
 	type Boot,
@@ -469,6 +476,17 @@ interface HalfBScript {
 			}
 		>
 	>;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — A REPLACEMENT MADE ON THE PAGE DURING THE RUN: once the Record
+	 * Assurance of the unit slugged `after` is pressed, each unit of `supersede` is SUPERSEDED, its successor linked on its state, and each
+	 * successor of `add` is in the store — its parent and its dependencies its old unit's, re-pointed to the successors, as the act proposes
+	 * them. None unless said: every other case reads the store exactly as before.
+	 */
+	readonly replace?: {
+		readonly after: string;
+		readonly supersede: Readonly<Record<string, string>>;
+		readonly add: readonly AgentUnit[];
+	};
 }
 
 /**
@@ -524,6 +542,15 @@ function halfBLane(script: HalfBScript) {
 		)
 	);
 	const recordOf = new Map(recorded.units.map((r) => [r.unitId, r]));
+	// ⭐⭐ Package L17a — D72 — the replacement the script makes on the page (`replace`), once its trigger is pressed: the superseded units
+	// linked to their successors, and the successors in the store, each recording its old unit's dependencies re-pointed.
+	let replaced = false;
+	const successorOf: Readonly<Record<string, string>> = script.replace?.supersede ?? {};
+	const predecessorOf = new Map(Object.entries(successorOf).map(([old, successor]) => [successor, old]));
+	const unitsNow = (): readonly AgentUnit[] => (replaced ? [...units, ...(script.replace?.add ?? [])] : units);
+	const recordedOf = (id: string) => recordOf.get(predecessorOf.get(id) ?? id);
+	const dependenciesOfUnit = (id: string): string[] =>
+		(recordedOf(id)?.dependencyIds ?? []).map((d) => (predecessorOf.has(id) ? (successorOf[d] ?? d) : d));
 	const snapshot = (): EngineSnapshot => {
 		const candidateStatus = sent && !accepted && script.noCandidate !== true ? statusAt(readsAfterSend) : null;
 		return {
@@ -531,10 +558,14 @@ function halfBLane(script: HalfBScript) {
 			pwuTypes: accepted ? types : [],
 			assurancePolicies: AGENT_POLICIES,
 			assessments: accepted ? FLOOR_OF_THE_CANDIDATE : [],
-			undertakings: undertaking ? [{ id: 'und_1', state: { name: 'wordfreq realization' } }] : [],
+			undertakings: undertaking
+				? [{ id: 'und_1', state: { name: 'wordfreq realization', ...(script.replace === undefined ? {} : { pwaId: PWA_ID }) } }]
+				: [],
 			pwus: undertaking
-				? units.map((u) => {
+				? unitsNow().map((u) => {
 						const s = pressed.get(u.id);
+						// ⭐⭐ Package L17a — D72 — a unit the script's replacement superseded, linked to its successor.
+						const supersededBy = replaced ? successorOf[u.id] : undefined;
 						return {
 							id: u.id,
 							state: {
@@ -543,15 +574,16 @@ function halfBLane(script: HalfBScript) {
 								undertakingId: 'und_1',
 								pwuTypeId: u.typeId,
 								...(u.parent === null ? {} : { parentWorkUnitId: u.parent }),
-								dependencyIds: recordOf.get(u.id)?.dependencyIds ?? [],
+								dependencyIds: dependenciesOfUnit(u.id),
 								// ⭐ Package O (D21) — as instantiation records them now: ~~`UNPRODUCED_INPUT`~~ expected from outside (`OUTSIDE_INPUT`).
-								inputRequirements: (recordOf.get(u.id)?.unproduced ?? []).map((name) => ({ name, status: OUTSIDE_INPUT })),
+								inputRequirements: (recordedOf(u.id)?.unproduced ?? []).map((name) => ({ name, status: OUTSIDE_INPUT })),
+								...(supersededBy === undefined ? {} : { supersedingWorkUnitId: supersededBy }),
 								// ⭐ J1 — as instantiation copies them: the type's `requiredAssurancePolicyIds`, unless the unit says.
 								assurancePolicyIds:
 									u.policies ??
 									(types.find((t) => t.id === u.typeId)?.state.requiredAssurancePolicyIds as string[] | undefined) ??
 									[],
-								workLifecycleState: s?.lifecycleState ?? 'PROPOSED',
+								workLifecycleState: supersededBy === undefined ? (s?.lifecycleState ?? 'PROPOSED') : 'SUPERSEDED',
 								executionState: s?.executionState ?? 'NOT_STARTED',
 								assuranceState: s?.assuranceState ?? 'UNASSESSED'
 							}
@@ -639,6 +671,8 @@ function halfBLane(script: HalfBScript) {
 			const ra = script.signOffs?.[unit.slug]?.ra ?? null;
 			// ⭐ Package M (D6) — an accepted Record Assurance moves the unit under assurance, as the store would read it.
 			if (ra?.envelopeType === 'success') pressed.set(unit.unitId!, ASSURED_B);
+			// ⭐⭐ Package L17a — D72 — and the script's replacement is made on the page once its trigger's sign-off is pressed.
+			if (script.replace?.after === unit.slug) replaced = true;
 			unitCallCount += ra === null ? 0 : (script.signOffs?.[unit.slug]?.calls ?? 0);
 			return ra;
 		},
@@ -4617,5 +4651,206 @@ describe('⭐⭐ L7 (§9) — PROMPT-LENGTH counts the run’s Undertaking', () 
 			'the lane measured without its Undertaking'
 		).toBe(GIVEN);
 		expect(lengthFindings(checks!).map((f) => [f.typeName, f.detail])).toEqual([['Specify wordfreq', counted(GIVEN)]]);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — THE LANE READS THE CURRENT COMPOSITION, SO A REPLACEMENT MADE ON THE
+// PAGE IS FOLLOWED ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+//
+// ⭑ L17a's part of the lane (the lead's): a rule-free hand — the lane presses nothing new; L17b's rule presses the act. But its unit
+// discovery, its tree, the record of what each unit waits for and its upstream check read the CURRENT composition through the supersession
+// links, so units a replacement proposed after the run began are found, and pressed as the page offers them, and a superseded unit is never
+// pressed or waited on. ⭑ THE CASE: the agent's tree; after "Verify wordfreq end to end"'s sign-off, a replacement made on the page sends
+// the work back to "Build wordfreq": Build and Verify superseded, a successor of each in the store.
+
+const BUILD_2 = 'pwu_b2';
+const VERIFY_2 = 'pwu_v2';
+/** The replacement the page makes once Verify's sign-off is pressed: Build and Verify superseded, a successor of each. */
+const REPLACED: NonNullable<HalfBScript['replace']> = {
+	after: 'verify-wordfreq-end-to-end',
+	supersede: { pwu_b: BUILD_2, pwu_v: VERIFY_2 },
+	add: [
+		{ id: BUILD_2, typeId: 'pwutype_build', title: 'Build wordfreq', parent: 'pwu_r' },
+		{ id: VERIFY_2, typeId: 'pwutype_verify', title: 'Verify wordfreq end to end', parent: 'pwu_r' }
+	]
+};
+/** A store's units as rows: `[id, title, parent, dependencies, state, successor]` each. */
+const rowsOf = (units: readonly (readonly [string, string, string | null, readonly string[], string, string?])[]): ObjectRow[] =>
+	units.map(([id, title, parent, dependencyIds, workLifecycleState, successor]) => ({
+		id,
+		state: {
+			objectType: 'PROFESSIONAL_WORK_UNIT',
+			title,
+			undertakingId: 'und_1',
+			...(parent === null ? {} : { parentWorkUnitId: parent }),
+			dependencyIds: [...dependencyIds],
+			workLifecycleState,
+			...(successor === undefined ? {} : { supersedingWorkUnitId: successor })
+		}
+	}));
+
+describe('⭐⭐ L17a (D72) — the lane follows a replacement made on the page: it finds the successors, presses them as the page offers them, and never presses or waits on a superseded unit', () => {
+	it('⛔ RED FIRST — PAID: after Verify’s sign-off the page replaces Build and Verify; the lane finds both successors, presses each as the page offers it, and the root — which waits for the successors through the links — last; the run ends complete', async () => {
+		const l = halfBLane({
+			paid: true,
+			replace: REPLACED,
+			signOffs: {
+				...signedOff(['root', 'specify-wordfreq', 'build-wordfreq', 'build-wordfreq-2', 'verify-wordfreq-end-to-end-2']),
+				'verify-wordfreq-end-to-end': { ra: answered('failure') }
+			}
+		});
+
+		const record = await l.run();
+
+		expect(l.only('beginExecute'), 'the successors were not pressed, or the root not last').toEqual([
+			'beginExecute specify-wordfreq',
+			'beginExecute build-wordfreq',
+			'beginExecute verify-wordfreq-end-to-end',
+			'beginExecute build-wordfreq-2',
+			'beginExecute verify-wordfreq-end-to-end-2',
+			'beginExecute root'
+		]);
+		expect(
+			record.units.map((u) => [u.order, u.slug, u.unitId, u.supersededBy ?? null]),
+			'the record does not hold the successors, or does not mark what they superseded'
+		).toEqual([
+			[1, 'root', 'pwu_r', null],
+			[2, 'specify-wordfreq', 'pwu_s', null],
+			[3, 'build-wordfreq', 'pwu_b', BUILD_2],
+			[4, 'verify-wordfreq-end-to-end', 'pwu_v', VERIFY_2],
+			[5, 'build-wordfreq-2', BUILD_2, null],
+			[6, 'verify-wordfreq-end-to-end-2', VERIFY_2, null]
+		]);
+		expect(record.order?.dependencies.root, 'the root’s record does not wait for the successors, read through the links').toEqual([
+			'specify-wordfreq',
+			'build-wordfreq-2',
+			'verify-wordfreq-end-to-end-2'
+		]);
+		expect(record.end?.reason, `the run did not end complete: ${record.end?.detail ?? ''}`).toBe('complete');
+		expect(withheldUnitsOf(record), 'a superseded unit is waited on').toEqual([]);
+	});
+
+	it('⭑ CONTROL — a run in which nothing is replaced presses what it pressed before, and its record carries no successor', async () => {
+		const l = halfBLane({ paid: true, signOffs: ALL_SIGNED_OFF });
+		const record = await l.run();
+		expect(l.only('beginExecute')).toEqual([...TREE_ORDER.slice(1), 'root'].map((s) => `beginExecute ${s}`));
+		expect(record.units.some((u) => u.supersededBy !== undefined)).toBe(false);
+		expect(record.end?.reason).toBe('complete');
+	});
+
+	it('⛔ RED FIRST — the current composition: a superseded unit out, each parent and each dependency read through the links; with no link, the rows as recorded', () => {
+		const rows = rowsOf([
+			['pwu_r', 'Root', null, ['pwu_s', 'pwu_b'], 'PROPOSED'],
+			['pwu_s', 'Specify', 'pwu_r', [], 'SATISFIED'],
+			['pwu_b', 'Build', 'pwu_r', ['pwu_s'], 'SUPERSEDED', BUILD_2],
+			[BUILD_2, 'Build', 'pwu_r', ['pwu_s'], 'PROPOSED'],
+			['pwu_t', 'Tests', 'pwu_b', ['pwu_b'], 'SATISFIED']
+		]);
+
+		const current = currentUnitRows(rows);
+
+		expect(
+			current.map((r) => [r.id, r.state.parentWorkUnitId ?? null, r.state.dependencyIds]),
+			'the current composition is not read through the links'
+		).toEqual([
+			['pwu_r', null, ['pwu_s', BUILD_2]],
+			['pwu_s', 'pwu_r', []],
+			[BUILD_2, 'pwu_r', ['pwu_s']],
+			['pwu_t', BUILD_2, [BUILD_2]]
+		]);
+		const unlinked = rowsOf([
+			['pwu_r', 'Root', null, ['pwu_s'], 'PROPOSED'],
+			['pwu_s', 'Specify', 'pwu_r', [], 'SATISFIED']
+		]);
+		expect(currentUnitRows(unlinked), 'with no link, the rows are not as recorded').toEqual(unlinked);
+	});
+
+	it('⛔ RED FIRST — the units a replacement proposed after the run began, found: unpressed, numbered after the record’s, each slug unique; each superseded unit with its successor', () => {
+		const snap = {
+			undertakings: [{ id: 'und_1', state: { name: 'u', pwaId: PWA_ID } }],
+			pwuTypes: AGENT_TYPES,
+			pwus: rowsOf([
+				['pwu_r', 'wordfreq Realization', null, ['pwu_s', 'pwu_b'], 'PROPOSED'],
+				['pwu_s', 'Specify wordfreq', 'pwu_r', [], 'SATISFIED'],
+				['pwu_b', 'Build wordfreq', 'pwu_r', [], 'SUPERSEDED', BUILD_2],
+				[BUILD_2, 'Build wordfreq', 'pwu_r', [], 'PROPOSED']
+			]).map((r, i) => ({ ...r, state: { ...r.state, pwuTypeId: ['pwutype_root', 'pwutype_specify', 'pwutype_build', 'pwutype_build'][i] } }))
+		} as unknown as EngineSnapshot;
+		const record = [
+			{ order: 1, slug: 'root', unitId: 'pwu_r' },
+			{ order: 2, slug: 'specify-wordfreq', unitId: 'pwu_s' },
+			{ order: 3, slug: 'build-wordfreq', unitId: 'pwu_b' }
+		] as unknown as Parameters<typeof discoveredUnits>[2];
+
+		const found = discoveredUnits(snap, 'und_1', record);
+
+		expect(
+			found.added.map((u) => [u.order, u.slug, u.title, u.unitId, u.beginExecute, u.notStarted, u.archive]),
+			'the successor was not found, unpressed, numbered and slugged after the record’s'
+		).toEqual([[4, 'build-wordfreq-2', 'Build wordfreq', BUILD_2, null, null, '04-build-wordfreq-2']]);
+		expect(found.superseded, 'the superseded unit was not found with its successor').toEqual([{ unitId: 'pwu_b', by: BUILD_2 }]);
+	});
+
+	it('⛔ RED FIRST — what a unit waits for, and its upstream check, read through the links: the successor, not the superseded unit', () => {
+		const snap = {
+			pwus: rowsOf([
+				['pwu_s', 'Specify', 'pwu_r', [], 'SATISFIED'],
+				['pwu_b', 'Build', 'pwu_r', ['pwu_s'], 'SUPERSEDED', BUILD_2],
+				[BUILD_2, 'Build', 'pwu_r', ['pwu_s'], 'SATISFIED'],
+				['pwu_v', 'Verify', 'pwu_r', ['pwu_b'], 'PROPOSED']
+			])
+		} as unknown as EngineSnapshot;
+		const units = [
+			{ slug: 'specify', unitId: 'pwu_s' },
+			{ slug: 'build-2', unitId: BUILD_2 },
+			{ slug: 'verify', unitId: 'pwu_v' }
+		] as unknown as Parameters<typeof dependenciesBySlug>[1];
+
+		expect(dependenciesBySlug(snap, units).verify, 'what Verify waits for is not its producer’s successor').toEqual(['build-2']);
+		expect(upstreamNotAssured(snap, 'pwu_v'), 'Verify’s producer’s successor is accepted, and its upstream read as not assured').toBe(false);
+	});
+
+	it('⛔ RED FIRST — the run never waits on a superseded unit, one pressed and left stopped among them: its successor carries its work', () => {
+		const pressed = (slug: string, stopped: boolean, supersededBy?: string) =>
+			({
+				slug,
+				title: slug,
+				beginExecute: { status: 200 },
+				stopped,
+				signOff: null,
+				notStarted: null,
+				...(supersededBy === undefined ? {} : { supersededBy })
+			}) as unknown as RunRecord['units'][number];
+
+		expect(
+			withheldUnitsOf({ units: [pressed('build', true, BUILD_2)] }),
+			'a superseded unit, pressed and left stopped, is waited on'
+		).toEqual([]);
+		expect(withheldUnitsOf({ units: [pressed('build', true)] }).length, 'the same unit, not superseded, is not withheld').toBe(1);
+	});
+
+	it('⛔ RED FIRST — the run’s units at its start are the current composition: a superseded unit out, its successor in the tree’s order', () => {
+		const snap = {
+			undertakings: [{ id: 'und_1', state: { name: 'wordfreq realization', pwaId: PWA_ID } }],
+			pwuTypes: AGENT_TYPES,
+			pwus: rowsOf([
+				['pwu_r', 'wordfreq Realization', null, ['pwu_s', BUILD_2], 'PROPOSED'],
+				['pwu_s', 'Specify wordfreq', 'pwu_r', [], 'SATISFIED'],
+				['pwu_b', 'Build wordfreq', 'pwu_r', ['pwu_s'], 'SUPERSEDED', BUILD_2],
+				[BUILD_2, 'Build wordfreq', 'pwu_r', ['pwu_s'], 'PROPOSED']
+			]).map((r, i) => ({ ...r, state: { ...r.state, pwuTypeId: ['pwutype_root', 'pwutype_specify', 'pwutype_build', 'pwutype_build'][i] } }))
+		} as unknown as EngineSnapshot;
+
+		const run = runUnitsOf(snap, PWA_ID, 'wordfreq realization');
+
+		expect(
+			run.units.map((u) => [u.slug, u.unitId]),
+			'the run’s units hold the superseded Build, or not its successor'
+		).toEqual([
+			['root', 'pwu_r'],
+			['specify-wordfreq', 'pwu_s'],
+			['build-wordfreq', BUILD_2]
+		]);
+		expect(run.problems, 'the run’s tree has a problem').toEqual([]);
 	});
 });

@@ -935,12 +935,61 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		);
 	});
 
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1); `REG-F-212`) — what a supersession cites: a person's EFFECTIVE `REPLAN`
+	 * Decision naming `subjects`, the first pinned at version 1, proposed and approved under the issuing principal's authority.
+	 */
+	let replans = 0;
+	function replan(subjects: readonly string[]): string {
+		replans += 1;
+		const decisionId = `dec_01ARZ3NDEKTSV4RRFFQ69G5D${String(replans).padStart(2, '0')}`;
+		const onDecision = (t: string, payload: unknown): DomainCommand =>
+			cmd(t, payload, { targetAggregateId: decisionId, targetAggregateType: 'DECISION' });
+		for (const [t, payload] of [
+			[
+				'ProposeDecision',
+				{
+					decisionType: 'REPLAN',
+					subjectObjectIds: [...subjects],
+					selectedOption: 'REPLACE_REACHED_WORK',
+					rationale: 'the unit is replaced by its successor',
+					authority: issuingAuthority(),
+					consideredObservationIds: []
+				}
+			],
+			[
+				'ApproveDecision',
+				{
+					selectedOption: 'REPLACE_REACHED_WORK',
+					rationale: 'the unit is replaced by its successor',
+					consideredEvidenceIds: [],
+					consideredObservationIds: [],
+					subjectSemanticVersions: { [subjects[0]!]: 1 }
+				}
+			]
+		] as const) {
+			const r = engine.dispatch(onDecision(t, payload));
+			expect(r.status, `${t}: ${r.error?.message}`).toBe('ACCEPTED');
+		}
+		return decisionId;
+	}
+
+	// ⭐⭐ RESTATED 2026-11-16 (`JAN-EXEC` Phase 7, package L17a — design D72; `REG-F-212`): ~~`cmd('SupersedePwu', { supersedingWorkUnitId:
+	// 'pwu_new' })`~~ — a successor never created, ACCEPTED — is now refused by the kernel, which asks a PROPOSED successor of the unit's type and
+	// Undertaking and a person's EFFECTIVE REPLAN Decision naming the unit (`supersede-pwu.test.ts` holds each refusal). The promise kept, byte
+	// for byte in what it asserts: a non-baselined PWU moves to SUPERSEDED, and this drive site — `pwu-fold-drive-sites.test.ts` names it by
+	// this title — replays.
 	it('SupersedePwu moves a non-baselined PWU -> SUPERSEDED', () => {
 		seedIntent();
 		engine.dispatch(cmd('ProposePwu', proposePayload()));
-		expect(engine.dispatch(cmd('SupersedePwu', { supersedingWorkUnitId: 'pwu_new' })).status).toBe(
-			'ACCEPTED'
-		);
+		const successor = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5S20';
+		expect(
+			engine.dispatch(cmd('ProposePwu', { ...proposePayload(), pwuId: successor, title: 'Successor Unit' }, { targetAggregateId: successor }))
+				.status
+		).toBe('ACCEPTED');
+		expect(
+			engine.dispatch(cmd('SupersedePwu', { supersedingWorkUnitId: successor, supersessionDecisionId: replan([PWU_ID]) })).status
+		).toBe('ACCEPTED');
 		expect(lifecycle()).toBe('SUPERSEDED');
 		// REG-F-084: folding `PwuSuperseded` proves nothing unless a test EMITS it. The reference undertaking does not
 		// reach this arrow, so this is the drive site `pwu-fold-drive-sites.test.ts` names for it.
@@ -1280,9 +1329,18 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			[PWU_ID]: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5S10',
 			[second]: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5S11'
 		};
+		// ⭐⭐ RESTATED 2026-11-16 (package L17a — design D72; `REG-F-212`): each successor is now a real unit, PROPOSED, and the supersession cites a
+		// person's REPLAN Decision naming both subjects, as the kernel asks; ~~successor ids that named nothing~~. The promise kept: each event
+		// records the successor THIS dispatch named, never a constant or the subject's own id — and now the Decision it cited too.
+		for (const successor of Object.values(successorOf))
+			expect(
+				engine.dispatch(cmd('ProposePwu', { ...proposePayload(), pwuId: successor, title: successor }, { targetAggregateId: successor })).status,
+				`propose ${successor}`
+			).toBe('ACCEPTED');
+		const decision = replan([PWU_ID, second]);
 		for (const [subject, successor] of Object.entries(successorOf)) {
 			const r = engine.dispatch(
-				cmd('SupersedePwu', { supersedingWorkUnitId: successor }, { targetAggregateId: subject })
+				cmd('SupersedePwu', { supersedingWorkUnitId: successor, supersessionDecisionId: decision }, { targetAggregateId: subject })
 			);
 			// The CONTROL half: the command is still ADMITTED from a declared source state, so an assertion that
 			// passed because supersession had stopped working would be caught here.
@@ -1294,7 +1352,7 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			expect(
 				emitted[0]!.payload,
 				`the successor recorded for ${subject} must be ${successor} — the id this dispatch named`
-			).toEqual({ supersedingWorkUnitId: successor, workLifecycleState: 'SUPERSEDED' });
+			).toEqual({ supersedingWorkUnitId: successor, supersessionDecisionId: decision, workLifecycleState: 'SUPERSEDED' });
 		}
 	});
 

@@ -13,6 +13,8 @@ export * from './pwa-graph-report.js';
 export * from './leaf.js';
 export * from './handoff-order.js';
 export * from './unit-dependencies.js';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 — the supersession links' resolver, the current composition, the candidates and the reach.
+export * from './unit-supersession.js';
 export * from './execution-view.js';
 export * from './execution-attempts.js';
 export * from './calibration.js';

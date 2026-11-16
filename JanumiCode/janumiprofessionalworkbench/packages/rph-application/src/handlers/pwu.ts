@@ -94,6 +94,8 @@ import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-
 import { resolveWaiverAuthorization } from './waiver-authorization.js';
 // ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D71 (`REG-D-163` (2)) — what authorizes canon's one way back.
 import { resolveReworkAuthorization } from './rework-authorization.js';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1); `REG-F-212`) — what a supersession may name as its successor, and what authorizes it.
+import { resolveSupersession } from './supersession-authorization.js';
 
 const PWU = 'PROFESSIONAL_WORK_UNIT';
 
@@ -1036,14 +1038,57 @@ export const invalidatePwu: CommandHandler = (ctx, command) => {
 	});
 };
 
-/** SupersedePwu — any non-baselined state -> SUPERSEDED. */
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1); `REG-F-643`; `REG-F-212`, its remedy (2) for this path) — THE KERNEL'S SEAT
+ * OF THE SUPERSESSION CHECK. ⛔ `supersedePwu` supplied no guard: it copied the caller's successor id into its event and never loaded it, so a
+ * supersession naming a successor that was never created was ACCEPTED, and SUPERSEDED is terminal (`REG-F-212`). ⛔ FAIL CLOSED, before the
+ * move: the successor this unit itself, not recorded, not a work unit, of another Undertaking or type, not PROPOSED, or the successor of another
+ * unit already; or no EFFECTIVE `REPLAN` Decision naming this unit cited (`resolveSupersession`). The unit's own state is then the lifecycle's
+ * to judge, as before: BASELINED is still refused as an undeclared arrow (`advancePwuLifecycle`).
+ */
+function rejectUnauthorizedSupersession(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	p: SupersedePwuPayload,
+	pwuState: Record<string, unknown>,
+	pwuSemanticVersion: number
+): CommandResult | undefined {
+	const id = command.targetAggregateId;
+	const verdict = resolveSupersession(ctx, {
+		pwuId: id,
+		pwuState,
+		pwuSemanticVersion,
+		successorId: p.supersedingWorkUnitId,
+		decisionId: p.supersessionDecisionId
+	});
+	if (verdict.ok) return undefined;
+	return reject(
+		command,
+		verdict.code,
+		`SupersedePwu ${id}: ${verdict.reason}. A replacement supersedes a unit with a new PROPOSED unit of its type and Undertaking that ` +
+			`succeeds no other, under a person's EFFECTIVE REPLAN Decision naming the unit (design D72; REG-D-166 (1); REG-F-212).`,
+		[id, p.supersedingWorkUnitId, p.supersessionDecisionId]
+	);
+}
+
+/**
+ * SupersedePwu — any non-baselined state -> SUPERSEDED. ⭐⭐ Package L17a — design D72 (`REG-D-166` (1)) — its successor and its Decision checked
+ * first (`rejectUnauthorizedSupersession`), and THE LINK written to the old unit's state by the lifecycle move (`supersedingWorkUnitId`) — a
+ * lifecycle fact, never its shape, which stays write-once (`REG-F-109`) — as well as to its event, which names the Decision too.
+ */
 export const supersedePwu: CommandHandler = (ctx, command) => {
+	const loaded = loadOrReject(ctx, command, command.targetAggregateId);
+	if (!loaded.ok) return loaded.result;
 	const p = command.payload as SupersedePwuPayload;
+	const refused = rejectUnauthorizedSupersession(ctx, command, p, loaded.state, loaded.semanticVersion);
+	if (refused) return refused;
 	return advancePwuLifecycle(ctx, command, {
 		spec: PWU_LIFECYCLE_COMMAND_SPECS.SupersedePwu,
+		mutate: (current) => ({ ...current, supersedingWorkUnitId: p.supersedingWorkUnitId }),
 		eventPayload: (next) =>
 			({
 				supersedingWorkUnitId: p.supersedingWorkUnitId,
+				supersessionDecisionId: p.supersessionDecisionId,
 				workLifecycleState: next.workLifecycleState as PwuSupersededPayload['workLifecycleState']
 			}) satisfies PwuSupersededPayload
 	});

@@ -148,7 +148,7 @@
 		},
 		"packages/rph-application/src/handlers/pwu.ts": {
 			"statements": 4,
-			"branches": 27,
+			"branches": 26,
 			"functions": 0,
 			"lines": 2
 		},
@@ -178,6 +178,12 @@
 		},
 		"packages/rph-application/src/handlers/skip-authorization.ts": {
 			"statements": 1,
+			"branches": 2,
+			"functions": 0,
+			"lines": 1
+		},
+		"packages/rph-application/src/handlers/supersession-authorization.ts": {
+			"statements": 2,
 			"branches": 2,
 			"functions": 0,
 			"lines": 1
@@ -701,6 +707,12 @@
 		"packages/rph-projections/src/unit-dependencies.ts": {
 			"statements": 1,
 			"branches": 18,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/unit-supersession.ts": {
+			"statements": 0,
+			"branches": 1,
 			"functions": 0,
 			"lines": 0
 		},

@@ -14,7 +14,13 @@
 		form
 	}: {
 		data: PageData;
-		form: { error?: string; proposed?: string; advanced?: string; acceptedWorkNotWritten?: string } | null;
+		form: {
+			error?: string;
+			proposed?: string;
+			advanced?: string;
+			acceptedWorkNotWritten?: string;
+			supersededWorkNotNoticed?: string;
+		} | null;
 	} = $props();
 	const themeContext = getContext<ThemeContext>(THEME_CONTEXT);
 	const colorTheme = themeContext.theme;
@@ -197,6 +203,9 @@
 			<!-- ⭐⭐ `JAN-EXEC` Phase 7, package L15 — D69 (`REG-D-159`): Mark Satisfied wrote no file for the unit's accepted work; the
 				 acceptance stands, and the page says so. -->
 			{#if form?.acceptedWorkNotWritten}<p class="err" role="alert" data-testid="accepted-work-not-written">{form.acceptedWorkNotWritten}</p>{/if}
+			<!-- ⭐⭐ `JAN-EXEC` Phase 7, package L17a — D72 (`REG-D-166` (1)), the lead's option (D): the work was sent back, and a superseded
+				 unit's accepted-work file could not be given its notice; the act stands, and the page says so, file by file. -->
+			{#if form?.supersededWorkNotNoticed}<p class="err" role="alert" data-testid="superseded-work-not-noticed">{form.supersededWorkNotNoticed}</p>{/if}
 			<h3>PWU Instances → PWU Types</h3>
 			<p class="hint">
 				Each PWU Instance realizes a PWU Type defined by the PWA (or is a declared local extension), and
@@ -386,6 +395,34 @@
 													<button class="mini" type="submit" data-testid="rerun-rejected-work"
 														>Re-run the work with the reviews’ findings</button
 													>
+												</form>
+											{/if}
+											<!-- ⭐⭐ JAN-EXEC Phase 7, package L17a — D72 (REG-D-166 (1); REG-F-643) — SEND THE WORK BACK TO AN EARLIER UNIT, BY
+											     REPLACEMENT. Offered ONLY on a unit its declared reviews rejected at its sign-off whose work used other units' work, as
+											     the server reads it (`sendBackOffer`): the person chooses the unit among those, and that unit and every started unit its
+											     work reached are replaced by new units of their types, each old one superseded. The choice is the person's Decision, so
+											     it asks for their rationale. -->
+											{#if data.sendBackByPwu[p.id]}
+												<form method="POST" action="?/sendWorkBack" use:enhance class="findingform">
+													<input type="hidden" name="pwuId" value={p.id} />
+													<label class="hint" for={`send-work-back-target-${p.id}`}>Send the work back to</label>
+													<select
+														id={`send-work-back-target-${p.id}`}
+														name="targetId"
+														required
+														data-testid="send-work-back-target"
+													>
+														{#each data.sendBackByPwu[p.id].candidates as c (c.id)}
+															<option value={c.id}>{c.title}</option>
+														{/each}
+													</select>
+													<input
+														name="rationale"
+														placeholder="Why send the work back?"
+														required
+														data-testid="send-work-back-rationale"
+													/>
+													<button class="mini" type="submit" data-testid="send-work-back">Send the work back</button>
 												</form>
 											{/if}
 											<!-- REJECTION IS OFFERED ONLY WHERE A BLOCKING FINDING ACTUALLY STANDS (S-1b / B-3).

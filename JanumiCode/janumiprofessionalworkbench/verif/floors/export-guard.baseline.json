@@ -554,6 +554,15 @@
 			],
 			"unattributedMutants": 0
 		},
+		"packages/rph-application/src/handlers/supersession-authorization.ts": {
+			"consumedExports": [
+				"resolveSupersession"
+			],
+			"guardedExports": [
+				"resolveSupersession"
+			],
+			"unattributedMutants": 12
+		},
 		"packages/rph-application/src/handlers/validator-registry.ts": {
 			"consumedExports": [
 				"disableValidator",
@@ -1495,6 +1504,7 @@
 		},
 		"packages/rph-projections/src/unit-dependencies.ts": {
 			"consumedExports": [
+				"ACCEPTED_UNIT_STATES",
 				"expectedFromOutside",
 				"OUTSIDE_INPUT",
 				"readinessUnitOf",
@@ -1503,12 +1513,35 @@
 				"unitDependencies"
 			],
 			"guardedExports": [
+				"ACCEPTED_UNIT_STATES",
 				"expectedFromOutside",
 				"OUTSIDE_INPUT",
+				"readinessUnitOf",
 				"startReadiness",
 				"unitDependencies"
 			],
-			"unattributedMutants": 1
+			"unattributedMutants": 2
+		},
+		"packages/rph-projections/src/unit-supersession.ts": {
+			"consumedExports": [
+				"effectiveDependencyIds",
+				"effectiveParentId",
+				"isCurrentUnit",
+				"liveEndOf",
+				"replacementCandidates",
+				"replacementReach",
+				"successorLinkOf"
+			],
+			"guardedExports": [
+				"effectiveDependencyIds",
+				"effectiveParentId",
+				"isCurrentUnit",
+				"liveEndOf",
+				"replacementCandidates",
+				"replacementReach",
+				"successorLinkOf"
+			],
+			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/work-projection.ts": {
 			"consumedExports": [

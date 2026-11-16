@@ -223,6 +223,12 @@
 					"field": "isLocalExtension",
 					"type": "boolean",
 					"required": false
+				},
+				{
+					"field": "supersedingWorkUnitId",
+					"type": "string",
+					"required": false,
+					"note": "AUTHORED 2026-11-16 (JAN-EXEC Phase 7, package L17a; design D72, REG-D-166 (1); REG-F-212): the unit that superseded this one, written to its state by the lifecycle move SupersedePwu makes and by nothing else — a lifecycle fact, not the unit's shape, which stays write-once (REG-F-109). Absent on a unit no replacement superseded."
 				}
 			]
 		},

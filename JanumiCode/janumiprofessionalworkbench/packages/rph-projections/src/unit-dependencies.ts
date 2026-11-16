@@ -41,7 +41,9 @@
 // only the unit's own type produces has no producer it could wait for, and is named ~~unproduced~~ ⭐ among the inputs no unit
 // of the Undertaking produces — expected from outside it (D21).
 //
-// Pure + browser-safe (no imports), like the rest of rph-projections.
+// Pure + browser-safe (no imports), like the rest of rph-projections. ⭐⭐ `JAN-EXEC` Phase 7, package L17a (design D72): save the resolver of
+// the supersession links, `unit-supersession.ts`, of this package, through which the readiness rule reads what a unit waits for.
+import { effectiveDependencyIds, liveEndOf, successorLinkOf } from './unit-supersession.js';
 
 /** The inputs the Undertaking's Intent supplies: no unit produces them, and none is waited for (design D1). */
 export const SUPPLIED_BY_INTENT: ReadonlySet<string> = new Set(['originating-intent']);
@@ -283,6 +285,11 @@ export interface ReadinessUnit {
 	 * `UNPRODUCED_INPUT` in a record made before D21), in the record's order. ⛔ None withholds the unit.
 	 */
 	readonly outsideInputs: readonly string[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — the unit that superseded it, as its record links it
+	 * (`supersedingWorkUnitId`); absent when a replacement never superseded it, so such a unit reads as it always did.
+	 */
+	readonly supersedingWorkUnitId?: string;
 }
 
 const strOf = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -297,6 +304,8 @@ export function readinessUnitOf(
 ): ReadinessUnit | undefined {
 	if (state?.objectType !== 'PROFESSIONAL_WORK_UNIT') return undefined;
 	const requirements = Array.isArray(state.inputRequirements) ? (state.inputRequirements as unknown[]) : [];
+	// ⭐⭐ Package L17a — D72 — its successor, where a replacement superseded it.
+	const successor = successorLinkOf(state);
 	return {
 		id,
 		title: strOf(state.title) || id,
@@ -310,7 +319,8 @@ export function readinessUnitOf(
 		outsideInputs: requirements
 			.map((r) => (typeof r === 'object' && r !== null ? (r as Record<string, unknown>) : {}))
 			.filter((r) => OUTSIDE_INPUT_STATUSES.has(r.status))
-			.map((r) => strOf(r.name))
+			.map((r) => strOf(r.name)),
+		...(successor === undefined ? {} : { supersedingWorkUnitId: successor })
 	};
 }
 
@@ -346,8 +356,11 @@ export interface StartReadiness {
 function loopThrough(start: string, lookup: (id: string) => ReadinessUnit | undefined): string[] | null {
 	const seen = new Set<string>();
 	const path: string[] = [];
+	// ⭐⭐ Package L17a — D72 — what each unit waits for, read through the supersession links (`effectiveDependencyIds`).
+	const waitsFor = (id: string): string[] =>
+		effectiveDependencyIds(lookup(id)?.dependencyIds ?? [], (d) => lookup(d)?.supersedingWorkUnitId);
 	const reaches = (id: string): boolean => {
-		for (const d of lookup(id)?.dependencyIds ?? []) {
+		for (const d of waitsFor(id)) {
 			if (d === start) {
 				path.push(id);
 				return true;
@@ -383,8 +396,18 @@ export function startReadiness(
 	const waitingFor: { id: string; title: string; state: string }[] = [];
 	const abandoned: { id: string; title: string }[] = [];
 	const unknown: string[] = [];
-	for (const id of new Set(unit?.dependencyIds ?? [])) {
-		const d = lookup(id);
+	const cycled: string[] = [];
+	const read = new Set<string>();
+	for (const recorded of unit?.dependencyIds ?? []) {
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — EACH DEPENDENCY READ THROUGH THE SUPERSESSION LINKS, to the live
+		// end of its chain (`liveEndOf`), once each: a unit a replacement superseded is waited for as its successor, so a unit not started follows
+		// the successors. ⛔ A chain that runs in a cycle reaches no live unit: refused as naming none (fail closed; no command can make one).
+		const end = liveEndOf(recorded, (x) => lookup(x)?.supersedingWorkUnitId);
+		const id = end.ok ? end.id : recorded;
+		if (read.has(id)) continue;
+		read.add(id);
+		if (!end.ok) cycled.push(id);
+		const d = end.ok ? lookup(id) : undefined;
 		if (d === undefined || d.undertakingId === undefined || d.undertakingId !== unit?.undertakingId) unknown.push(id);
 		else if (d.workLifecycleState === 'ABANDONED') abandoned.push({ id, title: d.title });
 		else if (!ACCEPTED_UNIT_STATES.includes(d.workLifecycleState))
@@ -412,6 +435,8 @@ export function startReadiness(
 		...(unknown.length > 0
 			? [`${listed(unknown)} name${unknown.length > 1 ? '' : 's'} no unit of this Undertaking`]
 			: []),
+		// ⭐⭐ Package L17a — D72 — and why, where a dependency's supersession links run in a cycle.
+		...(cycled.length > 0 ? [`the supersession links of ${listed(cycled)} run in a cycle and reach no live unit`] : []),
 		// ~~"nothing in this Undertaking produces its input(s) …"~~ ⛔ D21: no reason — the page names it apart (`expectedFromOutside`).
 		...(loop !== null
 			? [`it sits in a loop: ${[...loop, loop[0]!].map((l) => quoted(l.title)).join(' → ')}`]

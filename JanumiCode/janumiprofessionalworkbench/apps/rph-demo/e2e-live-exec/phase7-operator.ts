@@ -58,11 +58,15 @@ import {
 	dependenciesOf,
 	floorDispositions,
 	PHASE7_HALF_B_REQUEST,
+	slugOf,
 	TURN_SETTLED,
 	unitsInTreeOrder,
 	type FloorDisposition,
 	type TreeUnit
 } from '../../../scripts/phase7/half-b.js';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — the supersession links' resolver: the lane reads the CURRENT composition
+// through it — its tree, what each unit waits for, its upstream check, and the units a replacement proposed after the run began.
+import { effectiveDependencyIds, effectiveParentId, isCurrentUnit, successorLinkOf } from '@janumipwb/rph-projections';
 import {
 	archiveName,
 	FINAL_ARCHIVE,
@@ -561,6 +565,13 @@ export interface RunUnit extends ArchiveUnit {
 	 * where the page withheld it (`not started: …`), or the run's where the run ended first; null for a unit pressed.
 	 */
 	notStarted: string | null;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — THE UNIT THAT SUPERSEDED IT, where a replacement made on the page
+	 * superseded it during the run, as the store links it (`discoveredUnits`); absent for a unit no replacement touched. The lane never presses it
+	 * again (the page offers Begin & Execute on a PROPOSED row alone) and never waits on it (`withheldUnitsOf`): its successor carries its
+	 * work.
+	 */
+	supersededBy?: string;
 }
 
 /** ⭐ P7-6R R-1f — one act the run plan's rule made on a stopped phase, and the unit as the STORE read it after. */
@@ -732,6 +743,8 @@ export const notStartedBecause = (o: StartOffer | undefined): string =>
  */
 export function withheldUnitsOf(record: Pick<RunRecord, 'units'>): string[] {
 	return record.units.flatMap((u) => {
+		// ⭐⭐ Package L17a — D72 — a unit a replacement superseded is never waited on: its successor carries its work.
+		if (u.supersededBy !== undefined) return [];
 		if (u.beginExecute === null) return [`${u.title} — ${u.notStarted ?? 'not started: never pressed'}`];
 		if ((u.signOff?.recordAssurance ?? null) !== null) return [];
 		const why =
@@ -906,14 +919,16 @@ export function stoppedAfter(envelopeType: EnvelopeType | null, state: UnitState
  */
 export function upstreamNotAssured(snap: EngineSnapshot, unitId: string): boolean {
 	const lifecycleOf = (id: string): string => str(snap.pwus.find((p) => p.id === id)?.state.workLifecycleState);
-	const waitsFor = dependenciesOf(snap.pwus.filter((p) => p.id === unitId)).get(unitId) ?? [];
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — what it waits for, read through the supersession links.
+	const waitsFor = dependenciesOf(currentUnitRows(snap.pwus).filter((p) => p.id === unitId)).get(unitId) ?? [];
 	return waitsFor.some((id) => !acceptedState(lifecycleOf(id)));
 }
 
 /** ⭐ Package M (D6) — what each unit waits for, by slug (by id for one the run holds no unit of), as the store recorded it. */
 export function dependenciesBySlug(snap: EngineSnapshot, units: readonly RunUnit[]): Record<string, string[]> {
 	const slugOf = new Map(units.map((u) => [u.unitId, u.slug]));
-	const recorded = dependenciesOf(snap.pwus);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — as read through the supersession links: a superseded unit has none.
+	const recorded = dependenciesOf(currentUnitRows(snap.pwus));
 	return Object.fromEntries(
 		units.map((u) => [u.slug, (recorded.get(u.unitId ?? '') ?? []).map((id) => slugOf.get(id) ?? id)])
 	);
@@ -1924,7 +1939,8 @@ export function runUnitsOf(
 		(p) => undertaking !== undefined && p.state.undertakingId === undertaking.id
 	);
 	const tree = unitsInTreeOrder(
-		units,
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — the CURRENT composition, its parents read through the links.
+		currentUnitRows(units),
 		snap.pwuTypes.filter((t) => t.state.pwaId === pwaId)
 	);
 	const titles = tree.units.map((u) => u.title);
@@ -1935,6 +1951,78 @@ export function runUnitsOf(
 			'id, never by the title their rows show (REG-D-112)'
 	);
 	return { units: tree.units, rows: new Map(units.map((u) => [u.id, u])), problems: [...tree.problems, ...repeated] };
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — THE UNDERTAKING'S CURRENT UNITS, AS THE LANE READS ITS TREE AND WHAT EACH
+ * UNIT WAITS FOR: the units not superseded (`isCurrentUnit`), each its parent and its dependencies read through the supersession links
+ * (`effectiveParentId`, `effectiveDependencyIds`). ⭑ For an Undertaking no replacement touched, its own rows, field for field. ⚠ The run
+ * report's readers (`half-b.ts`'s `unitsInTreeOrder`, `treeAgainstPlan`, `dependenciesOf`) are left as they were, byte for byte: the report's
+ * readings of a replacement are design D81's (package L17c).
+ */
+export function currentUnitRows(units: readonly ObjectRow[]): ObjectRow[] {
+	const successorOf = (id: string): string | undefined => successorLinkOf(units.find((u) => u.id === id)?.state);
+	return units
+		.filter((u) => isCurrentUnit(str(u.state.workLifecycleState)))
+		.map((u) => {
+			const parent = effectiveParentId(str(u.state.parentWorkUnitId) || undefined, successorOf);
+			const state = Object.fromEntries(Object.entries(u.state).filter(([field]) => field !== 'parentWorkUnitId'));
+			return {
+				...u,
+				state: {
+					...state,
+					...(parent === undefined ? {} : { parentWorkUnitId: parent }),
+					dependencyIds: effectiveDependencyIds(stringsOf(u.state.dependencyIds), successorOf)
+				}
+			};
+		});
+}
+
+/** `slug`, or `slug-2`, `slug-3` … — the first `taken` does not hold, which it then takes; a reserved one is `<slug>-unit`, as `half-b.ts`'s. */
+function slugAmong(slug: string, taken: Set<string>): string {
+	const base = slug === 'root' || slug === 'final' ? `${slug}-unit` : slug;
+	let candidate = base;
+	for (let n = 2; taken.has(candidate); n += 1) candidate = `${base}-${n}`;
+	taken.add(candidate);
+	return candidate;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — WHAT A REPLACEMENT MADE ON THE PAGE CHANGED, AS THE LANE TAKES IT INTO ITS
+ * RECORD: each unit of the record the store reads superseded, with its successor (`superseded`); and each unit of the Undertaking's CURRENT
+ * composition, in its tree's order (`currentUnitRows`, `unitsInTreeOrder`), that the record does not hold — unpressed, numbered after the
+ * record's last, its slug its title's, unique among the record's (`added`). ⭑ Where the current composition holds no unit the record does not,
+ * nothing is placed, and the PWA's types are not read. Pure: the lane appends the one and marks the other (`runTheLane`).
+ */
+export function discoveredUnits(
+	snap: EngineSnapshot,
+	undertakingId: string,
+	record: readonly RunUnit[]
+): { readonly added: RunUnit[]; readonly superseded: readonly { readonly unitId: string; readonly by: string }[] } {
+	const units = snap.pwus.filter((p) => p.state.undertakingId === undertakingId);
+	const current = currentUnitRows(units);
+	const held = new Set(record.map((u) => u.unitId));
+	const superseded = record.flatMap((u) => {
+		const row = units.find((p) => p.id === u.unitId);
+		const by = successorLinkOf(row?.state);
+		return row !== undefined && by !== undefined && !isCurrentUnit(str(row.state.workLifecycleState)) ? [{ unitId: row.id, by }] : [];
+	});
+	if (current.every((u) => held.has(u.id))) return { added: [], superseded };
+	const pwaId = str(snap.undertakings.find((u) => u.id === undertakingId)?.state.pwaId);
+	const tree = unitsInTreeOrder(
+		current,
+		snap.pwuTypes.filter((t) => t.state.pwaId === pwaId)
+	);
+	const taken = new Set(record.map((u) => u.slug));
+	let order = record.reduce((most, u) => Math.max(most, u.order), 0);
+	const added = tree.units
+		.filter((t) => !held.has(t.unitId))
+		.map((t): RunUnit => {
+			order += 1;
+			const [unit] = unpressed([{ order, slug: slugAmong(slugOf(t.title), taken), title: t.title }]);
+			return { ...unit!, unitId: t.unitId };
+		});
+	return { added, superseded };
 }
 
 /** Where half B's authoring ended short of its units: the run's end, and why. */
@@ -3011,6 +3099,26 @@ export async function runTheLane(r: {
 				}
 			writeRunRecord(lane, record);
 		};
+		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — WHAT A REPLACEMENT MADE ON THE PAGE CHANGED, TAKEN INTO THE RECORD
+		 * (`discoveredUnits`): each unit it proposed appended, unpressed; each unit it superseded marked so; and the order's record of what each
+		 * unit waits for read again, through the links (`dependenciesBySlug`) — a superseded unit, out of the current composition, waits for none
+		 * there, and its `supersededBy` says why. True when anything was appended or marked.
+		 */
+		const follow = (snapshot: EngineSnapshot): boolean => {
+			const found = discoveredUnits(snapshot, undertakingId, record.units);
+			const marked = found.superseded.filter((s) => {
+				const unit = record.units.find((u) => u.unitId === s.unitId);
+				if (unit === undefined || unit.supersededBy === s.by) return false;
+				unit.supersededBy = s.by;
+				return true;
+			});
+			if (found.added.length === 0 && marked.length === 0) return false;
+			record.units.push(...found.added);
+			record.order = { dependencies: dependenciesBySlug(snapshot, record.units), pressed: record.order?.pressed ?? [] };
+			writeRunRecord(lane, record);
+			return true;
+		};
 		let offers = await offersNow();
 		// ⛔ D5 — A LOOP ENDS THE RUN BEFORE ANY PRESS: no unit of it can ever start, and the page names it. ⛔ NEVER A FALLBACK
 		// TO THE TREE'S ORDER, which would start a unit whose producers the loop holds unaccepted forever.
@@ -3055,7 +3163,14 @@ export async function runTheLane(r: {
 			const next = record.units.find(
 				(u) => u.beginExecute === null && u.notStarted === null && offers.get(u.unitId!)?.offered === true
 			);
-			if (next === undefined) break;
+			if (next === undefined) {
+				// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — BEFORE THE PRESSES END, A REPLACEMENT MADE ON THE PAGE IS
+				// FOLLOWED: the store read once more, and each unit it proposed taken into the record (`follow`); a unit taken in, the page is asked
+				// again, and the units it offers are pressed in its order. ⭑ The lane presses nothing new itself in L17a: L17b's rule presses the act.
+				if (!follow((await hands.read()).snapshot)) break;
+				offers = await offersNow();
+				continue;
+			}
 			const checked = await pressCheck(next);
 			if (checked !== null && 'reason' in checked) {
 				notStartedFrom(offers);

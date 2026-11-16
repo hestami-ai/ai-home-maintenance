@@ -499,6 +499,9 @@
     },
     "isLocalExtension": {
       "type": "boolean"
+    },
+    "supersedingWorkUnitId": {
+      "type": "string"
     }
   },
   "required": [

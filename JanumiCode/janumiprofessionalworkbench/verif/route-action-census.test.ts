@@ -207,6 +207,11 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 		// rejected — canon's one way back. It records the person's Decision, the move back to planning and a new plan in one batch, and the
 		// server refuses it unless the unit is in that state (`rejectedRerunOffer`); the kernel refuses the move without its Decision.
 		'rerunRejectedWork',
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — D72 (`REG-D-166` (1)): the person's sending of the work of a unit its declared reviews rejected
+		// back to an earlier unit, by replacement. It records the person's Decision, the new units, their decompositions and the supersessions in
+		// one batch; the server refuses it unless the unit is in that state and the target a candidate (`sendBackOffer`), and the kernel refuses
+		// each supersession without its successor and its Decision (`resolveSupersession`). This census reddened on its arrival, which is its job.
+		'sendWorkBack',
 		// S-1a (REG-F-104): abandonment is one of the three acts DOC-001 §5.2 reserves to Governance, and it
 		// had no caller from any surface. This census reddened on arrival, which is its job.
 		'abandonPwu',

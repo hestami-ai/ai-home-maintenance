@@ -349,14 +349,52 @@ const REVISION = 'dec_01ARZ3NDEKTSV4RRFFQ69G5C60';
 /**
  * The successor named by `O-4`'s SUPERSEDED control.
  *
- * ⚠ DISCLOSED, NOT SMUGGLED: NOTHING SEEDS IT, AND THAT IS AN OBSERVED FACT ABOUT THE ENGINE RATHER THAN A
+ * ~~⚠ DISCLOSED, NOT SMUGGLED: NOTHING SEEDS IT, AND THAT IS AN OBSERVED FACT ABOUT THE ENGINE RATHER THAN A
  * SHORTCUT. `SupersedePwuPayloadSchema` is `{ supersedingWorkUnitId: string }`
  * (`packages/rph-contracts/src/messages.ts:452`) and the command was driven with an id naming no object: it is
  * ACCEPTED and the unit commits to SUPERSEDED. The clause that uses it asserts nothing about the successor —
  * it is about the CLOSED unit — so no assertion here rests on the dangling id; but this file condemns cited-and-
- * never-seeded governance ids elsewhere, so the exception is stated rather than left for a reader to find.
+ * never-seeded governance ids elsewhere, so the exception is stated rather than left for a reader to find.~~
+ * ⭐⭐ RESTATED 2026-11-16 (`JAN-EXEC` Phase 7, package L17a — design D72, `REG-D-166` (1); `REG-F-212`): the exception is gone. The kernel now
+ * refuses a supersession naming a successor that is not a PROPOSED unit of the old one's shape, and one citing no person's EFFECTIVE `REPLAN`
+ * Decision naming it (`SupersedePwuPayloadSchema` gained `supersessionDecisionId`); so `O-4`'s control proposes SUCCESSOR and cites
+ * `SUPERSESSION` (`supersessionOf`). The clause still asserts nothing about the successor: it is about the CLOSED unit.
  */
 const SUCCESSOR = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5C70';
+/** ⭐⭐ Package L17a — D72 — the person's EFFECTIVE REPLAN Decision `O-4`'s supersession cites. */
+const SUPERSESSION = 'dec_01ARZ3NDEKTSV4RRFFQ69G5C71';
+
+/** ⭐⭐ Package L17a — D72 — SUCCESSOR proposed in `j`, PROPOSED and of PWU's shape, and the person's REPLAN naming PWU, `SUPERSESSION`. */
+function supersessionOf(j: Journey): void {
+	j.send('ProposePwu', 'PROFESSIONAL_WORK_UNIT', SUCCESSOR, {
+		pwuId: SUCCESSOR,
+		pwuKind: 'ARCHITECTURE_DEFINITION',
+		title: 'Architecture Definition, replaced',
+		description: 'the successor the supersession names, proposed and never started',
+		intentId: INTENT,
+		boundaries: { inScope: ['tenant isolation boundary'], outOfScope: ['billing integration'], permittedChanges: [], prohibitedChanges: [] },
+		obligationIds: [],
+		constraintIds: [],
+		assumptionIds: [],
+		expectedOutputs: [{ outputId: `out_${SUCCESSOR}`, kind: 'DOCUMENT' }],
+		assurancePolicyIds: [],
+		riskProfile: { consequence: 'HIGH', uncertainty: 'MEDIUM', irreversibility: 'LOW', securitySensitivity: 'LOW', regulatoryExposure: 'LOW' }
+	});
+	j.send('ProposeDecision', 'DECISION', SUPERSESSION, {
+		decisionType: 'REPLAN',
+		subjectObjectIds: [PWU],
+		selectedOption: 'REPLACE_REACHED_WORK',
+		rationale: 'the job is replaced by its successor',
+		authority: JOURNEY_ACTOR
+	});
+	j.send('ApproveDecision', 'DECISION', SUPERSESSION, {
+		selectedOption: 'REPLACE_REACHED_WORK',
+		rationale: 'the job is replaced by its successor',
+		consideredEvidenceIds: [],
+		consideredObservationIds: [],
+		subjectSemanticVersions: { [PWU]: 1 }
+	});
+}
 
 /**
  * The job, driven to the moment the customer calls: plan ACTIVE, the attend step RUNNING, the repair step QUEUED.
@@ -701,9 +739,13 @@ describe('SLICE CLS-CANCELLATION — a job under way is called off, deliberately
 		// `sourceStates`, so the very same mid-flight arrangement can be closed at the OTHER terminal without any
 		// change to the job — which is what makes the comparison below a comparison and not two different stories.
 		const superseded = jobUnderWay();
+		// ⭐⭐ RESTATED 2026-11-16 (package L17a — D72): ~~`{ supersedingWorkUnitId: SUCCESSOR }`~~, a successor never created and nothing cited —
+		// refused by the kernel now — becomes a real successor and the person's Decision (`supersessionOf`); the promise below unchanged.
+		supersessionOf(superseded);
 		expect(
 			superseded.attempt('SupersedePwu', 'PROFESSIONAL_WORK_UNIT', PWU, {
-				supersedingWorkUnitId: SUCCESSOR
+				supersedingWorkUnitId: SUCCESSOR,
+				supersessionDecisionId: SUPERSESSION
 			}).status,
 			'the unit must be closable at SUPERSEDED from the same arrangement — otherwise the two refusals compared below come from two different journeys'
 		).toBe('ACCEPTED');

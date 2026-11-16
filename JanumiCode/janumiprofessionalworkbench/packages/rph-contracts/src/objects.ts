@@ -568,7 +568,8 @@ export const ProfessionalWorkUnitSchema = z.strictObject({
 	currentBaselineId: z.string().optional(),
 	undertakingId: z.string().optional(),
 	pwuTypeId: z.string().optional(),
-	isLocalExtension: z.boolean().optional()
+	isLocalExtension: z.boolean().optional(),
+	supersedingWorkUnitId: z.string().optional()
 });
 export type ProfessionalWorkUnit = z.infer<typeof ProfessionalWorkUnitSchema>;
 

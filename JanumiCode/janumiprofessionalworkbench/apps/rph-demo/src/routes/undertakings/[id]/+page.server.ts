@@ -29,6 +29,12 @@ import {
 	type ExecutionAttemptView,
 	executionAttempts,
 	expectedFromOutside,
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 — the supersession links' resolver, read by the hand-over and a composite's reviews.
+	ACCEPTED_UNIT_STATES,
+	effectiveDependencyIds,
+	effectiveParentId,
+	isCurrentUnit,
+	successorLinkOf,
 	type ExecutionPlanInput,
 	plansForPwus,
 	prunableStepIds,
@@ -175,10 +181,22 @@ import {
 	DECLARED_RERUN_RATIONALE_REQUIRED,
 	// ⭐⭐ Package L16 — D71 — what authorises a re-run of the work a unit's declared reviews rejected, and what the person must type.
 	REJECTED_RERUN_RATIONALE_REQUIRED,
-	RERUN_REJECTED_WORK_CITATION
+	RERUN_REJECTED_WORK_CITATION,
+	// ⭐⭐ Package L17a — D72 — what authorises sending the work back to an earlier unit, and what the person must type.
+	REPLACE_REACHED_WORK_CITATION,
+	SEND_BACK_RATIONALE_REQUIRED
 } from '$lib/server/execution/recovery-authority';
 // ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — a unit its declared reviews rejected: what the page offers, and the findings.
 import { RERUN_REJECTED_WORK, rejectedRerunOffer } from '$lib/server/execution/rejected-rerun';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — a unit its declared reviews rejected: the units its work may be sent back to,
+// and the replacement that sends it.
+import {
+	REPLACE_REACHED_WORK,
+	replacementPlan,
+	sendBackOffer,
+	supersededWorkNotice,
+	type ReplacedUnit
+} from '$lib/server/execution/send-back';
 import { runProcessResultFloor } from '$lib/server/execution/process-result-floor';
 import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer';
 // ⭐ `JAN-NOANS`: the `resolveJudgeModel` import is GONE from this route, and its absence is the check. It was
@@ -714,6 +732,14 @@ export const load: PageServerLoad = ({ params }) => {
 		if (!('refusedBecause' in offer))
 			rejectedRerunByPwu[p.id] = { policies: offer.rejected.map((v) => v.policyId), findings: offer.findings.length };
 	}
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — D72 (`REG-D-166` (1)) — each unit its declared reviews REJECTED at its sign-off whose work used other
+	// units' work: the units the person may send its work back to. Read from the record (`sendBackOffer`), so the page offers exactly what
+	// `sendWorkBack` accepts — and the kernel refuses each supersession without its successor and its Decision.
+	const sendBackByPwu: Record<string, { readonly candidates: readonly { readonly id: string; readonly title: string }[] }> = {};
+	for (const p of pwus) {
+		const offer = sendBackOffer(engine, p.id);
+		if (!('refusedBecause' in offer)) sendBackByPwu[p.id] = { candidates: offer.candidates };
+	}
 
 	// Tier-2 execution SEQUENCE (JAN-EXECPLAN DWP-04, fork C): arrange the Undertaking's PWU INSTANCES by their TYPES'
 	// hand-off dependency (reuse buildPwaExport — version-scoped to the bound (pwaId, pwaVersion) — then layerHandoff),
@@ -761,6 +787,7 @@ export const load: PageServerLoad = ({ params }) => {
 		awaitingChoiceStepIds,
 		declaredRerunByPwu,
 		rejectedRerunByPwu,
+		sendBackByPwu,
 		sequence,
 		assessments,
 		disclosures,
@@ -1412,11 +1439,17 @@ function acceptedWorkProductOf(pwuId: string): string | undefined {
  * listed. Direct dependencies only — the producers of its required inputs and, for a parent, its children (the lead's reading).
  */
 function acceptedWorkOf(pwuId: string): readonly AcceptedWork[] {
-	const unit = readinessUnitOf(pwuId, getObject(getEngine(), pwuId));
-	return [...new Set(unit?.dependencyIds ?? [])].flatMap((unitId): AcceptedWork[] => {
+	const lookup = (id: string) => readinessUnitOf(id, getObject(getEngine(), id));
+	const unit = lookup(pwuId);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — EACH DEPENDENCY READ THROUGH THE SUPERSESSION LINKS to the live end of
+	// its chain (`effectiveDependencyIds`), once each, in the recorded order: a current producer's work, never a superseded unit's. For a unit
+	// no replacement touched, its recorded dependencies, as before. ⭑ ACCEPTED, AS BEFORE, BY THE READINESS RULE, NOT HERE: every instruction
+	// that names the work is sent only once each effective dependency is accepted (Begin & Execute's offer and the kernel's guard on a step's
+	// start, a work re-run's among them), and a rebuild names what was sent — so no state is read here that the send did not read.
+	return effectiveDependencyIds(unit?.dependencyIds ?? [], (id) => lookup(id)?.supersedingWorkUnitId).flatMap((unitId): AcceptedWork[] => {
 		const workProductId = acceptedWorkProductOf(unitId);
 		if (workProductId === undefined) return [];
-		const dependency = readinessUnitOf(unitId, getObject(getEngine(), unitId));
+		const dependency = lookup(unitId);
 		return [{ title: dependency?.title ?? unitId, unitId, workProductId }];
 	});
 }
@@ -1528,6 +1561,28 @@ async function writeOwnAcceptedWork(pwuId: string): Promise<string | null> {
 	return why === null
 		? null
 		: `The unit is accepted, but its accepted work product was not written to ${acceptedWorkFile(work.title, pwuId)} in the Undertaking's shared workspace: ${why}`;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72, as the lead ruled it (option D) — EACH SUPERSEDED UNIT'S ACCEPTED-WORK FILE OVERWRITTEN WITH
+ * A NOTICE once the replacement has committed: its work superseded, its successor, the Decision, and where the successor's own file will be
+ * written (`supersededWorkNotice`), so a model reads only current work in `.jpwb/accepted/`. ⚠ The workspace port has no removal, and `purge`
+ * refuses on a workspace RETAINED_BY_PARTICIPATION, so the file is overwritten through `writeFile`; the work's bytes stay in the content store.
+ * A write that fails is stated on the page, and the act stands. Null when every notice was written; else the words.
+ */
+async function noticeSupersededWork(replaced: readonly ReplacedUnit[], decisionId: string): Promise<string | null> {
+	const failed: string[] = [];
+	for (const r of replaced) {
+		const file = acceptedWorkFile(r.title, r.oldId);
+		const place = sharedWorkspaceOf(r.oldId);
+		const written = place.ok
+			? await place.workspace.writeFile(file, supersededWorkNotice({ title: r.title, unitId: r.oldId, successorId: r.newId, decisionId }))
+			: { written: false as const, refusedBecause: place.why };
+		if (!written.written) failed.push(`${file}: ${written.refusedBecause}`);
+	}
+	return failed.length === 0
+		? null
+		: `The work was sent back, but the notice of the superseded work was not written to ${failed.join('; ')}`;
 }
 
 /** ⭐ E2 — each command a completion's evidence records: the command, its exit, whether it timed out. Pointers, no bytes. */
@@ -1710,7 +1765,16 @@ async function declaredReviewWorkOf(
 	if (!own.ok) return own;
 	const producer = own.work.executedBy ?? operator;
 	const units = listPwus(getEngine());
-	const childrenOf = (id: string) => units.filter((u) => String(u.state.parentWorkUnitId ?? '') === id);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1)) — ITS CURRENT CHILDREN ONLY: the units not superseded whose parent, read
+	// through the supersession links (`effectiveParentId`), is it — so a replaced child's work is never shown, and its successor's is. For an
+	// Undertaking no replacement touched, the units whose recorded parent is it, as before.
+	const successorOf = (id: string): string | undefined => successorLinkOf(units.find((u) => u.id === id)?.state);
+	const childrenOf = (id: string) =>
+		units.filter(
+			(u) =>
+				isCurrentUnit(String((u.state.workLifecycleState ?? '') as string)) &&
+				effectiveParentId(String((u.state.parentWorkUnitId ?? '') as string) || undefined, successorOf) === id
+		);
 	// ⭐ `REG-F-569` (`REG-D-121` Q18) — A LEAF IS GATHERED AS A UNIT COMPOSED OF OTHERS IS, its own work and no unit below it,
 	// so the one refusal below reaches it too: it returned its own work before that check, and was reviewed over nothing.
 	const composite = childrenOf(pwuId).length > 0;
@@ -4179,6 +4243,70 @@ export const actions: Actions = {
 			carriedFindings: offer.findings
 		});
 		return 'advanced' in ran ? { advanced: 'rejected-work-rerun' } : ran;
+	},
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1), (2), (5); `REG-F-643`; `REG-F-212`) — SEND THE WORK BACK TO AN EARLIER
+	// UNIT, BY REPLACEMENT ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+	//
+	// ⛔ `REG-F-643`: a defect a later check found in work already accepted had no way back to the unit that made it — D71's re-run redoes only the
+	// rejected unit's own work. ⭑ THE PERSON CHOOSES THE UNIT, among those whose work the rejected unit's work used (`sendBackOffer`; package L17b
+	// puts the Hypothesizer's naming and the Historian's rule in front of it), and that unit and every started unit its work reached are replaced.
+	// ⭑ IN ONE BATCH (the lead's): the person's Decision (`REPLAN`, `REPLACE_REACHED_WORK`, their words then `REG-D-166` (1)), its subjects the
+	// rejected unit, each rejecting verdict and each other unit in the reach; a new unit of each reached unit's type, parents before children, the
+	// old one's shape re-pointed (`replacementPlan`); each new composite's decomposition proposed and validated over its children, as the
+	// Undertaking's creation does; then each old unit superseded by its successor, citing the Decision — the kernel refusing a supersession without
+	// them (`supersedePwu`, `resolveSupersession`). Then each superseded unit's accepted-work file is overwritten with a notice (the lead's ruling,
+	// option D): a write that fails is stated on the page, and the act stands. The old units' plans, work products, exchanges and verdicts stay
+	// recorded on them.
+	// ⛔ Refused before any write without a rationale, when the unit is in no such state, and when the target is not a candidate. D71's re-run in
+	// place (`rerunRejectedWork`) stays as it is.
+	sendWorkBack: async ({ request }) => {
+		const f = await request.formData();
+		const pwuId = str(f, 'pwuId');
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const rationale = str(f, 'rationale');
+		if (!rationale) return fail(400, { error: SEND_BACK_RATIONALE_REQUIRED });
+		const offer = sendBackOffer(getEngine(), pwuId);
+		if ('refusedBecause' in offer) return fail(400, { error: `Sending the work back refused: ${offer.refusedBecause}` });
+		const targetId = str(f, 'targetId');
+		if (!offer.candidates.some((c) => c.id === targetId))
+			return fail(400, {
+				error:
+					`Sending the work back refused: ${targetId || 'no unit'} is not among the units whose work this unit’s work used ` +
+					`(${offer.candidates.map((c) => `"${c.title}" ${c.id}`).join(', ')}) (REG-D-166 (1); design D72).`
+			});
+		const plan = replacementPlan(getEngine(), targetId, mintUiId);
+		if ('refusedBecause' in plan) return fail(400, { error: `Sending the work back refused: ${plan.refusedBecause}` });
+		// ⭐ Read BEFORE the act moves them: the superseded units that were accepted with a work product — the ones whose file the act overwrites.
+		const noticed = plan.replaced.filter(
+			(r) => ACCEPTED_UNIT_STATES.includes(r.oldState) && acceptedWorkProductOf(r.oldId) !== undefined
+		);
+		const decisionId = mintUiId('dec');
+		const err = runSteps([
+			...personsDecision(
+				decisionId,
+				'REPLAN',
+				REPLACE_REACHED_WORK,
+				[pwuId, ...offer.rejected.map((v) => v.assessmentId), ...plan.replaced.map((r) => r.oldId).filter((id) => id !== pwuId)],
+				offer.consideredObservationIds,
+				// ⭐ The person's words, then the ruling that provides the replacement (`recovery-authority.ts`).
+				decisionRationale(rationale, REPLACE_REACHED_WORK_CITATION)
+			),
+			...plan.proposals.map((payload): Step => ['ProposePwu', PWU, payload.pwuId, payload]),
+			...plan.decompositions.flatMap((d): Step[] => {
+				const contractId = mintUiId('dcp');
+				return [
+					['ProposeDecomposition', 'DECOMPOSITION_CONTRACT', contractId, d],
+					['ValidateDecomposition', 'DECOMPOSITION_CONTRACT', contractId, { disposition: 'VALID' }]
+				];
+			}),
+			...plan.replaced.map(
+				(r): Step => ['SupersedePwu', PWU, r.oldId, { supersedingWorkUnitId: r.newId, supersessionDecisionId: decisionId }]
+			)
+		]);
+		if (err) return fail(400, { error: `Sending the work back refused: ${err}` });
+		const notNoticed = await noticeSupersededWork(noticed, decisionId);
+		return notNoticed === null ? { advanced: 'work-sent-back' } : { advanced: 'work-sent-back', supersededWorkNotNoticed: notNoticed };
 	},
 
 	// ── ABANDON — S-1 of ROADMAP-decision-subject-scope (REG-F-077) ──────────────────────────────────────────

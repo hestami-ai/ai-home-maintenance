@@ -276,8 +276,8 @@ export const SLICE = {
 			replace: "\t\t\t\tsupersedingWorkUnitId: 'pwu_mutant_not_the_successor',",
 			expectRed: ['O-e(partial)'],
 			predictedMessage:
-				'where the successor link CAN be written it names the successor, and it is written to the EVENT only — the PWU object has no field to hold it',
-			why: "Proves the differential limb of `O-e(partial)`: that `SupersedePwu` performs the arrow it declares and carries a real successor id when its source state is one it claims. Without that limb the test would show only refusals, and a refusal proves nothing about a command that might be broken for unrelated reasons. ⚠ THE OTHER HALF OF THIS ASSERTION CARRIES NO MUTANT AND CANNOT: that the PWU object has no successor field is a property of a `z.strictObject`, derived at runtime, and there is no find/replace that adds a field to a schema without also adding the write that fills it."
+				'where the successor link CAN be written it names the successor on the EVENT — and, since design D72, on the superseded unit’s own state too',
+			why: "⭐⭐ RESTATED 2026-11-16 (JAN-EXEC Phase 7, package L17a — design D72; REG-F-212): the assertion it reddens now says the link is written to the event AND to the superseded unit's state (`supersedingWorkUnitId`), where it said ~~'to the EVENT only — the PWU object has no field to hold it'~~; its anchor and its mutation unchanged. Proves the differential limb of `O-e(partial)`: that `SupersedePwu` performs the arrow it declares and carries a real successor id when its source state is one it claims. Without that limb the test would show only refusals, and a refusal proves nothing about a command that might be broken for unrelated reasons. ⚠ THE OTHER HALF OF THIS ASSERTION CARRIES NO MUTANT AND CANNOT: that the PWU object has no successor field is a property of a `z.strictObject`, derived at runtime, and there is no find/replace that adds a field to a schema without also adding the write that fills it."
 		},
 		{
 			id: 'E2E-003-M8',
@@ -313,6 +313,16 @@ const SUCCESSOR = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X12';
  * back — which is what makes "replay" a measured claim rather than an adjective.
  */
 const NEVER_CREATED = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X13';
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1); `REG-F-212`) — A SUPERSESSION NOW NAMES A REAL SUCCESSOR AND CITES A PERSON'S
+ * EFFECTIVE `REPLAN` Decision: the kernel refuses a successor that is not a PROPOSED unit of the old one's type and Undertaking, and a supersession
+ * that cites no such Decision naming the old unit. So `O-e(partial)`'s two supersessions each get a successor of their own, proposed, and a
+ * Decision: the BASELINED predecessor's, so that the refusal it meets is still the lifecycle's; and the differential's.
+ */
+const ARCHITECTURE_SUCCESSOR = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X14';
+const SUCCESSOR_SUCCESSOR = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5X15';
+const ARCHITECTURE_REPLAN = 'dec_01ARZ3NDEKTSV4RRFFQ69G5X16';
+const SUCCESSOR_REPLAN = 'dec_01ARZ3NDEKTSV4RRFFQ69G5X17';
 const CLAIM = 'clm_01ARZ3NDEKTSV4RRFFQ69G5X20';
 const EVIDENCE = 'evd_01ARZ3NDEKTSV4RRFFQ69G5X30';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5X40';
@@ -535,6 +545,38 @@ function proposeSuccessor(j: Journey): void {
 			securitySensitivity: 'HIGH',
 			regulatoryExposure: 'MEDIUM'
 		}
+	});
+}
+
+/** ⭐⭐ Package L17a — D72 — a successor of `pwuId`'s shape proposed as `successorId`, PROPOSED; and a person's EFFECTIVE REPLAN naming `pwuId`. */
+function successorAndReplan(j: Journey, pwuId: string, successorId: string, decisionId: string): void {
+	j.send('ProposePwu', 'PROFESSIONAL_WORK_UNIT', successorId, {
+		pwuId: successorId,
+		pwuKind: 'ARCHITECTURE_DEFINITION',
+		title: 'Architecture Definition, replaced',
+		description: 'a successor the supersession names, proposed and never started',
+		intentId: INTENT,
+		boundaries: { inScope: ['tenant isolation boundary'], outOfScope: ['billing integration'], permittedChanges: [], prohibitedChanges: [] },
+		obligationIds: [],
+		constraintIds: [],
+		assumptionIds: [],
+		expectedOutputs: [{ outputId: `out_${successorId}`, kind: 'DOCUMENT' }],
+		assurancePolicyIds: [JOURNEY_POLICY],
+		riskProfile: { consequence: 'HIGH', uncertainty: 'MEDIUM', irreversibility: 'LOW', securitySensitivity: 'LOW', regulatoryExposure: 'LOW' }
+	});
+	j.send('ProposeDecision', 'DECISION', decisionId, {
+		decisionType: 'REPLAN',
+		subjectObjectIds: [pwuId],
+		selectedOption: 'REPLACE_REACHED_WORK',
+		rationale: 'the work is replaced by its successor',
+		authority: JOURNEY_ACTOR
+	});
+	j.send('ApproveDecision', 'DECISION', decisionId, {
+		selectedOption: 'REPLACE_REACHED_WORK',
+		rationale: 'the work is replaced by its successor',
+		consideredEvidenceIds: [],
+		consideredObservationIds: [],
+		subjectSemanticVersions: { [pwuId]: 1 }
 	});
 }
 
@@ -840,9 +882,14 @@ describe('SLICE E2E-003 — a material assumption is falsified after the archite
 			'and the intent it was shaped under must be the REVISED one — the clause is about work created AFTER the premise fell, not about work the fixture had already seeded'
 		).toBe('REVISED');
 
-		// Route 1: the named command.
+		// Route 1: the named command. ⭐⭐ RESTATED 2026-11-16 (package L17a — design D72; `REG-F-212`): ~~`{ supersedingWorkUnitId: SUCCESSOR }`~~ —
+		// the successor READY and nothing cited — would now be refused by the kernel's own supersession check before the lifecycle is asked. So the
+		// BASELINED predecessor is offered a successor the check admits — a PROPOSED unit of its shape — and a person's EFFECTIVE REPLAN naming it:
+		// the refusal it meets is still the one this route is about, the lifecycle's undeclared arrow. The promise kept, word for word.
+		successorAndReplan(j, ARCHITECTURE, ARCHITECTURE_SUCCESSOR, ARCHITECTURE_REPLAN);
 		const superseded = j.attempt('SupersedePwu', 'PROFESSIONAL_WORK_UNIT', ARCHITECTURE, {
-			supersedingWorkUnitId: SUCCESSOR
+			supersedingWorkUnitId: ARCHITECTURE_SUCCESSOR,
+			supersessionDecisionId: ARCHITECTURE_REPLAN
 		});
 		expect(superseded.status, 'the baselined predecessor cannot be marked superseded').not.toBe(
 			'ACCEPTED'
@@ -869,8 +916,12 @@ describe('SLICE E2E-003 — a material assumption is falsified after the archite
 
 		// THE DIFFERENTIAL. The same command against a non-baselined PWU is ACCEPTED, so the refusals above
 		// discriminate on BASELINED rather than on the command being broken.
+		// ⭐⭐ RESTATED 2026-11-16 (package L17a — design D72; `REG-F-212`): ~~`{ supersedingWorkUnitId: NEVER_CREATED }`~~ — a successor never created,
+		// ACCEPTED — is refused now (below, disclosure (ii)); the differential names a real successor and cites a person's REPLAN, as the check asks.
+		successorAndReplan(j, SUCCESSOR, SUCCESSOR_SUCCESSOR, SUCCESSOR_REPLAN);
 		const control = j.attempt('SupersedePwu', 'PROFESSIONAL_WORK_UNIT', SUCCESSOR, {
-			supersedingWorkUnitId: NEVER_CREATED
+			supersedingWorkUnitId: SUCCESSOR_SUCCESSOR,
+			supersessionDecisionId: SUCCESSOR_REPLAN
 		});
 		expect(
 			control.status,
@@ -880,8 +931,12 @@ describe('SLICE E2E-003 — a material assumption is falsified after the archite
 		expect(
 			(supersededEvent?.payload as { supersedingWorkUnitId?: string } | undefined)
 				?.supersedingWorkUnitId,
-			'where the successor link CAN be written it names the successor, and it is written to the EVENT only — the PWU object has no field to hold it'
-		).toBe(NEVER_CREATED);
+			'where the successor link CAN be written it names the successor on the EVENT — and, since design D72, on the superseded unit’s own state too'
+		).toBe(SUCCESSOR_SUCCESSOR);
+		expect(
+			(j.state(SUCCESSOR) ?? {}).supersedingWorkUnitId,
+			'⭐⭐ D72 — the link on the superseded unit’s own state: a lifecycle fact, written by the move'
+		).toBe(SUCCESSOR_SUCCESSOR);
 
 		// ⚠ TWO DISCLOSURES, BOTH DERIVED, BOTH WRITTEN TO FAIL THE DAY THEY STOP BEING TRUE.
 		// (i) The successor relation lives on no PWU field. `supersedePwu` supplies no `mutate`, and
@@ -894,12 +949,16 @@ describe('SLICE E2E-003 — a material assumption is falsified after the archite
 		//     aggregate carries exactly such a field. The search is therefore run the other way immediately
 		//     below, so the absence is recorded as SPECIFIC — which is the sharper finding anyway, because it
 		//     means the ontology knows how to express succession and the PWU simply was not given it.
+		// ⭐⭐ RESTATED 2026-11-16 (package L17a — design D72, `REG-D-166` (1); `REG-F-212`): the PINNED DEFECT is repaired, and the pin turns with
+		// it — ~~'PINNED DEFECT: the PWU object carries no successor or predecessor field, so PWU succession exists only in the event log'~~,
+		// ~~`.toEqual([])`~~. The PWU object now carries its successor (`supersedingWorkUnitId`), written to the superseded unit's state by the
+		// lifecycle move alone, and no predecessor field: the link points one way, from the old unit to the new.
 		expect(
 			Object.keys(ProfessionalWorkUnitSchema.shape).filter((k) =>
 				/supersed|success|predecess/i.test(k)
 			),
-			'PINNED DEFECT: the PWU object carries no successor or predecessor field, so PWU succession exists only in the event log'
-		).toEqual([]);
+			'REPAIRED (design D72): the PWU object carries its successor, written by the supersession, and no predecessor field'
+		).toEqual(['supersedingWorkUnitId']);
 		// `/supersed/i` and not the wider filter above, because on the Intent the wider one also catches
 		// `successConditions` — a §6 outcome field that has nothing to do with succession. The narrower probe is
 		// the one whose hit means what the sentence says it means.
@@ -907,12 +966,24 @@ describe('SLICE E2E-003 — a material assumption is falsified after the archite
 			Object.keys(IntentObjectSchema.shape).filter((k) => /supersed/i.test(k)),
 			'THE SEARCH RUN THE OTHER WAY: a sibling aggregate DOES carry a succession field, so the absence above is specific to the PWU rather than a property of the ontology — the general claim was too strong'
 		).toEqual(['supersedesIntentId']);
-		// (ii) And nothing checks that the successor EXISTS. The accepted supersession above named an id that
+		// ~~(ii) And nothing checks that the successor EXISTS. The accepted supersession above named an id that
 		//     resolves to no object, exactly as the falsification did — the same unvalidated-forward-reference
-		//     shape, in a second place.
+		//     shape, in a second place.~~
+		// ⭐⭐ RESTATED 2026-11-16 (package L17a — design D72; `REG-F-212`'s remedy (2) for this path): (ii) the successor's EXISTENCE is checked now —
+		// ~~'PINNED DEFECT: a supersession was accepted naming a superseding work unit that does not exist; nothing validates the reference'~~. A
+		// supersession naming `NEVER_CREATED` is REFUSED by the kernel at its first limb, the successor, naming the id; and `NEVER_CREATED` is
+		// still nothing.
+		const toNothing = j.attempt('SupersedePwu', 'PROFESSIONAL_WORK_UNIT', ARCHITECTURE_SUCCESSOR, {
+			supersedingWorkUnitId: NEVER_CREATED,
+			supersessionDecisionId: ARCHITECTURE_REPLAN
+		});
+		expect(
+			JSON.stringify(toNothing.error ?? {}),
+			'REPAIRED (design D72; REG-F-212): a supersession naming a superseding work unit that does not exist is refused, naming it'
+		).toContain(`it names ${NEVER_CREATED} as its successor, and nothing by that id is recorded`);
 		expect(
 			j.engine.loadObject(NEVER_CREATED),
-			'PINNED DEFECT: a supersession was accepted naming a superseding work unit that does not exist; nothing validates the reference'
+			'and the id still names nothing: the refusal created nothing'
 		).toBeUndefined();
 	});
 
