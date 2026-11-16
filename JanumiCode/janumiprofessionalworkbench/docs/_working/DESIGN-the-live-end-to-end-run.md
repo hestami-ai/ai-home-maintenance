@@ -208,6 +208,7 @@ This design's own steps for the roadmap's Phase 7.
 - **P7-2's build decisions** (2026-10-09, under `REG-D-101`'s delegation). They come from a read-only map of the code on round 1's tree, by five mappers and a critic.
   - **D1, paid only on request.** The spec is dry unless `JPWB_PHASE7_PAID=1`. The config collects `phase7.live.ts` only when `JPWB_LIVE_RUN_DIR` is set, and `execution.live.ts` only when it is not. So the two specs never share a server or a store: an unfiltered run collected both, and each counts the PWA picker.
   - **D2, the run folder.** `JPWB_LIVE_RUN_DIR` must be absolute and must exist. It must lie outside the repository and the temporary folder (`REG-F-526`), hold no store yet, and have no `AGENTS.md`, `CLAUDE.md`, `.pi/` or `.agents/` in it or in any ancestor.
+    - ⭑ **2026-11-16 (`REG-D-166` (9); design D80).** A run that continues a stopped one holds, in place of an empty folder's, a copy of its predecessor's final record store, content store and workspaces, each file checked against the predecessor's final copy, beside `lane/continues.json`, which names the predecessor, its end and those hashes; nothing else may be there.
     - The config refuses otherwise, in the runner's load only: the worker loads the config again, after the server has made the store.
     - A dry run and the paid run never share a folder: a store is seeded only when empty, and command ids restart at each boot.
   - **D3, at boot.**
@@ -294,6 +295,7 @@ This design's own steps for the roadmap's Phase 7.
   - **After a phase stops,** the later phases still run, in order, each recorded as "its upstream phase was not assured". The limit is checked before each phase.
   - **Forbidden during the run,** and confirmed from the event log afterwards: `completeStep`, `skipStep`, `retryStep`, waivers, Mark Satisfied without Record Assurance, and Abandon followed by re-proposing.
     - ⭑ 2026-10-10: the recovery acts of P7-6's rule are allowed, by that rule only (`REG-D-105` (4); P7-6 below).
+    - ⭑ 2026-11-16 (`REG-D-166`; design D82): and the assurance stage of a rejected unit's sign-off and the way back its records offer, the replacement act among them, by P7-6's rule (2) as amended; a unit whose type declares the work HUMAN and which has no current child is never pressed (D79); and the run's pause, in each of D79's three cases, is an allowed ending.
 - **P7-4, our checks.** Each is written and committed before P7-3, with its predicted result.
   - **a. The acceptance suite** of §3.1, kept outside the workspace and run on each phase's archived copy.
   - **b. Seeded faults:** a fixed list of hand-made faults in `src/` (a wrong N, case folding off, a wrong exit code, a broken entry point). Each must make the model's own suite fail. The report says how many each suite catches.
@@ -319,6 +321,7 @@ This design's own steps for the roadmap's Phase 7.
   - **The controls:** the P7-4 controls are frozen and re-run after every fix. A fix that lets a control pass is a regression to register, not progress.
   - **Re-reviewing:** a fix that reviews something again first builds `REG-F-433`'s join key (the `REG-D-070` Q2 order), or mints a new subject.
   - **Paid re-runs:** each one comes back to the sponsor.
+    - ⭑ 2026-11-16 (`REG-D-166` (9); design D80): a run that continues a stopped one is a paid run, launched by the sponsor as every paid run is.
   - ⭑ **2026-10-10 — what P7-6 became** (`REG-D-103`, `REG-D-104`, `REG-D-105`):
     - **The reviewer fix:** `DESIGN-the-reviewer-isolated.md`, I1 to I6.
     - **The recovery of a stopped unit, P7-6R:** `DESIGN-the-stopped-unit-recovery.md`.
@@ -326,11 +329,11 @@ This design's own steps for the roadmap's Phase 7.
     - **The limit is 200 reviewer calls** (`REG-D-105` (1)), checked as before: between phases, and now also before each recovery re-run.
   - ⭑ **The paid run's recovery rule** (`REG-D-105` (4): *"Rule in run plan (Recommended)"*). When a phase's Begin & Execute is refused, the lane acts as the operator, once, by this rule:
     1. A review that did not conclude is re-run once (the re-run-the-review act).
-    2. A review that concluded against the work has the work re-run once, with its findings (the re-run-the-work act). ⭐ (2026-11-14, `REG-D-163` (2); design D71) And a unit its declared reviews reject at its sign-off has its work re-run once, with their findings, by D71's act; a second rejection ends the run `withheld`, as today.
+    2. A review that concluded against the work has the work re-run once, with its findings (the re-run-the-work act). ⭐ (2026-11-14, `REG-D-163` (2); design D71) And a unit its declared reviews reject at its sign-off ~~has its work re-run once, with their findings, by D71's act; a second rejection ends the run `withheld`, as today.~~ goes through the assurance stage of its sign-off (design D73 to D76), then the way back its records offer: its work re-run in place by D71's act, or the replacement of the units its fault reached (D72); ⭐ (2026-11-16, `REG-D-166`; design D82) as many rounds as the Historian's recorded judgment allows, each press's worst case counted first, the spend limit the one hard stop. Where the Hypothesizer cannot tell which unit holds the fault, the lane picks Source Construction, by this PWA's type. A Historian's recommended control action, or its assessment inconclusive when asked twice, pauses the run for the sponsor (design D79).
     3. If that re-run is refused again, the unit is abandoned.
     - Each act posts the page's own form, with a rationale naming this rule. So each choice is recorded as the operator's Decision, never the engine's.
     - The run report lists each re-run beside the Decision that made it.
-    - **Allowed during the run,** beside the list below: ~~these three acts, by this rule only.~~ these three acts and D71's re-run of a unit its declared reviews reject (`REG-D-163` (2)), by this rule only. Abandon followed by re-proposing stays forbidden.
+    - **Allowed during the run,** beside the list below: ~~these three acts, by this rule only.~~ ~~these three acts and D71's re-run of a unit its declared reviews reject (`REG-D-163` (2)), by this rule only.~~ these three acts, D71's re-run of a unit its declared reviews reject (`REG-D-163` (2)), and the assurance stage and the replacement of the units a defect reached (`REG-D-166`; design D72, D82), by this rule only. Abandon followed by re-proposing stays forbidden.
   - ⭑ **D13 after I1.** I1 runs the reviewer in its own folder with the trust check off, so the reviewer no longer needs a trusted checkout. D13 stays as written until the next paid run shows the worktree works.
 - **P7-7, half B.**
   - **The request:** *"Create a PWA for realizing a small command-line product through requirements, design, implementation with unit tests, and end-to-end verification, with the assurance policies each phase needs."*
