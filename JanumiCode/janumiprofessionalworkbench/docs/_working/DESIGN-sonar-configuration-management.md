@@ -127,7 +127,7 @@ These inform the design and bind nothing:
 ## 3. Findings
 
 **F-1. No build step runs Sonar, and campaigns are far apart.**
-- `docs/operations/sonarqube.md:32` — "**No gate or CI step runs a scan today.**" `package.json:10-43` names no Sonar
+- `docs/operations/sonarqube.md:32` — "**No gate or CI step runs a scan today.**" `package.json:10-45` (~~`:10-43`~~ until package T0, `8cc18d7e`, added two scripts to it) names no Sonar
   script.
 - JPWB's `.github/workflows/ci.yml` sits "where Actions does not look" (REG-F-419, register `:36728-36731`).
 - 29 commits whose subjects name Sonar remediation fall into six date groups (history reviewer; re-derived with
@@ -319,7 +319,7 @@ JPWB:
 - `guards:export` (`package.json:41-42`) "refuses a STALE CENSUS" (`scripts/export-guard.ts:36-38`), and its
   `--baseline=<path>` flag lets a test hand it a doctored copy (`:77-80`; used at `verif/export-guard.test.ts:242-249`).
 - A test pins the whole of `gate:fast`, every step in order, `bun run lint` among them
-  (`verif/assurance-surface.test.ts:218-259`, `expect(steps).toEqual([...])`); `verif/gen-freshness.test.ts:137-138`
+  (`verif/assurance-surface.test.ts:228-278`, `expect(steps).toEqual([...])`; ~~`:218-259`~~ until package T0, `8cc18d7e`, added lines above it and `toolchain:check` to it); `verif/gen-freshness.test.ts:137-138`
   pins its own step's wiring.
 - The ledger names its anchors by text, not line (`verif/guard-enforcement-ledger.ts:56`), and a ruling it cites must
   exist: "`verif/mutant-ledger.test.ts` resolves it against the register" (`scripts/mutants/ledger.ts:155-157`).
@@ -487,12 +487,12 @@ takes about 23 minutes, and a diff is empty once work is committed (F-11). (e) A
   (J4). ESLint fails on its own only on an empty population (F-7); losing part of it passes.
 - **Pins.** eslint, @eslint/js, typescript-eslint and the three plugins are pinned exactly, because the lint baseline
   pins their output, as `JAN-TOOLCUR`'s D8 pins vitest and @vitest/coverage-v8 for the coverage floor; they join the
-  matrix's lint group (G3). Today the first three are caret ranges (`package.json:45`, `:50`, `:55`). unicorn 65.0.1,
+  matrix's lint group (G3). Today the first three are caret ranges (`package.json:47`, `:52`, `:57`; ~~`:45`, `:50`, `:55`~~ until package T0, `8cc18d7e`, added lines above them). unicorn 65.0.1,
   which SonarJS 14.4 bundles, declares ESLint ">=9.38.0", so it admits ESLint 10 too (whether it runs there is
   unmeasured); 79.0.0 needs ">=10.4" (web-sonar option B). Parity with the engine argues for 65.0.1 on either major.
 
 **Reason.** The sponsor asked for issues to be found "closer or closest to when changes are made". Lint already runs
-on every `gate:fast` (`package.json:27`, step 6 of the 13 `bun run` steps there) and in any editor with ESLint, and
+on every `gate:fast` (`package.json:27`, step 7 of the 14 `bun run` steps there; ~~step 6 of the 13~~ until package T0, `8cc18d7e`, put `toolchain:check` first) and in any editor with ESLint, and
 the plugin's recommended set is the part of Sonar way the plugin carries. The engine stays the authority because the
 copies differ.
 
@@ -821,7 +821,7 @@ to the committed tree: editing in place "edits the very thing it measures, and a
 | V-14 | The engine reads every part (D-7) | A sweep of the parts reports each as analysed; the control, a copy with one known finding seeded into a part, must report it. | Cycle 6's "returned no findings in 11 seconds" was silence, not proof (F-9). |
 | V-15 | Counts compared under one engine only; each result carries its configuration (D-4, J2, J3) | The compare tool given two records with different engine versions refuses; a record that lacks the engine version, the rule-set hash or the scope hash is refused too. | Doctored records; J3 forbids the comparison and J2 requires the fields. |
 | V-16 | Lint's population (D-2, J4) | A copy of the config that ignores `scripts/` makes the census check fail. | ESLint alone fails only on an empty population (F-7), never on a partial one. |
-| V-17 | The lint step stays wired (D-2) | A doctored `package.json` whose `lint` script lacks the suppressions location fails a new wiring test. Removing `bun run lint` from `gate:fast` is already red today (`verif/assurance-surface.test.ts:218-259`). | The new test reads the root scripts the way `verif/gen-freshness.test.ts:137-138` does. |
+| V-17 | The lint step stays wired (D-2) | A doctored `package.json` whose `lint` script lacks the suppressions location fails a new wiring test. Removing `bun run lint` from `gate:fast` is already red today (`verif/assurance-surface.test.ts:228-278`; ~~`:218-259`~~ until package T0, `8cc18d7e`). | The new test reads the root scripts the way `verif/gen-freshness.test.ts:137-138` does. |
 | V-18 | Each of the 152 has one disposition (D-10, J1) | A census over the committed cycle-6 record: each of the 152 is named by exactly one Tier E package or one register entry. Two fixtures, each failing alone: a finding in neither, and a finding in both. | Red today: the per-finding list is not in the repository (F-14). |
 | V-19 | The `scripts/reviewer-qual/run.ts:276` guard keeps rejecting a malformed results file (D-10) | A results file with a JSON `null` line before the last SELECTION is rejected after the `findLast` rewrite. | A plain `findLast` rewrite accepts it and returns that SELECTION, where the `filter().at(-1)` form throws a TypeError (ES-level review, K15). The test belongs to whichever package lands the findLast group. |
 | V-20 | A run never reuses an old result (D-1, J4) | Run the runner twice on one output folder, editing a seeded file between the runs: the second run reports the edited file's new result, or reports it as not analysed, never its first result. | Today's runner resumes from `<outDir>/ledger.json` and skips files already done (`:56-60`), so it returns the first run's result (F-2). |
