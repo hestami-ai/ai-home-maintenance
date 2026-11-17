@@ -140,7 +140,7 @@
 			"declared": {
 				"apps/rph-demo": "^7.0.0"
 			},
-			"locked": "7.3.6",
+			"locked": "7.3.8",
 			"nested": {
 				"vitest/vite": "8.1.4"
 			}

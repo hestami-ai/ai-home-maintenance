@@ -43,7 +43,7 @@ design governs.
 | @sveltejs/vite-plugin-svelte | Svelte/Vite | caret | apps/rph-demo: `^6.0.0` → 6.2.4 | — | 6.x peers vite "^6.3.0 \|\| ^7.0.0", so the app stays on vite 7 while vitest runs its own vite 8: the split of F-14, which T3a ends. |
 | @sveltejs/adapter-auto | Svelte/Vite | caret | apps/rph-demo: `^6.0.0` → 6.1.1 | — | 8 needs SvelteKit 3. |
 | svelte-check | Svelte/Vite | caret | apps/rph-demo: `^4.0.0` → 4.7.2 | — | 4.7.2 peers TypeScript ">=5.0.0"; "^5 \|\| ^6" from 4.7.4; TypeScript 7 only through --tsgo. |
-| vite | Svelte/Vite | caret | apps/rph-demo: `^7.0.0` → 7.3.6 | vitest/vite 8.1.4 | vite-plugin-svelte 6.x admits vite "^6.3.0 \|\| ^7.0.0" (F-14). |
+| vite | Svelte/Vite | caret | apps/rph-demo: `^7.0.0` → 7.3.8 | vitest/vite 8.1.4 | vite-plugin-svelte 6.x admits vite "^6.3.0 \|\| ^7.0.0" (F-14). |
 | vitest | vitest | exact | .: `4.1.10` → 4.1.10 | — | — |
 | @vitest/coverage-v8 | vitest | exact | .: `4.1.10` → 4.1.10 | — | moves with vitest: its peer range on vitest is exact. |
 | eslint | lint | caret | .: `^9.37.0` → 9.39.5 | — | ESLint 9 reached end of life on 2026-08-06, and npm marks every 9.x version deprecated (F-13); T2 moves the lint group to 10. |
