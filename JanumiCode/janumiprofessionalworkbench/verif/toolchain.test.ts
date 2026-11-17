@@ -24,7 +24,7 @@ import { describe, expect, it } from 'vitest';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const TOOLCHAIN = join(ROOT, 'scripts', 'toolchain');
 const TIMEOUT = 120_000;
-const CONDITION_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', 'steps'];
+const CONDITION_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'steps'];
 
 function scratch(): string {
 	return mkdtempSync(join(tmpdir(), 'jan-toolcur-'));
@@ -155,10 +155,12 @@ describe('JAN-TOOLCUR T0 — toolchain:check, one condition per red', () => {
 		expect(r.status).toBe(1);
 	});
 
-	it('7 — the matrix records the Edge major 156', { timeout: TIMEOUT }, () => {
+	// ⭐ (roadmap T6) Edge's row is recorded only (check none): no lane runs it. The major probe is kept (the review reads
+	// Edge through it too), so this red sets the row back to a major check and shows the probe still judges.
+	it('7 — an Edge row checked by its major, recording 156, fails', { timeout: TIMEOUT }, () => {
 		const dir = scratch();
 		const m = matrix();
-		machineRow(m, 'edge').observed = '156';
+		Object.assign(machineRow(m, 'edge'), { check: 'major', observed: '156' });
 		const r = check({ 'scripts/toolchain/matrix.json': put(dir, 'matrix.json', JSON.stringify(m)) });
 		expect(verdicts(r.out)).toEqual(onlyFailed('7'));
 		expect(r.out).toMatch(/Edge: the machine has major \d+ installed \([^)]*\); the matrix records 156/);
@@ -254,6 +256,91 @@ describe('JAN-TOOLCUR T0 — toolchain:check, one condition per red', () => {
 		expect(r.out).toContain('names a user');
 		expect(r.status).toBe(1);
 	});
+
+	// ── 9 (roadmap T6): the e2e browser, each limb alone ──
+	const LIVE = 'apps/rph-demo/playwright.live.config.ts';
+	const LIVE_EXEC = 'apps/rph-demo/playwright.live-exec.config.ts';
+	const E2E = 'apps/rph-demo/playwright.config.ts';
+	const PROJECTS = "use: { ...devices['Desktop Chrome'] } }],";
+	function shown(): string {
+		const e = matrix().e2eBrowser as Json;
+		return `the e2e browser is Playwright's own Chromium ${String(e.browserVersion)} (revision ${String(e.revision)})`;
+	}
+
+	it("9 — a config naming channel: 'msedge' fails, naming the config and the browser", { timeout: TIMEOUT }, () => {
+		const text = once(real(E2E), PROJECTS, "use: { ...devices['Desktop Chrome'], channel: 'msedge' } }],");
+		const r = check({ [E2E]: put(scratch(), 'playwright.config.ts', text) });
+		expect(verdicts(r.out)).toEqual(onlyFailed('9'));
+		expect(r.out).toMatch(/apps\/rph-demo\/playwright\.config\.ts:\d+ sets a browser channel \(.*msedge.*\)/);
+		expect(r.out).toContain(`${shown()}, which no channel selects`);
+		expect(r.status).toBe(1);
+	});
+
+	it('9 — a config setting an executablePath fails', { timeout: TIMEOUT }, () => {
+		const text = once(real(LIVE_EXEC), PROJECTS, "use: { ...devices['Desktop Chrome'], launchOptions: { executablePath: 'C:/x/chrome.exe' } } }],");
+		const r = check({ [LIVE_EXEC]: put(scratch(), 'playwright.live-exec.config.ts', text) });
+		expect(verdicts(r.out)).toEqual(onlyFailed('9'));
+		expect(r.out).toMatch(/apps\/rph-demo\/playwright\.live-exec\.config\.ts:\d+ sets an executablePath/);
+		expect(r.status).toBe(1);
+	});
+
+	it("9 — browsers.json at a revision other than the row's fails", { timeout: TIMEOUT }, () => {
+		const rel = 'node_modules/playwright-core/browsers.json';
+		const b = JSON.parse(real(rel)) as { browsers: Json[] };
+		const chromium = b.browsers.find((x) => x.name === 'chromium');
+		if (chromium === undefined) throw new Error('no chromium in browsers.json');
+		const recorded = String((matrix().e2eBrowser as Json).revision);
+		chromium.revision = '9999';
+		const r = check({ [rel]: put(scratch(), 'browsers.json', JSON.stringify(b)) });
+		expect(verdicts(r.out)).toEqual(onlyFailed('9'));
+		expect(r.out).toContain(`the e2e browser's revision is 9999 in the tree; the matrix records ${recorded}`);
+		expect(r.status).toBe(1);
+	});
+
+	it('9 — the row missing a config that is on disk fails', { timeout: TIMEOUT }, () => {
+		const m = matrix();
+		const e = m.e2eBrowser as Json;
+		e.configs = (e.configs as string[]).filter((c) => c !== LIVE);
+		const r = check({ 'scripts/toolchain/matrix.json': put(scratch(), 'matrix.json', JSON.stringify(m)) });
+		expect(verdicts(r.out)).toEqual(onlyFailed('9'));
+		expect(r.out).toContain(`${LIVE} is a Playwright config the matrix's e2e browser row does not list`);
+		expect(r.status).toBe(1);
+	});
+
+	it('9 — the row naming a config that is not there fails', { timeout: TIMEOUT }, () => {
+		const m = matrix();
+		const e = m.e2eBrowser as Json;
+		e.configs = [...(e.configs as string[]), 'apps/rph-demo/playwright.gone.config.ts'];
+		const r = check({ 'scripts/toolchain/matrix.json': put(scratch(), 'matrix.json', JSON.stringify(m)) });
+		expect(verdicts(r.out)).toEqual(onlyFailed('9'));
+		expect(r.out).toContain("the matrix's e2e browser row lists apps/rph-demo/playwright.gone.config.ts, which is not there");
+		expect(r.status).toBe(1);
+	});
+
+	it('9 — a row that lists no config judged none, and fails (I6)', { timeout: TIMEOUT }, () => {
+		const m = matrix();
+		(m.e2eBrowser as Json).configs = [];
+		const r = check({ 'scripts/toolchain/matrix.json': put(scratch(), 'matrix.json', JSON.stringify(m)) });
+		expect(verdicts(r.out)).toEqual(onlyFailed('9'));
+		expect(r.out).toContain("the matrix's e2e browser row lists no Playwright config, so it would judge none (I6)");
+		expect(r.status).toBe(1);
+	});
+
+	it("9 — CONTROL: a comment that names channel: sets nothing, and condition 9 holds", { timeout: TIMEOUT }, () => {
+		const text = once(real(E2E), PROJECTS, `${PROJECTS} // it ran on channel: 'msedge' before T6`);
+		const r = check({ [E2E]: put(scratch(), 'playwright.config.ts', text) });
+		expect(verdicts(r.out)).toEqual(onlyFailed('none'));
+		expect(r.status).toBe(0);
+	});
+
+	it('8 — a matrix whose e2eBrowser row lacks its revision is refused', { timeout: TIMEOUT }, () => {
+		const m = matrix();
+		delete (m.e2eBrowser as Json).revision;
+		const r = check({ 'scripts/toolchain/matrix.json': put(scratch(), 'matrix.json', JSON.stringify(m)) });
+		expect(verdicts(r.out)).toEqual(['8: FAILED']);
+		expect(r.out).toContain('e2eBrowser: no revision');
+		expect(r.status).toBe(1);
+	});
 });
 
 describe('JAN-TOOLCUR T0 — the boundary population guard, each limb alone', () => {
@@ -314,6 +401,17 @@ describe('JAN-TOOLCUR T0 — the generator and the review', () => {
 		const m = matrix();
 		rowOf(m, 'turbo').locked = '0.0.0';
 		const r = run('generate.ts', ['--check', `--override=scripts/toolchain/matrix.json=${put(scratch(), 'matrix.json', `${JSON.stringify(m, null, '\t')}\n`)}`]);
+		expect(r.out).toContain('not current: scripts/toolchain/matrix.json');
+		expect(r.status).toBe(1);
+	});
+
+	it("T6 — --check reports a matrix whose e2e browser facts browsers.json has moved", { timeout: TIMEOUT }, () => {
+		const rel = 'node_modules/playwright-core/browsers.json';
+		const b = JSON.parse(real(rel)) as { browsers: Json[] };
+		const shell = b.browsers.find((x) => x.name === 'chromium-headless-shell');
+		if (shell === undefined) throw new Error('no chromium-headless-shell in browsers.json');
+		shell.revision = '9999';
+		const r = run('generate.ts', ['--check', `--override=${rel}=${put(scratch(), 'browsers.json', JSON.stringify(b))}`]);
 		expect(r.out).toContain('not current: scripts/toolchain/matrix.json');
 		expect(r.status).toBe(1);
 	});

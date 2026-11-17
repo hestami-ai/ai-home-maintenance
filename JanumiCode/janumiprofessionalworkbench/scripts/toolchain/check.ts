@@ -6,7 +6,8 @@
  * would already have measured on a runtime nobody recorded. With turbo hashing the matrix and `.node-version`
  * (`globalDependencies`), the gate never reaches a cached result on a runtime the matrix does not record (I1).
  *
- * THE EIGHT CONDITIONS (D-9), each reported on its own line, each failure naming what disagrees with what:
+ * THE NINE CONDITIONS (D-9; the ninth, roadmap T6), each reported on its own line, each failure naming what disagrees
+ * with what:
  *   1 runtimes      — the Node on PATH (asked, never assumed: Bun's `process.version` reads v24.3.0) against the
  *                     day-to-day Node, or against the floor in floor-lane mode; the running Bun against its exact pin.
  *   2 tree and lock — for each matrix package, every copy `bun.lock` holds (nested ones included) against the matrix,
@@ -17,8 +18,12 @@
  *                     package resolves as `bun.lock` records it (I5). A peer resolved elsewhere is not judged here.
  *   5 cross-row     — the VS Code floor's Node, and the day-to-day Node, not below the Node floor.
  *   6 browser floor — Vite's `build.target` and the matrix's browser floor agree (both absent until T1c sets them).
- *   7 machine tools — the Edge major installed and the SonarLint version, found through `machine-paths.json`.
+ *   7 machine tools — the SonarLint version, found through `machine-paths.json`. Edge's row is recorded only since
+ *                     T6: no lane runs it.
  *   8 population    — an unreadable or empty matrix or lock, or a lock holding no matrix package, fails (I6).
+ *   9 e2e browser   — (T6) the app's Playwright configs on disk are exactly the e2eBrowser row's, none names a
+ *                     `channel` or an `executablePath` (so each runs Playwright's own Chromium), and the row's
+ *                     generated facts agree with `browsers.json` and the lock.
  * And the step runtimes: each `gate:fast` step's runtime, derived from its command and the shebang of the bin it
  * starts, against the runtime the matrix records for it (D-9, F-3).
  *
@@ -32,8 +37,10 @@
  * exit:  0 every condition holds; 1 a condition failed; 2 a usage error.
  */
 
-import { posix } from 'node:path';
+import { existsSync, readdirSync } from 'node:fs';
+import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { e2eBrowserFacts } from './e2e-browser.js';
 import { copiesOf, installedDir, parseLockfile, resolveFrom, type LockPackage, type Lockfile } from './lockfile.js';
 import { edgeInstalled, nodeOnPath, parseMachinePaths, runningBun, sonarLintInstalled, type MachinePaths } from './machine.js';
 import { compareVersions, parseMatrix, versionParts, type Matrix, type PackageRow, type StepRuntime } from './matrix.js';
@@ -434,6 +441,65 @@ function stepRuntimes(x: Inputs, t: Tally): string[] {
 	return f;
 }
 
+// ── 9 (roadmap T6): the e2e browser ───────────────────────────────────────────────────────────────────────────
+/** The app whose Playwright configs condition 9 judges, and the names a config file takes. */
+const E2E_APP = 'apps/rph-demo';
+const PLAYWRIGHT_CONFIG = /^playwright(?:\.[\w-]+)?\.config\.ts$/;
+
+/** The app's Playwright configs on disk, by path from the root. Read from the disk, not the reader: a red that lists
+ * one config too few or too many doctors the matrix's list instead. */
+function configsOnDisk(x: Inputs): string[] {
+	const dir = join(x.reader.root, E2E_APP);
+	if (!existsSync(dir)) return [];
+	return readdirSync(dir)
+		.filter((name) => PLAYWRIGHT_CONFIG.test(name))
+		.map((name) => `${E2E_APP}/${name}`)
+		.sort((a, b) => a.localeCompare(b));
+}
+
+/** Each line of a config that sets a browser channel or an executable; a comment that names either sets nothing. */
+function browserSettings(config: string, text: string, shown: string): string[] {
+	const f: string[] = [];
+	text.split(/\r?\n/).forEach((line, i) => {
+		const comment = line.indexOf('//');
+		const code = comment < 0 ? line : line.slice(0, comment);
+		if (/\bchannel\s*:/.test(code)) {
+			f.push(`${config}:${i + 1} sets a browser channel (${line.trim()}); the e2e browser is ${shown}, which no channel selects`);
+		}
+		if (/\bexecutablePath\b/.test(code)) f.push(`${config}:${i + 1} sets an executablePath (${line.trim()}); the e2e browser is ${shown}`);
+	});
+	return f;
+}
+
+function e2eBrowser(x: Inputs, t: Tally): string[] {
+	const row = x.matrix.e2eBrowser;
+	const shown = `Playwright's own Chromium ${row.browserVersion} (revision ${row.revision})`;
+	const listed = [...row.configs].sort((a, b) => a.localeCompare(b));
+	const f: string[] = [];
+	if (listed.length === 0) f.push("the matrix's e2e browser row lists no Playwright config, so it would judge none (I6)");
+	for (const config of configsOnDisk(x)) {
+		if (!listed.includes(config)) f.push(`${config} is a Playwright config the matrix's e2e browser row does not list`);
+	}
+	for (const config of listed) {
+		const text = x.reader.read(config);
+		if (text === undefined) {
+			f.push(`the matrix's e2e browser row lists ${config}, which is not there`);
+			continue;
+		}
+		t.judged++;
+		f.push(...browserSettings(config, text, shown));
+	}
+	try {
+		const facts = e2eBrowserFacts(x.reader, x.lock);
+		for (const k of ['playwright', 'revision', 'browserVersion', 'headlessShellRevision'] as const) {
+			if (facts[k] !== row[k]) f.push(`the e2e browser's ${k} is ${facts[k]} in the tree; the matrix records ${row[k]} (generate.ts writes it)`);
+		}
+	} catch (e) {
+		f.push(`the e2e browser's facts could not be read: ${(e as Error).message}`);
+	}
+	return f;
+}
+
 // ── 8, and the run ───────────────────────────────────────────────────────────────────────────────────────────────
 function loadMatrix(reader: TreeReader, problems: string[]): Matrix | undefined {
 	const matrixText = reader.read(MATRIX_FILE);
@@ -514,6 +580,7 @@ const CONDITIONS: readonly [string, string, string, (x: Inputs, t: Tally) => str
 	['5', 'cross-row rules', '', crossRow],
 	['6', 'browser floor', '', browserFloor],
 	['7', 'machine tools', 'machine tools', machineTools],
+	['9', 'e2e browser', 'Playwright configs', e2eBrowser],
 	['steps', 'gate step runtimes', 'gate steps', stepRuntimes]
 ];
 
@@ -572,7 +639,8 @@ export function main(argv: readonly string[], out: (s: string) => void, env: Nod
 	const checkedTools = m.machine.filter((t) => t.check !== 'none').length;
 	out(
 		`toolchain:check — every condition holds: Node ${m.node.dayToDay} (floor ${m.node.floor}), Bun ${m.bun.version}, ` +
-			`${m.packages.length} packages, ${checkedTools} machine tools checked, ${Object.keys(m.gateSteps).length} gate steps.\n`
+			`${m.packages.length} packages, ${checkedTools} machine tool${checkedTools === 1 ? '' : 's'} checked, ` +
+			`${Object.keys(m.gateSteps).length} gate steps, e2e browser Chromium ${m.e2eBrowser.browserVersion}.\n`
 	);
 	return 0;
 }

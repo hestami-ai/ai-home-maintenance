@@ -411,11 +411,12 @@
 			"pin": "exact",
 			"reason": "Packages that put breaking changes in minor releases (D-8): Playwright 1.63, 1.64 and 1.65 (F-13).",
 			"blockers": [
-				"T6 moves the e2e browser from the system Edge to Playwright's bundled Chromium."
+				"The e2e browser is the Chromium this version bundles (the e2eBrowser row): moving Playwright moves the browser, so the same package regenerates the row and installs the new revision."
 			],
 			"moves": [
 				"the e2e suite in gate:tail",
-				"the live lanes"
+				"the live lanes",
+				"the e2e browser (the e2eBrowser row: the Chromium it bundles)"
 			],
 			"declared": {
 				"apps/rph-demo": "1.61.1"
@@ -634,10 +635,10 @@
 		{
 			"component": "edge",
 			"group": "e2e (machine)",
-			"check": "major",
+			"check": "none",
 			"observed": "157",
 			"date": "2026-11-16",
-			"detail": "The system Edge, the only e2e browser (channel 'msedge' in all three Playwright configs), which updates itself: launcher 157.0.4341.42, with 157.0.4341.46 and 157.0.4341.60 staged. T6 replaces it with Playwright's bundled Chromium."
+			"detail": "The system Edge, which updates itself. Since T6 no lane runs it: the three Playwright configs run Playwright's own Chromium (the e2eBrowser row, condition 9), so its major is recorded and no longer judged (D-13: \"T6 takes Edge out of this\")."
 		},
 		{
 			"component": "sonarlint",
@@ -725,6 +726,19 @@
 		]
 	},
 	"browserFloor": null,
+	"e2eBrowser": {
+		"group": "e2e",
+		"reason": "Roadmap T6, D-13: Playwright's own Chromium, the revision the locked @playwright/test bundles, for every e2e lane, instead of the system Edge, which updates itself (F-12). No reason for Edge beyond \"no browser download\" was found, in the repository or outside it (2026-11-16).",
+		"configs": [
+			"apps/rph-demo/playwright.config.ts",
+			"apps/rph-demo/playwright.live-exec.config.ts",
+			"apps/rph-demo/playwright.live.config.ts"
+		],
+		"playwright": "1.61.1",
+		"revision": "1228",
+		"browserVersion": "149.0.7827.55",
+		"headlessShellRevision": "1228"
+	},
 	"gateSteps": {
 		"bun run toolchain:check": "bun",
 		"bun run slices:ledger:check": "bun",

@@ -100,7 +100,7 @@ export default defineConfig({
 		trace: 'retain-on-failure',
 		screenshot: 'only-on-failure'
 	},
-	projects: [{ name: 'edge', use: { ...devices['Desktop Chrome'], channel: 'msedge' } }],
+	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 	webServer: {
 		command: `node ../../node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${PORT} --strictPort`,
 		url: `http://127.0.0.1:${PORT}/test-api/introspect`,

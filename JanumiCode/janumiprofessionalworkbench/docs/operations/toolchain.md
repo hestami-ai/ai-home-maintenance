@@ -59,7 +59,7 @@ design governs.
 | @earendil-works/pi-coding-agent | Pi SDK | exact | apps/rph-demo: `0.80.6` → 0.80.6 | — | breaking changes in patches after 0.80.6: 0.80.7, 0.80.8, 0.84.3, 1.0.3, 1.5.1 (F-13); a move needs a sponsor ruling. |
 | @earendil-works/pi-agent-core | Pi SDK | exact | apps/rph-demo: `0.80.6` → 0.80.6 | — | moves with pi-coding-agent; a move needs a sponsor ruling. |
 | typebox | Pi SDK | exact | apps/rph-demo: `1.1.38` → 1.1.38 | — | moves with Pi. |
-| @playwright/test | e2e | exact | apps/rph-demo: `1.61.1` → 1.61.1 | — | T6 moves the e2e browser from the system Edge to Playwright's bundled Chromium. |
+| @playwright/test | e2e | exact | apps/rph-demo: `1.61.1` → 1.61.1 | — | The e2e browser is the Chromium this version bundles (the e2eBrowser row): moving Playwright moves the browser, so the same package regenerates the row and installs the new revision. |
 | elkjs | graph layout | exact | apps/rph-demo: `0.11.1` → 0.11.1 | — | Skip 0.13.0, which npm marks deprecated; 0.12.0 "adds GPL-3.0 as a secondary license" (F-13). |
 | @dagrejs/dagre | graph layout | exact | apps/rph-demo: `3.0.0` → 3.0.0 | — | — |
 | @statelyai/graph | graph layout | exact | apps/rph-demo: `2.1.0` → 2.1.0 | — | — |
@@ -73,7 +73,7 @@ design governs.
 | turbo | standalone | caret | .: `^2.10.4` → 2.10.4 | — | — |
 | ulid | standalone | caret | apps/rph-demo: `^2.3.0`, packages/rph-authoring: `^2.3.0`, packages/rph-contracts: `^2.3.0` → 2.4.0 | — | — |
 | fast-check | standalone (tests) | exact | packages/rph-domain: `4.9.0` → 4.9.0 | — | — |
-| edge | e2e (machine) | observed, major checked | 157 (2026-11-16) | — | The system Edge, the only e2e browser (channel 'msedge' in all three Playwright configs), which updates itself: launcher 157.0.4341.42, with 157.0.4341.46 and 157.0.4341.60 staged. T6 replaces it with Playwright's bundled Chromium. |
+| edge | e2e (machine) | observed | 157 (2026-11-16) | — | The system Edge, which updates itself. Since T6 no lane runs it: the three Playwright configs run Playwright's own Chromium (the e2eBrowser row, condition 9), so its major is recorded and no longer judged (D-13: "T6 takes Edge out of this"). |
 | sonarlint | Sonar runner (machine) | observed, version checked | 6.3.0 (2026-11-16) | — | The SonarLint extension the Sonar runner drives (~/.devin/extensions), bundling SonarJS 14.4.0.46458 and its JRE 21.0.12.1. It decides no gate:fast step today (D-9); JAN-SONARCM's runner checks it again at run time. |
 | java | host tools (G12) | observed | 21.0.7 (2026-11-16) | — | Java on PATH: Temurin 21.0.7. |
 | git | host tools (G12) | observed | 2.53.0.windows.1 (2026-11-16) | — | git on PATH. |
@@ -81,6 +81,7 @@ design governs.
 | devin | agent CLIs | observed | 3000.11.234 (2026-11-16) | — | The devin CLI, which updates itself. |
 | pi | agent CLIs | observed | 1.4.0 (2026-11-16) | — | The pi CLI, beside the in-process SDK the app pins (0.80.6). |
 | ollama | agent CLIs | observed | 0.40.16 (2026-11-16) | — | The Ollama server, which updates itself; its version is governed at run time by REG-D-152 (0.40.16 accepted beside the recorded 0.40.15). |
+| e2e browser | e2e | Playwright's own, checked | @playwright/test 1.61.1: Chromium 149.0.7827.55 (revision 1228; headless shell 1228) | — | configs: apps/rph-demo/playwright.config.ts, apps/rph-demo/playwright.live-exec.config.ts, apps/rph-demo/playwright.live.config.ts |
 | VS Code | VS Code (new) | floor | 1.123.0: Electron 42.3.0, Node 24.15.0 | — | F-5's table from each VS Code tag's .npmrc target= and Electron's release list; 1.123.0 is the first VS Code on Node 24, and engines.vscode becomes ">=1.123.0" when the extension's manifest exists (D-2). |
 
 <!-- end of matrix table -->
@@ -101,10 +102,13 @@ measures on it and before any cached step (`turbo.json` hashes the matrix and `.
    `bun.lock` records it) does not satisfy.
 5. **Cross-row rules.** The VS Code floor's Node, or the day-to-day Node, is below the Node floor.
 6. **Browser floor.** Vite's `build.target` and the matrix's browser floor disagree. Both are absent until T1c sets them.
-7. **Machine tools.** The Edge major installed (a staged update counts) or the SonarLint version differs from the one
-   recorded.
+7. **Machine tools.** The SonarLint version differs from the one recorded. ~~The Edge major installed (a staged update
+   counts)~~: since T6 no lane runs Edge, so its row records the major and the check does not judge it.
 8. **Population.** The matrix or the lock is empty or unreadable, or the lock holds no matrix package. A check over
    nothing would pass, so it fails instead.
+9. **E2e browser** (T6). The app's Playwright configs on disk are not exactly the matrix's `e2eBrowser` row's, a config
+   names a `channel` or an `executablePath`, or the row's generated facts (the locked `@playwright/test`, and the
+   Chromium revision and version its `browsers.json` names) disagree with the tree.
 
 It also derives the runtime of each `gate:fast` step from its command and the shebang of the bin it starts, and fails
 when that differs from the runtime the matrix records (for example a step that runs `bun --bun vitest run` where the
@@ -136,8 +140,13 @@ Every worktree on this machine shares one Node, one Edge and one SonarLint, so a
   hold its landings for the hour a merge and its gate take.
 - **How live branches take it.** Each live branch merges the main line (or takes the one-line change) before its next
   gate run.
-- **Edge until T6.** Edge's majors arrive about every two weeks. T6 moves the e2e suite to Playwright's bundled
-  Chromium, which the lock pins, and takes Edge out of this.
+- ~~**Edge until T6.** Edge's majors arrive about every two weeks. T6 moves the e2e suite to Playwright's bundled
+  Chromium, which the lock pins, and takes Edge out of this.~~ **Edge since T6.** No lane runs Edge: the three
+  Playwright configs run Playwright's own Chromium, which the lock pins (the `e2eBrowser` row). Edge's row records its
+  major and is not judged, so an Edge update fails nothing.
+- **The e2e browser moves with Playwright.** A package that moves `@playwright/test` moves the browser it bundles: it
+  regenerates the matrix (`bun run scripts/toolchain/generate.ts`, which writes the new revision into the
+  `e2eBrowser` row) and installs that revision (`node node_modules/@playwright/test/cli.js install chromium`).
 
 ## The upgrade procedure: one coupling group per package (D-11)
 
