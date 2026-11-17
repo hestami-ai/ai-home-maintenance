@@ -142,7 +142,7 @@
 			},
 			"locked": "7.3.8",
 			"nested": {
-				"vitest/vite": "8.1.4"
+				"vitest/vite": "8.1.6"
 			}
 		},
 		{
@@ -157,9 +157,9 @@
 				"the mutation runner's reading of its summary (scripts/mutants/run.ts)"
 			],
 			"declared": {
-				".": "4.1.10"
+				".": "4.1.12"
 			},
-			"locked": "4.1.10",
+			"locked": "4.1.12",
 			"nested": {}
 		},
 		{
@@ -174,9 +174,9 @@
 				"the coverage thresholds and coverage:floor's per-file counts"
 			],
 			"declared": {
-				".": "4.1.10"
+				".": "4.1.12"
 			},
-			"locked": "4.1.10",
+			"locked": "4.1.12",
 			"nested": {}
 		},
 		{
