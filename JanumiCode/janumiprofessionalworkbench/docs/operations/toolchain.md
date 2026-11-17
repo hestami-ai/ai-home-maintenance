@@ -66,7 +66,7 @@ design governs.
 | @xyflow/svelte | graph layout | caret | apps/rph-demo: `^1.4.0` → 1.6.2 | — | — |
 | xstate | xstate | exact | apps/rph-demo: `5.32.5` → 5.32.5 | — | — |
 | @xstate/svelte | xstate | exact | apps/rph-demo: `5.0.0` → 5.0.0 | — | moves with xstate. |
-| zod | codegen | exact | packages/rph-application: `4.4.3`, packages/rph-contracts: `4.4.3`, packages/rph-domain: `4.4.3` → 4.4.3 | — | — |
+| zod | codegen | exact | packages/rph-application: `4.6.7`, packages/rph-contracts: `4.6.7`, packages/rph-domain: `4.6.7` → 4.6.7 | — | — |
 | prettier | codegen | exact | .: `3.9.5` → 3.9.5 | — | — |
 | ajv | codegen | caret | packages/rph-contracts: `^8.17.0` → 8.20.0 | @eslint/eslintrc/ajv 6.15.0, eslint/ajv 6.15.0 | — |
 | ajv-formats | codegen | caret | packages/rph-contracts: `^3.0.0` → 3.0.1 | — | moves with ajv. |

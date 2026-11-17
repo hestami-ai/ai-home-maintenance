@@ -528,11 +528,11 @@
 				"the committed JSON Schemas and gen:check"
 			],
 			"declared": {
-				"packages/rph-application": "4.4.3",
-				"packages/rph-contracts": "4.4.3",
-				"packages/rph-domain": "4.4.3"
+				"packages/rph-application": "4.6.7",
+				"packages/rph-contracts": "4.6.7",
+				"packages/rph-domain": "4.6.7"
 			},
-			"locked": "4.4.3",
+			"locked": "4.6.7",
 			"nested": {}
 		},
 		{
