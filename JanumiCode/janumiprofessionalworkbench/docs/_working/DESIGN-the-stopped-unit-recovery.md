@@ -138,6 +138,7 @@ The route reader found that a re-review needs four things the floor took from me
 - **The hazard, found by the route reader.** Today the findings turn omits the instruction, because the session held it (`run-model-step.ts:271-279`). A fresh session given that turn would get findings with no task.
 - **The fix.** In a re-run, try 1's turn is the instruction followed by the findings. It declares `PRIOR_REVIEW_FINDING` only. It does not declare `PRIOR_WORK_PRODUCT` or `PRIOR_RATIONALE`, because the fresh session does not hold them (:149-150).
 - **The workspace still holds the earlier files** (`workspace-host.ts:232-239`). The producer sees them as files, and the record says so.
+- ⭐ **Amended 2026-11-17, before package L17b1's code lands (`REG-D-169`; design D85, amended).** With a durable store the re-run reopens the unit's saved session: its first turn is the instruction, then the findings, then, in place of this section's fresh-session sentence, what that session holds, then the request; and it declares the carried finding and the earlier work product and its rationale at `THIS_WORK_UNIT`, as a repair turn on a remembering session does. With none, or where the unit's earlier step left no file, the fresh session and this section's turn, byte for byte.
 - **Only subject findings are carried** (DOC-001:227). An escalation recommendation and an INCONCLUSIVE review carry nothing (`REG-D-090`; `REG-D-059`).
 
 ### RD9. Budgets
