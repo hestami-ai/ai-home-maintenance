@@ -285,6 +285,59 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
 - **Governed items that need a ruling.** The engine stays at D-1's rows. Detecting drift is not permission to adopt a new engine baseline (D-4, `docs/_working/DESIGN-sonar-configuration-management.md:534-535`). The §1 pins stay fixed.
 - **Prohibited shortcuts.** Taking the highest installed engine; fixed `C:/Users` or `Program Files` paths in code; the runner's self-reported `productVersion` as evidence (`docs/_working/DESIGN-sonar-configuration-management.md:145-147`); implicit resume or silently skipped files; any move to Cloud, Community Build, the CLI or the MCP server (D-8, `:654-664`).
 - **Exit criterion.** The named reds and the gate pass; the server echoes and fresh results are saved. If V-3 or V-4 fails, the runner is fixed or the mechanism goes back to design review; today's defaults are not accepted as equivalent. Extra: `mutants:changed --run`; e2e within the gate; a scan of S1's changed analysable files with the new runner, and of T0's and T6's if their scans were recorded as not run.
+- **What the scratch probes measured (2026-11-17; a disposable worktree at TS4's tree, the 6.3.0 server driven as the runner drives it; nothing committed).**
+  - *The engine's defaults come from the server.* `sonarlint/listAllRules`, a request the extension itself sends, lists every rule with `activeByDefault`: TypeScript 552 rules, 440 on (F-3's 440); JavaScript 533, 425 on; Secrets 30, all on. It gives no parameter defaults.
+  - *A rule list reaches the server.* With `typescript:S3776` answered as off in the `sonarlint` configuration section, the server logs `excludedRules=[typescript:S3776]` (its "Global settings updated" line), its analysis line counts 439 TypeScript rules (`activeRules`), and a seed of cognitive complexity 16 is reported clean; with no rules it reports *"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed."* This is V-4's mechanism.
+  - *The order.* The server asks for its configuration as soon as it is initialised, about five seconds before it answers `listAllRules`. A rule list sent later, through `workspace/didChangeConfiguration`, takes effect (the seed is clean) but logs no "Global settings updated" line. If the client holds the server's first request until the list arrives, its first answer is applied and echoed; the server answers `listAllRules` while its own request is held.
+  - *The scope reaches the server.* With the properties' five tsconfig globs passed as the analyzer property `sonar.typescript.tsconfigPaths`, the server logs *"Found 14 tsconfig.json file(s)"*, the 14 tracked files the globs match; without it, 17, among them `apps/rph-demo/.svelte-kit/tsconfig.json`. This is V-3(b), red against today's runner.
+  - *The population.* The properties' scope holds 474 tracked files today (`apps/` 190, `packages/` 141, `scripts/` 113, `verif/` 30; 455 `.ts`, 17 `.js`, 2 `.mjs`), and leaves out 553 `*.test.ts` files, 11 `.svelte` files and 4 files in excluded folders.
+- **S1's choices (2026-11-17), for the reviewing lead.**
+  - *Its base.* TS4's `74e72aad`, as TS1 to TS5 were built on their predecessors, not the main line's `03ce3314`. S1 edits the matrix that TS1 to TS4 regenerate, and until T6 lands, a new Edge major stops `toolchain:check` on any branch without it. So S1 lands after the T6-to-TS4 stack, or with it in one push. TS5 is not under it.
+  - *The rule set.* `scripts/sonar/rules.json` holds the 895 rules the engine of record turns on by default in the three repositories that can report on the scope's files: TypeScript 440, JavaScript 425 and Secrets 30. Cycle 6's sweeps met the first two only. It sets no parameters. Today it equals the defaults, so the server is sent no difference, and an engine change can no longer change the active rules without a commit (F-3). At each run the runner asks the server for its defaults (`listAllRules`) and holds the server's first configuration request until it has them. It then answers with the differences D-1 names. It refuses (exit 2) unless the server's echo equals what was sent and each analysis counts the rule set's rules in each of the three repositories. A rule the engine does not have is refused by name.
+  - *The scope.* `scripts/sonar/census.ts` (`bun run sonar:census`) writes `scripts/sonar/scope-census.json` from `sonar-project.properties` and the tracked files: the files in scope and the tsconfigs the five globs match. The runner reads the census, not a hand list. `--all` analyses every census file, and a file named with `--files` must be in it. The runner passes the properties' tsconfig globs as an analyzer property and the properties' test inclusions as the test pattern. It refuses (exit 2) when the server's tsconfig list differs from the census's. Every package that adds or removes a file in scope regenerates the census, and the census test names the command.
+  - *The engine.* Three machine rows join the `sonarlint` row: the language server 6.3.0.79979 and SonarJS 14.4.0.46458, read from the extension's `jarDependencies`, and the bundled JRE 21.0.12.1, read from its `release` file. Each takes a new check kind, `runner`: the Sonar runner refuses any other version at each run, while `toolchain:check` keeps judging the extension's version, which fixes all three. `machine-paths.json` gains the extension's layout (its server jar, JRE folder, analyzers and bridge), profile-relative as before. The runner:
+    - picks the extension whose own `package.json` names the pinned version, never the highest;
+    - reads SonarJS's version again from the server's *"Plugin version"* line;
+    - runs the bridge on the Node that runs the runner, which must be the matrix's day-to-day Node (anything else, Bun included, is refused);
+    - turns the server's telemetry off, with its storage inside the output folder.
+  - *The output.* Every run writes to a new, empty folder:
+    - `run.json`: the engine; the rule set's hash and the server's echo; the census's hash and the server's tsconfig list; the Node; each file's status;
+    - `results.json`: each file's findings and the hash of the bytes analysed;
+    - the server's log and the rule catalogue.
+
+    `--resume` reuses a file's result only when the file's hash matches and the engine, rule set and census match.
+
+    Exit codes: 0, every listed file analysed; 2, refused before or during the run (engine, Node, rule set, scope, echo, or a used folder); 3, nothing analysable; 4, a listed file not analysed, named (J4).
+  - *Its language.* The runner stays CommonJS (`.cjs`) under node, with its pure logic in `scripts/sonar/runner-core.cjs`. Both are checked by `tsc` through JSDoc: `allowJs` and `checkJs` for `scripts/sonar/*.cjs` in `scripts/tsconfig.json`, and `allowJs` in `verif/tsconfig.json`, so the tests import the core with its types. ESLint's `no-require-imports` is turned off for `scripts/sonar/*.cjs` alone, since those files are CommonJS by design.
+  - *The cycle tools (CM-16's 40, inventoried).* Two are ported:
+    - the file list becomes the census and the runner's `--all`;
+    - the compare tool becomes `scripts/sonar/compare.ts`. It reads two runs, and refuses runs under different engine versions and a run missing its engine version, rule-set hash or census hash (J2, J3), because J3 binds the first compare tool. S4 still runs V-15 on its sweep records.
+
+    **A departure from this entry's "may stay Python, run by the operator":** no Python helper becomes live tooling. Twenty hand-written tools are kept byte for byte as records under `docs/operations/sonar-cycles/cycle-6/tools/`, with an inventory naming each one's use and successor, for three reasons:
+    - they read the old runner's `worklist.json` and `ledger.json`, which S1 replaces;
+    - `triage.py` holds cycle 6's refusals in code, which S5's register is designed to own;
+    - the wave helpers write Workflow-tool scripts whose prompts name cycle 6's worktree.
+
+    The first package that runs a fix cycle adapts what it needs. Not kept:
+    - the nine generated wave scripts, outputs of `mk_waves.py` (about 1.9 MB);
+    - the ten files of the `fp/` and `ledger-limit/` investigations, whose results are in cycle 6's commit messages;
+    - `push_scan.py`, a general pre-push scan, not a Sonar tool, which names the operator's accounts.
+- **Planned reds, each first red with its own message while the others stay green.**
+  - Committed, in `verif/sonar-runner.test.ts` and `verif/sonar-compare.test.ts`:
+    - V-2: a copy of a `scripts/sonar/` file holding an absolute drive path;
+    - V-3(a): the tracked files plus one new `scripts/*.ts`, checked against the committed census;
+    - V-1's four limbs, each alone, on a temporary extension folder: the extension's version, the language server's, SonarJS's and the JRE's;
+    - a rule set naming a rule the catalogue lacks;
+    - a server echo that differs from what was sent, in each of its three lists;
+    - a used output folder without `--resume`, and a resumed file whose bytes changed;
+    - for the compare tool, two runs under different engine versions, and a run missing each of the three fields.
+  - One-off, with the real engine on disposable copies, each saved with the server's echo:
+    - V-1: the committed runner exits 2 on a copy of the configuration pointing at a doctored extension folder;
+    - V-3(b): the server's 14 tsconfigs equal the census's;
+    - V-4: the control rule set without `typescript:S3776` gives no S3776 on the seed and the echo lists it, while the committed set reports it;
+    - V-20: two runs on one folder with the seed edited between, refused without `--resume` and given the new result with it.
+
+    V-9's two channels run in scratch, for S5 to record.
 
 ### S5 · The exception register and the marker proof
 
