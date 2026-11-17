@@ -39,7 +39,7 @@ design governs.
 | Node | Node/native | floor and day to day | `>=24.15.0`; day to day 24.22.3 | — | Node 26: no stable Electron, and so no VS Code, runs it (F-5); the planned extension's host decides (D-2). |
 | Bun | runtime (G0) | exact | 1.3.14 | — | Bun 1.4: evaluated as its own package after T1-T3 (QT2, ruled; F-15). |
 | svelte | Svelte/Vite | caret | apps/rph-demo: `^5.0.0` → 5.56.4 | — | SvelteKit 3 needs svelte 5.57.1 (D-12 T3). |
-| @sveltejs/kit | Svelte/Vite | caret | apps/rph-demo: `^2.22.0` → 2.69.2 | — | SvelteKit 3 needs vite 8, vite-plugin-svelte 7, TypeScript 6 and adapter-auto 8 (D-12 T3); T3a moves to the newest 2.x first. |
+| @sveltejs/kit | Svelte/Vite | caret | apps/rph-demo: `^2.22.0` → 2.70.4 | — | SvelteKit 3 needs vite 8, vite-plugin-svelte 7, TypeScript 6 and adapter-auto 8 (D-12 T3); T3a moves to the newest 2.x first. |
 | @sveltejs/vite-plugin-svelte | Svelte/Vite | caret | apps/rph-demo: `^6.0.0` → 6.2.4 | — | 6.x peers vite "^6.3.0 \|\| ^7.0.0", so the app stays on vite 7 while vitest runs its own vite 8: the split of F-14, which T3a ends. |
 | @sveltejs/adapter-auto | Svelte/Vite | caret | apps/rph-demo: `^6.0.0` → 6.1.1 | — | 8 needs SvelteKit 3. |
 | svelte-check | Svelte/Vite | caret | apps/rph-demo: `^4.0.0` → 4.7.2 | — | 4.7.2 peers TypeScript ">=5.0.0"; "^5 \|\| ^6" from 4.7.4; TypeScript 7 only through --tsgo. |
