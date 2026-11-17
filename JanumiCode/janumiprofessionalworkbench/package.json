@@ -41,7 +41,10 @@
 		"guards:export": "bun run scripts/export-guard.ts --write",
 		"guards:export:check": "bun run scripts/export-guard.ts --check",
 		"toolchain:check": "bun run scripts/toolchain/check.ts",
-		"toolchain:review": "bun run scripts/toolchain/review.ts"
+		"toolchain:review": "bun run scripts/toolchain/review.ts",
+		"sonar:census": "bun run scripts/sonar/census.ts",
+		"sonar:scan": "node scripts/sonar/batch-runner.cjs",
+		"sonar:compare": "bun run scripts/sonar/compare.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.37.0",

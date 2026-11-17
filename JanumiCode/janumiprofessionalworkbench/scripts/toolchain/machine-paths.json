@@ -6,7 +6,16 @@
 	},
 	"sonarlint": {
 		"roots": ["~/.devin/extensions"],
-		"extensionDir": "^sonarsource\\.sonarlint-vscode-\\d+\\.\\d+\\.\\d+(?:-[a-z0-9-]+)?$"
+		"extensionDir": "^sonarsource\\.sonarlint-vscode-\\d+\\.\\d+\\.\\d+(?:-[a-z0-9-]+)?$",
+		"layout": {
+			"$comment": "Inside the extension folder, for the Sonar runner (JAN-SONARCM S1): the language server jar; the folder holding the bundled JRE (one subfolder, whose release file names its version) and its bin folder; the analyzers folder and the analyzers the runner loads from it (janumicode_v2's runner's list, each loaded when present); and the bridge.",
+			"languageServer": "server/sonarlint-ls.jar",
+			"jre": "jre",
+			"javaBin": "bin",
+			"analyzers": "analyzers",
+			"analyzerJars": ["sonargo", "sonarjava", "sonarjavasymbolicexecution", "sonarjs", "sonarphp", "sonarpython", "sonarhtml", "sonarxml", "sonartext", "sonariac", "sonarlintomnisharp"],
+			"eslintBridge": "eslint-bridge"
+		}
 	},
 	"executables": {
 		"node": { "command": "node", "args": ["--version"], "version": "v(\\d+\\.\\d+\\.\\d+)" },

@@ -17,7 +17,11 @@
 
 export type PinStyle = 'exact' | 'caret';
 export type StepRuntime = 'node' | 'bun' | 'node+bun' | 'none';
-export type MachineCheck = 'major' | 'version' | 'none';
+/**
+ * What judges a machine row: `toolchain:check` ('major', 'version'); nothing ('none', recorded only); or the Sonar
+ * runner at each run ('runner': the engine the SonarLint extension bundles, JAN-SONARCM S1), not `toolchain:check`.
+ */
+export type MachineCheck = 'major' | 'version' | 'none' | 'runner';
 
 export interface Judgment {
 	readonly group: string;
@@ -111,7 +115,7 @@ export interface Matrix {
 export const MATRIX_SCHEMA = 'jpwb-toolchain-matrix/1';
 
 const STEP_RUNTIMES: ReadonlySet<string> = new Set(['node', 'bun', 'node+bun', 'none']);
-const MACHINE_CHECKS: ReadonlySet<string> = new Set(['major', 'version', 'none']);
+const MACHINE_CHECKS: ReadonlySet<string> = new Set(['major', 'version', 'none', 'runner']);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
 	return v !== null && typeof v === 'object' && !Array.isArray(v);

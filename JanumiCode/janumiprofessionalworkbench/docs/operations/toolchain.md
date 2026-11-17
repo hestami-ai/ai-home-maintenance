@@ -23,7 +23,9 @@ design governs.
   committed files are current.
 - **Observed** from the machine, each with its date: the Edge major, the SonarLint version, the host tools and the VS
   Code installs. When `toolchain:check` reports drift, whoever ran it records the new value and its date. That is an
-  ordinary re-baseline too.
+  ordinary re-baseline too. The engine the SonarLint extension bundles, its language server, SonarJS and JRE, is
+  observed as well, with the check kind `runner` (JAN-SONARCM S1): the Sonar runner refuses any other version at each
+  run (`docs/operations/sonarqube.md` §7), and its move is a governed re-baseline (JAN-SONARCM D-4), not an ordinary one.
 - **Hand-written** judgments: coupling group, floor, pin style, blockers, the instruments a component moves, the runtime
   each gate step runs on, and the reason for each. `toolchain:check` enforces them, so they are gate configuration.
   Weakening, rewriting or removing one (lowering a floor, loosening a pin style, deleting a blocker whose condition has
@@ -75,6 +77,9 @@ design governs.
 | fast-check | standalone (tests) | exact | packages/rph-domain: `4.9.0` → 4.9.0 | — | — |
 | edge | e2e (machine) | observed | 157 (2026-11-16) | — | The system Edge, which updates itself. Since T6 no lane runs it: the three Playwright configs run Playwright's own Chromium (the e2eBrowser row, condition 9), so its major is recorded and no longer judged (D-13: "T6 takes Edge out of this"). |
 | sonarlint | Sonar runner (machine) | observed, version checked | 6.3.0 (2026-11-16) | — | The SonarLint extension the Sonar runner drives (~/.devin/extensions), bundling SonarJS 14.4.0.46458 and its JRE 21.0.12.1. It decides no gate:fast step today (D-9); JAN-SONARCM's runner checks it again at run time. |
+| sonarlint-language-server | Sonar runner (machine) | observed, checked by the Sonar runner | 6.3.0.79979 (2026-11-17) | — | The language server the SonarLint extension bundles (its package.json jarDependencies, sonarlint-language-server). scripts/sonar/batch-runner.cjs refuses any other at each run (JAN-SONARCM D-1, S1); toolchain:check judges the extension's version, which fixes it. |
+| sonarjs | Sonar runner (machine) | observed, checked by the Sonar runner | 14.4.0.46458 (2026-11-17) | — | SonarJS, the JavaScript and TypeScript analyzer the extension bundles (jarDependencies, sonar-javascript-plugin): the engine version a Sonar result is recorded and compared under (J2, J3). The runner refuses any other at each run, read from jarDependencies and again from the server's own "Plugin version" line. |
+| sonarlint-jre | Sonar runner (machine) | observed, checked by the Sonar runner | 21.0.12.1 (2026-11-17) | — | The JRE the extension bundles (its release file's JAVA_VERSION), which runs the language server; not the Java on PATH (the java row). The runner refuses any other at each run. |
 | java | host tools (G12) | observed | 21.0.7 (2026-11-16) | — | Java on PATH: Temurin 21.0.7. |
 | git | host tools (G12) | observed | 2.53.0.windows.1 (2026-11-16) | — | git on PATH. |
 | python | host tools (G12) | observed | 3.14.0 (2026-11-16) | — | Python on PATH. |
@@ -103,7 +108,9 @@ measures on it and before any cached step (`turbo.json` hashes the matrix and `.
 5. **Cross-row rules.** The VS Code floor's Node, or the day-to-day Node, is below the Node floor.
 6. **Browser floor.** Vite's `build.target` and the matrix's browser floor disagree. Both are absent until T1c sets them.
 7. **Machine tools.** The SonarLint version differs from the one recorded. ~~The Edge major installed (a staged update
-   counts)~~: since T6 no lane runs Edge, so its row records the major and the check does not judge it.
+   counts)~~: since T6 no lane runs Edge, so its row records the major and the check does not judge it. The three
+   rows of the engine the extension bundles (check `runner`) are judged by the Sonar runner at each run, not here: the
+   extension's version, judged here, fixes them.
 8. **Population.** The matrix or the lock is empty or unreadable, or the lock holds no matrix package. A check over
    nothing would pass, so it fails instead.
 9. **E2e browser** (T6). The app's Playwright configs on disk are not exactly the matrix's `e2eBrowser` row's, a config

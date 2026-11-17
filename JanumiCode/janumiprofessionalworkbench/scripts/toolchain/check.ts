@@ -19,7 +19,9 @@
  *   5 cross-row     — the VS Code floor's Node, and the day-to-day Node, not below the Node floor.
  *   6 browser floor — Vite's `build.target` and the matrix's browser floor agree (both absent until T1c sets them).
  *   7 machine tools — the SonarLint version, found through `machine-paths.json`. Edge's row is recorded only since
- *                     T6: no lane runs it.
+ *                     T6: no lane runs it. The engine the extension bundles (its language server, SonarJS and JRE;
+ *                     check 'runner', JAN-SONARCM S1) is judged by the Sonar runner at each run, not here: the
+ *                     extension's version, judged here, fixes all three.
  *   8 population    — an unreadable or empty matrix or lock, or a lock holding no matrix package, fails (I6).
  *   9 e2e browser   — (T6) the app's Playwright configs on disk are exactly the e2eBrowser row's, none names a
  *                     `channel` or an `executablePath` (so each runs Playwright's own Chromium), and the row's
@@ -43,7 +45,7 @@ import { fileURLToPath } from 'node:url';
 import { e2eBrowserFacts } from './e2e-browser.js';
 import { copiesOf, installedDir, parseLockfile, resolveFrom, type LockPackage, type Lockfile } from './lockfile.js';
 import { edgeInstalled, nodeOnPath, parseMachinePaths, runningBun, sonarLintInstalled, type MachinePaths } from './machine.js';
-import { compareVersions, parseMatrix, versionParts, type Matrix, type PackageRow, type StepRuntime } from './matrix.js';
+import { compareVersions, parseMatrix, versionParts, type MachineRow, type Matrix, type PackageRow, type StepRuntime } from './matrix.js';
 import { externalDeclarations, makeReader, parseOverrides, readManifest, workspaceDirs, type Manifest, type TreeReader } from './tree.js';
 
 export const FLOOR_LANE_ENV = 'JPWB_TOOLCHAIN_FLOOR_LANE';
@@ -338,10 +340,15 @@ function sonarLintFailure(x: Inputs, observed: string): string | undefined {
 	return undefined;
 }
 
+/** The machine rows this check judges: not the recorded-only ones, nor the engine rows the Sonar runner judges. */
+function judgedHere(row: MachineRow): boolean {
+	return row.check !== 'none' && row.check !== 'runner';
+}
+
 function machineTools(x: Inputs, t: Tally): string[] {
 	const f: string[] = [];
 	for (const row of x.matrix.machine) {
-		if (row.check === 'none') continue;
+		if (!judgedHere(row)) continue;
 		t.judged++;
 		let failure: string | undefined;
 		if (row.component === 'edge' && row.check === 'major') failure = edgeFailure(x, row.observed);
@@ -636,7 +643,7 @@ export function main(argv: readonly string[], out: (s: string) => void, env: Nod
 		return 1;
 	}
 	const m = inputs.matrix;
-	const checkedTools = m.machine.filter((t) => t.check !== 'none').length;
+	const checkedTools = m.machine.filter(judgedHere).length;
 	out(
 		`toolchain:check — every condition holds: Node ${m.node.dayToDay} (floor ${m.node.floor}), Bun ${m.bun.version}, ` +
 			`${m.packages.length} packages, ${checkedTools} machine tool${checkedTools === 1 ? '' : 's'} checked, ` +

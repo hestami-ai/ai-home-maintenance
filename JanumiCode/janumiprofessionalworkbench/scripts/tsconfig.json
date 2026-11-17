@@ -9,10 +9,16 @@
   // while the shared base declares `"lib": ["ES2022"]`. It worked under Bun and would have failed anywhere held
   // to the level the packages promise. Rewritten to `filter(...).at(-1)` rather than raising `lib` here, because
   // a second lib level in tooling is what later gets copied into a package.
+  //
+  // THE SONAR RUNNER IS COMMONJS AND STILL CHECKED (JAN-SONARCM S1). `sonar/*.cjs` is the runner and its core; they
+  // stay CommonJS under node, and `allowJs` with `checkJs` type-check them through their JSDoc, as strictly as the
+  // TypeScript beside them. No other JavaScript is included.
   "extends": "@janumipwb/typescript-config/base.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": true
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "sonar/*.cjs"]
 }

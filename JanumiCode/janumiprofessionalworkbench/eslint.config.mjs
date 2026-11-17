@@ -46,5 +46,13 @@ export default tseslint.config(
 			'@typescript-eslint/no-explicit-any': 'off',
 			'@typescript-eslint/no-non-null-assertion': 'off'
 		}
+	},
+	{
+		// The Sonar runner and its core are CommonJS by design (JAN-SONARCM S1): they run under node and load node's
+		// modules with `require`. Nothing else in the repository may.
+		files: ['scripts/sonar/*.cjs'],
+		rules: {
+			'@typescript-eslint/no-require-imports': 'off'
+		}
 	}
 );

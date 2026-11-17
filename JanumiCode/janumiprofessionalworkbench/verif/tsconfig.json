@@ -15,10 +15,15 @@
   //
   // The root `check-types` script runs this leg AFTER turbo, because these files import `@janumipwb/*` from
   // `dist`, which turbo's `^build` dependency produces.
+  //
+  // `allowJs` (JAN-SONARCM S1): the Sonar runner's tests import its CommonJS core, and with it TypeScript reads the
+  // core's JSDoc types. It includes no JavaScript file: `include` stays `**/*.ts`, and `scripts/tsconfig.json`
+  // checks the core itself.
   "extends": "@janumipwb/typescript-config/base.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "allowJs": true
   },
   "include": ["**/*.ts"]
 }

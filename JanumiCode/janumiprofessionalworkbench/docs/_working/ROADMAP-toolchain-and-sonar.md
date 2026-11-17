@@ -338,6 +338,24 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
     - V-20: two runs on one folder with the seed edited between, refused without `--resume` and given the new result with it.
 
     V-9's two channels run in scratch, for S5 to record.
+- **Built (2026-11-17).** As planned above, with one addition: the runner also holds the server's echo of the folder settings (`WorkspaceFolderSettings`: the analyzer property and the test pattern) to what it sent, and records it. Each committed red was seen failing alone, with its message.
+  - *The one-off proofs* (the committed runner on a disposable worktree; each run's folder holds its echoes):
+    - V-4: the committed rule set reported *"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed."* on the seed, with nothing sent, nothing echoed, and 440 TypeScript, 425 JavaScript and 30 Secrets rules counted. The control set without `typescript:S3776` reported nothing, with `excludedRules=[typescript:S3776]` sent and echoed and 439 TypeScript rules counted.
+    - V-3(b): the server's 14 tsconfigs equal the census's in every run, and the folder echo holds the five globs and the test pattern. Without the globs, the probe that drove the server as today's runner does found 17.
+    - V-20: a second run into the first run's folder was refused (exit 2). With `--resume`, the edited seed was analysed again and found clean, and the unchanged file was reused.
+    - V-1: the committed runner, its configuration pointed at a copy of the extension folder whose `package.json` names 9.9.9, exited 2: *"SonarLint 6.3.0, the matrix's pin, is not installed under %JPWB_SONAR_FIXTURE%: found 9.9.9 (sonarsource.sonarlint-vscode-6.3.0-win32-x64)"*.
+  - *V-9, in scratch, for S5 to record.* The engine through the runner, and ESLint 9.39.5 with eslint-plugin-sonarjs 4.2.2's recommended set, typed, on one seed per case:
+    - no marker: both report the complexity;
+    - `// eslint-disable-next-line sonarjs/cognitive-complexity`: neither does;
+    - a marker naming `sonarjs/no-identical-functions`: both still report, and lint warns that the directive is unused;
+    - a marker naming `unicorn/no-array-for-each`, which lint does not load: lint fails (*"Definition for rule 'unicorn/no-array-for-each' was not found."*), and the engine still reports.
+
+    The two measurements:
+    - A marker for ESLint core's `no-unused-vars`, a name the plugin shares, silenced the engine's `javascript:S1481`. The engine reported S1481 without it. Lint's `sonarjs/no-unused-vars` was not silenced, so the engine matches the name's last segment and lint the whole name, as F-5 infers.
+    - With the properties' test pattern passed, the engine still reports S2925 in `apps/rph-demo/e2e/`: 6 of 6 on the two files cycle 6 met them in, which match neither test pattern.
+
+    Beside them, for S2: the engine has no `typescript:S1481`, since SonarJS 14.4.0.46458 lists S1481 for JavaScript alone, yet the plugin's recommended set reports `sonarjs/no-unused-vars` on TypeScript files.
+  - *The Sonar scan of S1's changed analysable files* (the five new files under `scripts/sonar/` and `scripts/toolchain/check.ts`, `generate.ts` and `matrix.ts`), with S1's runner. The first scan found 7. Four were fixed: a redundant type alias, swapped argument names, a nested template literal, and a `require.main` comparison the engine reads as always false. The last scan finds 3, each S4036 at a `git` spawned by name, kept with its reason at the site, cycle 6's convention, as T0 kept its own.
 
 ### S5 · The exception register and the marker proof
 

@@ -2,12 +2,12 @@
 
 **This document is the artifact JAN-ENGC-001 §7.1 names** — the "accepted operations
 documentation" through which the repository defines how its quality gates are executed — and the
-REG-E-019 placement. Driver *mechanics* — how the headless SonarLint language server is spawned,
-initialized, and driven over LSP — remain documented in
-`../../../janumicode_v2/docs/sonarqube-headless-remediation-guide.md`, consulted **as background
-per §7.1**: an out-of-repository guide MAY be consulted but SHALL NOT silently control this
-repository. Between 2026-07-17 and this document's landing, that guide was the only operational
-Sonar procedure anywhere — precisely the state §7.1 forbids.
+REG-E-019 placement. Since 2026-11-17 the driver itself is JPWB's: `scripts/sonar/batch-runner.cjs`
+spawns the headless SonarLint language server and drives it over LSP under the pinned engine, the
+committed rule set and the scope census (JAN-SONARCM D-1, package S1; §7). The janumicode_v2 guide,
+`../../../janumicode_v2/docs/sonarqube-headless-remediation-guide.md`, is background per §7.1: it MAY
+be consulted but SHALL NOT silently control this repository. From 2026-07-17 until S1, its gitignored
+runner was the only working driver anywhere — precisely the state §7.1 forbids.
 
 Authority: **JAN-ENGC-001** (normative, effective 2026-07-17) §7.1 repository-local procedure,
 §7.3 findings remediated fully by default, §7.4 recorded exceptions. Provenance, not authority:
@@ -35,18 +35,18 @@ silently until the next scan — which is why campaign completion notes record t
 
 ## 2. How a scan is run
 
-Headless, via the SonarLint language-server driver documented in the sibling guide (§3 quick
-start, §6 reconstruction, §7 tooling). Machine-specific prerequisites (extension root, JRE, LS
-jar, eslint-bridge, Node path) are in guide §2. The tooling lives in
-`janumicode_v2/.sonar-remediation/` (gitignored; reconstructible from guide §6). Findings are
-byte-identical to the IDE Problems panel. Batch mode pays the ~30–40 s boot once and streams
-files at ~2–4 s each; a stale `ledger.json` in the output dir silently skips files, so a true
-re-sweep needs a fresh output dir.
+With JPWB's runner, from the JPWB root (§7 has the procedure): `bun run sonar:scan -- --out <new
+folder> --all` analyses every file of `scripts/sonar/scope-census.json`, which `bun run sonar:census`
+writes from `sonar-project.properties`; `--files <list>` analyses named census files. The runner
+refuses (exit 2) an engine other than the matrix's pins, a rule set the engine cannot run, a server
+whose echo of the rules, the scope settings or the tsconfigs differs from what it was given, and a used folder.
+Each run writes into a new, empty folder (`--resume` reuses a result only for unchanged bytes), so a
+stale ledger can no longer skip files in silence: a listed file with no fresh result is named, exit 4.
 
-⚠ The tooling's hardcoded machine paths ROT: as of 2026-08-20, `driver.js` pins a SonarLint
-extension version that no longer exists (auto-updated away), so the ad-hoc single-file path is
-broken until its constants are re-pointed per guide §2. Verify the extension path before a
-campaign, not during one.
+Machine paths come from `scripts/toolchain/machine-paths.json` (profile-relative) and the engine's
+versions from the matrix's Sonar rows, which `toolchain:check` and the runner check; so the 2026-08-20
+warning that the tooling's "hardcoded machine paths ROT" is answered, and the engine moves only by a
+governed re-baseline (JAN-SONARCM D-4).
 
 ## 3. The JPWB gate per remediation batch
 
@@ -56,14 +56,14 @@ edit-only (guide §4.1, learned the hard way). Package manager is **bun** — np
 
 1. `bun run check-types` — includes `verif/` and `scripts/` tsconfigs; both are part of the tell
    when an instrument edit breaks.
-2. Re-sonar the changed files against the pre-batch baseline: targeted findings cleared AND no
-   introduced findings (decompositions routinely spawn S107/S7778/S6551/S2301).
+2. Re-scan the changed files and compare them with the pre-batch run (`sonar:scan --files`, then
+   `sonar:compare`): targeted findings cleared AND none introduced (decompositions spawn S107/S7778/S6551/S2301).
 3. `bunx vitest run` on the affected projects; `bun run test` for a full pass.
 4. `bunx vitest run --project=verif verif/mutant-ledger.test.ts` — **non-negotiable whenever any
    file carrying a ledger anchor was touched** (see §4).
-5. `bun run boundary`; `bun run csaa:inventory:check` when any provenance-listed file changed
-   (regenerate with `bun run csaa:inventory` — inventory drift is expected whenever docs or
-   provenance-listed sources change).
+5. `bun run boundary`. ~~`bun run csaa:inventory:check` when any provenance-listed file changed~~:
+   that script left JPWB with CSAA (`verif/csaa/DISPOSITION.md:41`), so this step no longer runs it;
+   and `bun run sonar:census` when a file entered or left the scope (its test names the file otherwise).
 6. A claim of the FULL gate additionally requires playwright (`e2e`) — vitest alone is not the
    full gate.
 
@@ -124,3 +124,60 @@ as register precedent. In practice:
   gate csaa's cost, and moved no mutation anchor (the one attempt that would have, was reverted
   and redesigned). Register: REG-F-180's sonar-adjacent bullets.
 - Sibling-repo methodology provenance: ~660 fixes in janumicode_v2 (guide §9).
+- **2026-11-12..13** (cycle 6: `e31c2f8a`, `a318be36`, `e299baef`): the first sweep in 86 days
+  found 512 findings in 126 files; Tiers A/B, C and D left 176, of which 24 are refused at their
+  sites and 152 await a fix package or an exception (JAN-SONARCM D-10). The lead's record is in
+  [`sonar-cycles/cycle-6/`](sonar-cycles/cycle-6/README.md), byte for byte, and the cycle's
+  hand-written tools are kept as records in [`sonar-cycles/cycle-6/tools/`](sonar-cycles/cycle-6/tools/README.md).
+- **2026-11-17** (JAN-SONARCM S1): the runner, the rule set and the scope census move into JPWB
+  (§7). The engine of record is SonarLint 6.3.0: language server 6.3.0.79979, SonarJS 14.4.0.46458.
+
+## 7. The runner (JAN-SONARCM S1)
+
+**What pins a result (J2).** Three committed inputs, each recorded in every run (the engine by its versions,
+the rule set and the census by their hashes):
+- *The engine.* The SonarLint extension the matrix's `sonarlint` row pins, and the three rows it
+  bundles, `check: "runner"`: the language server, SonarJS and the JRE (`scripts/toolchain/matrix.json`).
+  The runner takes the extension whose own `package.json` names the pinned version, never the highest
+  installed, and refuses a bundle that differs, naming both versions; it reads SonarJS's version again
+  from the server's own "Plugin version" line. The extension's folder and layout come from
+  `scripts/toolchain/machine-paths.json`. The bridge runs on the Node that runs the runner, which must be
+  the matrix's day-to-day Node: run the runner with node, never Bun.
+- *The rule set.* `scripts/sonar/rules.json`: the rules the engine runs, in the repositories it governs
+  (TypeScript, JavaScript and Secrets: the ones that report on the scope's files), and any parameters.
+  At each run the runner asks the server for its defaults (`sonarlint/listAllRules`), holds the server's
+  first configuration request until it has them, and sends the differences: listed rules off by
+  default, on; defaults not listed, off; the parameters. It refuses a listed rule the engine does not
+  have, a server whose echo ("Global settings updated") differs from what was sent, and an analysis whose
+  active-rule count in a governed repository differs from the rule set's.
+- *The scope.* `scripts/sonar/scope-census.json`, written by `bun run sonar:census` from
+  `sonar-project.properties` and the tracked files: the files in scope and the tsconfigs the properties'
+  globs match. The runner gives the server those globs (`sonar.typescript.tsconfigPaths`) and the test
+  pattern, and refuses when the server echoes other scope settings ("WorkspaceFolderSettings") or reports
+  finding other tsconfigs (without the globs it finds SvelteKit's generated one among 17; with them, the
+  14 tracked ones).
+
+**Commands**, from the JPWB root:
+- `bun run sonar:census` after a file in `packages/`, `apps/`, `verif/` or `scripts/` is added, removed
+  or renamed; `verif/sonar-runner.test.ts` fails, naming the file, until the census is rewritten.
+- `bun run sonar:scan -- --out <new folder> --all` for a full sweep; `--files <list>` (paths, one per
+  line) for named census files; `--resume` to reuse an earlier run's results in that folder for files whose
+  bytes, engine, rule set and census are unchanged; `--rules <file>` for a control rule set (recorded).
+- `bun run sonar:compare -- <before folder> <after folder> [--files <list>] [--fail-on-introduced]`: what
+  a change cleared and introduced, matched per file by rule and message. It refuses runs under different
+  engines or rule sets (J3) and a run that does not record its engine, rule set or census (J2).
+
+**What a run writes**, into its folder: `run.json` (the tree's commit, the Node, the engine, the rule set's
+hash, what was sent and the server's echo, the active-rule counts, the census's hash, the scope settings and
+their echo, the server's tsconfig list, and each file's status), `results.json` (each file's findings and the hash of the bytes
+analysed), `ls-log.txt` (everything the server logged) and `catalogue.json` (the server's rule list).
+
+**Exit codes.** 0, every listed file analysed; 2, refused (the engine, the Node, the rule set, the scope,
+an echo that differs, a used folder, or usage), with the reason in `run.json` when the server had
+started; 3, nothing analysable; 4, a listed file not analysed, each named in `run.json` (J4).
+
+**Changing what pins a result.** The engine moves only by a governed re-baseline (JAN-SONARCM D-4):
+detecting drift is not permission to adopt a new engine. The rule set is a reviewed change; a rule
+removed is a class of finding no longer looked for, never a way to silence one finding (that is an
+exception, §5). The scope is `sonar-project.properties`, then the census; narrowing it needs a register
+entry (§1).

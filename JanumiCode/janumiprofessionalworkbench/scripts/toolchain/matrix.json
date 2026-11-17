@@ -649,6 +649,30 @@
 			"detail": "The SonarLint extension the Sonar runner drives (~/.devin/extensions), bundling SonarJS 14.4.0.46458 and its JRE 21.0.12.1. It decides no gate:fast step today (D-9); JAN-SONARCM's runner checks it again at run time."
 		},
 		{
+			"component": "sonarlint-language-server",
+			"group": "Sonar runner (machine)",
+			"check": "runner",
+			"observed": "6.3.0.79979",
+			"date": "2026-11-17",
+			"detail": "The language server the SonarLint extension bundles (its package.json jarDependencies, sonarlint-language-server). scripts/sonar/batch-runner.cjs refuses any other at each run (JAN-SONARCM D-1, S1); toolchain:check judges the extension's version, which fixes it."
+		},
+		{
+			"component": "sonarjs",
+			"group": "Sonar runner (machine)",
+			"check": "runner",
+			"observed": "14.4.0.46458",
+			"date": "2026-11-17",
+			"detail": "SonarJS, the JavaScript and TypeScript analyzer the extension bundles (jarDependencies, sonar-javascript-plugin): the engine version a Sonar result is recorded and compared under (J2, J3). The runner refuses any other at each run, read from jarDependencies and again from the server's own \"Plugin version\" line."
+		},
+		{
+			"component": "sonarlint-jre",
+			"group": "Sonar runner (machine)",
+			"check": "runner",
+			"observed": "21.0.12.1",
+			"date": "2026-11-17",
+			"detail": "The JRE the extension bundles (its release file's JAVA_VERSION), which runs the language server; not the Java on PATH (the java row). The runner refuses any other at each run."
+		},
+		{
 			"component": "java",
 			"group": "host tools (G12)",
 			"check": "none",

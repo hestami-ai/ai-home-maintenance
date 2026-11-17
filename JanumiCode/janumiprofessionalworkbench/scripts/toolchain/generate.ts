@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { e2eBrowserFacts } from './e2e-browser.js';
 import { copiesOf, parseLockfile, type Lockfile } from './lockfile.js';
-import { parseMatrix } from './matrix.js';
+import { parseMatrix, type MachineCheck } from './matrix.js';
 import { externalDeclarations, makeReader, parseOverrides, readManifest, workspaceDirs, type TreeReader } from './tree.js';
 
 export const MATRIX_PATH = 'scripts/toolchain/matrix.json';
@@ -85,6 +85,14 @@ function cell(s: string): string {
 	return s.replaceAll('|', String.raw`\|`).replace(/\r?\n/g, ' ');
 }
 
+/** The page's Pin cell for a machine row, by what judges it (the first three as T0 wrote them). */
+const MACHINE_PIN: Readonly<Record<MachineCheck, string>> = {
+	none: 'observed',
+	major: 'observed, major checked',
+	version: 'observed, version checked',
+	runner: 'observed, checked by the Sonar runner'
+};
+
 /** The human page's table, rebuilt from the matrix text between its two markers. */
 export function regeneratePage(pageText: string, matrixText: string): string {
 	const m = parseMatrix(matrixText);
@@ -111,7 +119,7 @@ export function regeneratePage(pageText: string, matrixText: string): string {
 		);
 	}
 	for (const t of m.machine) {
-		const pin = t.check === 'none' ? 'observed' : `observed, ${t.check} checked`;
+		const pin = MACHINE_PIN[t.check];
 		lines.push(`| ${cell(t.component)} | ${cell(t.group)} | ${pin} | ${cell(t.observed)} (${t.date}) | — | ${cell(t.detail)} |`);
 	}
 	const e = m.e2eBrowser;
