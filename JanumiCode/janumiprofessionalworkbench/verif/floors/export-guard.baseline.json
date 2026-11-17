@@ -17,12 +17,16 @@
 			"consumedExports": [
 				"DEFAULT_CONTEXT_ASSEMBLY_POLICY",
 				"DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID",
+				"LOOP_CONTEXT_ASSEMBLY_POLICY",
+				"LOOP_CONTEXT_ASSEMBLY_POLICY_ID",
 				"permits",
 				"resolveContextAssemblyPolicy"
 			],
 			"guardedExports": [
 				"DEFAULT_CONTEXT_ASSEMBLY_POLICY",
 				"DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID",
+				"LOOP_CONTEXT_ASSEMBLY_POLICY",
+				"LOOP_CONTEXT_ASSEMBLY_POLICY_ID",
 				"permits",
 				"resolveContextAssemblyPolicy"
 			],

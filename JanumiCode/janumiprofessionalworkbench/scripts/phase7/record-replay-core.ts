@@ -68,6 +68,7 @@ import { freeTierRefusalsIn } from '../../apps/rph-demo/src/lib/server/replay/re
 import { FREE_TIER_REFUSALS_OPENING, type FreeTierRefusals } from '../../apps/rph-demo/src/lib/server/tools/free-tier-refusals.js';
 // ⭐⭐ Package Z2a — D51 — the decision model's requests, known by their identity. ⚠ A pure module.
 import { isDecisionModelExchange, unloadBody } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
+import { isAssuranceStageExchange } from '../../apps/rph-demo/src/lib/server/assurance/assurance-stage-roles.js';
 import { workspaceTreeSha256 } from './node-tests.js';
 import type { StoredObject, StoreRows } from './run-report-core.js';
 
@@ -121,6 +122,11 @@ export interface RecorderOutput {
 	readonly problems: readonly string[];
 	/** ⭐ How many of the run's reviewer calls were the authoring floor's, left out (`REG-D-112` (c)). */
 	readonly authoringCallsLeftOut: number;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D76 — how many of the run's exchanges were the assurance stage's, left out: its helpers'
+	 * EXECUTION ones and its narrative writer's ASSURANCE one (`isAssuranceStageExchange`).
+	 */
+	readonly assuranceStageCallsLeftOut: number;
 	/** The run's own scrub, for `verifyWrites` (which writes with the run's paths, so a tree hash compares). */
 	readonly pairs: readonly ScrubPair[];
 }
@@ -737,9 +743,15 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 		usedEvidence: new Set(),
 		problems: []
 	};
-	const exchanges = i.store.objects
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D76 — THE ASSURANCE STAGE'S EXCHANGES ARE LEFT OUT, and counted: a replay runs none of the stage's
+	// roles (`assurance-stage.ts`, `REPLAY_RUNS_NO_STAGE`), so a helper's EXECUTION exchange kept as an executor try would stand where the unit's next
+	// turn is served — a replay serves the tries strictly in order (`replay-run.ts`) — and the writer's ASSURANCE one would be kept as a reviewer call,
+	// its prompt full of ids a replay mints afresh. ⚠ Replaying the stage itself is not built.
+	const recorded = i.store.objects
 		.filter((o) => o.objectType === 'MODEL_EXCHANGE')
 		.sort(byRequest);
+	const assuranceStageCallsLeftOut = recorded.filter((e) => isAssuranceStageExchange(e.state)).length;
+	const exchanges = recorded.filter((e) => !isAssuranceStageExchange(e.state));
 	const executionRows = exchanges.filter((e) => e.state.plane === 'EXECUTION');
 	const assuranceRows = exchanges.filter(recordsAsReviewerCall);
 	// ⭐ `REG-D-112` (c) — counted, so the recorder can say what it left out and why.
@@ -786,7 +798,7 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 		x.problems.push('the run report holds no matrix, and a recording expects the run it records');
 	if (executionRows.length === 0) x.problems.push('the archive holds no executor try');
 	if (x.problems.length > 0 || typeof digest !== 'string' || Array.isArray(pwa))
-		return { recording: null, problems: x.problems, pairs, authoringCallsLeftOut };
+		return { recording: null, problems: x.problems, pairs, authoringCallsLeftOut, assuranceStageCallsLeftOut };
 	const none: RecordedIdentity = { agentId: '', modelId: '', providerId: '' };
 	return {
 		recording: {
@@ -814,7 +826,8 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 		},
 		problems: [],
 		pairs,
-		authoringCallsLeftOut
+		authoringCallsLeftOut,
+		assuranceStageCallsLeftOut
 	};
 }
 

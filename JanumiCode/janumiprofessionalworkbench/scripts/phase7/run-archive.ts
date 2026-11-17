@@ -121,6 +121,13 @@ export function workspaceDirectoryOf(storePath: string, undertakingId: string): 
 export const processOutputDirectoryOf = (workspace: string): string =>
 	`${workspace}.process-output`;
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4)) — the run's Pi sessions, as the server keeps them (`workspace-host.ts`,
+ * `durableSessionsRoot`): `<store>.sessions`, beside the workspaces — each unit's executor's, and the assurance stage's helpers'. ⚠ Restated, as
+ * `workspaceDirectoryOf` is.
+ */
+export const sessionsFolderOf = (storePath: string): string => resolve(`${storePath}.sessions`);
+
 /** What the server writes beside each folder when it purges something in it (`filesystem-workspace.ts`). */
 const TOMBSTONE_SUFFIX = '.jpwb-workspace-tombstones.json';
 
@@ -1136,6 +1143,8 @@ export interface UnitChecks {
 		readonly workspace: ArchivedFolder;
 		readonly processOutput: ArchivedFolder;
 		readonly tombstones: readonly string[];
+		/** ⭐⭐ Package L17b1 — design D85 — the run's sessions (`sessionsFolderOf`), copied as the workspace is, or their absence. */
+		readonly sessions: ArchivedFolder;
 	};
 }
 
@@ -1186,7 +1195,9 @@ export async function archiveUnit(r: ArchiveRequest): Promise<ArchiveOutcome> {
 			.map((kept) => {
 				copyFileSync(kept, join(r.archiveDir, basename(kept)), constants.COPYFILE_EXCL);
 				return basename(kept);
-			})
+			}),
+		// ⭐⭐ Package L17b1 — D85 — and the run's sessions, as the workspace is copied.
+		sessions: copyIfPresent(sessionsFolderOf(r.storePath), join(r.archiveDir, 'sessions'))
 	};
 	const captures = listCaptures(join(r.archiveDir, 'process-output', 'captures'));
 	const reader = contentReaderOf(content.present ? join(r.archiveDir, CONTENT_STORE) : null);

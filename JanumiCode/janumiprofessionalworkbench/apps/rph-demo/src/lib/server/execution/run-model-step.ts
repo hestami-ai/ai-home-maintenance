@@ -41,7 +41,8 @@ import {
 } from './execution-contract.js';
 import { governedToolCallReport } from '../tools/observed-tool-calls.js';
 import { stepCapabilityRefusal, type StepBinding } from './step-binding.js';
-import type { ProducerSession } from './producer-session.js';
+import type { ExecutorSessionPlace, ProducerSession } from './producer-session.js';
+import { CARRIED_FINDINGS_LINE } from './executor-session.js';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
 
@@ -116,6 +117,25 @@ export interface RunModelStepInput {
 	 * on the now-held session and use `priorFindings`.
 	 */
 	readonly carriedFindings?: readonly { readonly code: string; readonly statement: string }[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`) — WHAT THE PRODUCER'S SESSION ALREADY HOLDS WHEN THIS STEP'S FIRST TURN IS SENT:
+	 * nothing, as every session held in memory and a unit's first step; the unit's own earlier steps (its one file reopened); or the conversation of
+	 * the unit it replaces (forked). The first turn says so, and declares what it holds (`firstTurnSources`). ⛔ REQUIRED, `{ kind: 'NOTHING' }` said
+	 * where there is none — an optional field would let a caller skip saying what the model is shown.
+	 */
+	readonly sessionHolds: SessionHolds;
+	/**
+	 * ⭐⭐ Package L17b1 — design D77 — THE HOLISTIC FEEDBACK this step's first turn carries after its instruction, and after a re-run's findings
+	 * (`successor-feedback.ts`). Absent where there is none.
+	 */
+	readonly feedback?: TurnFeedback;
+	/**
+	 * ⭐⭐ Package L17b1 — the independent review's defect 1 — ON A TRY AFTER THE STEP'S FIRST: what the session held when the step began, and the feedback
+	 * its first turn carried. A session that keeps its history (`retainsHistory`) still holds both, so the try declares the other units' material in
+	 * them (`crossUnitSources`) — never says it: its turn is the repair turn, as before. Absent on the first try, which declares them through
+	 * `sessionHolds` and `feedback`.
+	 */
+	readonly stillHeld?: { readonly holds: SessionHolds; readonly feedback?: TurnFeedback };
 	/**
 	 * ⭑ CP-04 — the policy this deployment operates under, RESOLVED, not an id.
 	 *
@@ -213,9 +233,159 @@ export function assembledSources(
  * instruction. ⛔ Carried findings are ignored beside prior ones: a repair turn is on a session that already has a task.
  */
 function turnAssembles(input: RunModelStepInput): readonly ContextSourceRule[] {
+	// ⭐⭐ Package L17b1 — the independent review's defect 1 — and a later try on a session that keeps its history declares the other units' material
+	// that session still holds from before the step and from its first turn (`stillHeld`): a fork's conversation, D77's cross-unit feedback. Its own
+	// unit's earlier work its repair turn declares, as before. Every turn on a session that holds nothing of the kind is declared byte for byte as before.
+	const held = input.stillHeld !== undefined && input.session.retainsHistory ? crossUnitSources(input.stillHeld.holds, input.stillHeld.feedback) : [];
+	return unionOfSources(turnOwnSources(input), held);
+}
+
+/** What this turn itself assembles: a repair turn's held attempt, a first turn's holdings and carried material, or a re-run's carried findings. */
+function turnOwnSources(input: RunModelStepInput): readonly ContextSourceRule[] {
 	if (input.priorFindings?.length)
 		return assembledSources(input.priorFindings, input.session.retainsHistory);
+	// ⭐⭐ Package L17b1 — D85, `REG-D-169`, `REG-D-170` — a first turn on a session that already holds work, or one carrying D77's feedback,
+	// declares what it holds and carries (`firstTurnSources`); every other first turn is declared byte for byte as before.
+	if (input.sessionHolds.kind !== 'NOTHING' || input.feedback !== undefined)
+		return firstTurnSources(input.sessionHolds, input.carriedFindings ?? [], input.feedback);
 	return assembledSources(input.carriedFindings, false);
+}
+
+/** ⭐ Package L17b1 — `a`, then each pair of `b` not in it: one declaration per pair, in the order first declared. */
+function unionOfSources(a: readonly ContextSourceRule[], b: readonly ContextSourceRule[]): readonly ContextSourceRule[] {
+	const out = [...a];
+	for (const r of b) if (!out.some((x) => x.source === r.source && x.scope === r.scope)) out.push(r);
+	return out;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`) — WHAT A STEP'S SESSION HOLDS WHEN ITS FIRST TURN IS SENT (`RunModelStepInput`).
+ */
+export type SessionHolds =
+	| { readonly kind: 'NOTHING' }
+	| {
+			readonly kind: 'THIS_UNIT';
+			/** ⭐ The independent review's defect 8 — whether the unit's own earlier turns returned a work product: one stopped in a tool call did not. */
+			readonly returnedAnswer: boolean;
+			/** Whether its own earlier turns carried review findings (a repair turn's, RD8's). */
+			readonly ownFindings: boolean;
+			/** ⭐ The independent review's defect 1 — whether an earlier turn of its own carried D77's feedback, which may hold other units' findings. */
+			readonly crossUnitFeedback: boolean;
+			/** ⭐ The independent review's defect 1 — where the file began as a fork, the conversation it was forked from, which it still holds. */
+			readonly predecessor?: HeldPredecessor;
+	  }
+	| ({ readonly kind: 'PREDECESSOR' } & HeldPredecessor);
+
+/** ⭐ Package L17b1 — the conversation of the unit a session was forked from, which the session holds: whose, and what it holds. */
+export interface HeldPredecessor {
+	readonly title: string;
+	readonly unitId: string;
+	readonly heldFindings: boolean;
+	/** ⭐ The independent review's defect 8 — whether that conversation returned a work product. */
+	readonly returnedAnswer: boolean;
+}
+
+/**
+ * ⭐⭐ Package L17b1 — design D77 — the feedback a first turn carries, rendered; and whether it carries another unit's findings or the assurance
+ * stage's records, which it then declares as findings at THIS_UNDERTAKING (`REG-D-170`).
+ */
+export interface TurnFeedback {
+	readonly text: string;
+	readonly crossUnit: boolean;
+}
+
+/**
+ * ⭐⭐ Package L17b1 — D85, `REG-D-169` — WHAT A FIRST TURN ON A SESSION THAT HOLDS WORK, OR CARRYING D77's FEEDBACK, DECLARES: a re-run's carried
+ * finding; the unit's own earlier work product and rationale where its one session was reopened (`assembledSources(…, true)`'s pairs, as a repair
+ * turn on a remembering session declares them); and the cross-unit pairs where it carries another unit's material (`crossUnitSources`).
+ */
+export function firstTurnSources(
+	holds: SessionHolds,
+	carried: readonly unknown[],
+	feedback: TurnFeedback | undefined
+): readonly ContextSourceRule[] {
+	const own: ContextSourceRule[] = [];
+	if (carried.length > 0) own.push({ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' });
+	return unionOfSources(own, [...ownHeldSources(holds), ...crossUnitSources(holds, feedback)]);
+}
+
+/**
+ * ⭐⭐ Package L17b1 — the independent review's defect 8 — WHAT A SESSION'S OWN EARLIER TURNS HOLD, AS DECLARED, read from the file: the work product and
+ * rationale they returned, where they returned one — a try stopped in its first tool call returned none — and the findings they carried.
+ */
+function ownHeldSources(holds: SessionHolds): ContextSourceRule[] {
+	const own: ContextSourceRule[] = [];
+	if (holds.kind !== 'THIS_UNIT') return own;
+	if (holds.returnedAnswer)
+		own.push({ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' }, { source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' });
+	if (holds.ownFindings) own.push({ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' });
+	return own;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — `REG-D-170` — THE ONE PLACE A TURN DECLARES ANOTHER UNIT'S RATIONALE OR FINDINGS (PRIOR_RATIONALE and
+ * PRIOR_REVIEW_FINDING at THIS_UNDERTAKING), which the policy every new binding names permits (`LOOP_CONTEXT_ASSEMBLY_POLICY`): a forked successor's
+ * first turn — its predecessor's work product and rationale, and its findings where that conversation held any — and a turn carrying D77's feedback
+ * from another unit or the assurance stage. ⭐ The independent review's defect 1 — and every later turn on a session that still holds either: a later
+ * try on one that keeps its history (`stillHeld`), a later step on a reopened fork, or on a file an earlier turn of which carried the feedback. ⭐ Its
+ * defect 8 — another unit's work product and rationale only where its conversation returned one. ⛔ NO OTHER TURN: the census holds it
+ * (`verif/context-pair-census.test.ts`).
+ */
+export function crossUnitSources(holds: SessionHolds, feedback: TurnFeedback | undefined): readonly ContextSourceRule[] {
+	const out: ContextSourceRule[] = [];
+	// ⭐ The independent review's defect 1 — the predecessor's conversation the session holds: a fork's, and a reopened fork's still.
+	const theirs = holds.kind === 'PREDECESSOR' ? holds : holds.kind === 'THIS_UNIT' ? holds.predecessor : undefined;
+	if (theirs !== undefined) {
+		// ⭐ The independent review's defect 8 — its work product and rationale where it returned them.
+		if (theirs.returnedAnswer)
+			out.push({ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_UNDERTAKING' }, { source: 'PRIOR_RATIONALE', scope: 'THIS_UNDERTAKING' });
+		if (theirs.heldFindings) out.push({ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' });
+	}
+	// ⭐ The independent review's defect 1 — D77's feedback this turn carries, or an earlier turn of the reopened file carried.
+	const heldFeedback = holds.kind === 'THIS_UNIT' && holds.crossUnitFeedback;
+	if ((feedback?.crossUnit === true || heldFeedback) && !out.some((r) => r.source === 'PRIOR_REVIEW_FINDING'))
+		out.push({ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' });
+	return out;
+}
+
+/**
+ * ⭐⭐ Package L17b1 — D85 (`REG-D-169`) — WHAT A SESSION HOLDS, FROM WHERE IT IS KEPT AND HOW IT OPENS: nothing in memory or in a new file; the unit's
+ * earlier steps in its reopened file; its predecessor's conversation in a fork, titled by `titleOf`.
+ */
+export function sessionHoldsOf(place: ExecutorSessionPlace, titleOf: (unitId: string) => string): SessionHolds {
+	if (place.kind === 'IN_MEMORY') return { kind: 'NOTHING' };
+	const opening = place.opening;
+	// ⭐ The independent review's defects 1 and 8 — a reopened file holds what it was read to hold (`sessionFileHoldings`): its own answer or none, its
+	// findings, D77's feedback, and the conversation it was forked from, where it began as a fork.
+	if (opening.kind === 'REOPEN') {
+		const held = opening.held;
+		const theirs = held.forkedFrom;
+		return {
+			kind: 'THIS_UNIT',
+			returnedAnswer: held.returnedAnswer,
+			ownFindings: held.ownFindings,
+			crossUnitFeedback: held.crossUnitFeedback,
+			...(theirs === undefined
+				? {}
+				: {
+						predecessor: {
+							title: titleOf(theirs.predecessorId),
+							unitId: theirs.predecessorId,
+							heldFindings: theirs.heldFindings,
+							returnedAnswer: theirs.returnedAnswer
+						}
+					})
+		};
+	}
+	if (opening.kind === 'FORK')
+		return {
+			kind: 'PREDECESSOR',
+			title: titleOf(opening.predecessorId),
+			unitId: opening.predecessorId,
+			heldFindings: opening.heldFindings,
+			returnedAnswer: opening.returnedAnswer
+		};
+	return { kind: 'NOTHING' };
 }
 
 /**
@@ -253,6 +423,56 @@ function firstTurn(
 	].join('\n');
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`, the sponsor's ruling: a unit's later step continues its saved conversation) — A FIRST
+ * TURN ON A SESSION THAT ALREADY HOLDS WORK: the instruction, then — in place of RD8's *"This is a fresh session: …"* — what the session holds, then
+ * what to do. ⭑ On the session held in memory (`firstTurn`), RD8's words byte for byte.
+ */
+function heldFirstTurn(
+	instruction: string,
+	carried: readonly { readonly code: string; readonly statement: string }[],
+	holds: Exclude<SessionHolds, { readonly kind: 'NOTHING' }>
+): string {
+	const findings = carried.length === 0 ? [] : ['', CARRIED_FINDINGS_LINE, ...carried.map((f) => `- ${f.code}: ${f.statement}`)];
+	let held: string;
+	// ⭐ The independent review's defect 8 — what the session holds, as the file was read: a work product returned, or none — a try stopped in its first
+	// tool call returned none, and is never said to have.
+	if (holds.kind === 'PREDECESSOR')
+		held =
+			`This session holds the conversation of the unit this one replaces, "${holds.title}" (${holds.unitId}): the turns above are its work, ` +
+			(holds.returnedAnswer
+				? 'with the work product it returned, its rationale and any review findings it was given.'
+				: 'which stopped before it returned a work product, with any review findings it was given.') +
+			' That work was superseded, and this unit takes its place.';
+	else if (carried.length > 0)
+		held =
+			'This session holds that attempt: the turns above are your earlier work on this unit, ' +
+			(holds.returnedAnswer ? 'with the work product you returned and your rationale.' : 'which stopped before it returned a work product.');
+	else
+		held = holds.returnedAnswer
+			? 'This session holds your earlier attempt at this work: the turns above, with the work product you returned and your rationale. ' +
+				'That attempt stopped before it was accepted.'
+			: 'This session holds your earlier attempt at this work: the turns above. That attempt stopped before it returned a work product.';
+	let ask: string[];
+	if (carried.length > 0)
+		ask = [
+			'Produce the work product again, addressing these findings. Do not argue with them and do not',
+			'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+		];
+	else if (holds.kind === 'PREDECESSOR')
+		ask = ['Produce this unit’s work product for the instruction above; files that work wrote may still be in the workspace.'];
+	else ask = ['Produce the work product for the instruction above; files your earlier attempt wrote may still be in the workspace.'];
+	return [instruction, ...findings, '', held, ...ask].join('\n');
+}
+
+/** ⭐⭐ Package L17b1 — the first turn: RD8's on a session that holds nothing (`firstTurn`), else what the session holds; then D77's feedback. */
+function firstTurnFor(instruction: string, input: RunModelStepInput): string {
+	const carried = input.carriedFindings ?? [];
+	const head =
+		input.sessionHolds.kind === 'NOTHING' ? firstTurn(instruction, carried) : heldFirstTurn(instruction, carried, input.sessionHolds);
+	return input.feedback === undefined ? head : `${head}\n\n${input.feedback.text}`;
+}
+
 /** The turn this call sends: a repair turn when prior findings arrived, otherwise `firstTurn`. */
 function stepTurnText(input: RunModelStepInput, instruction: string): string {
 	return input.priorFindings?.length
@@ -263,7 +483,7 @@ function stepTurnText(input: RunModelStepInput, instruction: string): string {
 				'Produce the work product again, addressing these findings. Do not argue with them and do not',
 				'restate them back; if you believe a finding is mistaken, say so in your rationale.'
 			].join('\n')
-		: firstTurn(instruction, input.carriedFindings ?? []);
+		: firstTurnFor(instruction, input);
 }
 
 /** A thrown value's message: an Error's own message, anything else stringified. */

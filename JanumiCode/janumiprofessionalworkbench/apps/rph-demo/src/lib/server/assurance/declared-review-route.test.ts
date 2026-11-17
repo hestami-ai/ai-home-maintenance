@@ -85,8 +85,9 @@ vi.mock('../execution/model.js', async (importOriginal) => {
 				}
 			});
 			// ⭑ THE REAL SESSION, its `processRuns` reporting what a case scripted (`seam.observed`), else what it saw.
-			return async (context: Parameters<typeof open>[0]) => {
-				const session = await open(context);
+			// ⭐ Package L17b1 — D85 (reading 3) — the opener's second argument, where its session is kept, passed through.
+			return async (context: Parameters<typeof open>[0], place: Parameters<typeof open>[1]) => {
+				const session = await open(context, place);
 				return {
 					...session,
 					processRuns: () =>

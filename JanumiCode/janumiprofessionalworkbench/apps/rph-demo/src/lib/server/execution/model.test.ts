@@ -26,7 +26,7 @@ import { createInMemoryWorkspace, createRefusingProcessRunner } from '@janumipwb
 import { agyPrint, type AgyExec } from '../assurance/agy-cli.js';
 import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
 import { deterministicExecutionPrint, getExecutionSession } from './model.js';
-import { oneShotSession, type ProducerSessionContext } from './producer-session.js';
+import { IN_MEMORY_SESSION, oneShotSession, type ExecutorSessionPlace, type ProducerSessionContext } from './producer-session.js';
 
 /** The sandbox an opener is handed. ⚠ IN_MEMORY + REFUSING is the hermetic pairing every spec runs under:
  *  no spec gains a real filesystem or a real child process, which is why the defaults exist. */
@@ -84,7 +84,7 @@ describe('⭐ D2 — the agy executor runs the model its selection names (REG-F-
 		const session = await getExecutionSession(
 			{ kind: 'AGY', modelId: EXECUTOR_MODEL },
 			{ agyExec: capturingExec(argv) }
-		)(SANDBOX);
+		)(SANDBOX, IN_MEMORY_SESSION);
 		await session.turn('Assess the northern route.');
 		expect(argv).toHaveLength(1);
 		const args = argv[0]!;
@@ -113,7 +113,7 @@ describe('⭐ D2 — the agy executor runs the model its selection names (REG-F-
 		const session = await getExecutionSession(
 			{ kind: 'AGY', modelId: EXECUTOR_MODEL },
 			{ agyExec: capturingExec([], executorOptions) }
-		)(SANDBOX);
+		)(SANDBOX, IN_MEMORY_SESSION);
 		await session.turn('Assess the northern route.');
 		expect(judgeOptions).toHaveLength(1);
 		expect(executorOptions).toHaveLength(1);
@@ -134,7 +134,7 @@ describe('⭐ D2 — the agy executor runs the model its selection names (REG-F-
 		const session = await getExecutionSession(
 			{ kind: 'AGY', modelId: EXECUTOR_MODEL },
 			{ agyExec: capturingExec(argv) }
-		)(SANDBOX);
+		)(SANDBOX, IN_MEMORY_SESSION);
 		await expect(session.turn('Assess the northern route.')).resolves.toBeTypeOf('string');
 		expect(argv).toHaveLength(1);
 	});
@@ -143,7 +143,7 @@ describe('⭐ D2 — the agy executor runs the model its selection names (REG-F-
 		const session = await getExecutionSession(
 			{ kind: 'AGY', modelId: EXECUTOR_MODEL },
 			{ agyExec: capturingExec([]) }
-		)(SANDBOX);
+		)(SANDBOX, IN_MEMORY_SESSION);
 		expect(session.retainsHistory).toBe(false);
 	});
 });
@@ -162,7 +162,7 @@ describe('⛔ a selection nobody wired opens NOTHING', () => {
 			reason: 'fixture reason',
 			guidance: 'fixture guidance'
 		} as unknown as Parameters<typeof getExecutionSession>[0];
-		await expect(getExecutionSession(leaked, { agyExec, openPi })(SANDBOX)).rejects.toThrow(
+		await expect(getExecutionSession(leaked, { agyExec, openPi })(SANDBOX, IN_MEMORY_SESSION)).rejects.toThrow(
 			/No executor is wired for the selection/
 		);
 		expect(agyExec).not.toHaveBeenCalled();
@@ -193,7 +193,7 @@ describe('⭐ PER-12 — a failed agy executor call carries no prompt content in
 		const session = await getExecutionSession(
 			{ kind: 'AGY', modelId: EXECUTOR_MODEL },
 			{ agyExec: rejectingExec }
-		)(SANDBOX);
+		)(SANDBOX, IN_MEMORY_SESSION);
 		let msg = '';
 		await Promise.resolve(session.turn(PROMPT)).catch((e: Error) => (msg = e.message));
 		return msg;
@@ -243,9 +243,12 @@ describe('⭐ D4 — Pi is opened with the selection’s model, and only when th
 			'Pi was opened on selection, before the opener was called'
 		).not.toHaveBeenCalled();
 
-		const session = await opener(SANDBOX);
+		// ⭐⭐ Package L17b1 — D85 (reading 3, as ruled) — RESTATED: the opener is handed where its session is kept, its second argument, and passes it
+		// on to Pi's. ~~`opener(SANDBOX)`~~; ~~`toHaveBeenCalledWith(SANDBOX, 'fixture-pi-model')`~~ — the selection's model and the sandbox, as before,
+		// and now the place beside them.
+		const session = await opener(SANDBOX, IN_MEMORY_SESSION);
 		expect(openPi).toHaveBeenCalledTimes(1);
-		expect(openPi).toHaveBeenCalledWith(SANDBOX, 'fixture-pi-model');
+		expect(openPi).toHaveBeenCalledWith(SANDBOX, 'fixture-pi-model', IN_MEMORY_SESSION);
 		expect(session).toBe(opened);
 		expect(agyExec, 'a Pi selection reached agy').not.toHaveBeenCalled();
 	});
@@ -322,7 +325,7 @@ describe('⭐ the STAND-IN — the gate’s fixture executor survives, and is pr
 		// agy session also passed, inside a helper that never awaited its assertion — so it could not fail.
 		const agyExec = vi.fn(capturingExec([]));
 		const openPi = vi.fn(async () => oneShotSession(async () => 'unused'));
-		const session = await getExecutionSession({ kind: 'STAND_IN' }, { agyExec, openPi })(SANDBOX);
+		const session = await getExecutionSession({ kind: 'STAND_IN' }, { agyExec, openPi })(SANDBOX, IN_MEMORY_SESSION);
 		const answer = await session.turn('Assess the northern route against the safety rubric.');
 		expect(typeof answer, 'the fixture answers with a bare string').toBe('string');
 		const parsed = JSON.parse(answer as string) as {
@@ -361,5 +364,30 @@ describe('⭐ the STAND-IN — the gate’s fixture executor survives, and is pr
 			parsed.rationale?.rationale,
 			'the fixture must honour the execution contract'
 		).toBeTruthy();
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4)) — THE PLACE A UNIT'S SESSION IS KEPT REACHES PI'S OPENER AS IT WAS HANDED, and no
+// other executor is handed it: the stand-in's, agy's and a replay's keep no session.
+describe('⭐⭐ L17b1 (D85) — the opener passes the session’s place on to Pi’s, untouched', () => {
+	it('⛔ RED FIRST — a durable place, a fork’s, reaches Pi’s opener as it was handed', async () => {
+		const opened = oneShotSession(async () => 'unused');
+		const openPi = vi.fn(async () => opened);
+		const place: ExecutorSessionPlace = {
+			kind: 'DURABLE',
+			folder: 'C:/run/demo.sqlite.sessions/executor/pwu_new',
+			opening: {
+				kind: 'FORK',
+				from: 'C:/run/demo.sqlite.sessions/executor/pwu_old/a.jsonl',
+				predecessorId: 'pwu_old',
+				heldFindings: false,
+				// ⭐ The review's defect 8 — the place says whether the forked conversation returned a work product; the opener passes it on untouched.
+				returnedAnswer: true
+			}
+		};
+
+		await getExecutionSession({ kind: 'PI', modelId: 'fixture-pi-model' }, { openPi, agyExec: vi.fn(capturingExec([])) })(SANDBOX, place);
+
+		expect(openPi, 'the place did not reach Pi’s opener as it was handed').toHaveBeenCalledWith(SANDBOX, 'fixture-pi-model', place);
 	});
 });

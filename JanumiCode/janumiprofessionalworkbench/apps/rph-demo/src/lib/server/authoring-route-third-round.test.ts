@@ -212,6 +212,10 @@ describe('⭐⭐ L12 — D67, through the route and the product’s floor: the t
 	// (`l12-facts.md` §4 item 3: the same in two runs, and under the prototype). Only a round HEAD never makes is new; the reviewer's
 	// template is unchanged (`reviewer:qual:check`, the fingerprint aba310bd…). ⭑ Its own mutant: a round after a refinement shown no
 	// account (`P6X-L12-M12`), which moves the second round's prompts.
+	// ⭐ RESTATED 2026-11-16 (`JAN-EXEC` Phase 7, package L17b1 — `REG-D-170`): the six values re-measured, each old one kept struck beside it. The seed
+	// now records a second context assembly policy (`ctx-default-loop`) before this file's first command, and each prompt's one host-computed line,
+	// "The candidate's subject hash (host-computed): …" — a hash over the stored PWA and its types, objects the store stamps — moved with it. Every other
+	// byte of every prompt is HEAD's: measured, all 24 of this file's prompts equal to HEAD's with that one hash masked, none equal without it.
 	it('⭑ CONTROL — the reviewer prompts of the first two rounds are HEAD’s, byte for byte', async () => {
 		const pwaId = draftPwa();
 
@@ -222,12 +226,18 @@ describe('⭐⭐ L12 — D67, through the route and the product’s floor: the t
 			seam.reviews.filter((r) => r.round <= 2).map((r) => [r.round, r.typeName, sha256(r.prompt)]),
 			'a reviewer prompt of the first two rounds is not HEAD’s, byte for byte'
 		).toEqual([
-			[1, 'Realize', '3aed56599538c482ca8dc1e1d8f83b77fad998f8eaf6f22eb6fcb2060eaec3a4'],
-			[1, 'Check', 'eb7d546657d7bc4348b089327947f1f35ec3ba0f17e33ed556e65c0e47dda811'],
-			[2, 'Realize', '3ad1a328e37810b5a19e7767ce114d126f76457c8ef86476c0171649ca511633'],
-			[2, 'Check', '5eaff24a86ef45e6fa9a1062a7fc6b6e82e08e46013ff8286c87d1415a357925'],
-			[2, 'Product Realization', 'e2ba3e63bd8147c6f313c3d961d481484c8eb3fc75c1681fb7b082833b4056ec'],
-			[2, 'Architecture Definition', '14813b924e99bbbc9ae42e5d5ca29a6dc7bb4091d3d04232dd3a345b99d6e471']
+			// ~~'3aed56599538c482ca8dc1e1d8f83b77fad998f8eaf6f22eb6fcb2060eaec3a4'~~
+			[1, 'Realize', '6bc5f11025ddd7afd9c634e036fa5c97342020097585c4cf39bb5d61ceee3611'],
+			// ~~'eb7d546657d7bc4348b089327947f1f35ec3ba0f17e33ed556e65c0e47dda811'~~
+			[1, 'Check', '216f0ac06cba6b057e49484d1d590ecacd618457f69f769836093c21bfc7d9f3'],
+			// ~~'3ad1a328e37810b5a19e7767ce114d126f76457c8ef86476c0171649ca511633'~~
+			[2, 'Realize', 'e637b461062676620eaef620ebfb2cbbc39c5617573e23c1a24bbb29c611367d'],
+			// ~~'5eaff24a86ef45e6fa9a1062a7fc6b6e82e08e46013ff8286c87d1415a357925'~~
+			[2, 'Check', '57640a8ff795611387060d285dcac804545a3d33b245090d3a2e2d600a82c9f9'],
+			// ~~'e2ba3e63bd8147c6f313c3d961d481484c8eb3fc75c1681fb7b082833b4056ec'~~
+			[2, 'Product Realization', 'ab2c8df2320770229e044492d132ef47979a3494d6a6933eda2db84fc2dd307f'],
+			// ~~'14813b924e99bbbc9ae42e5d5ca29a6dc7bb4091d3d04232dd3a345b99d6e471'~~
+			[2, 'Architecture Definition', 'b0804ea2dd6d49cca2857d1c9152a5ee260f1c17b0cfe886cbcc02211ac9efb8']
 		]);
 	});
 });

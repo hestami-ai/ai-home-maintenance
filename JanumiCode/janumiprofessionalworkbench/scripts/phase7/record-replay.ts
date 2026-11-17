@@ -341,6 +341,12 @@ export function main(
 			`left out ${built.authoringCallsLeftOut} reviewer call(s) of the authoring floor: the replay covers the ` +
 				'execution half from the published PWA, which the recording holds (REG-D-112 (c))'
 		);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D76 — and the assurance stage's, named: a replay runs none of its roles.
+	if (built.assuranceStageCallsLeftOut > 0)
+		say(
+			`left out ${built.assuranceStageCallsLeftOut} exchange(s) of the assurance stage (its narrative writer and its helpers): a replay ` +
+				'runs none of the stage’s roles, and replaying the stage itself is not built (design D74 to D76)'
+		);
 	if (built.recording === null) {
 		say(
 			`refused, and nothing was written — the run cannot be read whole into a recording:\n  ${built.problems.join('\n  ')}`

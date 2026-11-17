@@ -191,9 +191,17 @@ export async function joinProcessEvidence(
 		readonly propose: (evidenceId: string, payload: Record<string, unknown>) => string | null;
 		/** Reads an object back after `propose` committed it — the floor needs its stored semantic version. */
 		readonly getObject: (id: string) => Record<string, unknown> | undefined;
+		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D74, D75 (the lead's ruling on reading 9) — STEPS 1 AND 2 ALONE: the assurance stage's helpers'
+		 * commands are captured as a unit's are, and their floor is NOT run — the floor is a reasoning review per command, and a helper changes no work
+		 * and decides nothing (`proposeHelperEvidence`). Absent, the join is as it always was.
+		 */
+		readonly withoutFloor?: true;
 	}
-): Promise<{ joined: JoinedProcessEvidence[]; refusedBecause?: string }> {
+): Promise<{ joined: JoinedProcessEvidence[]; proposed: string[]; refusedBecause?: string }> {
 	const joined: JoinedProcessEvidence[] = [];
+	// ⭐ Package L17b1 — every evidence object this join proposed, in order: the floorless mode's whole result, and beside the joined runs otherwise.
+	const proposed: string[] = [];
 	for (const run of input.runs) {
 		// 1. THE PARTICIPATING MINT. ⛔ NOT a re-label of the runner's capture: the runner's own header forbids
 		// it — *"a later phase that PERSISTS the outcome must persist the REFERENCE and not the bytes, or it
@@ -225,6 +233,7 @@ export async function joinProcessEvidence(
 		if (meta === undefined)
 			return {
 				joined,
+				proposed,
 				// ⛔ NOT A WARNING. The store accepted the bytes one line ago and cannot describe them, so nothing
 				// here can say what was retained or under what class — and an evidence object whose own content
 				// reference is a guess is worse than no evidence object.
@@ -291,7 +300,9 @@ export async function joinProcessEvidence(
 			limitations: processResultLimitations(run),
 			capturedAt: opts.now()
 		});
-		if (refused !== null) return { joined, refusedBecause: refused };
+		if (refused !== null) return { joined, proposed, refusedBecause: refused };
+		proposed.push(evidenceId);
+		if (opts.withoutFloor === true) continue;
 
 		// 3. ITS OWN FLOOR. ⛔ Not optional: an id named in `proposedEvidenceIds` with no floor makes the whole
 		// completion REJECT, with all three policies MISSING.
@@ -312,7 +323,29 @@ export async function joinProcessEvidence(
 			autoRefine: floor.remediation.autoRefine
 		});
 	}
-	return { joined };
+	return { joined, proposed };
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D74, D75 — THE ASSURANCE STAGE'S HELPERS' COMMANDS, CAPTURED AS A UNIT'S ARE, WITH NO FLOOR: each run's
+ * participating mint and its `OBSERVATION` evidence (the join's steps 1 and 2), its scope naming the helper and the round. ⚠ The fields only the
+ * floor reads — the producing exchange, prompt, provider and account — are not read in this mode, so none is asked for.
+ */
+export async function proposeHelperEvidence(
+	input: Pick<EvidenceJoinInput, 'runs' | 'scope' | 'tenantPrefix' | 'producerModelId'>,
+	opts: {
+		readonly artifacts: ArtifactStore;
+		readonly now: () => string;
+		readonly newId: (prefix: string) => string;
+		readonly propose: (evidenceId: string, payload: Record<string, unknown>) => string | null;
+	}
+): Promise<{ evidenceIds: string[]; refusedBecause?: string }> {
+	const result = await joinProcessEvidence(
+		{ ...input, exchange: {} as EvidenceJoinInput['exchange'], producingPrompt: '', producerProviderId: '' },
+		{} as AuthedEngineHandle,
+		{ ...opts, criteria: [], getObject: () => undefined, withoutFloor: true }
+	);
+	return { evidenceIds: result.proposed, ...(result.refusedBecause === undefined ? {} : { refusedBecause: result.refusedBecause }) };
 }
 
 /** The subject one joined run's floor reviews: the recorded evidence, the run, and the producing model's account. */

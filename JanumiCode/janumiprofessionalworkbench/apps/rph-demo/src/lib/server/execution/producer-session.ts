@@ -133,6 +133,47 @@ export interface ProducerSessionContext extends ProducerSessionPorts {
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4); `REG-D-169`) — WHERE A PI SESSION IS KEPT: in memory, as before, or as Pi's own
+ * session file in `folder` (`<D>.sessions/executor/<unit id>/`, or a helper's), opened as `opening` says. Decided from the folder before the session
+ * opens (`executor-session.ts`, `executorSessionPlaceOf`), and handed to the opener beside the context (`OpenProducerSession`).
+ */
+export type ExecutorSessionPlace =
+	| { readonly kind: 'IN_MEMORY' }
+	| { readonly kind: 'DURABLE'; readonly folder: string; readonly opening: SessionOpening };
+
+/**
+ * ⭐ D85 — how a durable session opens: a new file (a unit's first step; `predecessorWithoutSession` where it replaces a unit that left none); the
+ * unit's one file reopened (its later steps, `REG-D-169`); or its predecessor's forked (a replacement's first step), `heldFindings` saying whether
+ * that history held review findings (`REG-D-170`). ⭐ The independent review's defects 1 and 8 — and what the file holds, read before it opens: a
+ * reopened file's holdings (`held`), a fork's whether its conversation returned a work product (`returnedAnswer`).
+ */
+export type SessionOpening =
+	| { readonly kind: 'NEW'; readonly predecessorWithoutSession?: string }
+	| { readonly kind: 'REOPEN'; readonly file: string; readonly held: SessionFileHoldings }
+	| {
+			readonly kind: 'FORK';
+			readonly from: string;
+			readonly predecessorId: string;
+			readonly heldFindings: boolean;
+			readonly returnedAnswer: boolean;
+	  };
+
+/**
+ * ⭐⭐ Package L17b1 — the independent review's defects 1 and 8 — WHAT A SESSION FILE HOLDS, read from it (`executor-session.ts`,
+ * `sessionFileHoldings`): whether the unit's own turns returned a work product, carried review findings or carried D77's feedback; and, where the file
+ * began as a fork, whose conversation it was forked from and what that holds — which every turn on it still declares (`REG-D-170`).
+ */
+export interface SessionFileHoldings {
+	readonly returnedAnswer: boolean;
+	readonly ownFindings: boolean;
+	readonly crossUnitFeedback: boolean;
+	readonly forkedFrom?: { readonly predecessorId: string; readonly heldFindings: boolean; readonly returnedAnswer: boolean };
+}
+
+/** ⭐ D85 — a session held in memory, byte for byte as before package L17b1: the place where there is no durable store. */
+export const IN_MEMORY_SESSION: ExecutorSessionPlace = Object.freeze({ kind: 'IN_MEMORY' }) as ExecutorSessionPlace;
+
+/**
  * A directory a producer session may lawfully run in, or a stated reason there is none.
  *
  * ⛔ A UNION FOR THE SAME REASON `ProcessRunPlan` IS ONE: a shape with an optional error would let a caller read
@@ -143,7 +184,13 @@ export type ProducerWorkingDirectory =
 	| { readonly resolved: true; readonly directoryPath: string }
 	| { readonly resolved: false; readonly refusedBecause: string };
 
-export type OpenProducerSession = (context: ProducerSessionContext) => Promise<ProducerSession>;
+/**
+ * ~~`(context: ProducerSessionContext) => Promise<ProducerSession>`~~ ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4); `REG-D-169`)
+ * — AND WHERE ITS SESSION IS KEPT AND HOW IT OPENS (`place`): a required argument, `IN_MEMORY_SESSION` said where there is no durable store, for
+ * `grantedCapabilities`' reason. ⭑ Only Pi's opener reads it (`openPiExecutionSession`); the stand-in's, agy's and a replay's keep no session and
+ * take none.
+ */
+export type OpenProducerSession = (context: ProducerSessionContext, place: ExecutorSessionPlace) => Promise<ProducerSession>;
 
 /**
  * The ONLY sanctioned source of a producer session's working directory.

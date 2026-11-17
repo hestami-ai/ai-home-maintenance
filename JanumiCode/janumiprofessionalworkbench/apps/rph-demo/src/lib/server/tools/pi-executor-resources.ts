@@ -39,7 +39,9 @@
 //     no command ran, offline or not. ⭐ (R3-C) The live lanes' server sets `PI_OFFLINE` (`playwright.live-exec.config.ts`
 //     says what that changes), so there a missing package the agent folder's settings list is not fetched;
 //   · THE WORKING-DIRECTORY LINE names the server's folder, not the workspace: `pi-executor.ts` gives its session no
-//     folder (`SessionManager.inMemory()`), so the session takes `process.cwd()` (`dist/core/sdk.js`).
+//     folder (`SessionManager.inMemory()`), so the session takes `process.cwd()` (`dist/core/sdk.js`). ⭐ SETTLED for a durable store by
+//     `JAN-EXEC` Phase 7, package L17b1 (design D85): the session is Pi's own file, created, reopened or forked in the workspace it works
+//     in (`executorSessionManager`), so the line names that workspace; held in memory, as before, it still takes `process.cwd()`.
 // ⭐⭐ AND THE AUTHORING AGENT'S PI NOW TAKES THE SAME CLOSED OPTIONS (the lead's delegated decision of 2026-10-16,
 // registered as REG-D-114 (19); `REG-F-512`): `pi-agent.ts` builds its loader from `closedResourceLoaderOptions` with its own
 // system prompt, and its settings manager trusts no project. ⚠ IT CHANGES THE AUTHORING AGENT'S BEHAVIOUR: `pi-agent.ts`

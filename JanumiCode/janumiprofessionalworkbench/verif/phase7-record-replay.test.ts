@@ -1382,3 +1382,111 @@ describe('⭐ The merge of E12 and E4 (J3) — a DECLARED review’s reviewer ca
 		expect(built.problems).toEqual(['decision-model request 1 (mex_dm_c00): its body is no decision-model request (D51), so it cannot be keyed']);
 	});
 });
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D76 (the lead's ruling, confirmed: the recorder leaves out the assurance stage's exchanges, counted and named
+// beside `authoringCallsLeftOut`) — A REPLAY RUNS NONE OF THE STAGE'S ROLES, so a recording keeps none of their exchanges: a helper's EXECUTION exchange
+// kept as an executor try would stand where the unit's next turn is served (a replay serves the tries strictly in order), and the writer's ASSURANCE one
+// would be kept as a reviewer call.
+describe('⭐⭐ L17b1 (D76) — the assurance stage’s exchanges are left out of a recording, and counted', () => {
+	const row = (id: string, objectType: string, state: Record<string, unknown>, firstSequence: number) => ({ id, objectType, state, firstSequence });
+	const head = payloadHead('the-fixture-cwd');
+	const composite = (text: string): string =>
+		JSON.stringify({ tools: head.tools, input: [head.instructionsMessage, { role: 'user', content: [{ type: 'input_text', text }] }] });
+	const tryOf = (id: string, unitId: string, at: string, n: number) =>
+		row(
+			id,
+			'MODEL_EXCHANGE',
+			{
+				plane: 'EXECUTION',
+				subjectObjectId: unitId,
+				invokerId: 'execution.model-invocation:t',
+				requestedAt: at,
+				materializedInputRef: { status: 'STORED', storageKey: `payload-${id}` },
+				rawOutputBeforeCoercionRef: { status: 'STORED', storageKey: 'answer' },
+				observedToolCalls: { observation: 'OBSERVED', calls: [], observedCount: 0 }
+			},
+			n
+		);
+	const STAGE = [
+		row(
+			'mex_hypothesizer',
+			'MODEL_EXCHANGE',
+			{
+				plane: 'EXECUTION',
+				invokerId: 'assurance-stage.hypothesizer',
+				subjectObjectId: 'asm_round',
+				subjectObjectType: 'ASSURANCE_ASSESSMENT',
+				requestedAt: '2026-10-11T08:30:00.000Z',
+				materializedInputRef: { status: 'STORED', storageKey: 'payload-mex_hypothesizer' },
+				rawOutputBeforeCoercionRef: { status: 'STORED', storageKey: 'answer' },
+				observedToolCalls: { observation: 'OBSERVED', calls: [], observedCount: 0 }
+			},
+			3
+		),
+		row(
+			'mex_writer',
+			'MODEL_EXCHANGE',
+			{
+				plane: 'ASSURANCE',
+				invokerId: 'assurance-stage.narrative-writer',
+				assurancePolicyId: 'pol_historical_consistency',
+				subjectObjectId: 'asm_round',
+				subjectObjectType: 'ASSURANCE_ASSESSMENT',
+				exchangeRole: 'INITIAL',
+				disposition: 'ACCEPTED',
+				requestedAt: '2026-10-11T08:20:00.000Z',
+				respondedAt: '2026-10-11T08:20:05.000Z',
+				materializedInputRef: { status: 'STORED', storageKey: 'writer-prompt' },
+				rawOutputBeforeCoercionRef: { status: 'STORED', storageKey: 'writer-reply' },
+				parseOutcome: { outcome: 'PARSED' }
+			},
+			4
+		)
+	];
+	const inputWith = (stage: readonly ReturnType<typeof row>[]): RecorderInput => ({
+		store: {
+			objects: [
+				row('pwa', 'PROFESSIONAL_WORK_ARCHITECTURE', { publicationStatus: 'PUBLISHED', rootPwuTypeId: 'pwut' }, 1),
+				tryOf('mex_req', 'pwu_req', '2026-10-11T08:00:00.000Z', 2),
+				...stage,
+				tryOf('mex_des', 'pwu_des', '2026-10-11T09:00:00.000Z', 5)
+			],
+			events: [],
+			content: null
+		},
+		content: new Map([
+			['payload-mex_req', composite('Write the requirements.')],
+			['payload-mex_des', composite('Design wordfreq.')],
+			['payload-mex_hypothesizer', composite('You are the Hypothesizer.')],
+			['answer', '{}'],
+			['writer-prompt', 'You are writing chapter 1 of the narrative memory.'],
+			['writer-reply', '{"chapter":1,"statements":[]}']
+		]),
+		units: [
+			{ slug: 'requirements', unitId: 'pwu_req', archive: '02-requirements' },
+			{ slug: 'design', unitId: 'pwu_des', archive: '03-design' }
+		],
+		workspace: resolve(tmpdir(), 'jpwb-no-such-workspace'),
+		home: resolve(tmpdir(), 'jpwb-no-such-home'),
+		captures: new Map(),
+		expectedMatrix: [{ stage: '5b', row: 'requirements', value: 'as intended' }],
+		commit: 'c',
+		reviewerFingerprint: 'f'
+	});
+
+	it('⛔ RED FIRST — the helper’s EXECUTION exchange is no executor try and the writer’s ASSURANCE exchange no reviewer call: both left out, counted; the units’ tries recorded in order', () => {
+		const built = buildRecording(inputWith(STAGE));
+		expect(built.problems, 'the stage’s exchanges stopped the recording').toEqual([]);
+		expect(
+			[built.assuranceStageCallsLeftOut, built.recording?.executor.map((t) => t.unit), built.recording?.reviewer.length],
+			'the stage’s exchanges were kept, or not counted'
+		).toEqual([2, ['requirements', 'design'], 0]);
+	});
+
+	it('⛔ RED FIRST — a run’s recording is the same with the stage’s exchanges as without them; a run with none counts none', () => {
+		const without = buildRecording(inputWith([]));
+		const withStage = buildRecording(inputWith(STAGE));
+		expect(without.assuranceStageCallsLeftOut, 'a run with no stage counted a stage exchange').toBe(0);
+		expect(JSON.stringify(withStage.recording), 'the stage’s exchanges changed what the recording holds').toBe(JSON.stringify(without.recording));
+	});
+});

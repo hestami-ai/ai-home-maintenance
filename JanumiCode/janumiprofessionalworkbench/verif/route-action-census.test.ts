@@ -212,6 +212,11 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 		// one batch; the server refuses it unless the unit is in that state and the target a candidate (`sendBackOffer`), and the kernel refuses
 		// each supersession without its successor and its Decision (`resolveSupersession`). This census reddened on its arrival, which is its job.
 		'sendWorkBack',
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — D74 to D76 (`REG-D-166` (3); the lead's ruling (B)): the person's press of the assurance stage on a unit
+		// its declared reviews rejected — the narrative's chapter, the Hypothesizer and, on an open recurrence, the Unsticking Agent, each recorded. It
+		// records no Decision and moves no state; the server refuses it unless the unit is in that state and its round has no stage record yet
+		// (`assuranceStageOffer`). This census reddened on its arrival, which is its job.
+		'runAssuranceStage',
 		// S-1a (REG-F-104): abandonment is one of the three acts DOC-001 §5.2 reserves to Governance, and it
 		// had no caller from any surface. This census reddened on arrival, which is its job.
 		'abandonPwu',

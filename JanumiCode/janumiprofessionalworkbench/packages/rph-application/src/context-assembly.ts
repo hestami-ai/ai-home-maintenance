@@ -23,7 +23,11 @@ const PolicyContentSchema = z.object({
 /** The policy as its reader sees it. */
 export type ContextAssemblyPolicyContent = z.infer<typeof PolicyContentSchema>;
 
-/** The id every `RUNTIME_BINDING` is minted with (`handlers/runtime-binding.ts:67`). */
+/**
+ * ~~The id every `RUNTIME_BINDING` is minted with (`handlers/runtime-binding.ts:67`).~~ ⭐ `JAN-EXEC` Phase 7, package L17b1 (`REG-D-170`) — the id
+ * every `RUNTIME_BINDING` minted before package L17b1 names: the policy that governed those steps, seeded still, unchanged. A binding minted since
+ * names `LOOP_CONTEXT_ASSEMBLY_POLICY_ID` (below).
+ */
 export const DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID = 'ctx-default';
 
 /**
@@ -64,6 +68,34 @@ export const DEFAULT_CONTEXT_ASSEMBLY_POLICY: ContextAssemblyPolicyContent = Obj
 		{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' },
 		// ⭐⭐ Package L15 — D69 (`REG-D-159`) — the accepted work of the units a unit depends on, named in its instruction.
 		{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_UNDERTAKING' }
+	]
+}) as ContextAssemblyPolicyContent;
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — `REG-D-170` (a delegated ruling, flagged for the sponsor's confirmation) — THE ID EVERY NEW `RUNTIME_BINDING`
+ * IS MINTED WITH (`handlers/runtime-binding.ts`). ⛔ A NEW POLICY UNDER A NEW ID, NEVER `ctx-default` REVISED: every binding already recorded names the
+ * policy that governed its step, and no command revises a stored policy (`CreateContextAssemblyPolicy` is the only one).
+ */
+export const LOOP_CONTEXT_ASSEMBLY_POLICY_ID = 'ctx-default-loop';
+
+/**
+ * ⭐⭐ Package L17b1 — `REG-D-170` — WHAT A STEP BOUND SINCE PACKAGE L17b1 MAY BE GIVEN: `ctx-default`'s five pairs, and two more at THIS_UNDERTAKING —
+ * `PRIOR_RATIONALE` and `PRIOR_REVIEW_FINDING` — the material the defect loop carries from one unit to another, which the sponsor ruled must reach the
+ * worker (`REG-D-166` (4), `REG-D-167` (2), (4)): a replacement's first turn on a session forked from its predecessor's (that unit's work product and
+ * rationale, and its findings where its session held a repair turn; design D85), and D77's holistic feedback (another unit's failed criteria, and the
+ * assurance stage's records, declared as findings).
+ * ⛔ STILL NOT `RENDERED_INSTRUCTION` AT THIS_UNDERTAKING: a forked history's first turn is the predecessor's rendering of the same type's instruction
+ * for the same work, which the successor's own instruction states again (`THIS_TRY`); a repair turn declares no earlier instruction.
+ * ⭑ WIDER FOR EVERY NEW STEP, SO HELD BY A CENSUS: only the turns `run-model-step.ts` names declare either new pair (`crossUnitSources`;
+ * `verif/context-pair-census.test.ts`), and a store seeded before this package holds `ctx-default` alone (a continued run's boot creates this one,
+ * design D80).
+ */
+export const LOOP_CONTEXT_ASSEMBLY_POLICY: ContextAssemblyPolicyContent = Object.freeze({
+	policyId: LOOP_CONTEXT_ASSEMBLY_POLICY_ID,
+	permittedSources: [
+		...DEFAULT_CONTEXT_ASSEMBLY_POLICY.permittedSources,
+		{ source: 'PRIOR_RATIONALE', scope: 'THIS_UNDERTAKING' },
+		{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }
 	]
 }) as ContextAssemblyPolicyContent;
 

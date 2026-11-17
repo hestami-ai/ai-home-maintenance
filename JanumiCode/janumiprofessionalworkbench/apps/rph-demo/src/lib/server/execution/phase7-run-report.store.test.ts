@@ -100,8 +100,9 @@ vi.mock('./model.js', async (importOriginal) => {
 					throw new Error('hermetic: no Pi session is opened here');
 				}
 			});
-			return async (context: Parameters<typeof open>[0]) => {
-				const session = await open(context);
+			// ⭐ Package L17b1 — D85 (reading 3) — the opener's second argument, where its session is kept, passed through.
+			return async (context: Parameters<typeof open>[0], place: Parameters<typeof open>[1]) => {
+				const session = await open(context, place);
 				return {
 					...session,
 					processRuns: () =>

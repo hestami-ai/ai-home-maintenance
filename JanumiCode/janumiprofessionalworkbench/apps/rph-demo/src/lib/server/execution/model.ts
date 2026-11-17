@@ -19,6 +19,7 @@ import { openReplayExecutionSession } from '../replay/replay-executor.js';
 import { replayRunFor } from '../replay/replay-run.js';
 import {
 	oneShotSession,
+	type ExecutorSessionPlace,
 	type OpenProducerSession,
 	type ProducerSession,
 	type ProducerSessionContext
@@ -68,7 +69,8 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
  */
 export interface ExecutionSessionDeps {
 	readonly agyExec?: AgyExec;
-	readonly openPi?: (context: ProducerSessionContext, modelId: string) => Promise<ProducerSession>;
+	/** ⭐ Package L17b1 — D85 — and where its session is kept and how it opens (`place`), as the opener is handed it. */
+	readonly openPi?: (context: ProducerSessionContext, modelId: string, place: ExecutorSessionPlace) => Promise<ProducerSession>;
 }
 
 /**
@@ -139,11 +141,13 @@ export function getExecutionSession(
 		// opened (`executorModel()`), a third read of the configuration; it is now handed the one the selection holds,
 		// which is also the one the record names. ⚠ `openPi` is not called until the returned opener is: selecting Pi
 		// costs nothing and loads nothing.
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4)) — AND WHERE ITS SESSION IS KEPT AND HOW IT OPENS, the opener's second
+		// argument, passed on: Pi's alone keeps a session file (`executorSessionManager`).
 		const openPi =
 			deps.openPi ??
-			(async (context: ProducerSessionContext, modelId: string) =>
-				(await import('../tools/pi-executor.js')).openPiExecutionSession(context, modelId));
-		return async (context) => openPi(context, selection.modelId);
+			(async (context: ProducerSessionContext, modelId: string, place: ExecutorSessionPlace) =>
+				(await import('../tools/pi-executor.js')).openPiExecutionSession(context, modelId, place));
+		return async (context, place) => openPi(context, selection.modelId, place);
 	}
 	// ⚠ `agy --print` is a fresh process per call: no memory, and the session says so.
 	// ⭐ `JAN-SELRES` RS-1 (D2; `REG-F-458`) — AND IT RUNS THE SELECTION'S MODEL. This called `agyPrint`, which pins

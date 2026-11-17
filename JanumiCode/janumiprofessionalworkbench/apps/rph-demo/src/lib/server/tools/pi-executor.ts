@@ -38,9 +38,11 @@ import { answerFromTurnEnd } from './backing-tool.js';
 import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
 import {
 	producerWorkingDirectory,
+	type ExecutorSessionPlace,
 	type ProducerSession,
 	type ProducerSessionContext
 } from '../execution/producer-session.js';
+import { sessionFilesIn, supplyCutOffResults, twoSessionFilesRefusal } from '../execution/executor-session.js';
 import {
 	createMaterializedInputRecorder,
 	type PayloadHookHost
@@ -78,6 +80,39 @@ function resolveExecutingModel(modelRegistry: ModelRegistry, configured: string)
 				'producer identity may not be a fiction (§8.4, §14.6).'
 		);
 	return resolved.model;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4); `REG-D-169`) — THE PI SESSION A PLACE NAMES. In memory: `SessionManager.inMemory()`,
+ * byte for byte as before. In a folder: the unit's one file REOPENED, its working folder the workspace it works in now (a continued run's copy may
+ * lie elsewhere), and a result appended for any call its stopped step never answered (`supplyCutOffResults`); its predecessor's file FORKED, the new
+ * header naming the parent; or a NEW file, which Pi writes at the first answer (`session-manager.js`, `_persist`). ⛔ A folder holding more than one
+ * session file is refused, naming it — here too, since it is read again as the session opens.
+ */
+export function executorSessionManager(place: ExecutorSessionPlace, cwd: string): SessionManager {
+	if (place.kind === 'IN_MEMORY') return SessionManager.inMemory();
+	const files = sessionFilesIn(place.folder);
+	if (files.length > 1) throw new Error(twoSessionFilesRefusal(place.folder, files.length));
+	const opening = place.opening;
+	if (opening.kind === 'REOPEN') {
+		if (files[0] !== opening.file)
+			throw new Error(
+				`the session folder ${place.folder} no longer holds the file this step was to reopen (${opening.file}), so its conversation cannot be continued (design D85).`
+			);
+		const reopened = SessionManager.open(opening.file, undefined, cwd);
+		supplyCutOffResults(reopened);
+		return reopened;
+	}
+	if (files.length === 1)
+		throw new Error(
+			`the session folder ${place.folder} already holds a session file, so a new one cannot be opened beside it (design D85).`
+		);
+	if (opening.kind === 'FORK') {
+		const forked = SessionManager.forkFrom(opening.from, cwd, place.folder);
+		supplyCutOffResults(forked);
+		return forked;
+	}
+	return SessionManager.create(cwd, place.folder);
 }
 
 /**
@@ -144,7 +179,9 @@ function resolveExecutingModel(modelRegistry: ModelRegistry, configured: string)
 export async function openPiExecutionSession(
 	context: ProducerSessionContext,
 	/** ⭐ `JAN-SELRES` RS-1 (D4) — the executor selection's model: the label this session runs and the record names. */
-	modelId: string
+	modelId: string,
+	/** ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4); `REG-D-169`) — where its session is kept and how it opens (`executorSessionManager`). */
+	place: ExecutorSessionPlace
 ): Promise<ProducerSession> {
 	const working = producerWorkingDirectory(context);
 	if (!working.resolved) throw new Error(working.refusedBecause);
@@ -198,13 +235,17 @@ export async function openPiExecutionSession(
 		noTools: 'builtin',
 		customTools: toPiExecutionTools(tools),
 		resourceLoader: loader,
-		// ⚠ IN-MEMORY, AND THAT IS A DISCLOSED BOUND. The session survives the work unit and NOT a restart —
+		// ~~⚠ IN-MEMORY, AND THAT IS A DISCLOSED BOUND. The session survives the work unit and NOT a restart —
 		// so the memory this change adds is per-unit and process-local, which the design states rather than
 		// letting a reader infer durability that is not there.
 		// ⚠ AND GIVEN NO FOLDER, so the session takes `process.cwd()`, and the working-directory line Pi ends the
 		// system prompt with names the server's folder, not the workspace — found in the E4 polish round and not
-		// changed: an open question (`pi-executor-resources.ts`).
-		sessionManager: SessionManager.inMemory(),
+		// changed: an open question (`pi-executor-resources.ts`).~~
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 — WHERE THE PLACE SAYS (`executorSessionManager`): with a durable store, Pi's own session
+		// file, kept with the run, reopened at the unit's later steps and forked for a replacement, its working folder the workspace — so the
+		// working-directory line Pi ends the system prompt with names the workspace (⚠ a change to the executor's system prompt from the ninth run's,
+		// named in D85). With none, in memory and given no folder, byte for byte as before: the session takes `process.cwd()`.
+		sessionManager: executorSessionManager(place, cwd),
 		settingsManager,
 		authStorage,
 		modelRegistry

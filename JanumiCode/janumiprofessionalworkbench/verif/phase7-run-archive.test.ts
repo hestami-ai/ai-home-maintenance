@@ -57,6 +57,7 @@ import {
 	readOnlyOpenWritesNothing,
 	RECORD_STORE,
 	reviewerCalls,
+	sessionsFolderOf,
 	workspaceDirectoryOf,
 	type ArchiveSnapshot,
 	type SnapshotRow
@@ -895,6 +896,47 @@ describe('⭐ D6, D7 — one archive: the dump, both stores, both folders and th
 			{ present: false }
 		]);
 		expect(existsSync(join(run, 'lane', 'archive', '01-root', 'workspace'))).toBe(false);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4)): the run's Pi sessions — each unit's executor's, and the assurance stage's
+	// helpers' — are kept with the run, so the archive copies `<store>.sessions` as it copies the workspace.
+	it('⛔ RED FIRST — the run’s sessions folder is copied byte for byte beside the workspace, each file’s hash the source’s; with none, it is recorded absent', async () => {
+		const run = folder('sessions-run');
+		const store = join(run, 'demo.sqlite');
+		walStore(store, 1);
+		const sessions = sessionsFolderOf(store);
+		expect(sessions, 'the sessions folder is not `<store>.sessions`').toBe(resolve(`${store}.sessions`));
+		const files: Readonly<Record<string, string>> = {
+			'executor/pwu_1/2026-11-16T00-00-00-000Z_a.jsonl': '{"type":"session"}\n{"type":"message"}\n',
+			'hypothesizer/asm_1/2026-11-16T00-00-01-000Z_b.jsonl': '{"type":"session"}\n'
+		};
+		for (const [rel, text] of Object.entries(files)) {
+			mkdirSync(dirname(join(sessions, rel)), { recursive: true });
+			writeFileSync(join(sessions, rel), text);
+		}
+		const request = (name: string) => ({
+			archiveDir: join(run, 'lane', 'archive', name),
+			storePath: store,
+			undertakingId: 'und_3',
+			unitId: 'pwu_1',
+			introspect: { text: '{}', snapshot: snapshotOf({}) },
+			capturesBefore: [],
+			refusal: null,
+			reviewedRunLimit: 32,
+			env: {}
+		});
+		const sha = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
+
+		const made = await archiveUnit(request('02-source'));
+
+		expect(made.checks.archived.sessions.present, 'the sessions were not archived').toBe(true);
+		for (const [rel, text] of Object.entries(files))
+			expect(sha(readFileSync(join(run, 'lane', 'archive', '02-source', 'sessions', rel))), `${rel} was not copied byte for byte`).toBe(
+				sha(Buffer.from(text, 'utf8'))
+			);
+		rmSync(sessions, { recursive: true, force: true });
+		const none = await archiveUnit(request('03-none'));
+		expect(none.checks.archived.sessions, 'an absent sessions folder was not recorded absent').toEqual({ present: false });
 	});
 
 	it('⛔ each archive is diffed with the one before: a capture folder the previous archive held is not this unit’s (K5)', async () => {

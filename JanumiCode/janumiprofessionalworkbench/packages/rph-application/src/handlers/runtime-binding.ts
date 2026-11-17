@@ -15,6 +15,7 @@ import {
 } from '@janumipwb/rph-domain';
 import { advanceStatus, createObject, newEnvelope, reject, type CommandHandler } from './kit.js';
 import { fromStates } from './command-precondition.js';
+import { LOOP_CONTEXT_ASSEMBLY_POLICY_ID } from '../context-assembly.js';
 
 const BINDING = 'RUNTIME_BINDING';
 const MACHINE = 'RuntimeBinding.authorizationStatus';
@@ -64,7 +65,9 @@ export const requestRuntimeBinding: CommandHandler = (ctx, command, payload) => 
 		requestedCapabilities: p.requestedCapabilities,
 		grantedCapabilities: [],
 		sandboxPolicy: {},
-		contextAssemblyPolicyId: 'ctx-default',
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — `REG-D-170` — ~~`'ctx-default'`~~: every new binding names the policy that carries the defect loop's
+		// two pairs (`context-assembly.ts`); a binding minted before names `ctx-default`, which stays seeded, unchanged.
+		contextAssemblyPolicyId: LOOP_CONTEXT_ASSEMBLY_POLICY_ID,
 		observabilityPolicyId: 'obs-default',
 		authorizationStatus: 'REQUESTED'
 	};

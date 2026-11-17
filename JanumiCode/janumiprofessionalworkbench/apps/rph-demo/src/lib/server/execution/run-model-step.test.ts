@@ -6,9 +6,20 @@
 import { describe, expect, it } from 'vitest';
 import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-contracts';
-import { assembledSources, runModelInvocationStep } from './run-model-step.js';
-import { DEFAULT_CONTEXT_ASSEMBLY_POLICY, type ContextAssemblyPolicyContent } from '@janumipwb/rph-application';
-import { oneShotSession } from './producer-session.js';
+import {
+	assembledSources,
+	crossUnitSources,
+	firstTurnSources,
+	runModelInvocationStep,
+	sessionHoldsOf,
+	type SessionHolds
+} from './run-model-step.js';
+import {
+	DEFAULT_CONTEXT_ASSEMBLY_POLICY,
+	LOOP_CONTEXT_ASSEMBLY_POLICY,
+	type ContextAssemblyPolicyContent
+} from '@janumipwb/rph-application';
+import { IN_MEMORY_SESSION, oneShotSession, type SessionFileHoldings } from './producer-session.js';
 import { stepBindingFor } from './step-binding.js';
 
 /**
@@ -78,6 +89,8 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		acceptedWork: [],
 		// ⭐⭐ Package L16 — D70 — no governing declared policy, SAID: the field is required, so a caller cannot skip it by omission.
 		reviewCriteria: [],
+		// ⭐⭐ Package L17b1 — D85 — a session that holds nothing, SAID: the field is required, so a caller cannot skip it by omission.
+		sessionHolds: { kind: 'NOTHING' as const } as SessionHolds,
 		// ⛔ SAID, NOT OMITTED. `binding` is required with an explicit NONE so that skipping the capability
 		// check cannot be expressed by leaving a field out — the dodge shape `REG-F-364` records.
 		binding: { kind: 'NONE' as const },
@@ -1413,5 +1426,290 @@ describe('⭐⭐ L16 (D70) — the step hands the criteria its declared reviews 
 		);
 		expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
 		expect(seen).toBe(WORK);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`, the sponsor's ruling: a unit's later step continues its saved conversation;
+// `REG-D-170`) — A FIRST TURN ON A SESSION THAT ALREADY HOLDS WORK: the instruction, then — in place of RD8's "This is a fresh session" — what the
+// session holds, then what to do; D77's feedback after it. And each declares what it holds: the unit's own earlier work at THIS_WORK_UNIT, as a repair
+// turn on a remembering session does; a predecessor's at THIS_UNDERTAKING, which only the defect loop's policy permits. ⭑ On a session that holds
+// nothing — every session held in memory, a unit's first step — RD8's turn byte for byte.
+describe('⭐⭐ L17b1 (D85; REG-D-169) — the first turn on a session that already holds work', () => {
+	/** RD8's line before a re-run's findings, restated (`firstTurn`; `executor-session.ts`, `CARRIED_FINDINGS_LINE`). */
+	const CARRIED_FINDINGS_LINE = 'An independent assurance review of an earlier attempt at this work found the following:';
+	const FINDINGS = [{ code: 'C1', statement: 'Requirement 3 has no acceptance criterion.' }];
+	// ⭐ RESTATED for the review's defect 8: a predecessor whose conversation returned a work product, said so (`returnedAnswer`).
+	const PREDECESSOR: SessionHolds = { kind: 'PREDECESSOR', title: 'Source', unitId: 'pwu_old', heldFindings: false, returnedAnswer: true };
+	/** ⭐ The review's defects 1 and 8 — the unit's own reopened session, its earlier try having returned a work product, holding nothing else. */
+	const THIS_UNIT_ANSWERED: SessionHolds = { kind: 'THIS_UNIT', returnedAnswer: true, ownFindings: false, crossUnitFeedback: false };
+	/** The turn sent, and the step's outcome, for `over`. */
+	async function sent(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {}) {
+		let seen = '';
+		const out = await runModelInvocationStep(
+			harness({
+				session: oneShotSession(async (p: string) => {
+					seen = p;
+					return ANSWER;
+				}),
+				...over
+			}).input
+		);
+		return { seen, out };
+	}
+	/** ⭐ The review's defect 1 — the same, on a session that keeps its history, as Pi's does. */
+	async function sentRetaining(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {}) {
+		let seen = '';
+		const out = await runModelInvocationStep(
+			harness({
+				session: {
+					...oneShotSession(async (p: string) => {
+						seen = p;
+						return ANSWER;
+					}),
+					retainsHistory: true
+				},
+				...over
+			}).input
+		);
+		return { seen, out };
+	}
+
+	it('⛔ RED FIRST — the unit’s own reopened session, carrying a re-run’s findings: the instruction, the findings, then what the session holds, then the ask', async () => {
+		const plain = await sent();
+		const { seen, out } = await sent({ sessionHolds: THIS_UNIT_ANSWERED, carriedFindings: FINDINGS });
+
+		expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
+		expect(seen, 'the turn is not the instruction, the findings, what the session holds and the ask').toBe(
+			[
+				plain.seen,
+				'',
+				CARRIED_FINDINGS_LINE,
+				'- C1: Requirement 3 has no acceptance criterion.',
+				'',
+				'This session holds that attempt: the turns above are your earlier work on this unit, with the work product you returned and your rationale.',
+				'Produce the work product again, addressing these findings. Do not argue with them and do not',
+				'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+			].join('\n')
+		);
+		expect(seen, 'the reopened session’s turn says it is fresh').not.toContain('This is a fresh session');
+	});
+
+	it('⛔ RED FIRST — the unit’s own reopened session after a stop, with nothing carried: the instruction, what it holds, and the ask', async () => {
+		const plain = await sent();
+		const { seen } = await sent({ sessionHolds: THIS_UNIT_ANSWERED });
+
+		expect(seen, 'the turn does not say the session holds the stopped attempt').toBe(
+			[
+				plain.seen,
+				'',
+				'This session holds your earlier attempt at this work: the turns above, with the work product you returned and your rationale. That attempt stopped before it was accepted.',
+				'Produce the work product for the instruction above; files your earlier attempt wrote may still be in the workspace.'
+			].join('\n')
+		);
+	});
+
+	it('⛔ RED FIRST — a forked session: the instruction, then that it holds the conversation of the unit it replaces, named, then the ask', async () => {
+		const plain = await sent();
+		const { seen, out } = await sent({ sessionHolds: PREDECESSOR, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY });
+
+		expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
+		expect(seen, 'the turn does not name the predecessor whose conversation it holds').toBe(
+			[
+				plain.seen,
+				'',
+				'This session holds the conversation of the unit this one replaces, "Source" (pwu_old): the turns above are its work, with the work product it returned, its rationale and any review findings it was given. That work was superseded, and this unit takes its place.',
+				'Produce this unit’s work product for the instruction above; files that work wrote may still be in the workspace.'
+			].join('\n')
+		);
+	});
+
+	it('⛔ RED FIRST — D77’s feedback follows the turn, after a blank line, on the first turn alone', async () => {
+		const plain = await sent();
+		const feedback = { text: 'Holistic feedback — the loop so far.', crossUnit: false };
+		const { seen } = await sent({ feedback });
+		expect(seen, 'the feedback does not follow the instruction').toBe(`${plain.seen}\n\n${feedback.text}`);
+
+		const repair = await sent({ feedback, priorFindings: FINDINGS });
+		expect(repair.seen, 'a repair turn carried the feedback').not.toContain(feedback.text);
+	});
+
+	it('⛔ RED FIRST — each declares what it holds: its own unit’s work at THIS_WORK_UNIT; a predecessor’s, and feedback from another unit, at THIS_UNDERTAKING', () => {
+		expect(
+			[
+				firstTurnSources(THIS_UNIT_ANSWERED, [], undefined),
+				firstTurnSources(THIS_UNIT_ANSWERED, FINDINGS, undefined),
+				firstTurnSources(PREDECESSOR, [], undefined),
+				firstTurnSources({ ...PREDECESSOR, heldFindings: true }, [], undefined),
+				firstTurnSources({ kind: 'NOTHING' }, [], { text: 'f', crossUnit: true }),
+				firstTurnSources({ kind: 'NOTHING' }, [], { text: 'f', crossUnit: false })
+			],
+			'a first turn does not declare what its session holds and its feedback carries'
+		).toEqual([
+			[
+				{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+				{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+			],
+			[
+				{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+				{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+				{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+			],
+			[
+				{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_UNDERTAKING' },
+				{ source: 'PRIOR_RATIONALE', scope: 'THIS_UNDERTAKING' }
+			],
+			[
+				{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_UNDERTAKING' },
+				{ source: 'PRIOR_RATIONALE', scope: 'THIS_UNDERTAKING' },
+				{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }
+			],
+			[{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }],
+			[]
+		]);
+		expect(crossUnitSources(THIS_UNIT_ANSWERED, undefined), 'the unit’s own session declared another unit’s material').toEqual([]);
+	});
+
+	it('⛔ RED FIRST — ctx-default refuses a forked successor’s first turn before its instruction is rendered; ctx-default-loop runs it', async () => {
+		const refused = await sent({ sessionHolds: PREDECESSOR, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
+		expect(refused.out.ran, 'ctx-default ran a forked successor’s turn').toBe(false);
+		expect(refused.out.ran ? '' : refused.out.refusedBecause, 'the refusal does not name the pair').toContain('PRIOR_RATIONALE at THIS_UNDERTAKING');
+		expect(refused.seen, 'the model was sent the refused turn').toBe('');
+		const loop = await sent({ sessionHolds: PREDECESSOR, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY });
+		expect(loop.out.ran, loop.out.ran ? '' : loop.out.refusedBecause).toBe(true);
+	});
+
+	it('⛔ RED FIRST — what a session holds is read from where it is kept: nothing in memory or in a new file; the unit’s own in its reopened file; its predecessor’s in a fork', () => {
+		const titleOf = (id: string) => (id === 'pwu_old' ? 'Source' : id);
+		const folder = 'C:/run/demo.sqlite.sessions/executor/pwu_new';
+		// ⭐ RESTATED for the review's defects 1 and 8: a reopened place carries what its file was read to hold (`held`), and a fork whether its
+		// conversation returned a work product; a reopened fork holds its predecessor's conversation still.
+		// ⭑ Each field takes both its values across the cases.
+		const held = { returnedAnswer: false, ownFindings: true, crossUnitFeedback: true };
+		const heldOther = { returnedAnswer: true, ownFindings: false, crossUnitFeedback: false };
+		const forkedFrom = { predecessorId: 'pwu_old', heldFindings: true, returnedAnswer: false };
+		const forkedFromOther = { predecessorId: 'pwu_old', heldFindings: false, returnedAnswer: true };
+		const reopened = (h: SessionFileHoldings) =>
+			sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'REOPEN', file: `${folder}/a.jsonl`, held: h } }, titleOf);
+		const forked = (heldFindings: boolean, returnedAnswer: boolean) =>
+			sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'FORK', from: 'x.jsonl', predecessorId: 'pwu_old', heldFindings, returnedAnswer } }, titleOf);
+		expect(
+			[
+				sessionHoldsOf(IN_MEMORY_SESSION, titleOf),
+				sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'NEW' } }, titleOf),
+				sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'NEW', predecessorWithoutSession: 'pwu_old' } }, titleOf),
+				reopened(held),
+				reopened(heldOther),
+				forked(true, false),
+				forked(false, true),
+				reopened({ ...held, forkedFrom }),
+				reopened({ ...heldOther, forkedFrom: forkedFromOther })
+			],
+			'what each place holds'
+		).toEqual([
+			{ kind: 'NOTHING' },
+			{ kind: 'NOTHING' },
+			{ kind: 'NOTHING' },
+			{ kind: 'THIS_UNIT', ...held },
+			{ kind: 'THIS_UNIT', ...heldOther },
+			{ kind: 'PREDECESSOR', title: 'Source', unitId: 'pwu_old', heldFindings: true, returnedAnswer: false },
+			{ kind: 'PREDECESSOR', title: 'Source', unitId: 'pwu_old', heldFindings: false, returnedAnswer: true },
+			{ kind: 'THIS_UNIT', ...held, predecessor: { title: 'Source', unitId: 'pwu_old', heldFindings: true, returnedAnswer: false } },
+			{ kind: 'THIS_UNIT', ...heldOther, predecessor: { title: 'Source', unitId: 'pwu_old', heldFindings: false, returnedAnswer: true } }
+		]);
+	});
+
+	it('⛔ RED FIRST — a later try keeps declaring what its session still holds: a forked successor’s repair, one after a cross-unit first turn, and a reopened fork declare the cross-unit pairs, which ctx-default refuses (the review’s defect 1)', async () => {
+		const forked = await sentRetaining({ priorFindings: FINDINGS, stillHeld: { holds: PREDECESSOR }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
+		expect(forked.out.ran ? 'ran' : forked.out.refusedBecause, 'a repair try on a forked session declared only its own unit’s material').toContain(
+			'PRIOR_RATIONALE at THIS_UNDERTAKING'
+		);
+		const fed = await sentRetaining({
+			priorFindings: FINDINGS,
+			stillHeld: { holds: { kind: 'NOTHING' }, feedback: { text: 'Holistic feedback — the round’s failed criteria.', crossUnit: true } },
+			contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY
+		});
+		expect(fed.out.ran ? 'ran' : fed.out.refusedBecause, 'a repair try after a cross-unit first turn declared none of it').toContain(
+			'PRIOR_REVIEW_FINDING at THIS_UNDERTAKING'
+		);
+		const reopenedFork = await sent({
+			sessionHolds: { ...THIS_UNIT_ANSWERED, predecessor: { title: 'Source', unitId: 'pwu_old', heldFindings: false, returnedAnswer: true } },
+			contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY
+		});
+		expect(reopenedFork.out.ran ? 'ran' : reopenedFork.out.refusedBecause, 'a later step on a reopened fork declared only its own unit’s material').toContain(
+			'PRIOR_RATIONALE at THIS_UNDERTAKING'
+		);
+		const reopenedFed = await sent({ sessionHolds: { ...THIS_UNIT_ANSWERED, crossUnitFeedback: true }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
+		expect(reopenedFed.out.ran ? 'ran' : reopenedFed.out.refusedBecause, 'a later step on a file that carried cross-unit feedback declared none of it').toContain(
+			'PRIOR_REVIEW_FINDING at THIS_UNDERTAKING'
+		);
+		expect(
+			firstTurnSources({ ...THIS_UNIT_ANSWERED, ownFindings: true }, [], undefined),
+			'the findings a reopened file’s own turns carried are not declared'
+		).toEqual([
+			{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' }
+		]);
+		expect(
+			firstTurnSources({ ...THIS_UNIT_ANSWERED, ownFindings: true }, FINDINGS, undefined),
+			'a pair both carried and held is declared twice'
+		).toEqual([
+			{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+		]);
+		const loop =await sentRetaining({ priorFindings: FINDINGS, stillHeld: { holds: PREDECESSOR }, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY });
+		expect(loop.out.ran, loop.out.ran ? '' : loop.out.refusedBecause).toBe(true);
+		// ⭑ A session that keeps no history holds none of it: its repair is declared as before.
+		const oneShot = await sent({ priorFindings: FINDINGS, stillHeld: { holds: PREDECESSOR }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
+		expect(oneShot.out.ran, 'a session that keeps no history was held to hold the fork').toBe(true);
+	});
+
+	it('⛔ RED FIRST — a session whose earlier try returned no work product is said to hold none, and declares none: its own, and a fork’s (the review’s defect 8)', async () => {
+		const plain = await sent();
+		const ownStopped: SessionHolds = { kind: 'THIS_UNIT', returnedAnswer: false, ownFindings: false, crossUnitFeedback: false };
+		const own = await sent({ sessionHolds: ownStopped });
+		expect(own.seen, 'the stopped try is said to have returned a work product').toBe(
+			[
+				plain.seen,
+				'',
+				'This session holds your earlier attempt at this work: the turns above. That attempt stopped before it returned a work product.',
+				'Produce the work product for the instruction above; files your earlier attempt wrote may still be in the workspace.'
+			].join('\n')
+		);
+		const theirs = await sent({ sessionHolds: { ...PREDECESSOR, returnedAnswer: false }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
+		expect(
+			[
+				theirs.out.ran,
+				theirs.seen.includes(
+					'the turns above are its work, which stopped before it returned a work product, with any review findings it was given. That work was superseded'
+				)
+			],
+			'a fork of a stopped try is said, or declared, to hold its work product'
+		).toEqual([true, true]);
+		expect(firstTurnSources(ownStopped, [], undefined), 'a stopped try’s session declared a work product and a rationale').toEqual([]);
+		const ownCarried = await sent({ sessionHolds: ownStopped, carriedFindings: FINDINGS });
+		expect(ownCarried.seen, 'a stopped try carrying a re-run’s findings is said to have returned a work product').toContain(
+			'This session holds that attempt: the turns above are your earlier work on this unit, which stopped before it returned a work product.'
+		);
+	});
+
+	it('⭑ CONTROL — a session that holds nothing: RD8’s carried turn byte for byte, “This is a fresh session” and all, declared as before', async () => {
+		const plain = await sent();
+		const { seen, out } = await sent({ carriedFindings: FINDINGS, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
+		expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
+		expect(seen, 'RD8’s carried turn moved').toBe(
+			[
+				plain.seen,
+				'',
+				'An independent assurance review of an earlier attempt at this work found the following:',
+				'- C1: Requirement 3 has no acceptance criterion.',
+				'',
+				'This is a fresh session: you do not hold that attempt’s work product or rationale,',
+				'though files it wrote may still be in the workspace.',
+				'Produce the work product, addressing these findings. Do not argue with them and do not',
+				'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+			].join('\n')
+		);
 	});
 });

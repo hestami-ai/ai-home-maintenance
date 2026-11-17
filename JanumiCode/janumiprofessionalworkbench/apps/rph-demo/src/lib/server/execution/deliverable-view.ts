@@ -106,10 +106,26 @@ export function deliverableFiles(
 	after: WorkspaceManifest,
 	stepStart?: ReadonlyMap<string, { readonly hash: string }>
 ): DeliverableFile[] {
-	const listed = changedFiles(baseline, after);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D77, as the lead ruled it (option D) — THE TACTIC RECORD IS NO PART OF THE DELIVERABLE: the host
+	// reads it after the step and overwrites it with a notice (`takeTacticRecord`), and every view leaves `.jpwb/tactic/` out, the second guard, so no
+	// review is shown a unit's tactic, nor the notice in its place.
+	const listed = changedFiles(baseline, after).filter((f) => !isTacticRecordPath(f.path));
 	if (stepStart === undefined) return listed;
 	const inThisStep = new Map(changedFiles(stepStart, after).map((f) => [f.path, f.change] as const));
 	return listed.map((f) => ({ ...f, inThisStep: inThisStep.get(f.path) ?? 'UNCHANGED' }));
+}
+
+/** ⭐⭐ Package L17b1 — D77 — the folder a unit's tactic record is written in, in the Undertaking's shared workspace (`.jpwb/tactic/<slug>--<id>.json`). */
+export const TACTIC_RECORD_FOLDER = '.jpwb/tactic';
+
+/**
+ * ⭐ Package L17b1 — D77 — whether a workspace path lies in the tactic records' folder, which no deliverable view lists. ⭐ The independent review's
+ * defect 2 — COMPARED WITHOUT CASE: a workspace's paths keep the disk's casing (`filesystem-workspace.ts`), and on a disk that ignores case a folder
+ * spelled `.JPWB/TACTIC/` is the one the model writes `.jpwb/tactic/` into — so its record, and a later try's rewrite of it, would reach the reviews.
+ */
+export function isTacticRecordPath(path: string): boolean {
+	const p = path.toLowerCase();
+	return p === TACTIC_RECORD_FOLDER || p.startsWith(`${TACTIC_RECORD_FOLDER}/`);
 }
 
 /**

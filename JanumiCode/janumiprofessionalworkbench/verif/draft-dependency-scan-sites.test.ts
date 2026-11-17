@@ -148,6 +148,34 @@ const DECLARED_SCAN_SITES: Record<
 		class: 'DISPLAY',
 		why: 'Waiver decisions (`hasEffectiveWaiver`) — display-only on the turn path, as `REG-F-066` records. A waiver never discharges the floor (ASR-3), so it cannot change what the draft commits.'
 	},
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — D74 to D76 (`REG-D-166` (3)): the assurance stage at a rejected sign-off, which a person presses on the
+	// Undertaking page. No draft reads any of these: each reads the canonical store for the execution half's defect loop, never in an authoring turn.
+	// This census reddened on their arrival, which is its job.
+	'apps/rph-demo/src/lib/server/assurance/assurance-stage-records.ts :: listByType': {
+		calls: 1,
+		class: 'ADVISORY',
+		why: "No draft reads it. `stageRecordsIn` walks the EVIDENCE for the assurance stage's records — a round's chapter, diagnosis and step-back, a unit's tactic record — for the stage's offer and its next chapter, a successor's first turn and D71's re-run, on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is, and being out of date changes nothing a draft commits."
+	},
+	'apps/rph-demo/src/lib/server/assurance/assurance-stage.ts :: listByType': {
+		calls: 1,
+		class: 'ADVISORY',
+		why: "No draft reads it. `openRecurrencesOf` reads a round's open KNOWN_FAILURE_RECURRENCE observations, which decide whether the Unsticking Agent runs, when a person presses the assurance stage on the Undertaking page — on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is."
+	},
+	'apps/rph-demo/src/lib/server/assurance/assurance-stage.ts :: listExecutionPlans': {
+		calls: 1,
+		class: 'ADVISORY',
+		why: "No draft reads it. `changedFilesOf` finds a candidate unit's last completion, so the Hypothesizer is shown the files its recorded work changed — on the canonical store, when a person presses the assurance stage, never in an authoring turn. It is in this file set only because `assurance/**` is."
+	},
+	'apps/rph-demo/src/lib/server/assurance/assurance-stage.ts :: listPwus': {
+		calls: 1,
+		class: 'ADVISORY',
+		why: "No draft reads it. `earlierRoundsOf` names the Undertaking's units, so the Unsticking Agent is shown the earlier rounds' diagnoses and tactic records — on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is."
+	},
+	'apps/rph-demo/src/lib/server/assurance/narrative-chapter.ts :: listByType': {
+		calls: 1,
+		class: 'ADVISORY',
+		why: "No draft reads it. `chapterRecordsOf` gives the narrative writer the Undertaking's records since the last chapter, each with its id (design D76), when a person presses the assurance stage — on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is."
+	},
 	'apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts :: listAssessments': {
 		calls: 1,
 		class: 'ADVISORY',

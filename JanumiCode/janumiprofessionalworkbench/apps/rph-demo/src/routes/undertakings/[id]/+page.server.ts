@@ -105,7 +105,7 @@ import type {
 } from '@janumipwb/rph-assurance';
 import { assurancePreflight } from '$lib/server/assurance/preflight';
 import { ASSURANCE_REVIEWER_CREDENTIAL, actingActor } from '$lib/server/identity';
-import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
+import { runModelInvocationStep, sessionHoldsOf, type TurnFeedback } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
 import { escalatedReviewNote } from '$lib/server/execution/floor-over-subject';
 import {
@@ -147,7 +147,7 @@ import {
 } from '$lib/server/execution/executor-selection';
 import { resolveContextPolicy } from '$lib/server/execution/context-policy';
 import { stepBindingFor } from '$lib/server/execution/step-binding';
-import { resolveUndertakingSandbox } from '$lib/server/execution/workspace-host';
+import { durableSessionsRoot, resolveUndertakingSandbox } from '$lib/server/execution/workspace-host';
 // ⭐ `JAN-EXEC` P7-6R R-1 — the stopped unit, read from the record: its wait, the person's three choices, and RD7's rebuild.
 import {
 	attemptKeyOf,
@@ -197,6 +197,17 @@ import {
 	supersededWorkNotice,
 	type ReplacedUnit
 } from '$lib/server/execution/send-back';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4); `REG-D-169`) — where each executor session is kept and how it opens; D77
+// (`REG-D-166` (4)) — what a successor's first turn and D71's re-run carry after the instruction, and the tactic record; D74 to D76 (`REG-D-166` (3)) —
+// the assurance stage at a rejected sign-off, which the page offers once per round (the lead's ruling (B)).
+import { executorSessionPlaceOf, recordPredecessorWithoutSession } from '$lib/server/execution/executor-session';
+// ⭐ The lead's rulings (h) and (k) on the review's fourth and fifth re-checks — the one describer of a thrown value, which cannot throw: the step's end,
+// its notes and the annotator, the session place's refusal and package N's two failure reasons describe through it.
+import { describedThrow } from '$lib/server/described-throw';
+import { IN_MEMORY_SESSION, type ExecutorSessionPlace } from '$lib/server/execution/producer-session';
+import { feedbackForRerun, feedbackForSuccessor, takeTacticRecord } from '$lib/server/execution/successor-feedback';
+import { assuranceStageOffer, runAssuranceStage } from '$lib/server/assurance/assurance-stage';
+import type { StageRecordDeps } from '$lib/server/assurance/assurance-stage-records';
 import { runProcessResultFloor } from '$lib/server/execution/process-result-floor';
 import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer';
 // ⭐ `JAN-NOANS`: the `resolveJudgeModel` import is GONE from this route, and its absence is the check. It was
@@ -740,6 +751,14 @@ export const load: PageServerLoad = ({ params }) => {
 		const offer = sendBackOffer(engine, p.id);
 		if (!('refusedBecause' in offer)) sendBackByPwu[p.id] = { candidates: offer.candidates };
 	}
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — D74 to D76 (`REG-D-166` (3); the lead's ruling (B)) — each unit its declared reviews REJECTED at its
+	// sign-off whose round has no stage record yet: the round the assurance stage would answer. Read from the record (`assuranceStageOffer`), so the
+	// page offers exactly what `runAssuranceStage` accepts — once per round.
+	const assuranceStageByPwu: Record<string, { readonly roundId: string }> = {};
+	for (const p of pwus) {
+		const offer = assuranceStageOffer(engine, p.id);
+		if (!('refusedBecause' in offer)) assuranceStageByPwu[p.id] = { roundId: offer.roundId };
+	}
 
 	// Tier-2 execution SEQUENCE (JAN-EXECPLAN DWP-04, fork C): arrange the Undertaking's PWU INSTANCES by their TYPES'
 	// hand-off dependency (reuse buildPwaExport — version-scoped to the bound (pwaId, pwaVersion) — then layerHandoff),
@@ -788,6 +807,7 @@ export const load: PageServerLoad = ({ params }) => {
 		declaredRerunByPwu,
 		rejectedRerunByPwu,
 		sendBackByPwu,
+		assuranceStageByPwu,
 		sequence,
 		assessments,
 		disclosures,
@@ -2184,12 +2204,46 @@ function modelExecutedBy(modelId: string) {
  * STEP, AND SAYS WHY: the step has STARTED, so a try that cannot reach its review is a failure with a reason, never an
  * escape (the context-policy and sandbox refusals' rule). The work product already recorded stays on the record (PER-9).
  */
-function failTheStepBeforeItsReview(planId: string, stepId: string, why: string) {
+function failTheStepBeforeItsReview(planId: string, stepId: string, why: string, stepEnd: StepEndNotes) {
 	const failed = runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
 	const notRecorded = failed ? ` — and the failure could not be recorded: ${failed}` : '';
+	// ⭐ The review's second re-check (D) — and the step's end, which its caller ran first: its notes beside the failure (`endTheStep`).
 	return fail(400, {
+		...stepEnd,
 		error: `The model invocation did not run to its review: ${why}${notRecorded}`
 	});
+}
+
+/**
+ * ⭐⭐ Package L17b1 — D77, and the lead's rulings (a) to (d) on the review's third re-check — WHAT A STEP'S END SAYS beside its outcome (`runModelUnit`,
+ * `endTheStep`): the tactic record's notes (`tacticRecordNote`), and why the producer's session could not be closed (`sessionCloseNote`), each on the
+ * page on its own line.
+ */
+interface StepEndNotes {
+	readonly tacticRecordNote?: string;
+	readonly sessionCloseNote?: string;
+}
+
+/**
+ * ⭐ The lead's ruling (c) on the review's third re-check — THE STEP'S END'S NOTES, NAMED ON AN EXCEPTION THAT ESCAPED A TRY, which then goes on as the
+ * same value (`runModelUnit`): an `Error` whose message can be written keeps its first message as the prefix, the notes after it as the page says them.
+ * ⚠ ANY OTHER THROWN VALUE, OR AN `Error` WHOSE MESSAGE CANNOT BE WRITTEN — a frozen `Error`, or a `DOMException`, whose message has only a getter —
+ * GOES ON UNCHANGED, NEVER REPLACED: the notes go unshown in those two cases. A step whose end said nothing leaves the message as it was. ⭐ The lead's
+ * ruling (h) on the review's fourth re-check — IT CANNOT THROW: the first exception is inspected inside the annotator's own guard (a revoked `Proxy`
+ * throws as it is inspected), its first message is read through the one describer (`describedThrow`), and a value it cannot inspect goes on unchanged,
+ * the notes unshown, as in those two cases.
+ */
+function nameTheStepsEndOn(thrown: unknown, notes: StepEndNotes): void {
+	const said = [notes.tacticRecordNote === undefined ? '' : `The tactic record: ${notes.tacticRecordNote}`, notes.sessionCloseNote ?? '']
+		.filter((n) => n !== '')
+		.join(' ');
+	if (said === '') return;
+	try {
+		if (!(thrown instanceof Error)) return;
+		thrown.message = `${describedThrow(thrown)} — the step's end, run before it went on: ${said}`;
+	} catch {
+		// An `Error` whose message cannot be written, or a value that cannot be inspected: it goes on unchanged, the notes unshown.
+	}
 }
 
 /** One recorded observation as a refusal message prints it: `code: statement`. */
@@ -2205,6 +2259,42 @@ function refusedEvidenceNote(joined: readonly JoinedProcessEvidence[]): string {
 	return describeRefusedEvidence(joined)
 		? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(joined)}`
 		: '';
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4); `REG-D-169`) — WHERE A STEP'S EXECUTOR SESSION IS KEPT AND HOW IT OPENS, read from
+ * the run's sessions folder (`<D>.sessions/executor/<unit id>/`) before anything is dispatched: in memory where there is no durable store, byte for
+ * byte as before; else the unit's one file reopened, or — on a replacement's first step, its predecessor named — the predecessor's forked, or a new
+ * file. ⭑ Pi's alone: no other executor keeps a session file, so any other is held as before, and its first turn says nothing of one.
+ * ⛔ A folder holding two session files, or an id that cannot name one, refuses the act before any write, naming why.
+ */
+function sessionPlaceFor(
+	pwuId: string,
+	predecessorId: string | undefined,
+	executor: RunnableExecutorSelection
+): ExecutorSessionPlace | { readonly refusedBecause: string } {
+	if (executor.kind !== 'PI') return IN_MEMORY_SESSION;
+	try {
+		return executorSessionPlaceOf(durableSessionsRoot(process.env), pwuId, predecessorId);
+	} catch (e) {
+		return { refusedBecause: describedThrow(e) };
+	}
+}
+
+/** ⭐ Package L17b1 — what a re-run's plan purpose says of its session: continued where its one file is reopened (`REG-D-169`), else fresh, as before. */
+function sessionWordsOf(place: ExecutorSessionPlace): string {
+	return place.kind === 'DURABLE' && place.opening.kind === 'REOPEN' ? 'in its continued session' : 'in a fresh session';
+}
+
+/** ⭐ Package L17b1 — what the assurance stage's records and the tactic record need of this route: its store, its ids, its clock and its batch. */
+function stageRecordDepsOf(): StageRecordDeps {
+	return {
+		store: getArtifactStore(),
+		tenantPrefix: EXECUTION_TENANT_PREFIX,
+		newId: mintUiId,
+		now: hostNow,
+		runSteps: (steps) => runSteps(steps.map((s): Step => [s[0], s[1], s[2], s[3]]))
+	};
 }
 
 /** What one model unit's run needs: the started plan and step, its binding, its executor, and its type's facts. */
@@ -2236,6 +2326,15 @@ interface ModelUnitRun {
 	 * session, on its first turn only. Absent for Begin & Execute.
 	 */
 	readonly carriedFindings?: readonly { readonly code: string; readonly statement: string }[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4); `REG-D-169`) — where the producer's session is kept and how it opens
+	 * (`sessionPlaceFor`), read by the action before anything was dispatched. ⛔ Required: `IN_MEMORY_SESSION` where there is no durable store.
+	 */
+	readonly sessionPlace: ExecutorSessionPlace;
+	/** ⭐⭐ Package L17b1 — design D77 — what the step's first turn carries after its instruction and any findings; absent where there is none. */
+	readonly feedback?: TurnFeedback;
+	/** ⭐⭐ Package L17b1 — design D77 — the tactic record the step is asked to write, and the round it answers; absent where none is asked. */
+	readonly tactic?: { readonly path: string; readonly roundId: string };
 }
 
 /**
@@ -2278,6 +2377,15 @@ async function runModelUnit(u: ModelUnitRun) {
 	let priorFindings: readonly { code: string; statement: string }[] = [];
 	const openPerTry: number[] = [];
 	let loopEnded = '';
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`; `REG-D-170`) — WHAT THE PRODUCER'S SESSION HOLDS as the step's first turn is sent,
+	// from where it is kept: nothing in memory or in a new file; the unit's earlier steps in its reopened file; its predecessor's conversation in a
+	// fork. The first turn says so, and declares it (`firstTurnSources`); a later try is a repair, as before.
+	const sessionHolds = sessionHoldsOf(u.sessionPlace, (id) => String((getObject(getEngine(), id)?.title ?? id) as string));
+	// ⭐⭐ Package L17b1 — design D77 — the tactic record's file as the step found it (a record is one the step wrote since), and whether it was taken.
+	let tacticAtStart: string | undefined;
+	let tacticTaken = false;
+	// ⭐ The independent review's defect 7 — what went wrong with a take, and a finding a take recorded, said on the page beside the step's outcome.
+	const tacticNotes: string[] = [];
 
 	// ⭑⭑ ONE SESSION FOR THE WHOLE WORK UNIT (`JAN-EXECSESS`). The sponsor's v2 mechanism: *"the CLI
 	// session wasn't closed or released until the phase or sub-phase completed … This approach allowed
@@ -2408,6 +2516,17 @@ async function runModelUnit(u: ModelUnitRun) {
 				throw new Error(`the host could not read the unit's workspace at this step's start: ${e instanceof Error ? e.message : String(e)}`);
 			}
 		}
+		// ⭐⭐ Package L17b1 — D85 — a replacement whose predecessor left no session file starts as a new unit does, and that is recorded for the
+		// run report (`recordPredecessorWithoutSession`); a note the store refuses fails the step here, as a baseline that cannot be named does.
+		const opening = u.sessionPlace.kind === 'DURABLE' ? u.sessionPlace.opening : undefined;
+		if (opening?.kind === 'NEW' && opening.predecessorWithoutSession !== undefined)
+			await recordPredecessorWithoutSession(getArtifactStore(), EXECUTION_TENANT_PREFIX, {
+				unitId: pwuId,
+				predecessorId: opening.predecessorWithoutSession
+			});
+		// ⭐ D77 — the tactic record's file as the step found it, read before the producer opens.
+		if (u.tactic !== undefined) tacticAtStart = await sandbox.workspace.readFile(u.tactic.path);
+		// ⭐⭐ Package L17b1 — D85 — and the opener is handed where its session is kept and how it opens, its second argument: Pi's alone reads it.
 		producer = await getExecutionSession(executor)({
 			...sandbox,
 			grantedCapabilities: current?.capabilities ?? [],
@@ -2418,7 +2537,7 @@ async function runModelUnit(u: ModelUnitRun) {
 			// resolves: both halves come back empty from ONE read, so the two cannot disagree about which
 			// case this is.
 			bindingAuthorizationStatus: current?.status ?? ''
-		});
+		}, u.sessionPlace);
 	} catch (e) {
 		// ⚠ A REFUSED SANDBOX FAILS THE STEP RATHER THAN ESCAPING AS A 500, mirroring the context-policy
 		// refusal directly above: the step has already STARTED, so a producer that cannot lawfully be opened
@@ -2444,6 +2563,80 @@ async function runModelUnit(u: ModelUnitRun) {
 	let joined: JoinedProcessEvidence[] = [];
 	// ⭐ Package N's check, finding 2 — where the last try's view is recorded: the try the completion admits.
 	let admittedView: DeliverableViewRef | undefined;
+	// ⭐⭐ Package L17b1 — D77, and the review's re-checks (D) as the lead ruled the third ((a) to (d)) and the fourth ((g) to (i)) — THE STEP'S END, ON EVERY
+	// WAY THE STEP ENDS ONCE ITS PRODUCER OPENED: the producer's session closed (`closeTheProducer`), then a tactic record asked for and not taken taken now —
+	// a finding where none was written while the step ran — and every note the step gathered put beside its outcome (`StepEndNotes`): on the way the step
+	// ends with no refusal in its tries, before its completion is recorded; beside its refusal where a try was refused in its middle (`stepRefused`); beside
+	// a failure before the try's review — its workspace not read, its view not recorded (`failTheStepBeforeItsReview`); and, on an exception that escapes a
+	// try, run before it goes on, the notes named on it where it is an `Error` whose message can be written (`nameTheStepsEndOn`). It runs once
+	// (`endTheStep`): a later call is given the first's result, so a handled failure that then throws has the notes its end gathered named on it.
+	// ⛔ NOTHING OF IT THROWS, WHATEVER VALUE IS THROWN AT IT: a take that throws — the end's, or ⭐ (g) a try's own, before its view — is the take's failure,
+	// and a close that throws the close's, each said among the notes, and the step goes on; ⭐ (h) every thrown value is described by one describer that
+	// cannot throw (`describedThrow`), a value that cannot be described said to be one, and the first exception is inspected inside the annotator's own
+	// guard. So a failure before a try's review — a content store that fails at a try's take and then at its view among them — is recorded with its own
+	// reason, a refusal in a try returns its refusal, the ordinary way out reaches its completion, and an exception that escapes a try goes on as the same
+	// value. The producer's session is closed once, best-effort, whichever call closes it — the end at its start, or the `finally` below — its failure said
+	// among the end's notes and never in the step's outcome's place. ⚠ AN EXCEPTION AFTER THE END RAN — from the completion's own recording — goes on as
+	// before, without the notes. ⚠ WHICH FAILURES A STARTED STEP RECORDS IS OWED, FILED BY THE LEAD AS A FINDING OF ITS OWN: a work product whose record is
+	// refused, a command whose evidence is refused, and an exception that escapes a try still leave the step RUNNING with no failure recorded — the end
+	// runs on each, and their recording is as it was. ⭑ A step refused before its producer opened sent no turn, so no record of it could have been
+	// written: it has no end to run.
+	let producerOpen = true;
+	let sessionCloseNote: string | undefined;
+	/** ⭐ The lead's ruling (b) — the producer's session closed once, best-effort: why it could not be, kept for the step's end's notes. */
+	const closeTheProducer = (): void => {
+		if (!producerOpen) return;
+		producerOpen = false;
+		try {
+			producer.dispose();
+		} catch (e) {
+			sessionCloseNote = `The executor's session could not be closed: ${describedThrow(e)}`;
+		}
+	};
+	/** D77 — the step's last take: a tactic record asked for and not taken, taken now; what it recorded, or what went wrong with it, said. */
+	const takeAtTheStepsEnd = async (): Promise<void> => {
+		if (u.tactic !== undefined && !tacticTaken) {
+			const took = await takeTacticRecord(stageRecordDepsOf(), {
+				workspace: sandbox.workspace,
+				path: u.tactic.path,
+				unitId: pwuId,
+				undertakingId: String((pwu?.undertakingId ?? '') as string),
+				roundId: u.tactic.roundId,
+				attemptKey,
+				// ⭑ A step refused before any try answered names the selection's model, as a thrown turn's record does.
+				producerModelId: (outcome as typeof outcome | undefined)?.producer.modelId ?? fallbackIdentity.modelId,
+				atStart: tacticAtStart,
+				stepEnded: true
+			});
+			// ⭐ The independent review's defect 7 — the step's-end take's result is said, never discarded.
+			if (took?.failure !== undefined) tacticNotes.push(took.failure);
+			else if (took?.why !== undefined) tacticNotes.push(took.why);
+		}
+	};
+	/** ⭐ The lead's rulings (a) and (b) — the step's end as it runs, once: the producer's session closed, then the last take, each failure its own note. */
+	const theStepsEnd = async (): Promise<StepEndNotes> => {
+		closeTheProducer();
+		try {
+			await takeAtTheStepsEnd();
+		} catch (e) {
+			// ⭐ The lead's ruling (a) — a take that throws is the take's failure, said among the end's notes; the step goes on.
+			tacticNotes.push(`its take at the step's end failed: ${describedThrow(e)}`);
+		}
+		// ⭐ The independent review's defect 7 — the tactic record's notes, on the page beside the step's outcome (`tacticRecordNote`); ⭐ the lead's ruling
+		// (b) — and why the producer's session could not be closed (`sessionCloseNote`).
+		return {
+			...(tacticNotes.length > 0 ? { tacticRecordNote: tacticNotes.join(' ') } : {}),
+			...(sessionCloseNote === undefined ? {} : { sessionCloseNote })
+		};
+	};
+	let stepEnd: Promise<StepEndNotes> | undefined;
+	/** ⭐ The lead's ruling (c) — the step's end, run once: a call after the first is given the first's result. */
+	const endTheStep = (): Promise<StepEndNotes> => {
+		stepEnd ??= theStepsEnd();
+		return stepEnd;
+	};
+	/** ⭐ The review's re-check (D) — a step refused in the middle of a try: its end run first, its notes beside the refusal. */
+	const stepRefused = async (error: string) => fail(400, { ...(await endTheStep()), error });
 	try {
 		for (let attempt = 1; ; attempt++) {
 			// ⭐ D9 — the boundary this try begins after: the step's sequence begins at none (its session, and so its one observer,
@@ -2546,6 +2739,12 @@ async function runModelUnit(u: ModelUnitRun) {
 				// ⭐ P7-6R RD8 — a person's re-run of the work carries the refused review's subject findings on its FIRST turn,
 				// after the instruction, into this fresh session; later tries are repairs on the now-held session.
 				...(attempt === 1 && u.carriedFindings?.length ? { carriedFindings: u.carriedFindings } : {}),
+				// ⭐⭐ Package L17b1 — D85 — what the session holds, said and declared on the step's first turn alone; D77 — the feedback after it.
+				sessionHolds: attempt === 1 ? sessionHolds : { kind: 'NOTHING' },
+				...(attempt === 1 && u.feedback ? { feedback: u.feedback } : {}),
+				// ⭐ The independent review's defect 1 — and on every later try, what the session held when the step began and the feedback its first turn
+				// carried: a session that keeps its history still holds both, so the try declares them (`stillHeld`), never says them.
+				...(attempt > 1 ? { stillHeld: { holds: sessionHolds, ...(u.feedback ? { feedback: u.feedback } : {}) } } : {}),
 				// ⭑ THE RESOLVED POLICY, not an id — obeying it is the STEP's job because that is where the
 				// assembly happens; resolving it is the caller's because that is what needs the store.
 				contextPolicy: governing.policy,
@@ -2579,9 +2778,7 @@ async function runModelUnit(u: ModelUnitRun) {
 						{ stepId, failureReason: tryOutcome.refusedBecause }
 					]
 				]);
-				return fail(400, {
-					error: `The model invocation did not run: ${tryOutcome.refusedBecause}`
-				});
+				return await stepRefused(`The model invocation did not run: ${tryOutcome.refusedBecause}`);
 			}
 			outcome = tryOutcome;
 
@@ -2619,7 +2816,38 @@ async function runModelUnit(u: ModelUnitRun) {
 				]
 			]);
 			if (recorded)
-				return fail(400, { error: `Recording the work product failed: ${recorded}` });
+				return await stepRefused(`Recording the work product failed: ${recorded}`);
+
+			// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D77 (the lead's ruling, option D) — THE TACTIC RECORD, TAKEN BEFORE THIS TRY'S VIEW ───────
+			// Where the step was asked to write one and has written it since it began: read, recorded, and overwritten with a notice
+			// (`takeTacticRecord`), before the view below is taken, so neither the floor nor a declared review is shown it; the view leaves out
+			// `.jpwb/tactic/` besides. ⭑ A record that is not one is a finding, never a refusal: the step goes on. ⭐ The lead's ruling (g) on the review's
+			// fourth re-check — THE TRY'S OWN TAKE CANNOT THROW: a take that throws — its record's store failing, as the view's below would — is the take's
+			// failure, said among the notes, and the try goes on to its view, so a content store that fails is met where package N meets it: the step FAILED
+			// with the view's own reason, the take's failure among its notes. The take, not on the record, is taken again at the step's end, as a refused one is.
+			if (u.tactic !== undefined && !tacticTaken) {
+				try {
+					const took = await takeTacticRecord(stageRecordDepsOf(), {
+						workspace: sandbox.workspace,
+						path: u.tactic.path,
+						unitId: pwuId,
+						undertakingId: String((pwu?.undertakingId ?? '') as string),
+						roundId: u.tactic.roundId,
+						attemptKey,
+						producerModelId: tryOutcome.producer.modelId,
+						atStart: tacticAtStart,
+						stepEnded: false
+					});
+					// ⭐ The independent review's defect 7 — A TAKE IS TAKEN ONLY WHERE IT IS ON THE RECORD: one the store refused is tried again at the
+					// step's end; what went wrong with it, or the finding it recorded, is said on the page.
+					if (took?.recorded === true) tacticTaken = true;
+					if (took?.failure !== undefined) tacticNotes.push(took.failure);
+					else if (took?.why !== undefined) tacticNotes.push(took.why);
+				} catch (e) {
+					// ⭐ The lead's ruling (g) — the take's failure, said among the notes; the try goes on to its view.
+					tacticNotes.push(`its take after try ${attempt} failed: ${describedThrow(e)}`);
+				}
+			}
 
 			// ── ⭐⭐ Package N — D9, D10 — THIS TRY'S FINISHED WORK AND ITS PLACE IN THE STEP'S SEQUENCE ──────────────────────
 			//
@@ -2645,7 +2873,8 @@ async function runModelUnit(u: ModelUnitRun) {
 				return failTheStepBeforeItsReview(
 					planId,
 					stepId,
-					`the host could not read the unit's workspace after try ${attempt}: ${e instanceof Error ? e.message : String(e)}`
+					`the host could not read the unit's workspace after try ${attempt}: ${describedThrow(e)}`,
+					await endTheStep()
 				);
 			}
 			const deliverable = {
@@ -2670,7 +2899,8 @@ async function runModelUnit(u: ModelUnitRun) {
 				return failTheStepBeforeItsReview(
 					planId,
 					stepId,
-					`the host could not record the files the unit changed after try ${attempt}: ${e instanceof Error ? e.message : String(e)}`
+					`the host could not record the files the unit changed after try ${attempt}: ${describedThrow(e)}`,
+					await endTheStep()
 				);
 			}
 			// ⭐ Package N's check, finding 2 — the view of the try the loop last made, which the completion below admits.
@@ -2777,9 +3007,7 @@ async function runModelUnit(u: ModelUnitRun) {
 				}
 			);
 			if (join.refusedBecause)
-				return fail(400, {
-					error: `The model ran ${observation.observedCount} command(s) and one could not be recorded as evidence: ${join.refusedBecause}`
-				});
+				return await stepRefused(`The model ran ${observation.observedCount} command(s) and one could not be recorded as evidence: ${join.refusedBecause}`);
 			joined = join.joined;
 			const refusedRuns = joined.filter((j) => !j.satisfied);
 			if (review.satisfied && refusedRuns.length === 0) break;
@@ -2824,11 +3052,23 @@ async function runModelUnit(u: ModelUnitRun) {
 			}
 			priorFindings = findings;
 		}
+	} catch (e) {
+		// ⭐ The review's second re-check (D), and the lead's ruling (c) on the third — an exception escaping a try runs the step's end before it goes on (or
+		// is given the end's result, where it already ran), and goes on as the same value, the end's notes named on it where its message can be written.
+		nameTheStepsEndOn(e, await endTheStep());
+		throw e;
 	} finally {
 		// ⚠ RELEASED WHEN THE UNIT STOPS BEING WORKED ON — satisfied, escalated, or out of tries — and in
-		// a `finally` so a refusal mid-loop cannot strand a live session.
-		producer.dispose();
+		// a `finally` so a refusal mid-loop cannot strand a live session. ⭐ The lead's rulings (b) and (i) on the review's third and fourth re-checks — the
+		// backstop, best-effort, where the producer is still open: on the ordinary way out — no refusal in a try — it is this `finally` that closes the
+		// producer, first, just before the step's end; on every other way out the end has closed it already, and this does nothing. Removing it would be
+		// equivalent, because the end closes the producer at its start; it stays as the backstop the lead ruled. Its failure is said among the end's notes,
+		// never in the step's outcome's place.
+		closeTheProducer();
 	}
+	// ⭐⭐ Package L17b1 — D77 — a tactic record asked for and not written while the step ran is a finding, recorded at the step's end; the step goes on —
+	// the step's end (`endTheStep`), here on the way the step ends with no refusal in its tries.
+	const stepEndNotes = await endTheStep();
 
 	// ── ⛔ AND NOW THE FLOOR DECIDES, WHICH IS THE WHOLE POINT ─────────────────────────────────────
 	//
@@ -2907,6 +3147,7 @@ async function runModelUnit(u: ModelUnitRun) {
 		// Why the loop stopped (`loopEnded`), as both arms below append it: `''` where it recorded no reason.
 		const loopEndedNote = loopEnded ? ` — ${loopEnded}` : '';
 		return fail(400, {
+			...stepEndNotes,
 			error: (review.satisfied
 				? // ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND WHEN THE WORK PRODUCT PASSED BUT A COMMAND'S RESULT DID NOT, THE COMMAND
 					// EVIDENCE'S OWN REFUSAL (`describeRefusedEvidence`), BEFORE THE ENGINE'S TEXT. The two reviews are independent
@@ -2942,7 +3183,7 @@ async function runModelUnit(u: ModelUnitRun) {
 				(waited ? ` — and the wait for a person’s choice could not be recorded: ${waited}` : '')
 		});
 	}
-	return { advanced: 'executed' };
+	return { advanced: 'executed', ...stepEndNotes };
 }
 
 /**
@@ -3234,6 +3475,21 @@ export const actions: Actions = {
 		const handOver = await handOverAcceptedWork(pwuId);
 		if (!handOver.ok) return fail(400, { error: `Execution failed: ${handOver.refusedBecause}` });
 
+		// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85, D77 (`REG-D-167` (4); `REG-D-166` (4)) — THE SESSION AND THE FEEDBACK, READ BEFORE ANYTHING
+		// IS DISPATCHED ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+		// Where this step's executor session is kept and how it opens — a replacement's forks its predecessor's (`successorRoundOf`) — and what its
+		// first turn carries after the instruction: a successor's, the narrative; the faulty unit's successor's, the round's failed criteria, the
+		// stage's records and the request for its tactic record (`feedbackForSuccessor`). ⛔ A session folder that cannot be read as one refuses the
+		// start here, nothing moved. ⭑ A unit that replaces none is started as before, its session aside.
+		let sessionPlace: ExecutorSessionPlace = IN_MEMORY_SESSION;
+		let successor: Awaited<ReturnType<typeof feedbackForSuccessor>> = undefined;
+		if (isModelStep) {
+			successor = await feedbackForSuccessor(getEngine(), getArtifactStore(), pwuId);
+			const place = sessionPlaceFor(pwuId, successor?.round.predecessor.id, executor);
+			if ('refusedBecause' in place) return fail(400, { error: `Execution failed: ${place.refusedBecause}` });
+			sessionPlace = place;
+		}
+
 		// ── ⭑⭑ JAN-EXECGOV EG-02 — `STA-8` STOPS BEING UNMET ────────────────────────────────────────────────
 		//
 		// *"Execution requires an approved plan and AUTHORIZED RUNTIME BINDINGS."* `REG-F-365` measured zero
@@ -3269,6 +3525,12 @@ export const actions: Actions = {
 				pwuType,
 				pwuTypeId,
 				typeFacts,
+				// ⭐⭐ Package L17b1 — D85 — where its session is kept and how it opens; D77 — what its first turn carries, and the tactic record it is asked for.
+				sessionPlace,
+				...(successor?.feedback ? { feedback: successor.feedback } : {}),
+				...(successor?.tacticRecordPath && successor.round.roundId
+					? { tactic: { path: successor.tacticRecordPath, roundId: successor.round.roundId } }
+					: {}),
 				// ⭐⭐ Package L15 — D69 — the units whose accepted work its instruction names, their files written above.
 				acceptedWork: handOver.acceptedWork,
 				// ⭐⭐ Package L16 — D70 — and the criteria its declared reviews will judge it by, read by the sign-off's own reader.
@@ -4176,6 +4438,10 @@ export const actions: Actions = {
 		// anything is dispatched, as Begin & Execute writes it: a refusal leaves the unit waiting, with nothing recorded.
 		const handOver = await handOverAcceptedWork(pwuId);
 		if (!handOver.ok) return fail(400, { error: `Re-running the work refused: ${handOver.refusedBecause}` });
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`) — the unit's one session, reopened where it was kept: read before anything is
+		// dispatched, a folder holding two session files refusing the re-run, naming it.
+		const sessionPlace = sessionPlaceFor(pwuId, undefined, chosen);
+		if ('refusedBecause' in sessionPlace) return fail(400, { error: `Re-running the work refused: ${sessionPlace.refusedBecause}` });
 
 		const decisionId = mintUiId('dec');
 		const planB = mintUiId('plan');
@@ -4205,7 +4471,8 @@ export const actions: Actions = {
 			...planRevision(s, decisionId, planB, {
 				id: stepB,
 				stepType: 'MODEL_INVOCATION',
-				purpose: `Re-attempt the work in a fresh session, after attempt ${s.attemptKey} was refused`,
+				// ⭐⭐ Package L17b1 — `REG-D-169` — on the unit's reopened session the purpose says so (`sessionWordsOf`); held in memory or new, as before.
+				purpose: `Re-attempt the work ${sessionWordsOf(sessionPlace)}, after attempt ${s.attemptKey} was refused`,
 				inputBindings: [],
 				...(binding ? { binding } : {})
 			})
@@ -4223,13 +4490,17 @@ export const actions: Actions = {
 			pwuType,
 			pwuTypeId,
 			typeFacts,
+			// ⭐⭐ Package L17b1 — D85 — the unit's one session, reopened where it was kept (`REG-D-169`).
+			sessionPlace,
 			// ⭐⭐ Package L15 — D69 — the units whose accepted work its instruction names, their files written above.
 			acceptedWork: handOver.acceptedWork,
 			// ⭐⭐ Package L16 — D70 — and the criteria its declared reviews will judge it by, read by the sign-off's own reader.
 			reviewCriteria: reviewCriteriaOf(pwuId),
 			carriedFindings: s.findings
 		});
-		return 'advanced' in ran ? { advanced: 'work-rerun' } : ran;
+		// ⭐ Package L17b1 — the lead's ruling (b) on the review's third re-check — the step's outcome kept, its end's notes with it (why its executor's
+		// session could not be closed among them), the advance named, as D71's re-run keeps them.
+		return 'advanced' in ran ? { ...ran, advanced: 'work-rerun' } : ran;
 	},
 
 	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L16 — design D71 (`REG-D-163` (2); `REG-F-640`; `REG-Q-034`) — RE-RUN THE WORK WITH THE REVIEWS'
@@ -4274,6 +4545,14 @@ export const actions: Actions = {
 		const handOver = await handOverAcceptedWork(pwuId);
 		if (!handOver.ok)
 			return fail(400, { error: `Re-running the work its declared reviews rejected refused: ${handOver.refusedBecause}` });
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`), D77 — the unit's one session, reopened where it was kept; and, where the
+		// assurance stage ran for this round, the feedback after the findings, with the request for its tactic record (`feedbackForRerun`) — both
+		// read before anything is dispatched. ⛔ A session folder that cannot be read as one refuses the re-run, nothing moved.
+		const sessionPlace = sessionPlaceFor(pwuId, undefined, chosen);
+		if ('refusedBecause' in sessionPlace)
+			return fail(400, { error: `Re-running the work its declared reviews rejected refused: ${sessionPlace.refusedBecause}` });
+		const roundId = offer.rejected[0]?.assessmentId;
+		const rerunFeedback = roundId === undefined ? undefined : await feedbackForRerun(getEngine(), getArtifactStore(), pwuId, roundId);
 
 		const decisionId = mintUiId('dec');
 		const planB = mintUiId('plan');
@@ -4297,7 +4576,8 @@ export const actions: Actions = {
 			chg(pwuId, 'UNDER_ASSURANCE', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED', [decisionId, ...verdictIds]),
 			...reworkPlan(pwuId, offer.activePlanIds, planB, {
 				id: stepB,
-				purpose: `Re-attempt the work in a fresh session, with the findings of the declared reviews that rejected it (Decision ${decisionId})`,
+				// ⭐⭐ Package L17b1 — `REG-D-169` — on the unit's reopened session the purpose says so (`sessionWordsOf`); held in memory or new, as before.
+				purpose: `Re-attempt the work ${sessionWordsOf(sessionPlace)}, with the findings of the declared reviews that rejected it (Decision ${decisionId})`,
 				...(binding ? { binding } : {})
 			})
 		]);
@@ -4314,12 +4594,16 @@ export const actions: Actions = {
 			pwuType,
 			pwuTypeId,
 			typeFacts,
+			// ⭐⭐ Package L17b1 — D85 — the unit's one session, reopened where it was kept; D77 — the feedback after its findings, and the tactic record.
+			sessionPlace,
+			...(rerunFeedback && roundId ? { feedback: rerunFeedback.feedback, tactic: { path: rerunFeedback.tacticRecordPath, roundId } } : {}),
 			acceptedWork: handOver.acceptedWork,
 			reviewCriteria: reviewCriteriaOf(pwuId),
 			// ⭐ D71 — each rejecting verdict's failed criteria, on the fresh session's first turn, after the instruction (RD8's form).
 			carriedFindings: offer.findings
 		});
-		return 'advanced' in ran ? { advanced: 'rejected-work-rerun' } : ran;
+		// ⭐ The independent review's defect 7 — the step's outcome kept, its tactic record's note with it (`tacticRecordNote`); the advance named.
+		return 'advanced' in ran ? { ...ran, advanced: 'rejected-work-rerun' } : ran;
 	},
 
 	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17a — design D72 (`REG-D-166` (1), (2), (5); `REG-F-643`; `REG-F-212`) — SEND THE WORK BACK TO AN EARLIER
@@ -4384,6 +4668,39 @@ export const actions: Actions = {
 		if (err) return fail(400, { error: `Sending the work back refused: ${err}` });
 		const notNoticed = await noticeSupersededWork(noticed, decisionId);
 		return notNoticed === null ? { advanced: 'work-sent-back' } : { advanced: 'work-sent-back', supersededWorkNotNoticed: notNoticed };
+	},
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D74 to D76 with D85 and D87 (`REG-D-166` (3), (4); `REG-D-167` (2), (4); the lead's ruling (B)) — RUN
+	// THE ASSURANCE STAGE AT A REJECTED SIGN-OFF ────────────────────────────────────────────────────────────────────────────────────────────────────
+	//
+	// ⭑ OFFERED ONCE PER ROUND, on a unit its declared reviews rejected whose round has no stage record yet (`assuranceStageOffer`); no rationale, since
+	// it records no Decision and moves no state. ONE PRESS (`runAssuranceStage`): the narrative's chapter (D76), then the Hypothesizer in a copy of the
+	// shared workspace (D74, D87), then — only on an open `KNOWN_FAILURE_RECURRENCE` recorded on the round — the Unsticking Agent (D75); each part
+	// recorded, a part that fails recorded as failing, refused or not run, and the stage going on. ⛔ The sign-off is byte for byte as it was, and the
+	// ways back stay offered whether or not the stage has run (package L17b2 puts the Historian and its rule in front of them).
+	runAssuranceStage: async ({ request }) => {
+		const pwuId = await pwuIdFrom(request);
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const testMode = isTestMode();
+		const done = await runAssuranceStage(pwuId, {
+			...stageRecordDepsOf(),
+			engine: getEngine(),
+			dispatchExchange: (payload, aggregateId) => dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
+			testMode,
+			executor: selectExecutor({ testMode }),
+			sandboxOf: (undertakingId) => resolveUndertakingSandbox(undertakingId),
+			sessionsRoot: durableSessionsRoot(process.env)
+		});
+		if ('refusedBecause' in done) return fail(400, { error: `The assurance stage refused: ${done.refusedBecause}` });
+		return {
+			advanced: 'assurance-stage',
+			stage: done.parts.map((p) => ({
+				part: p.part,
+				status: p.status,
+				...(p.artifactId ? { artifactId: p.artifactId } : {}),
+				...(p.why ? { why: p.why } : {})
+			}))
+		};
 	},
 
 	// ── ABANDON — S-1 of ROADMAP-decision-subject-scope (REG-F-077) ──────────────────────────────────────────

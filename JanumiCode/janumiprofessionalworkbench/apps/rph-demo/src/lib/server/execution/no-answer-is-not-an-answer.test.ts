@@ -80,6 +80,8 @@ function harness(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {
 		acceptedWork: [],
 		// ⭐⭐ Package L16 — D70 — no governing declared policy, SAID: the field is required.
 		reviewCriteria: [],
+		// ⭐⭐ Package L17b1 — D85 — a session that holds nothing, SAID: the field is required.
+		sessionHolds: { kind: 'NOTHING' as const },
 		binding: { kind: 'NONE' as const },
 		...over
 	};

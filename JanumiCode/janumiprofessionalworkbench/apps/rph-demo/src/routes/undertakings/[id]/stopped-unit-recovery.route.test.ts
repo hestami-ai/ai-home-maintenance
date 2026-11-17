@@ -57,7 +57,9 @@ const seam = vi.hoisted(() => ({
 	 * ⭐ `P76F-D` D2 — set, the engine refuses the next batch that completes a step, with this reason, and the seam clears it.
 	 * Unset, every batch is the real engine's.
 	 */
-	refuseCompletion: undefined as string | undefined
+	refuseCompletion: undefined as string | undefined,
+	/** ⭐ Package L17b1 — the lead's ruling (b) on the review's third re-check — set, the producer's session's close throws this, as Pi's cleanup does. */
+	disposeThrows: undefined as undefined | { readonly error: unknown }
 }));
 
 // ⭐⭐ `P76F-D` D2 — THE ENGINE'S BATCHES, the real `dispatchBatch`, save the one completion a case has the engine refuse
@@ -113,8 +115,9 @@ vi.mock('../../../lib/server/execution/model.js', async (importOriginal) => {
 				}
 			});
 			// ⭑ THE REAL SESSION, OBSERVED: each opening counted, and every turn recorded with the session it went to.
-			return async (context: Parameters<typeof open>[0]) => {
-				const session = await open(context);
+			// ⭐ Package L17b1 — D85 (reading 3) — the opener's second argument, where its session is kept, passed through.
+			return async (context: Parameters<typeof open>[0], place: Parameters<typeof open>[1]) => {
+				const session = await open(context, place);
 				const n = ++seam.sessions;
 				return {
 					...session,
@@ -125,7 +128,13 @@ vi.mock('../../../lib/server/execution/model.js', async (importOriginal) => {
 					processRuns: () =>
 						seam.observed
 							? (seam.observed as ReturnType<typeof session.processRuns>)
-							: session.processRuns()
+							: session.processRuns(),
+					// ⭐ Package L17b1 — the lead's ruling (b) — the real close, then, where a case says so, a throw, as Pi's `cleanupSessionResources` throws an
+					// `AggregateError` after its cleanups ran.
+					dispose: () => {
+						session.dispose();
+						if (seam.disposeThrows !== undefined) throw seam.disposeThrows.error;
+					}
 				};
 			};
 		})
@@ -409,6 +418,7 @@ beforeEach(() => {
 	seam.producerReply = undefined;
 	seam.reportedModel = 'fixture-assurance-model';
 	seam.refuseCompletion = undefined;
+	seam.disposeThrows = undefined;
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -819,6 +829,20 @@ describe('⭐ R-1c — re-run the work (RD5, RD8): a fresh session whose first t
 		);
 		expect(getEngine().readAllEvents().length).toBe(events);
 		expect(seam.sessions).toBe(sessions);
+	});
+
+	it('⛔ RED FIRST — a re-run of the work whose executor session cannot be closed says so beside its advance, and the advance stands (package L17b1, the lead’s ruling (b) on the review’s third re-check)', async () => {
+		const k = await aWaitingUnit([], REJECTED);
+		seam.answer = CLEAN;
+		// ⭑ Only the re-run's session fails to close, as Pi's cleanup fails (`pi-ai`, `session-resources.js`): an `AggregateError`.
+		seam.disposeThrows = { error: new AggregateError([new Error('the bash process would not stop')], 'Failed to cleanup session resources') };
+
+		const result = await act('rerunWork', { pwuId: k.pwuId, rationale: 'Address the finding.' }).catch((e: unknown) => ({ thrown: String(e) }));
+
+		expect(result, 'the close’s failure took the re-run’s outcome’s place, or is not said beside its advance').toEqual({
+			advanced: 'work-rerun',
+			sessionCloseNote: "The executor's session could not be closed: Failed to cleanup session resources"
+		});
 	});
 });
 

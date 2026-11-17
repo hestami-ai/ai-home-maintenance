@@ -28,6 +28,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createFilesystemWorkspace } from '../execution/filesystem-workspace.js';
 import { getExecutionSession } from '../execution/model.js';
+import { IN_MEMORY_SESSION } from '../execution/producer-session.js';
 import type { ToolInvocationResult } from '../tools/backing-tool.js';
 import {
 	expandText,
@@ -202,8 +203,10 @@ describe('⭐ the replay executor (D2) — recorded tool calls through the real 
 			writeFileSync(join(dir, file), text);
 		// ⭑ The sandbox's runner draws on the same replay the session opens: one recording, one set of cursors.
 		const run = checked(replayRunFor(dir));
+		// ⭐ Package L17b1 — D85 — the opener is handed where its session is kept; a replay keeps none and takes none.
 		const session = await getExecutionSession({ kind: 'REPLAY', recordingDir: dir })(
-			contextOn(run)
+			contextOn(run),
+			IN_MEMORY_SESSION
 		);
 		expect(session.retainsHistory).toBe(true);
 		const result = (await session.turn(TURN)) as ToolInvocationResult;

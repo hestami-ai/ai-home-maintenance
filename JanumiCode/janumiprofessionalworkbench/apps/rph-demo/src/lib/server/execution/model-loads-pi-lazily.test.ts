@@ -224,11 +224,14 @@ describe('⭐ D4 — loading `model.ts` loads no part of Pi’s SDK: it reaches 
 });
 
 describe('⭑ CONTROLS — the walk sees each load it forbids, and passes what it must', () => {
+	// ⭐ Package L17b1 — D85 (reading 3, the lead's addition: "it still pins the lazy load, and now the place passed") — RESTATED as model.ts writes
+	// the default opener now, its third argument the session's place: ~~`(async (context, modelId) =>`~~ and
+	// ~~`openPiExecutionSession(context, modelId));`~~.
 	const OPENER = [
 		'const openPi =',
 		'\tdeps.openPi ??',
-		'\t(async (context, modelId) =>',
-		"\t\t(await import('../tools/pi-executor.js')).openPiExecutionSession(context, modelId));"
+		'\t(async (context, modelId, place) =>',
+		"\t\t(await import('../tools/pi-executor.js')).openPiExecutionSession(context, modelId, place));"
 	].join('\n');
 
 	it('the default opener, as model.ts writes it, is the one load it allows', () => {

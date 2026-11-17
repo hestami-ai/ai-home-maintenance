@@ -11,7 +11,7 @@ import {
 	humanizeCode,
 	type Severity
 } from '@janumipwb/rph-assurance';
-import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from '@janumipwb/rph-application';
+import { DEFAULT_CONTEXT_ASSEMBLY_POLICY, LOOP_CONTEXT_ASSEMBLY_POLICY } from '@janumipwb/rph-application';
 import type { AuthedEngineHandle, EngineSeedPolicy } from './engine.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
 
@@ -263,6 +263,18 @@ export function seedContextAssemblyPolicy(handle: AuthedEngineHandle): void {
 		{
 			policyId: DEFAULT_CONTEXT_ASSEMBLY_POLICY.policyId,
 			permittedSources: DEFAULT_CONTEXT_ASSEMBLY_POLICY.permittedSources
+		}
+	);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — `REG-D-170` — AND, BESIDE IT, THE POLICY EVERY NEW BINDING IS MINTED WITH (`handlers/runtime-binding.ts`):
+	// `ctx-default`'s five pairs and the defect loop's two at THIS_UNDERTAKING. ⛔ `ctx-default` stays seeded, unchanged: the record of what governed
+	// every binding minted before it. A store seeded before this package holds it alone (a continued run's boot creates this one, design D80).
+	send(
+		'CreateContextAssemblyPolicy',
+		'CONTEXT_ASSEMBLY_POLICY',
+		'ctxpol_0000000000000000000000CTX2',
+		{
+			policyId: LOOP_CONTEXT_ASSEMBLY_POLICY.policyId,
+			permittedSources: LOOP_CONTEXT_ASSEMBLY_POLICY.permittedSources
 		}
 	);
 }

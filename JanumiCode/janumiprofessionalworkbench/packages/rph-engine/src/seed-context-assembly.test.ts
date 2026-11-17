@@ -6,7 +6,9 @@
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { testDirectory } from '@janumipwb/rph-ports/testing';
 import {
+	DEFAULT_CONTEXT_ASSEMBLY_POLICY,
 	DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID,
+	LOOP_CONTEXT_ASSEMBLY_POLICY_ID,
 	permits,
 	resolveContextAssemblyPolicy
 } from '@janumipwb/rph-application';
@@ -85,5 +87,62 @@ describe('JAN-CTXPOL — the seeded policy resolves from a real engine', () => {
 		expect(permits(policy, 'PRIOR_WORK_PRODUCT', 'THIS_UNDERTAKING')).toBe(true);
 		for (const source of ['RENDERED_INSTRUCTION', 'PRIOR_REVIEW_FINDING', 'PRIOR_RATIONALE'] as const)
 			expect(permits(policy, source, 'THIS_UNDERTAKING'), `${source} crosses into a second unit`).toBe(false);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — `REG-D-170` (the lead's delegated ruling, flagged for the sponsor's confirmation) — A SECOND POLICY, UNDER A NEW
+// ID, SEEDED BESIDE `ctx-default`, WHICH STAYS AS IT IS: `ctx-default`'s five pairs and the defect loop's two at THIS_UNDERTAKING; and every binding
+// minted from here on names it. ⛔ Still no other unit's instruction: `RENDERED_INSTRUCTION` at THIS_UNDERTAKING stays refused.
+describe('⭐⭐ REG-D-170 — ctx-default-loop, seeded beside ctx-default and named by every new binding', () => {
+	it('⛔ RED FIRST — the seed holds ctx-default-loop: ctx-default’s five pairs, then PRIOR_RATIONALE and PRIOR_REVIEW_FINDING at THIS_UNDERTAKING', () => {
+		const engine = build();
+		seedContextAssemblyPolicy(engine);
+		const loop = resolveContextAssemblyPolicy(finder(engine), LOOP_CONTEXT_ASSEMBLY_POLICY_ID);
+		expect(loop.permittedSources, 'the loop’s policy is not ctx-default’s pairs and the two').toEqual([
+			...DEFAULT_CONTEXT_ASSEMBLY_POLICY.permittedSources,
+			{ source: 'PRIOR_RATIONALE', scope: 'THIS_UNDERTAKING' },
+			{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }
+		]);
+		expect(permits(loop, 'RENDERED_INSTRUCTION', 'THIS_UNDERTAKING'), 'another unit’s instruction crosses').toBe(false);
+		expect(
+			listByType(engine, 'CONTEXT_ASSEMBLY_POLICY').map((r) => (r.state as { policyId?: unknown }).policyId),
+			'the seed does not hold the two policies'
+		).toEqual([DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID, LOOP_CONTEXT_ASSEMBLY_POLICY_ID]);
+	});
+
+	it('⭑ CONTROL — ctx-default stays seeded, unchanged: the record of what governed every binding minted before', () => {
+		const engine = build();
+		seedContextAssemblyPolicy(engine);
+		const policy = resolveContextAssemblyPolicy(finder(engine), DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID);
+		expect(policy.permittedSources, 'ctx-default moved').toEqual(DEFAULT_CONTEXT_ASSEMBLY_POLICY.permittedSources);
+	});
+
+	it('⛔ RED FIRST — a binding requested now names ctx-default-loop, which resolves', () => {
+		const engine = build();
+		seedContextAssemblyPolicy(engine);
+		const bindingId = 'bind_01ARZ3NDEKTSV4RRFFQ69H17B1';
+		const r = engine.dispatch({
+			commandId: 'l17b1-bind-1',
+			commandType: 'RequestRuntimeBinding',
+			commandSchemaVersion: 1,
+			targetAggregateType: 'RUNTIME_BINDING',
+			targetAggregateId: bindingId,
+			issuedAt: '2026-09-06T00:00:00Z',
+			correlationId: 'l17b1',
+			idempotencyKey: 'l17b1-bind-1',
+			payload: {
+				runtimeBindingId: bindingId,
+				executionStepId: 'plan_01ARZ3NDEKTSV4RRFFQ69H17B1-s1',
+				roleId: 'role-executor',
+				requestedCapabilities: [{ capability: 'file-system' }]
+			}
+		});
+		expect(r.status, `arrangement: the binding — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+		const named = (listByType(engine, 'RUNTIME_BINDING').find((b) => b.id === bindingId)?.state as { contextAssemblyPolicyId?: unknown } | undefined)
+			?.contextAssemblyPolicyId;
+		expect(named, 'a new binding does not name the loop’s policy').toBe(LOOP_CONTEXT_ASSEMBLY_POLICY_ID);
+		expect(resolveContextAssemblyPolicy(finder(engine), String(named)).policyId, 'the policy it names does not resolve').toBe(
+			LOOP_CONTEXT_ASSEMBLY_POLICY_ID
+		);
 	});
 });

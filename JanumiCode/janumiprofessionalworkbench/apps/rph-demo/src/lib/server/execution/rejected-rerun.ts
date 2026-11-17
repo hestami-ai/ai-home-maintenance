@@ -10,6 +10,7 @@ import { listByType, listExecutionPlans, type EngineHandle } from '@janumipwb/rp
 import {
 	governingDeclaredPolicies,
 	latestDeclaredVerdicts,
+	type GoverningDeclaredPolicy,
 	type LatestDeclaredVerdict
 } from '../assurance/declared-policy-signoff.js';
 
@@ -35,6 +36,51 @@ export interface RejectedRerunOffer {
 	readonly consideredObservationIds: readonly string[];
 	/** The unit's ACTIVE plans: the one the new plan supersedes (RD5's edge; one plan per unit may be ACTIVE). */
 	readonly activePlanIds: readonly string[];
+}
+
+/**
+ * ⭐ D71 — each rejecting verdict's carried criteria (`CARRIED_RESULTS`), policy by policy in the selection's order and each policy's criteria in its own
+ * order: coded by the criterion's id, its statement the verdict's recorded rationale for it (the lead's). ⭐ Package L17b1 — moved here, whole, so the
+ * re-run, the assurance stage and a successor's turn read one statement of them (`rejectingVerdictFindings`).
+ */
+function carriedFindingsOf(
+	engine: EngineHandle,
+	rejecting: readonly GoverningDeclaredPolicy[],
+	latest: ReadonlyMap<string, LatestDeclaredVerdict>
+): { readonly code: string; readonly statement: string }[] {
+	return rejecting.flatMap((p) => {
+		const recorded = recordedResultsOf(engine, latest.get(p.policyId)!.assessmentId);
+		return p.criteria.flatMap((c) => {
+			const r = recorded.get(c.id);
+			if (r === undefined || !CARRIED_RESULTS.has(r.result)) return [];
+			return [
+				{
+					code: c.id,
+					// ⚠ The builder's reading, named: a criterion recorded with no rationale is carried with its result instead.
+					statement: r.rationale.trim() === '' ? `Criterion ${c.id} was answered ${r.result}, with no rationale recorded.` : r.rationale
+				}
+			];
+		});
+	});
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D74, D76, D77 — THE REJECTING VERDICTS OF A UNIT AND THEIR FAILED CRITERIA, whoever does its work: the
+ * governing declared policies whose latest verdict over it is REJECTED, in the selection's order — the round the assurance stage answers, its first
+ * the round's id — and their findings in D71's form. ⭑ No state is asked: a reader of a round already knows the unit was rejected.
+ */
+export function rejectingVerdictFindings(
+	engine: EngineHandle,
+	pwuId: string
+): { readonly rejected: readonly LatestDeclaredVerdict[]; readonly findings: readonly { readonly code: string; readonly statement: string }[] } {
+	const { policies } = governingDeclaredPolicies(engine, pwuId);
+	const latest = latestDeclaredVerdicts(
+		engine,
+		pwuId,
+		policies.map((p) => p.policyId)
+	);
+	const rejecting = policies.filter((p) => latest.get(p.policyId)?.state === 'REJECTED');
+	return { rejected: rejecting.map((p) => latest.get(p.policyId)!), findings: carriedFindingsOf(engine, rejecting, latest) };
 }
 
 /** One criterion's last recorded result on `assessmentId` (`AssuranceCriterionEvaluated`), by its id: its result and its rationale. */
@@ -96,20 +142,8 @@ export function rejectedRerunOffer(engine: EngineHandle, pwuId: string): Rejecte
 				'reviews at its sign-off, and nothing here may be re-run with their findings (REG-D-163 (2))'
 		};
 	const rejected = rejecting.map((p) => latest.get(p.policyId)!);
-	const findings = rejecting.flatMap((p) => {
-		const recorded = recordedResultsOf(engine, latest.get(p.policyId)!.assessmentId);
-		return p.criteria.flatMap((c) => {
-			const r = recorded.get(c.id);
-			if (r === undefined || !CARRIED_RESULTS.has(r.result)) return [];
-			return [
-				{
-					code: c.id,
-					// ⚠ The builder's reading, named: a criterion recorded with no rationale is carried with its result instead.
-					statement: r.rationale.trim() === '' ? `Criterion ${c.id} was answered ${r.result}, with no rationale recorded.` : r.rationale
-				}
-			];
-		});
-	});
+	// ⭐ Package L17b1 — the one reading of the rejecting verdicts' findings, which the assurance stage and a successor's turn read too (D74, D77).
+	const findings = carriedFindingsOf(engine, rejecting, latest);
 	const verdictIds = new Set(rejected.map((v) => v.assessmentId));
 	return {
 		rejected,

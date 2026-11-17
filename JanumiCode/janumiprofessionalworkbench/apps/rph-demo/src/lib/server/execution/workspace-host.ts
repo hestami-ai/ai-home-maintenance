@@ -146,6 +146,35 @@ function durableWorkspaceRoot(env: NodeJS.ProcessEnv): string | undefined {
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4)) — WHERE THE RUN'S PI SESSIONS ARE KEPT: `<D>.sessions`, beside `<D>.workspaces`
+ * and outside every workspace, so no review and no tree a model writes holds a session — or `undefined`, and every session is then held in memory,
+ * byte for byte as before. ⛔ ASKED OF `durableWorkspaceRoot` ITSELF, never restated: one affirmative test, from one key, decides every plane's
+ * durability — only a process that declares itself serving, with its store named, gets either.
+ */
+export function durableSessionsRoot(env: NodeJS.ProcessEnv): string | undefined {
+	return durableWorkspaceRoot(env) === undefined ? undefined : `${env.JPWB_DEMO_DB}.sessions`;
+}
+
+/** ⭐ D85 — whose sessions a folder holds: a unit's executor's, or the assurance stage's helper of one round (D74, D75). */
+export type SessionRole = 'executor' | 'hypothesizer' | 'unsticking';
+
+/**
+ * ⭐ D85 — THE FOLDER ONE SESSION LIVES IN: `<root>/<role>/<id>`, the id a unit's or a round's. ⛔ Refused, never substituted, for the owner id's reasons
+ * (`resolveUndertakingSandbox`): an id that is not one path segment, or a root that resolves against this process.
+ */
+export function sessionFolderOf(root: string, role: SessionRole, id: string): string {
+	const segment = containedWorkspacePath(id);
+	if (segment === undefined || segment !== id || segment.includes('/'))
+		throw new Error(
+			`'${id}' cannot name a session folder: the id becomes ONE path segment under the sessions root, so it may not be empty, contain a separator or resolve above the root.`
+		);
+	const rooted = rootedIndependentlyOfTheProcess(root);
+	if (!rooted)
+		throw new Error(`'${root}' cannot be a sessions root: it is not absolute, so it resolves against this process's own working directory.`);
+	return resolvePath(join(root, role, id));
+}
+
+/**
  * ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D3; `REG-F-530`) — THE REPLAY THIS PROCESS RUNS, or `undefined`.
  *
  * ⛔ TEST MODE AND THE SWITCH, BOTH, READ AFFIRMATIVELY — `RPH_DEMO_MODE === 'test'`, the one declaration the stand-ins

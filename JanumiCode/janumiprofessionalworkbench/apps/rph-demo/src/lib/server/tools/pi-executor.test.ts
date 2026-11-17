@@ -45,7 +45,7 @@ import {
 import type { ProcessRunner, Workspace } from '@janumipwb/rph-ports';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
-import type { ProducerSessionContext } from '../execution/producer-session.js';
+import { IN_MEMORY_SESSION, type ProducerSessionContext } from '../execution/producer-session.js';
 import { isToolInvocationResult } from './backing-tool.js';
 import { openPiExecutionSession } from './pi-executor.js';
 
@@ -148,7 +148,8 @@ afterAll(() => {
 describe('⭐ REG-F-512’s predicted red, for the executor: its recorded composite carries nothing Pi finds around the workspace', () => {
 	it('⛔ a session opened over a workspace holding AGENTS.md and .pi/APPEND_SYSTEM.md carries neither text — nor the CLAUDE.md above it, nor the agent folder’s — and its tools are the minted ones', async () => {
 		faux.setResponses([answering('The faux provider’s answer.')]);
-		const session = await openPiExecutionSession(context, `${PROVIDER}/faux-model`);
+		// ⭐ Package L17b1 — D85 — held in memory, as before: the place a store with no durable path gives (`pi-executor-session.test.ts` holds the rest).
+		const session = await openPiExecutionSession(context, `${PROVIDER}/faux-model`, IN_MEMORY_SESSION);
 		let composite: string | undefined;
 		try {
 			const result = await session.turn('One turn, answered from the faux script.');

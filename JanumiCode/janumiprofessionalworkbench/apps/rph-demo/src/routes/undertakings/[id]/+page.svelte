@@ -20,6 +20,12 @@
 			advanced?: string;
 			acceptedWorkNotWritten?: string;
 			supersededWorkNotNoticed?: string;
+			// ⭐⭐ Package L17b1 — D74 to D76 — what one press of the assurance stage recorded, part by part.
+			stage?: readonly { readonly part: string; readonly status: string; readonly artifactId?: string; readonly why?: string }[];
+			// ⭐ Package L17b1 — the independent review's defect 7 — what went wrong with the step's tactic record, or the finding its take recorded.
+			tacticRecordNote?: string;
+			// ⭐ Package L17b1 — the lead's ruling (b) on the review's third re-check — why the executor's session could not be closed at the step's end.
+			sessionCloseNote?: string;
 		} | null;
 	} = $props();
 	const themeContext = getContext<ThemeContext>(THEME_CONTEXT);
@@ -206,6 +212,14 @@
 			<!-- ⭐⭐ `JAN-EXEC` Phase 7, package L17a — D72 (`REG-D-166` (1)), the lead's option (D): the work was sent back, and a superseded
 				 unit's accepted-work file could not be given its notice; the act stands, and the page says so, file by file. -->
 			{#if form?.supersededWorkNotNoticed}<p class="err" role="alert" data-testid="superseded-work-not-noticed">{form.supersededWorkNotNoticed}</p>{/if}
+			<!-- ⭐ Package L17b1 — the independent review's defect 7: a tactic record not taken, a notice not written, or a record never written, said. -->
+			{#if form?.tacticRecordNote}<p class="err" role="alert" data-testid="tactic-record-note">The tactic record: {form.tacticRecordNote}</p>{/if}
+			<!-- ⭐ Package L17b1 — the lead's ruling (b) on the review's third re-check: the executor's session could not be closed at the step's end; the step's
+				 outcome stands, and the page says so. -->
+			{#if form?.sessionCloseNote}<p class="err" role="alert" data-testid="session-close-note">{form.sessionCloseNote}</p>{/if}
+			<!-- ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — D74 to D76 (`REG-D-166` (3)): what one press of the assurance stage recorded, part by part, and why a
+				 part did not run or failed. -->
+			{#if form?.stage}<p class="hint" role="status" data-testid="assurance-stage-outcome">The assurance stage: {form.stage.map((s) => `${s.part} ${s.status}${s.why ? ` (${s.why})` : ''}`).join('; ')}.</p>{/if}
 			<h3>PWU Instances → PWU Types</h3>
 			<p class="hint">
 				Each PWU Instance realizes a PWU Type defined by the PWA (or is a declared local extension), and
@@ -423,6 +437,16 @@
 														data-testid="send-work-back-rationale"
 													/>
 													<button class="mini" type="submit" data-testid="send-work-back">Send the work back</button>
+												</form>
+											{/if}
+											<!-- ⭐⭐ JAN-EXEC Phase 7, package L17b1 — D74 to D76 (REG-D-166 (3); the lead's ruling (B)) — THE ASSURANCE STAGE AT A REJECTED
+											     SIGN-OFF. Offered ONLY on a unit its declared reviews rejected whose round has no stage record yet, as the server reads it
+											     (`assuranceStageOffer`), once per round: the narrative's chapter, the Hypothesizer, and — on an open recurrence — the
+											     Unsticking Agent, each recorded. It records no Decision and moves no state, so it asks for no rationale. -->
+											{#if data.assuranceStageByPwu[p.id]}
+												<form method="POST" action="?/runAssuranceStage" use:enhance class="findingform">
+													<input type="hidden" name="pwuId" value={p.id} />
+													<button class="mini" type="submit" data-testid="run-assurance-stage">Run the assurance stage</button>
 												</form>
 											{/if}
 											<!-- REJECTION IS OFFERED ONLY WHERE A BLOCKING FINDING ACTUALLY STANDS (S-1b / B-3).
