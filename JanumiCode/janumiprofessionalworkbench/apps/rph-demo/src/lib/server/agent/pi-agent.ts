@@ -7,13 +7,13 @@
 // DISABLED (noTools: "builtin") — it can ONLY touch the workbench through our authoring tools. ⭐ And, since the lead's
 // delegated decision of 2026-10-16 (registered as REG-D-114 (19)), with no extension's tools beside them: until then an
 // extension Pi found around the server's folder or in its agent folder offered its own (`run`, at the loader).
+import { InMemoryModelsStore } from '@earendil-works/pi-ai';
 import {
-	AuthStorage,
 	createAgentSession,
 	DefaultResourceLoader,
 	defineTool,
 	getAgentDir,
-	ModelRegistry,
+	ModelRuntime,
 	resolveCliModel,
 	SessionManager,
 	SettingsManager
@@ -66,13 +66,15 @@ function toPiTools(descriptors: AuthoringToolDescriptor[]) {
  *   1. JPWB_AGENT_MODEL ("provider/id") — an explicit override for this app.
  *   2. The user's configured DEFAULT model+provider from Pi's real settings (what the TUI shows).
  *   3. The first model that actually has valid credentials.
- * (Never hardcode a provider — a plain modelRegistry.find() would return a keyless catalog entry that fails at
- * session time, and assuming "anthropic" is wrong when the user is on, e.g., OpenAI/Codex.)
+ * (Never hardcode a provider — a plain ~~modelRegistry.find()~~ catalog lookup (`modelRuntime.getModel()`, Pi 1.5.2) would
+ * return a keyless catalog entry that fails at session time, and assuming "anthropic" is wrong when the user is on, e.g.,
+ * OpenAI/Codex.)
+ * ⭐ TS5 (Pi 1.5.2): asked of Pi's `ModelRuntime`, which replaced the registry in 0.80.8; its `getAvailable()` is async.
  */
-function resolveModel(modelRegistry: ModelRegistry, settingsManager: SettingsManager) {
+async function resolveModel(modelRuntime: ModelRuntime, settingsManager: SettingsManager) {
 	const override = process.env.JPWB_AGENT_MODEL;
 	if (override) {
-		const r = resolveCliModel({ cliModel: override, modelRegistry });
+		const r = resolveCliModel({ cliModel: override, modelRuntime });
 		if (r.model) return r.model;
 	} else {
 		const defaultModelId = settingsManager.getDefaultModel();
@@ -80,12 +82,12 @@ function resolveModel(modelRegistry: ModelRegistry, settingsManager: SettingsMan
 			const r = resolveCliModel({
 				cliProvider: settingsManager.getDefaultProvider(),
 				cliModel: defaultModelId,
-				modelRegistry
+				modelRuntime
 			});
 			if (r.model) return r.model;
 		}
 	}
-	const available = modelRegistry.getAvailable();
+	const available = await modelRuntime.getAvailable();
 	if (available[0]) return available[0];
 	throw new Error(
 		'No Pi model available. Configure a model in Pi (run `pi` and log in, or the TUI), or set JPWB_AGENT_MODEL to a provider/id.'
@@ -118,8 +120,10 @@ export class PiAuthoringAgent implements AuthoringAgent {
 		let session: Awaited<ReturnType<typeof createAgentSession>>['session'] | undefined;
 		let unsubscribe: (() => void) | undefined;
 		try {
-			const authStorage = AuthStorage.create();
-			const modelRegistry = ModelRegistry.create(authStorage);
+			// ⭐ TS5 (Pi 1.5.2): one `ModelRuntime` where `AuthStorage` and `ModelRegistry` were, its catalog store in
+			// memory, as the executor's is and for its reason (`tools/pi-executor.ts`): Pi's built-in models and
+			// `models.json` alone, not the catalog Pi's own command line last saved in the agent folder.
+			const modelRuntime = await ModelRuntime.create({ modelsStore: new InMemoryModelsStore() });
 			// Read the user's REAL Pi settings (same agent dir the TUI uses) so we inherit their default model.
 			// ⛔ TRUSTING NO PROJECT, as the executor's does (the lead's delegated decision of 2026-10-16, registered
 			// as REG-D-114 (19); `REG-F-512`). Pi trusts a project's `.pi/settings.json` by default, and the project here is the
@@ -129,7 +133,7 @@ export class PiAuthoringAgent implements AuthoringAgent {
 			const settingsManager = SettingsManager.create(process.cwd(), getAgentDir(), {
 				projectTrusted: false
 			});
-			const model = resolveModel(modelRegistry, settingsManager);
+			const model = await resolveModel(modelRuntime, settingsManager);
 			// §8.12 checks independence against the ACTUAL model/provider, never a role label — so emit the
 			// resolved identity structurally rather than only as display text, and let the floor bind to it.
 			emit({
@@ -147,7 +151,8 @@ export class PiAuthoringAgent implements AuthoringAgent {
 			// under it; the extensions found in both, and in the packages the settings list, were loaded into the server,
 			// their tools offered beside the authoring tools; and a turn beginning with `/` could expand a skill or prompt
 			// template found there. Now the instruction is the prompt with Pi's own date and working-directory lines after
-			// it, and the tools are the authoring tools alone.
+			// it ⭐ (TS5, Pi 1.5.2: with Pi's working-directory section, `<cwd>`, and no date), and the tools are the
+			// authoring tools alone.
 			const loader = new DefaultResourceLoader(
 				closedResourceLoaderOptions({
 					cwd: process.cwd(),
@@ -168,8 +173,7 @@ export class PiAuthoringAgent implements AuthoringAgent {
 				resourceLoader: loader,
 				sessionManager: SessionManager.inMemory(),
 				settingsManager,
-				authStorage,
-				modelRegistry
+				modelRuntime
 			});
 			session = created.session;
 

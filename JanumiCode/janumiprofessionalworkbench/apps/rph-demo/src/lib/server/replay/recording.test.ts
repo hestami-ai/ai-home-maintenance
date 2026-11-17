@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
 	DECLARED_TYPE_FIELDS,
 	expandText,
+	instructionsOfSentPrompt,
 	RECORDING_FILES,
 	RECORDING_FORMAT,
 	readRecording,
@@ -27,6 +28,39 @@ import {
 	type Recording
 } from './recording.js';
 import { fixtureExecutorKey, fixtureManifest } from './replay-fixture.testing.js';
+
+/**
+ * ⭐ TS5 (Pi 1.5.2) — THE EXECUTOR'S INSTRUCTIONS AS SENT ARE THE SYSTEM PROMPT LESS PI'S TRAILER, IN EITHER PI'S FORM. The
+ * recorder keys a try's instructions as this cut leaves them (`scripts/phase7/record-replay-core.ts`), and refuses a try
+ * whose prompt has no trailer it knows. Pi 0.80.6 ends a custom prompt with *"Current date: …"* and *"Current working
+ * directory: …"*; Pi 1.5.2 sends no date and ends it with its working-directory section, `<cwd>`, each section after the
+ * first in its tag (`pi-coding-agent` `dist/core/system-prompt.js`, `buildSystemPromptSections`). A recording of a run on
+ * 0.80.6 holds the first, one on 1.5.2 the second, and the contract between them is the same text, so both key alike.
+ * ⛔ PREDICTED RED, observed 2026-11-17 before the cut knew the second form: the 1.5.2 cases, *"expected undefined to be
+ * 'THE CONTRACT\nline two'"* and the same for the section before it.
+ */
+describe('⭐ TS5 (Pi 1.5.2) — the executor’s instructions as sent: the system prompt less Pi’s trailer, in either Pi’s form', () => {
+	const contract = 'THE CONTRACT\nline two';
+	it('⭑ CONTROL — Pi 0.80.6’s trailer, the date and the working directory, is cut: a recording of a run made before TS5', () => {
+		expect(
+			instructionsOfSentPrompt(`${contract}\nCurrent date: 2026-10-11\nCurrent working directory: E:/runs/x`)
+		).toBe(contract);
+	});
+	it('⛔ Pi 1.5.2’s trailer, its working-directory section, is cut', () => {
+		expect(instructionsOfSentPrompt(`${contract}\n\n<cwd>\nE:/runs/x\n</cwd>`)).toBe(contract);
+	});
+	it('⛔ a section Pi added before it stays in the instructions, as anything else Pi added does', () => {
+		expect(
+			instructionsOfSentPrompt(`${contract}\n\n<addendum>\nmore\n</addendum>\n\n<cwd>\nE:/runs/x\n</cwd>`)
+		).toBe(`${contract}\n\n<addendum>\nmore\n</addendum>`);
+	});
+	it('⭑ CONTROL — no trailer it knows, no instructions: nothing is guessed about where the instruction ends', () => {
+		expect(instructionsOfSentPrompt(contract)).toBeUndefined();
+		expect(
+			instructionsOfSentPrompt(`${contract}\n\n<cwd>\nE:/runs/x\n</cwd>\n\n<mcp_servers>\nx\n</mcp_servers>`)
+		).toBeUndefined();
+	});
+});
 
 const RECORDING: Recording = {
 	manifest: {

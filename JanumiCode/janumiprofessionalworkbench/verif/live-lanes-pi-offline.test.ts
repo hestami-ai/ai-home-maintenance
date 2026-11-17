@@ -9,6 +9,15 @@
 // `pi-agent-core`, which make the model calls, names it — held below against the installed packages, so a Pi upgrade
 // that reads it anywhere else reddens here until someone decides about it. `playwright.live-exec.config.ts` says which
 // of those reads the server reaches.
+// ⭐ TS5 (Pi 1.5.2, read 2026-11-17) — NINE FILES OF THE CODING AGENT, AND STILL NONE OF THE PACKAGES THAT MAKE A MODEL CALL.
+// The five above, and four more. `dist/core/model-runtime.js`: `new ModelRuntime(…, process.env.PI_OFFLINE ===
+// undefined)`, the parameter `modelNetworkEnabled`, so offline (set to anything) Pi refreshes no model catalog over the
+// network; the model calls themselves are untouched, and the executor and the authoring agent keep their catalog in
+// memory (`InMemoryModelsStore`), so what Pi's command line last saved never reaches them either.
+// `dist/modes/interactive/bug-report.js`: `/bug` uploads nothing offline. And two chunks of Pi's bundled command line
+// (`dist/bundle/chunks/`, behind `dist/bundle/cli.js`, the `pi` binary, and `rpc-entry`), which carry the same model
+// runtime, package-manager, tools-manager and version-check code; the server imports Pi's main entry, which loads no
+// part of the bundle. ⛔ pi-schema and pi-telemetry, new in 1.5 and loaded by pi-ai, name it nowhere either: held below.
 // ⭑ READ FROM THE CONFIGS' SOURCE, never loaded: loading `playwright.live-exec.config.ts` runs its lane-key refusal, and
 // no live lane runs here. Playwright starts the server with `{ ...process.env, ...webServer.env }`
 // (`verif/live-backend-isolation.reporter.ts`), so the value a config sets is the server's whatever the operator's shell
@@ -110,16 +119,24 @@ describe('⭐ every live lane’s server runs Pi offline (the lead’s delegated
 		);
 	});
 
-	it('⛔ PI_OFFLINE touches no model call: no file of pi-ai or pi-agent-core names it, and the coding agent reads it in its five files alone', () => {
-		// ⭑ The two packages that make a model call are searched for the NAME, anywhere — a read, a help text, a key.
+	it('⛔ PI_OFFLINE touches no model call: no file of pi-ai, pi-agent-core or the two packages pi-ai loads names it, and the coding agent reads it in its nine files alone', () => {
+		// ⭑ The two packages that make a model call ⭐ and the two pi-ai loads since Pi 1.5 (TS5) are searched for the NAME,
+		// anywhere — a read, a help text, a key.
 		expect(filesHolding(join(installed('pi-ai'), 'dist'), 'PI_OFFLINE')).toEqual([]);
 		expect(filesHolding(join(installed('pi-agent-core'), 'dist'), 'PI_OFFLINE')).toEqual([]);
-		// ⭑ CONTROL, and the coding agent's reads: the search reads the installed files, and finds the five.
+		expect(filesHolding(join(installed('pi-schema'), 'dist'), 'PI_OFFLINE')).toEqual([]);
+		expect(filesHolding(join(installed('pi-telemetry'), 'dist'), 'PI_OFFLINE')).toEqual([]);
+		// ⭑ CONTROL, and the coding agent's reads: the search reads the installed files, and finds ~~the five~~ ⭐ the nine
+		// (TS5, Pi 1.5.2: the header says what each of the four added does).
 		expect(
 			filesHolding(join(installed('pi-coding-agent'), 'dist'), 'process.env.PI_OFFLINE')
 		).toEqual([
+			'bundle/chunks/chunk-MMDXLZVS.js',
+			'bundle/chunks/chunk-VEJDBY3O.js',
+			'core/model-runtime.js',
 			'core/package-manager.js',
 			'main.js',
+			'modes/interactive/bug-report.js',
 			'modes/interactive/interactive-mode.js',
 			'utils/tools-manager.js',
 			'utils/version-check.js'

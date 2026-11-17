@@ -24,7 +24,7 @@
 // ⭑ IT RESUMES: an entry the file holds is not asked again. And before the first request it prints how many it will make, and
 // the time they take at 16.3 s a request (the later check's median on Ollama 0.40.15).
 //
-// usage: bun --conditions=source scripts/reviewer-qual/decision-model-records.ts --server <address> --model <name>
+// usage: bun --conditions=janumipwb-source scripts/reviewer-qual/decision-model-records.ts --server <address> --model <name>
 //          --digest <12 or more hexadecimal characters> [--set v13|probes|both]
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

@@ -731,9 +731,11 @@ export function k5Check(input: K5Input): K5Check {
  * polish round, reads none (`pi-executor-resources.ts`): `AGENTS.md`, `AGENTS.MD`,
  * `CLAUDE.md` or `CLAUDE.MD` (`@earendil-works/pi-coding-agent` `dist/core/resource-loader.js`,
  * `loadContextFileFromDir`). ⚠ Matched in ANY case: Pi asks for each by name with `existsSync`, which on Windows finds
- * `Agents.md` too.
+ * `Agents.md` too. ⭐ TS5 (Pi 1.5.2): and `AGENTS.override.md`, which Pi asks each folder for first since 0.84.0
+ * (*"Added per-directory `AGENTS.override.md` context files, which replace `AGENTS.md` or `CLAUDE.md` in the same
+ * directory"*).
  */
-const CONTEXT_FILE_NAMES = ['agents.md', 'claude.md'] as const;
+const CONTEXT_FILE_NAMES = ['agents.override.md', 'agents.md', 'claude.md'] as const;
 
 /**
  * ⭑ What Pi takes from its AGENT FOLDER beside the context files — round 2's verification found K4 read the folder for

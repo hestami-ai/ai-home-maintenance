@@ -5,7 +5,7 @@
 //
 //   · D11 — under bare `bun`, every `@janumipwb/*` specifier resolves to the package's built `dist`, which is stale
 //     the moment a source file is edited. A qualification run that silently measured last build's reviewer would be
-//     recorded against today's fingerprint. So the runner runs FROM SOURCE — `bun --conditions=source`, which every
+//     recorded against today's fingerprint. So the runner runs FROM SOURCE — `bun --conditions=janumipwb-source`, which every
 //     package's export map answers with `./src/…` — and refuses to run on anything else.
 //   · D12 — `agy-cli.ts` and `devin-reviewer.ts` read `JPWB_AGY_BIN` / `JPWB_DEVIN_BIN` ONCE, AT MODULE LOAD, and any
 //     program named there is recorded as the real tool (`REG-F-441`: every stand-in measurement so far reached its
@@ -77,6 +77,6 @@ export function sourceResolutionProblem(resolved: string): string | undefined {
 	return (
 		`REFUSED (REG-D-072 D11): ${SOURCE_PROBE} resolves to ${resolved}, not to its source. Under bare bun every ` +
 		'@janumipwb package resolves to its built dist, which is stale after any source edit, so a run would measure the ' +
-		'last build’s reviewer. Run it from source: bun --conditions=source scripts/reviewer-qual/run.ts …'
+		'last build’s reviewer. Run it from source: bun --conditions=janumipwb-source scripts/reviewer-qual/run.ts …'
 	);
 }

@@ -16,7 +16,18 @@
 // archive reported others (`scripts/phase7/run-archive.ts`, K4), and the replay's keys would name stale a recording
 // whose instruction or tools held one (`replay/recording.ts`).
 // ⭐ NOW EACH IS SWITCHED OFF HERE, AT THE LOADER, so the executor's instruction is exactly the execution contract — with
-// Pi's own date and working-directory lines after it — and its tools are exactly the minted ones.
+// ~~Pi's own date and working-directory lines after it~~ ⭐ Pi's own working-directory section after it (TS5, below) — and
+// its tools are exactly the minted ones.
+// ⭐ TS5 (Pi 1.5.2, read 2026-11-17): every function this header names is still in 1.5.2 by its name, and what changed is
+// held in the gate by `pi-executor.test.ts`. Pi sends no date, and ends the instruction with a `<cwd>` section, still the
+// server's folder (`dist/core/system-prompt.js`, `buildSystemPromptSections`). A context file joined the others,
+// `AGENTS.override.md` (0.84.0), which `noContextFiles` leaves out with them. Built-in extensions arrived (0.99.0): MCP
+// servers, codemode and tool search; Pi's command line loads them, and *"SDK sessions do not"* (Pi's `docs/sdk.md`): a
+// session gets MCP only from `createMcpExtension()` among its loader's `extensionFactories` and a call to
+// `bindExtensions`, neither of which the executor or the authoring agent makes. A project's `.pi/mcp.json` is read only
+// when the project is trusted (`dist/extensions/mcp/config.js`, `loadMcpConfig`), and the loader's `reload()` keeps the
+// settings manager's `projectTrusted` as it was handed (`dist/core/resource-loader.js:381`); Pi resolves a project's trust
+// on its command line's path alone (`dist/main.js`, `resolveProjectTrust`).
 // ⚠ IT CHANGES THE EXECUTOR'S BEHAVIOUR, and that is the point: a context file, an appended prompt, an extension, a skill
 // or a prompt template no longer reaches the executor, wherever it lies. `SYSTEM.md` was already replaced by the override.
 // ⚠ AND WHAT IT DOES NOT SWITCH OFF, each an open question of the E4 polish round:

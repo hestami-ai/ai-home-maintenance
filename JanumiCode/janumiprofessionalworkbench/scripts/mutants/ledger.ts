@@ -12329,8 +12329,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "RS1-M23-pi-executor-reads-the-environment",
 		file: "apps/rph-demo/src/lib/server/tools/pi-executor.ts",
-		find: "\tconst model = resolveExecutingModel(modelRegistry, modelId);\n",
-		replace: "\tconst model = resolveExecutingModel(modelRegistry, process.env.JPWB_EXECUTOR_MODEL ?? modelId); // MUTANT: the adapter reads the variable itself\n",
+		// RE-ANCHORED 2026-11-17 (TS5, Pi 1.5.2): the call's first argument is Pi's `ModelRuntime`, which replaced its
+		// `ModelRegistry` (Pi 0.80.8); the mutation is unchanged.
+		find: "\tconst model = resolveExecutingModel(modelRuntime, modelId);\n",
+		replace: "\tconst model = resolveExecutingModel(modelRuntime, process.env.JPWB_EXECUTOR_MODEL ?? modelId); // MUTANT: the adapter reads the variable itself\n",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/model.test.ts"],
 		why: "PROMISE (JAN-SELRES D4): pi-executor.ts runs the model it is HANDED and reads neither executorModel nor JPWB_EXECUTOR_MODEL. WHO RELIES: the one-read rule - the label configured, the label Pi resolves and the label recorded. WHAT THE MUTATION DOES: the adapter takes the process variable over the selection's label, a third read of the configuration. OBSERVED: KILLED — 1 test(s) red in model.test.ts: '⛔ pi-executor.ts reads the model it is HANDED — neither `executorModel` nor `JPWB_EXECUTOR_MODEL`' (AssertionError: pi-executor.ts reads the executor model itself: expected [ 'property JPWB_EXECUTOR_MODEL' ] to deeply equal [])",
 		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
@@ -23216,8 +23218,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ7-M135-dot-agents-is-not-looked-for",
 		file: "apps/rph-demo/e2e-live-exec/run-folder.ts",
-		find: "export const PI_CONTEXT_NAMES = ['AGENTS.md', 'CLAUDE.md', '.pi', '.agents'] as const;",
-		replace: "export const PI_CONTEXT_NAMES = ['AGENTS.md', 'CLAUDE.md', '.pi'] as const;",
+		// RE-ANCHORED 2026-11-17 (TS5, Pi 1.5.2): the list ends with `AGENTS.override.md`, the context file Pi takes since
+		// 0.84.0; the mutation, `.agents` dropped, is unchanged.
+		find: "export const PI_CONTEXT_NAMES = ['AGENTS.md', 'CLAUDE.md', '.pi', '.agents', 'AGENTS.override.md'] as const;",
+		replace: "export const PI_CONTEXT_NAMES = ['AGENTS.md', 'CLAUDE.md', '.pi', 'AGENTS.override.md'] as const;",
 		expectRed: ["verif/phase7-run-folder.test.ts"],
 		why: "PROMISE: each of the four names is looked for - AGENTS.md, CLAUDE.md, .pi and .agents (D2); .agents skills are read from every folder above Pi's working folder (package-manager.js, collectAncestorAgentsSkillDirs). WHO RELIES: the scan of the run folder's path. WHAT THE MUTATION DOES: .agents is not looked for. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p apps/rph-demo/e2e/tsconfig.json), a .git marker planted at the copy's root, which the suite's real-host repository test reads): KILLED — 2 test(s) red in phase7-run-folder.test.ts: '⛔ in any case — agents.md, Claude.MD, .PI, .Agents — on a filesystem that keeps case too' (AssertionError: .Agents: expected '' to contain 'E:\\runs\\.Agents is on the path Pi rea…'); '⛔ each name Pi reads is refused — AGENTS.md, CLAUDE.md, .pi and .agents' (AssertionError: .agents: expected '' to contain 'E:\\runs\\.agents is on the path Pi rea…')",
 		source: "JAN-EXEC Phase 7 P7-2 (round 2, builder L) - the run's lane, its configuration: lane-config.ts's Phase 7 allowance and limit, derived from the one-unit lane's budget by reference (D4, D8); the two variables the server reads at call time, refused at boot by a rule of the lane (D3); the run folder, checked in the runner's load only, and one spec collected per run (D1, D2; e2e-live-exec/run-folder.ts); and the one-unit spec's reviewer, read from the first call that answered (D10) (docs/_working/DESIGN-the-live-end-to-end-run.md §6 P7-2; REG-D-101; REG-D-102; REG-F-526; REG-F-531) ⭑ FIXED after round 2's two adversarial verifiers (2026-10-10): the tree rule widened to every git working tree, since P7-3 runs from a worktree; a Phase 7 request with no run folder refused at boot; the one-unit spec's reviewer calls printed and annotated for D8; and the link, near-miss, empty-folder, hand-off and real-host promises each given a test and a mutant. The range PQ7-M110 to PQ7-M139 being full, each new entry takes a letter after the entry whose promise it extends, as TT-M1b does."
@@ -29895,8 +29899,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "E4-M97-the-executors-session-makes-its-own-settings-manager",
 		file: "apps/rph-demo/src/lib/server/tools/pi-executor.ts",
-		find: "\t\tsettingsManager,\n\t\tauthStorage,\n",
-		replace: "\t\tauthStorage, // MUTANT: the session is handed no settings manager, so Pi makes its own at its default, trusting a project\n",
+		// RE-ANCHORED 2026-11-17 (TS5, Pi 1.5.2): the property after the settings manager is Pi's `modelRuntime`, which
+		// replaced `authStorage` and `modelRegistry` (Pi 0.80.8); the mutation, the settings manager dropped, is unchanged.
+		find: "\t\tsettingsManager,\n\t\tmodelRuntime\n",
+		replace: "\t\tmodelRuntime // MUTANT: the session is handed no settings manager, so Pi makes its own at its default, trusting a project\n",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/pi-executor-resources.test.ts"],
 		why: "PROMISE (the check of E4's polish round, F1; proposed for the lead's ruling): the executor's session takes the settings manager its loader takes, so no part of the session reads settings at Pi's default. WHO RELIES: the executor session's own settings - createAgentSession handed no manager makes one at Pi's default, trusting the project of the folder the session takes (dist/core/sdk.js), which is the server's own, since the executor's session is SessionManager.inMemory(). WHAT THE MUTATION DOES: the session is handed no manager (observed 2026-10-15 with the mutant applied by hand: 'AssertionError: expected { managers: [ { …(3) } ], …(1) } to deeply equal { managers: [ { …(3) } ], …(1) }', its diff the session taking '\"absent\"' where '\"settingsManager\"' was expected). Measured (bun run mutants -- E4-M93, E4-M95, E4-M96, E4-M97, E4-M98 and E4-M99 by their full ids, 2026-10-15, in the polish fix round's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M97-the-executors-session-makes-its-own-settings-manager ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 8 E4 polish fix (p7c-e4) - the executor's settings trust no project, so a workspace's .pi/settings.json is not read and nothing it lists is installed (the check of E4's polish round, F1; proposed for the lead's ruling)"
@@ -31137,8 +31143,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "R3C-M4-the-authoring-agents-session-makes-its-own-settings-manager",
 		file: "apps/rph-demo/src/lib/server/agent/pi-agent.ts",
-		find: "settingsManager,\n\t\t\t\tauthStorage,",
-		replace: "authStorage, // MUTANT: the session is handed no settings manager, so Pi makes its own at its default, trusting a project",
+		// RE-ANCHORED 2026-11-17 (TS5, Pi 1.5.2): the property after the settings manager is Pi's `modelRuntime`, which
+		// replaced `authStorage` and `modelRegistry` (Pi 0.80.8); the mutation, the settings manager dropped, is unchanged.
+		find: "settingsManager,\n\t\t\t\tmodelRuntime",
+		replace: "modelRuntime // MUTANT: the session is handed no settings manager, so Pi makes its own at its default, trusting a project",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/pi-executor-resources.test.ts"],
 		why: "PROMISE (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (19)): the authoring agent's session takes the one settings manager, the one trusting no project. WHO RELIES: R3C-M2's promise: a session handed no manager makes its own at Pi's default, which trusts a project (dist/core/sdk.js, createAgentSession). WHAT THE MUTATION DOES: the session is handed none. Applied by hand first, the file restored byte for byte: 'AssertionError: expected { managers: [ { …(3) } ], …(1) } to deeply equal { managers: [ { …(3) } ], …(1) }', createAgentSession's settingsManager 'absent' ('Tests  1 failed | 7 passed (8)'). OBSERVED (bun run mutants -- thirty-six ids: R3-C's sixteen, the two it re-anchored, the eleven other E4 entries whose victim is pi-executor-resources.test.ts and the seven anchored in playwright.live-exec.config.ts, 2026-10-16, in R3-C's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3C-M4-the-authoring-agents-session-makes-its-own-settings-manager ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-C (Pi's loaders; REG-F-512) - F1: the authoring agent's Pi takes the executor's closed loader, with its own prompt, and its settings trust no project (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (19))"

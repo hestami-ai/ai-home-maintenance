@@ -833,18 +833,21 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 		for (const pkg of readdirSync(`${REPO}/packages`)) {
 			const manifest = `${REPO}/packages/${pkg}/package.json`;
 			if (!existsSync(manifest)) continue;
+			// ⭐ TS5 (Pi 1.5.2): each export's source is under JPWB's own condition, `janumipwb-source`, ~~`source`~~ until
+			// TS5 renamed it (Pi's new packages publish a `source` condition for files they do not ship).
 			const { name, exports } = JSON.parse(readFileSync(manifest, 'utf8')) as {
 				name?: string;
-				exports?: Record<string, { source?: string }>;
+				exports?: Record<string, { 'janumipwb-source'?: string }>;
 			};
 			if (!name?.startsWith('@janumipwb/') || !exports) continue;
 			const dir = `${root}/node_modules/${name}`;
 			mkdirSync(dir, { recursive: true });
 			const shim: Record<string, string> = {};
 			for (const [sub, target] of Object.entries(exports)) {
-				if (!target.source) continue;
+				const source = target['janumipwb-source'];
+				if (!source) continue;
 				const file = sub === '.' ? 'index.ts' : `${sub.slice(2)}.ts`;
-				const real = pathToFileURL(`${REPO}/packages/${pkg}/${target.source.slice(2)}`).href;
+				const real = pathToFileURL(`${REPO}/packages/${pkg}/${source.slice(2)}`).href;
 				writeFileSync(`${dir}/${file}`, `export * from ${JSON.stringify(real)};\n`);
 				shim[sub] = `./${file}`;
 			}
@@ -853,7 +856,7 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 		return root;
 	}
 	const fingerprintIn = (root: string): { reviewer: string; components: Record<string, string> } => {
-		const r = spawnSync(BUN, ['--conditions=source', `${root}/scripts/reviewer-qual/fingerprint.ts`], {
+		const r = spawnSync(BUN, ['--conditions=janumipwb-source', `${root}/scripts/reviewer-qual/fingerprint.ts`], {
 			cwd: root,
 			encoding: 'utf8',
 			env: hermeticEnv(),
@@ -864,7 +867,7 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 	};
 	/** ⭐ Z2b phase 2 — the program's run in `root`, whatever it came to: its exit status and what it printed. */
 	const fingerprintRunIn = (root: string): { status: number | null; stdout: string; stderr: string } => {
-		const r = spawnSync(BUN, ['--conditions=source', `${root}/scripts/reviewer-qual/fingerprint.ts`], {
+		const r = spawnSync(BUN, ['--conditions=janumipwb-source', `${root}/scripts/reviewer-qual/fingerprint.ts`], {
 			cwd: root,
 			encoding: 'utf8',
 			env: hermeticEnv(),

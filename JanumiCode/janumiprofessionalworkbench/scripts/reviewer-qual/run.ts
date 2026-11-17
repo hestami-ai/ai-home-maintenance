@@ -1,7 +1,7 @@
 /**
  * ⭐ `JAN-CRITREAD` J2-2 — a reviewer-qualification run, from the command line (DESIGN-what-the-tests-prove.md §5.3).
  *
- *   bun --conditions=source scripts/reviewer-qual/run.ts --transport agy|devin|ollama --model <label> --out <file.ndjson>
+ *   bun --conditions=janumipwb-source scripts/reviewer-qual/run.ts --transport agy|devin|ollama --model <label> --out <file.ndjson>
  *       [--repetitions 2] [--cases <id>,<id>…] [--run-id <id>]
  *       [--ollama-url http://host:11434 (required for ollama)] [--think <level>] [--temperature 0] [--seed 42]
  *       [--num-ctx 131072]
@@ -14,7 +14,7 @@
  * test whose flag a mutant dropped, would otherwise reach it. The server a run measures is the one its command says.
  *
  * ⛔ IT LOADS FROM SOURCE (`REG-D-072` D11). Under bare `bun` every `@janumipwb/*` specifier resolves to built `dist`,
- * stale after any source edit; `--conditions=source` makes every package's export map answer with `./src/…`. The first
+ * stale after any source edit; `--conditions=janumipwb-source` makes every package's export map answer with `./src/…`. The first
  * thing this file does is ask where `@janumipwb/rph-assurance` resolves, and it refuses to run on anything but source.
  * ⛔ THEN IT REFUSES THE PROGRAM OVERRIDES (`REG-D-072` D12), before any transport module is loaded.
  * ⚠ So this file imports nothing at load but the two pure modules those checks need; everything else is loaded after.

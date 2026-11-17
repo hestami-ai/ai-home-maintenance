@@ -377,6 +377,18 @@ describe('⭐ P7-2 D2 — the run folder, checked in the runner’s load, every 
 		}
 	});
 
+	it('⛔ TS5 (Pi 1.5.2) — AGENTS.override.md, a context file Pi takes since 0.84.0, is refused too, in any case', () => {
+		// ⭑ Pi 1.5.2 asks each folder for `AGENTS.override.md` first, then `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md` and
+		// `CLAUDE.MD` (`pi-coding-agent` `dist/core/resource-loader.js`, `loadContextFileFromDir`).
+		for (const name of ['AGENTS.override.md', 'agents.OVERRIDE.md']) {
+			const found = at('runs', name);
+			expect(
+				problemsOf(GOOD, fakeHost({ platform: 'linux', folders: [GOOD], files: [found] })),
+				name
+			).toContain(`${found} is on the path Pi reads its context from`);
+		}
+	});
+
 	it('⛔ Pi’s path is the folder AS WRITTEN, which Pi walks with no link resolved — so a run folder that is a link is refused for what lies above its name', () => {
 		// Pi walks `resolvePath(cwd)` (`pi-coding-agent` `dist/core/resource-loader.js`), and the server makes each phase's
 		// working folder under the run folder as written (`workspace-host.ts`).

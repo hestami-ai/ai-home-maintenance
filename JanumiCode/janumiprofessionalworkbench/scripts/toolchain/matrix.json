@@ -343,15 +343,15 @@
 			"pin": "exact",
 			"reason": "Packages that put breaking changes in patch releases (D-8); governed: the Pi pins move only after a sponsor ruling (REG-D-114 (19), I3).",
 			"blockers": [
-				"breaking changes in patches after 0.80.6: 0.80.7, 0.80.8, 0.84.3, 1.0.3, 1.5.1 (F-13); a move needs a sponsor ruling."
+				"Pi puts breaking changes in patch releases (0.80.7, 0.80.8, 0.84.3, 1.0.3 and 1.5.1 among those TS5 crossed, F-13); a move needs a sponsor ruling (the move to 1.5.2: ruled 2026-11-17, TS5)."
 			],
 			"moves": [
 				"the live lanes' agent behaviour"
 			],
 			"declared": {
-				"apps/rph-demo": "0.80.6"
+				"apps/rph-demo": "1.5.2"
 			},
-			"locked": "0.80.6",
+			"locked": "1.5.2",
 			"nested": {}
 		},
 		{
@@ -360,15 +360,15 @@
 			"pin": "exact",
 			"reason": "Packages that put breaking changes in patch releases (D-8); governed: the Pi pins move only after a sponsor ruling (REG-D-114 (19), I3).",
 			"blockers": [
-				"breaking changes in patches after 0.80.6: 0.80.7, 0.80.8, 0.84.3, 1.0.3, 1.5.1 (F-13); a move needs a sponsor ruling."
+				"Pi puts breaking changes in patch releases (0.80.7, 0.80.8, 0.84.3, 1.0.3 and 1.5.1 among those TS5 crossed, F-13); a move needs a sponsor ruling (the move to 1.5.2: ruled 2026-11-17, TS5)."
 			],
 			"moves": [
 				"the live lanes' agent behaviour"
 			],
 			"declared": {
-				"apps/rph-demo": "0.80.6"
+				"apps/rph-demo": "1.5.2"
 			},
-			"locked": "0.80.6",
+			"locked": "1.5.2",
 			"nested": {}
 		},
 		{
@@ -383,16 +383,16 @@
 				"the live lanes' agent behaviour"
 			],
 			"declared": {
-				"apps/rph-demo": "0.80.6"
+				"apps/rph-demo": "1.5.2"
 			},
-			"locked": "0.80.6",
+			"locked": "1.5.2",
 			"nested": {}
 		},
 		{
 			"component": "typebox",
 			"group": "Pi SDK",
 			"pin": "exact",
-			"reason": "Must equal Pi's exact pin (F-13: bun.lock records Pi's \"typebox\": \"1.1.38\").",
+			"reason": "Must equal Pi's exact pin (F-13: bun.lock records pi-coding-agent's \"typebox\": \"1.3.27\" since TS5; 1.1.38 before it).",
 			"blockers": [
 				"moves with Pi."
 			],
@@ -400,9 +400,9 @@
 				"the live lanes' tool schemas"
 			],
 			"declared": {
-				"apps/rph-demo": "1.1.38"
+				"apps/rph-demo": "1.3.27"
 			},
-			"locked": "1.1.38",
+			"locked": "1.3.27",
 			"nested": {}
 		},
 		{

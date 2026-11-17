@@ -35,7 +35,8 @@ export interface SentToolResult {
  * WHAT A TOOL'S RESULT REACHES THE MODEL AS: the text an OpenAI Responses payload carries for it, its
  * `function_call_output`'s `output` — the result's text parts joined by newlines, `(no tool output)` when there are
  * none, and every unpaired surrogate removed (`@earendil-works/pi-ai` 0.80.6, `dist/api/openai-responses-shared.js`,
- * `convertResponsesMessages`). It is the payload shape the replay's recorder reads (`scripts/phase7/record-replay-core.ts`).
+ * `convertResponsesMessages`; ⭐ the same in 1.5.2, `:45`, read for TS5 on 2026-11-17). It is the payload shape the
+ * replay's recorder reads (`scripts/phase7/record-replay-core.ts`).
  * ⚠ FOR A RESULT OF TEXT ALONE, as every result this host's tools give is: an image part is sent another way, and is not
  * rendered here. Held to pi-ai's own converter by `tools/pi-execution-tools.test.ts`.
  */
@@ -52,7 +53,8 @@ export function toolResultAsSent(result: SentToolResult): string {
 
 /**
  * ⭐ PI'S OWN RESULT FOR A CALL TO A TOOL ITS SESSION DOES NOT HAVE — `Tool <name> not found`, as an error result
- * (`@earendil-works/pi-agent-core` 0.80.6, `dist/agent-loop.js`, `prepareToolCall`). The model reads it as it reads any
+ * (`@earendil-works/pi-agent-core` 0.80.6, `dist/agent-loop.js`, `prepareToolCall`; ⭐ the same in 1.5.2, `:487-492`,
+ * read for TS5 on 2026-11-17). The model reads it as it reads any
  * result, so a replay renders it for such a call. Held to pi-agent-core's own loop by `tools/pi-execution-tools.test.ts`.
  */
 export function unknownToolResult(name: string): SentToolResult {

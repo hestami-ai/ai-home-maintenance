@@ -24,12 +24,12 @@
 // ⭐ And the executor's resource-loader options moved to `pi-executor-resources.ts` (the lead's delegated decision of
 // 2026-10-15, to be registered), which imports types alone from Pi: its test reads Pi's declaration of those options,
 // and this module's source, and loads neither.
+import { InMemoryModelsStore } from '@earendil-works/pi-ai';
 import {
-	AuthStorage,
 	createAgentSession,
 	DefaultResourceLoader,
 	getAgentDir,
-	ModelRegistry,
+	ModelRuntime,
 	resolveCliModel,
 	SessionManager,
 	SettingsManager
@@ -65,11 +65,11 @@ import { createProcessRunObserver } from './process-run-observer.js';
  * is its registry's resolution of that label, graded `PROVIDER_REPORTED` below, not a model the provider reported
  * (`REG-F-465`).
  */
-function resolveExecutingModel(modelRegistry: ModelRegistry, configured: string) {
+function resolveExecutingModel(modelRuntime: ModelRuntime, configured: string) {
 	// ~~Throws with REG-D-052's reasoning when JPWB_EXECUTOR_MODEL is unset.~~ ⭐ `JAN-SELRES` D1: an unset
 	// `JPWB_EXECUTOR_MODEL` never reaches here — the selector refuses it before dispatch (`EXECUTOR_MODEL_UNSET`). What
 	// can still refuse here is a label Pi cannot resolve, which needs Pi's SDK to know.
-	const resolved = resolveCliModel({ cliModel: configured, modelRegistry });
+	const resolved = resolveCliModel({ cliModel: configured, modelRuntime });
 	if (!resolved.model)
 		throw new Error(
 			`JPWB_EXECUTOR_MODEL is set to '${configured}', but Pi cannot resolve it to an available model. ` +
@@ -170,14 +170,19 @@ export async function openPiExecutionSession(
 	const mintedToolNames = tools.map((t) => t.name);
 	const observer = createToolCallObserver();
 
-	const authStorage = AuthStorage.create();
-	const modelRegistry = ModelRegistry.create(authStorage);
+	// ⭐ TS5 (Pi 1.5.2) — ONE `ModelRuntime` WHERE `AuthStorage` AND `ModelRegistry` WERE: Pi 0.80.8 *"Replaced the SDK's
+	// `CreateAgentSessionOptions.authStorage` and `modelRegistry` options with the async `modelRuntime` option"*. It reads
+	// the operator's credentials and `models.json` from Pi's agent folder, as the two did. ⛔ ITS CATALOG STORE IS IN
+	// MEMORY: Pi's default store since 0.80.8 is the agent folder's `models-store.json`, the catalog a network refresh by
+	// Pi's own command line last saved there, so with it the model this record names would depend on when the operator
+	// last ran Pi online. In memory, the executor sees Pi's built-in models and `models.json` alone, as on 0.80.6.
+	const modelRuntime = await ModelRuntime.create({ modelsStore: new InMemoryModelsStore() });
 	// ⛔ TRUSTING NO PROJECT (the check of E4's polish round, F1): Pi trusts a project's `.pi/settings.json` by default, and
 	// the workspace is a project the executor writes into — so a unit's `write_file` of that file made every later unit's
 	// load install what it listed and was missing, by the command it named, on this host with this server's environment.
 	// Untrusted, the workspace's settings are not read at all; the agent folder's, the operator's own, still are.
 	const settingsManager = SettingsManager.create(cwd, getAgentDir(), { projectTrusted: false });
-	const model = resolveExecutingModel(modelRegistry, modelId);
+	const model = resolveExecutingModel(modelRuntime, modelId);
 
 	// ⭐⭐ THE EXECUTOR'S INSTRUCTION IS THE CONTRACT AND ITS TOOLS ARE THE MINTED ONES — NOTHING PI FINDS AROUND THE
 	// WORKSPACE (the lead's delegated decision of 2026-10-15, to be registered). ~~The contract overriding the system prompt
@@ -206,8 +211,7 @@ export async function openPiExecutionSession(
 		// changed: an open question (`pi-executor-resources.ts`).
 		sessionManager: SessionManager.inMemory(),
 		settingsManager,
-		authStorage,
-		modelRegistry
+		modelRuntime
 	});
 	const session = created.session;
 

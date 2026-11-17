@@ -7,13 +7,13 @@
   "license": "AGPL-3.0-only",
   "exports": {
     ".": {
-      "source": "./src/index.ts",
+      "janumipwb-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./testing": {
-      "source": "./src/testing.ts",
+      "janumipwb-source": "./src/testing.ts",
       "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js",
       "default": "./dist/testing.js"

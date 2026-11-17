@@ -30,7 +30,13 @@
 // never the coding agent, which is what `pi-executor.ts` imports. No model is called: the faux provider answers from its
 // script, in process.
 import { Agent, type AgentTool } from '@earendil-works/pi-agent-core';
-import { createFauxCore, fauxAssistantMessage, fauxToolCall, type Message } from '@earendil-works/pi-ai';
+import {
+	createFauxCore,
+	fauxAssistantMessage,
+	fauxToolCall,
+	normalizeContext,
+	type Message
+} from '@earendil-works/pi-ai';
 import { convertResponsesMessages } from '@earendil-works/pi-ai/api/openai-responses-shared';
 import { describe, expect, it } from 'vitest';
 import { toolResultAsSent, toPiToolResult, unknownToolResult } from '../agent/pi-tool-result.js';
@@ -143,7 +149,9 @@ describe('⭐ the replay’s tool-result key renders a result exactly as Pi send
 		const sent = agent.state.messages.filter(
 			(m): m is Message => m.role === 'user' || m.role === 'assistant' || m.role === 'toolResult'
 		);
-		return convertResponsesMessages(model, { messages: sent }, new Set([model.provider]), {
+		// ⭐ TS5 (Pi 1.5.2): since 0.86.0 the conversion takes a `TranscriptContext`, which `normalizeContext` makes of the
+		// messages, as Pi's own providers are handed one.
+		return convertResponsesMessages(model, normalizeContext({ messages: sent }), new Set([model.provider]), {
 			includeSystemPrompt: false
 		})
 			.filter((item) => (item as { type?: unknown }).type === 'function_call_output')

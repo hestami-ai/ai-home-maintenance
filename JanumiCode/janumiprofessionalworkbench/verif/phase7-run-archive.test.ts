@@ -648,6 +648,23 @@ describe('⭐ D7, K4 — what Pi loads from around the workspace (REG-F-512), as
 		expect(findings.join('\n')).not.toContain('docs');
 	});
 
+	it('⛔ TS5 (Pi 1.5.2) — an AGENTS.override.md, a context file Pi takes since 0.84.0, is found as the others are, in any case', () => {
+		// ⭑ Pi 1.5.2 asks each folder for `AGENTS.override.md` first (`pi-coding-agent` `dist/core/resource-loader.js`,
+		// `loadContextFileFromDir`).
+		const a = arrangement();
+		writeFileSync(join(a.agent, 'AGENTS.override.md'), 'agent-wide');
+		writeFileSync(join(a.workspace, 'Agents.Override.md'), 'at the root');
+		const k4 = k4Check({
+			workspace: a.workspace,
+			env: a.env,
+			home: a.base,
+			tries: [],
+			contentOf: () => undefined
+		});
+		expect(k4.agentDir.contextFiles).toEqual(['AGENTS.override.md']);
+		expect(k4.workspaceRoot).toEqual({ exists: true, contextFiles: ['Agents.Override.md'] });
+	});
+
 	it('⛔ Pi’s agent folder is read for what Pi takes from it besides its context files: its appended prompt, in any case, and its extensions, listed whole', () => {
 		// ⭑ Round 2's verification: an agent folder holding both read as holding nothing (`contextFiles: []`, no finding).
 		const a = arrangement();

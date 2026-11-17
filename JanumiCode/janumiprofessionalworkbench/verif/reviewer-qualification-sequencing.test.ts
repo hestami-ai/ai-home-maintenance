@@ -203,7 +203,7 @@ describe('⭐ CONTROL — the pin reddens on a fixture repository, and clears on
 					'gate:fast': 'bun run test && cd apps/rph-demo && bun run check && cd ../.. && bun run gate:tail',
 					test: 'vitest run',
 					'gate:tail': 'bun run scripts/tail.ts',
-					'reviewer:qual:check': 'bun --conditions=source scripts/check.ts'
+					'reviewer:qual:check': 'bun --conditions=janumipwb-source scripts/check.ts'
 				}
 			})
 		);

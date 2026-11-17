@@ -256,9 +256,10 @@ describe('⭐ D4 — Pi is opened with the selection’s model, and only when th
 		// its own). A structural walk, never a grep, so its prose may still explain what it no longer does.
 		const reads = environmentModelReads(readSource('../tools/pi-executor.ts'));
 		expect(reads, 'pi-executor.ts reads the executor model itself').toEqual([]);
-		// …and it hands the label it was given to the resolver.
+		// …and it hands the label it was given to the resolver. ⭐ TS5 (Pi 1.5.2): beside Pi's `ModelRuntime`, which replaced
+		// its `ModelRegistry` (Pi 0.80.8): ~~'const model = resolveExecutingModel(modelRegistry, modelId);'~~.
 		expect(readSource('../tools/pi-executor.ts')).toContain(
-			'const model = resolveExecutingModel(modelRegistry, modelId);'
+			'const model = resolveExecutingModel(modelRuntime, modelId);'
 		);
 	});
 

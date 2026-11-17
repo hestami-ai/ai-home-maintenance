@@ -572,7 +572,7 @@ export function committedCaseSet(root: URL): CaseSet {
 	return JSON.parse(readFileSync(new URL(CURRENT_CASE_SET_FILE, root), 'utf8')) as CaseSet;
 }
 
-// `bun --conditions=source scripts/reviewer-qual/fingerprint.ts` — today's fingerprint of this tree, as JSON on stdout.
+// `bun --conditions=janumipwb-source scripts/reviewer-qual/fingerprint.ts` — today's fingerprint of this tree, as JSON on stdout.
 if (import.meta.main) {
 	const f = await reviewerFingerprint(committedCaseSet(new URL('../../', import.meta.url)).cases);
 	process.stdout.write(

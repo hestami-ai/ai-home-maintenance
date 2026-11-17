@@ -61,8 +61,13 @@ export const STORE_FILE = 'demo.sqlite';
  */
 export const MINTED_STORE_VARIABLE = 'JPWB_LIVE_EXEC_MINTED_DB';
 
-/** What Pi reads on the path (the header), as Pi spells them; a name on disk matches in any case. */
-export const PI_CONTEXT_NAMES = ['AGENTS.md', 'CLAUDE.md', '.pi', '.agents'] as const;
+/**
+ * What Pi reads on the path (the header), as Pi spells them; a name on disk matches in any case. ⭐ TS5 (Pi 1.5.2): and
+ * `AGENTS.override.md`, the context file Pi asks each folder for first since 0.84.0 (`pi-coding-agent`
+ * `dist/core/resource-loader.js`, `loadContextFileFromDir`), last here so the names this rule's messages list keep their
+ * order.
+ */
+export const PI_CONTEXT_NAMES = ['AGENTS.md', 'CLAUDE.md', '.pi', '.agents', 'AGENTS.override.md'] as const;
 
 /** What the run-folder rules read of the host. */
 export interface RunFolderHost {

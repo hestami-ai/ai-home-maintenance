@@ -20,13 +20,13 @@ export default defineConfig({
 		// Stately ELK adapter imports the package root, so pin that exact root request to ELK's in-process browser
 		// bundle. The RegExp is intentionally exact: elkjs/lib/elk-api type/runtime subpaths must remain untouched.
 		alias: [{ find: /^elkjs$/, replacement: elkBrowserEntry }],
-		conditions: ['source', 'module', 'browser', 'development|production']
+		conditions: ['janumipwb-source', 'module', 'browser', 'development|production']
 	},
 	ssr: {
 		// The engine's native better-sqlite3 driver must stay external to the SSR bundle (and never reach the browser).
 		external: ['better-sqlite3'],
 		resolve: {
-			conditions: ['source', 'module', 'node', 'development|production']
+			conditions: ['janumipwb-source', 'module', 'node', 'development|production']
 		}
 	}
 });

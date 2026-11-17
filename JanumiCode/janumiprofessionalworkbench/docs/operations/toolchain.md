@@ -55,10 +55,10 @@ design governs.
 | @types/node | Node/native | exact | .: `24.13.6` → 24.13.6 | — | must not run ahead of the Node floor (D-8): a types release whose minor is above the floor's describes APIs the floor lacks, so it moves only with the floor. |
 | better-sqlite3 | Node/native | caret | packages/rph-persistence: `^12.8.0` → 12.11.1 | — | a native addon on Node 24's ABI 137, which does not load under Bun; inside Electron it must match Electron's ABI, which 13's N-API builds may settle (D-2, left to the extension's design). |
 | @types/better-sqlite3 | Node/native | caret | packages/rph-persistence: `^7.6.13` → 7.6.13 | — | moves with better-sqlite3. |
-| @earendil-works/pi-ai | Pi SDK | exact | apps/rph-demo: `0.80.6` → 0.80.6 | — | breaking changes in patches after 0.80.6: 0.80.7, 0.80.8, 0.84.3, 1.0.3, 1.5.1 (F-13); a move needs a sponsor ruling. |
-| @earendil-works/pi-coding-agent | Pi SDK | exact | apps/rph-demo: `0.80.6` → 0.80.6 | — | breaking changes in patches after 0.80.6: 0.80.7, 0.80.8, 0.84.3, 1.0.3, 1.5.1 (F-13); a move needs a sponsor ruling. |
-| @earendil-works/pi-agent-core | Pi SDK | exact | apps/rph-demo: `0.80.6` → 0.80.6 | — | moves with pi-coding-agent; a move needs a sponsor ruling. |
-| typebox | Pi SDK | exact | apps/rph-demo: `1.1.38` → 1.1.38 | — | moves with Pi. |
+| @earendil-works/pi-ai | Pi SDK | exact | apps/rph-demo: `1.5.2` → 1.5.2 | — | Pi puts breaking changes in patch releases (0.80.7, 0.80.8, 0.84.3, 1.0.3 and 1.5.1 among those TS5 crossed, F-13); a move needs a sponsor ruling (the move to 1.5.2: ruled 2026-11-17, TS5). |
+| @earendil-works/pi-coding-agent | Pi SDK | exact | apps/rph-demo: `1.5.2` → 1.5.2 | — | Pi puts breaking changes in patch releases (0.80.7, 0.80.8, 0.84.3, 1.0.3 and 1.5.1 among those TS5 crossed, F-13); a move needs a sponsor ruling (the move to 1.5.2: ruled 2026-11-17, TS5). |
+| @earendil-works/pi-agent-core | Pi SDK | exact | apps/rph-demo: `1.5.2` → 1.5.2 | — | moves with pi-coding-agent; a move needs a sponsor ruling. |
+| typebox | Pi SDK | exact | apps/rph-demo: `1.3.27` → 1.3.27 | — | moves with Pi. |
 | @playwright/test | e2e | exact | apps/rph-demo: `1.61.1` → 1.61.1 | — | The e2e browser is the Chromium this version bundles (the e2eBrowser row): moving Playwright moves the browser, so the same package regenerates the row and installs the new revision. |
 | elkjs | graph layout | exact | apps/rph-demo: `0.11.1` → 0.11.1 | — | Skip 0.13.0, which npm marks deprecated; 0.12.0 "adds GPL-3.0 as a secondary license" (F-13). |
 | @dagrejs/dagre | graph layout | exact | apps/rph-demo: `3.0.0` → 3.0.0 | — | — |

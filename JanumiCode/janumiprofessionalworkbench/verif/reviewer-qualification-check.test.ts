@@ -3631,13 +3631,13 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	});
 
 	it('⛔ a flag it does not know is refused', () => {
-		const r = cli(['--conditions=source'], ['--record', gitRepo()]);
+		const r = cli(['--conditions=janumipwb-source'], ['--record', gitRepo()]);
 		expect(r.status, r.out).toBe(2);
 		expect(r.out).toContain('unknown flag --record');
 	});
 
 	it('⛔ a record directory outside any git work tree is refused — only what git tracks is the record', () => {
-		const r = cli(['--conditions=source'], ['--records', tmp()]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', tmp()]);
 		expect(r.status, r.out).toBe(2);
 		expect(r.out).toContain('is not in a git work tree');
 	});
@@ -3645,7 +3645,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
 	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('⛔ RED on an empty record — all ~~76~~ ~~⭐ 91~~ ~~⭐ 94~~ ⭐ 97 cases of the committed set are owed (package Y, 2026-10-31: v13 adds three cases)', () => {
-		const r = cli(['--conditions=source'], ['--records', gitRepo()]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', gitRepo()]);
 		expect(r.status, r.out).toBe(1);
 		// ⭐ Package P F3 — ~~54 of 54~~: version seven's sixty. ⭐ B7 — ~~60 of 60~~: version eight's 76. ⭐ Package V — ~~76 of
 		// 76~~: version twelve's 91. ⭐ Package V-2, 2026-10-29 (`REG-D-137`) — ~~91 of 91~~: and its three re-run cases, 94.
@@ -3682,7 +3682,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 			text(await recorded({ runId: 'qr-cli-1', cases: CURRENT_CASES, versions: { caseSet: 13, oracles: 13 } /* ⭐ package K — ~~10, 10~~; ⭐ package V — ~~11, 11~~ */ }))
 		);
 		git(dir, 'add', 'runs.ndjson');
-		const r = cli(['--conditions=source'], ['--records', dir]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', dir]);
 		// ⭐ B8a — ~~GREEN~~: red on the confirmation alone (`ONLY_THE_CONFIRMATION`). ⭐ `REG-D-129` — GREEN again.
 		expect(r.out).toContain(GREEN);
 		expect(r.status, r.out).toBe(0);
@@ -3961,7 +3961,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const lines = await recorded({ runId: 'qr-cli-2', cases: CURRENT_CASES, versions: { caseSet: 13, oracles: 13 } /* ⭐ package K — ~~10, 10~~; ⭐ package V — ~~11, 11~~ */ });
 		const untracked = gitRepo();
 		writeFileSync(join(untracked, 'runs.ndjson'), text(lines));
-		const r = cli(['--conditions=source'], ['--records', untracked]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', untracked]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('runs.ndjson: not read — git does not track it');
 		// ⭐ package V — ~~76 of 76~~; ⭐ package V-2, 2026-10-29 — ~~91 of 91~~: and the three re-run cases.
@@ -3974,7 +3974,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		// ⭐ D3b (8) — ~~'G3-CLEAN.T01'~~: a case of version ten's, under its new id. ⭐ Package K — ~~'G10-CLEAN.T01'~~: version
 		// eleven's, under its new id (D3d).
 		appendFileSync(join(changed, 'runs.ndjson'), serializeLine(escalate('qr-cli-2', ['G11-CLEAN.T01'])));
-		const c = cli(['--conditions=source'], ['--records', changed]);
+		const c = cli(['--conditions=janumipwb-source'], ['--records', changed]);
 		expect(c.status, c.out).toBe(1);
 		expect(c.out).toContain('runs.ndjson: not read — it differs from what git has staged');
 	}, 120_000);
@@ -3990,7 +3990,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		git(dir, 'add', 'runs.ndjson');
 		rmSync(join(dir, 'runs.ndjson'));
 		expect(git(dir, 'status', '--porcelain'), 'arrangement: the record file, staged and gone from the working tree').toBe('AD runs.ndjson\n');
-		const r = cli(['--conditions=source'], ['--records', dir]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', dir]);
 		expect(r.out).toContain(
 			'  [RECORD] runs.ndjson: not read — git tracks it, but it is gone from the working tree — a record file is struck, never deleted (§5.4)\n'
 		);
@@ -4001,7 +4001,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		// ⭑ CONTROL — the same file, restored from what git staged: read, it covers today's set.
 		git(dir, 'checkout', '--', 'runs.ndjson');
 		expect(git(dir, 'status', '--porcelain'), 'arrangement: the record file, restored as staged').toBe('A  runs.ndjson\n');
-		const restored = cli(['--conditions=source'], ['--records', dir]);
+		const restored = cli(['--conditions=janumipwb-source'], ['--records', dir]);
 		expect(restored.out, 'CONTROL: the record file restored is read').toContain(GREEN);
 		expect(restored.status, restored.out).toBe(0);
 	}, 120_000);
@@ -4021,12 +4021,12 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		git(dir, 'add', 'runs.ndjson');
 		const register = join(tmp(), 'register.md');
 		writeFileSync(register, '### ~~REG-F-105~~ — RULED\n');
-		const r = cli(['--conditions=source'], ['--records', dir, '--register', register]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', dir, '--register', register]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('ESCALATION cites REG-F-105, whose register heading is struck');
 		expect(r.out).toContain('run qr-cli-3: G10-RR-04.T05 — PLANTED_DEFECT_NOT_REJECTED');
 		writeFileSync(register, '### REG-F-105 — open, for the control\n');
-		const open = cli(['--conditions=source'], ['--records', dir, '--register', register]);
+		const open = cli(['--conditions=janumipwb-source'], ['--records', dir, '--register', register]);
 		// ⭐ Package P F3 — ~~GREEN, its oracles conferred (REG-D-113)~~: nothing owed but the conferral of the six new oracles.
 		// ⭐ B7 — GREEN again, version eight's oracles conferred (`REG-D-126`). ⭐ B8a — ~~GREEN~~: the confirmation alone owed.
 		// ⭐ `REG-D-129` — GREEN again, the restatement confirmed.
@@ -4046,7 +4046,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		});
 		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
 		git(dir, 'add', 'runs.ndjson');
-		const r = cli(['--conditions=source'], ['--records', dir]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', dir]);
 		expect(r.out).toContain(
 			[
 				ATTRIBUTION_HEADER,
@@ -4077,7 +4077,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const now = await recorded({ runId: 'qr-cli-6', cases: CURRENT_CASES, versions: { caseSet: 13, oracles: 13 } /* ⭐ package K — ~~10, 10~~; ⭐ package V — ~~11, 11~~ */ });
 		writeFileSync(join(dir, 'runs.ndjson'), text([...v1, ...now]));
 		git(dir, 'add', 'runs.ndjson');
-		const r = cli(['--conditions=source'], ['--records', dir]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', dir]);
 		expect(r.out).toContain(
 			[
 				ATTRIBUTION_HEADER,
@@ -4108,7 +4108,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const glm = await recorded({ runId: 'qr-cli-7', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 13, oracles: 13 } /* ⭐ package K — ~~10, 10~~; ⭐ package V — ~~11, 11~~ */ });
 		writeFileSync(join(dir, 'runs.ndjson'), text([...glm, select({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' })]));
 		git(dir, 'add', 'runs.ndjson');
-		const r = cli(['--conditions=source'], ['--records', dir]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', dir]);
 		expect(r.out).toContain(
 			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084 (runs.ndjson:${glm.length + 1}) — every current case is owed its measurement under today’s fingerprint (REG-D-086)\n`
 		);
@@ -4119,7 +4119,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.status, r.out).toBe(0);
 		appendFileSync(join(dir, 'runs.ndjson'), serializeLine(select({ transport: 'devin', modelLabel: 'a-model-never-run' })));
 		git(dir, 'add', 'runs.ndjson');
-		const red = cli(['--conditions=source'], ['--records', dir]);
+		const red = cli(['--conditions=janumipwb-source'], ['--records', dir]);
 		expect(red.status, red.out).toBe(1);
 		expect(red.out).toContain(
 			// ⭐ Package V — ~~76 of 76~~: version twelve's 91. ⭐ Package V-2, 2026-10-29 — ~~91 of 91~~: and its three re-run cases.
@@ -4145,7 +4145,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect([...registerRulings(struck).struck], 'the fixture: exactly REG-D-084 struck in the copy').toEqual(['REG-D-084']);
 		const register = join(tmp(), 'register.md');
 		writeFileSync(register, struck);
-		const r = cli(['--conditions=source'], ['--records', dir, '--register', register]);
+		const r = cli(['--conditions=janumipwb-source'], ['--records', dir, '--register', register]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain(
 			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084, WITHDRAWN — its register heading is struck (runs.ndjson:${lines.length}) — every current case is owed its measurement under today’s fingerprint (REG-D-086)\n`
@@ -4154,7 +4154,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 			`  [RECORD] runs.ndjson:${lines.length}: the SELECTION in force cites REG-D-084, whose register heading is struck — a withdrawn ruling selects nothing; append a SELECTION citing a ruling in force\n`
 		);
 		writeFileSync(register, live);
-		const control = cli(['--conditions=source'], ['--records', dir, '--register', register]);
+		const control = cli(['--conditions=janumipwb-source'], ['--records', dir, '--register', register]);
 		expect(control.out, 'CONTROL: the same register, the heading live').toContain(
 			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084 (runs.ndjson:${lines.length}) — every current case`
 		);

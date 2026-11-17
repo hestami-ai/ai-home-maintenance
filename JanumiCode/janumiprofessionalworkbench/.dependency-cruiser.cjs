@@ -74,7 +74,7 @@ module.exports = {
 			// Resolve workspace cross-package imports to SOURCE (not built dist, which is excluded),
 			// so the boundary rules actually enforce on source. Only depcruise uses the 'source'
 			// condition; Node/Bun/Vitest/tsc ignore it and use types/import -> dist.
-			conditionNames: ['source', 'import', 'types', 'node', 'default']
+			conditionNames: ['janumipwb-source', 'import', 'types', 'node', 'default']
 		}
 	}
 };

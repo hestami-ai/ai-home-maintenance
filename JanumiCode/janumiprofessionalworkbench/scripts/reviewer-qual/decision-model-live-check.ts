@@ -14,7 +14,7 @@
 // ⭐ THE CANARY (`--canary <case>`): one v13 case asked live through the product's client — the product's own review of the case,
 // not its record — and through step 1's path, each question once; every key compared, the counts and times printed.
 //
-// usage: bun --conditions=source scripts/reviewer-qual/decision-model-live-check.ts --server <address> --model <name>
+// usage: bun --conditions=janumipwb-source scripts/reviewer-qual/decision-model-live-check.ts --server <address> --model <name>
 //          --digest <hex> --step1 <step1_single.py> --out <folder> [--hardpairs <folder of W14 prompts>] [--canary <case id>]
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

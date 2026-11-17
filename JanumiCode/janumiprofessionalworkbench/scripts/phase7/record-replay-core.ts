@@ -11,7 +11,8 @@
 //     text (`resultSha256`; the lead's delegated decision of 2026-10-15, to be registered), a call with none refused.
 //     The host's own observation (`observedToolCalls`) gives each call's outcome, paired by position.
 //     ⭐ AND THE REST OF THE TRY'S KEY (the review of E4, finding 1): the payload's SYSTEM PROMPT (its `instructions`, or
-//     its developer/system message), less Pi's date and working-directory lines (`instructionsOfSentPrompt`), and its
+//     its developer/system message), less Pi's date and working-directory lines ⭐ (TS5: or Pi 1.5.2's `<cwd>` section)
+//     (`instructionsOfSentPrompt`), and its
 //     TOOLS list — each tool's name, description and parameter schema — hashed as the replay hashes what this code gives.
 //     ⚠ INFERRED, AS `REG-F-530` SAYS: the record names tool calls and their outcomes only, so `write_file`'s contents
 //     exist only in that payload — which is why `verifyWrites` replays every write and holds the result to each unit
@@ -252,8 +253,9 @@ function turnOf(payload: string | undefined): PayloadTurn | string {
 	const instructions = instructionsOfSentPrompt(sent);
 	if (instructions === undefined)
 		return (
-			"its payload's system prompt does not end with Pi's date and working-directory lines, so the execution " +
-			'contract cannot be told apart from what Pi added (finding 1)'
+			"its payload's system prompt does not end with Pi's working-directory trailer (Pi 0.80.6's date and " +
+			"working-directory lines, or Pi 1.5.2's <cwd> section), so the execution contract cannot be told apart from " +
+			'what Pi added (finding 1)'
 		);
 	const tools = payloadTools(composite);
 	if (typeof tools === 'string') return tools;

@@ -41,7 +41,8 @@
 // ⭐⭐ THE EXECUTOR'S KEY IS ITS WHOLE INSTRUCTION, NOT ONLY ITS TURN (the review of E4, finding 1). What a model answered
 // is a function of the system prompt it was given and the tools it was offered as well as the turn's text, so a try is
 // served only when all three hash to the recording's: `instructionsSha256` over the execution contract AS SENT
-// (`instructionsOfSentPrompt` — the payload's system prompt less Pi's own date and working-directory lines), and
+// (`instructionsOfSentPrompt` — the payload's system prompt less Pi's own date and working-directory lines ⭐ or, on Pi
+// 1.5.2, its `<cwd>` section: TS5), and
 // `toolsSha256` over each tool's name, description and parameter schema AS MINTED (`toolDefinitionsSha256`). The replay
 // recomputes both from the code under test (`replay-executor.ts`) and refuses `REPLAY_STALE` on a mismatch, naming the
 // part and both hashes — a changed `EXECUTION_CONTRACT_PROMPT` or tool surface can no longer replay green.
@@ -249,8 +250,14 @@ export function canonicalJson(value: unknown): string {
  * The lines Pi appends after a CUSTOM system prompt, last: the date and the working directory (`pi-coding-agent`
  * `dist/core/system-prompt.js`, `buildSystemPrompt`: *"Add date and working directory last"*). The date moves every day
  * and the directory is the run's, so neither is the instruction a replay can be held to.
+ * ⭐ TS5 (Pi 1.5.2): EITHER PI'S FORM. Pi 1.5.2 builds the prompt as sections, each after the first in its tag, and sends
+ * no date; with the executor's closed loader its last is the working directory, `\n\n<cwd>\n<folder>\n</cwd>`
+ * (`buildSystemPromptSections`). A recording of a run made on Pi 0.80.6 holds the first form, one made on 1.5.2 the
+ * second, and the contract before each is the same text, so the two key alike. A section after `<cwd>` is no trailer
+ * this knows, and nothing is guessed.
  */
-const PI_PROMPT_TRAILER = /\nCurrent date: \d{4}-\d{2}-\d{2}\nCurrent working directory: [^\n]*$/;
+const PI_PROMPT_TRAILER =
+	/(?:\nCurrent date: \d{4}-\d{2}-\d{2}\nCurrent working directory: [^\n]*|\n\n<cwd>\n[^\n]*\n<\/cwd>)$/;
 
 /**
  * ⭐ THE EXECUTOR'S INSTRUCTIONS, AS SENT: a provider payload's system prompt less Pi's own trailer — or undefined when

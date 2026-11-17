@@ -2,7 +2,7 @@
  * ⭐ `JAN-CRITREAD` J2-3 — `bun run reviewer:qual:check`: is today's reviewer covered, does the record reproduce, and is
  * every material failure written up? (DESIGN-what-the-tests-prove.md §5.6; ROADMAP J2-3 + J2-4.)
  *
- *   bun --conditions=source scripts/reviewer-qual/check.ts [--records <dir>] [--register <file>]
+ *   bun --conditions=janumipwb-source scripts/reviewer-qual/check.ts [--records <dir>] [--register <file>]
  *
  * A static check that runs no model: the limbs are `check-core.ts`'s; this reads the record's top-level `*.ndjson`
  * files that git tracks, exactly as staged (~~`trackedRecord`~~ `trackedFiles`), today's case set and oracles, and the
@@ -14,7 +14,7 @@
  *
  * ⛔ IT READS SOURCE (`REG-D-072` D11), decided here as the runner decided it (`REG-D-074`): under bare `bun` every
  * `@janumipwb/*` package resolves to its built `dist`, stale after any source edit, and a fingerprint computed from a
- * stale build would call a record current that is not. So it runs under `bun --conditions=source`, and refuses to run
+ * stale build would call a record current that is not. So it runs under `bun --conditions=janumipwb-source`, and refuses to run
  * on anything else — before it loads anything that reaches a package.
  *
  * ⚠ WHAT IT IS AND IS NOT (§5.6): *"never the guarantee"* (`DOC-004:258`) — nothing runs it but a person running the

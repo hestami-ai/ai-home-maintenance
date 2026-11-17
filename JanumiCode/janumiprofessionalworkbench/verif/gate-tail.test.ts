@@ -42,7 +42,7 @@ describe('JAN-CRITREAD J2-3 — gate:tail runs the check and the browser tests, 
 		for (const s of GATE_STEPS)
 			expect(scripts(`${s.cwd === '.' ? '' : `${s.cwd}/`}package.json`)[s.script], `${s.cwd}:${s.script}`).toBeTypeOf('string');
 		expect(scripts('package.json')['gate:tail']).toBe('bun run scripts/gate-tail.ts');
-		expect(scripts('package.json')['reviewer:qual:check']).toBe('bun --conditions=source scripts/reviewer-qual/check.ts');
+		expect(scripts('package.json')['reviewer:qual:check']).toBe('bun --conditions=janumipwb-source scripts/reviewer-qual/check.ts');
 	});
 
 	it('⭐ CONTROL — both green, the tail is green, and both ran', () => {

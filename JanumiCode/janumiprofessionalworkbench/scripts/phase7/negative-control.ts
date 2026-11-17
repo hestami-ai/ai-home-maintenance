@@ -1,8 +1,8 @@
 // ⭐ `JAN-EXEC` Phase 7, P7-4e (DESIGN-the-live-end-to-end-run.md §6; `REG-D-102` item 4) — THE `RPH-EVD-004` NEGATIVE CONTROL:
 // A UNIT-TESTS-ONLY RUN BESIDE AN ACCOUNT CLAIMING FULL FITNESS, WHICH THE REVIEWER MUST REFUSE.
 //
-//   bun --conditions=source scripts/phase7/negative-control.ts --out <result.json> [--stub rejected|satisfied]
-//   bun --conditions=source scripts/phase7/negative-control.ts --out <result.json> --live --model glm-5-3-flash-high
+//   bun --conditions=janumipwb-source scripts/phase7/negative-control.ts --out <result.json> [--stub rejected|satisfied]
+//   bun --conditions=janumipwb-source scripts/phase7/negative-control.ts --out <result.json> --live --model glm-5-3-flash-high
 //
 // ⛔ `--live` CALLS THE SELECTED REVIEWER AND IS PAID. It is the OPERATOR's, in P7-4e, within the sponsor's limit — at most
 // 4 reviewer calls (`MAX_REVIEWER_CALLS`), enforced here, not hoped for. Without `--live` this is a DRY RUN: a stub answers
@@ -380,7 +380,7 @@ export async function main(argv: readonly string[], deps: NegativeControlCliDeps
 	const d11 = sourceResolutionProblem(deps.resolve(SOURCE_PROBE));
 	if (d11) {
 		// The shared refusal names the qualification runner's command; this one's is said beside it.
-		say(`${d11} — here: bun --conditions=source scripts/phase7/negative-control.ts …`);
+		say(`${d11} — here: bun --conditions=janumipwb-source scripts/phase7/negative-control.ts …`);
 		return 2;
 	}
 	const flags = parseFlags(argv, { out: 'value', live: 'switch', model: 'value', stub: 'value' });

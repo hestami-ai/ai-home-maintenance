@@ -13,7 +13,7 @@
 //     model variable to the RECORDED label; and it asserts agy's argv through the exec seam, so the recorded label is
 //     the `--model` the program was actually given.
 //   · A TIMEOUT AND A REFUSAL ARE CLASSIFIED APART, on every transport.
-//   · D11 — the CLI runs from SOURCE (`bun --conditions=source`), and refuses to run on built `dist`.
+//   · D11 — the CLI runs from SOURCE (`bun --conditions=janumipwb-source`, ~~`source`~~ until TS5), and refuses to run on built `dist`.
 // ⛔ AND NO MODEL IS REACHABLE, BY CONSTRUCTION (`JAN-CRITREAD` J2-3; `reviewer-qualification-hermetic.ts`): in process
 // PATH names an empty directory, so a product transport whose exec seam a mutant bypassed finds no program; every
 // spawned CLI runs bun by absolute path on a PATH of bun's and git's directories alone; and the runner reaches only
@@ -1191,8 +1191,8 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		expect(r.wrote).toBe(false);
 	});
 
-	it('⛔ under --conditions=source it gets past D11, and refuses JPWB_AGY_BIN before loading a transport (D12)', () => {
-		const r = cli(['--conditions=source'], { JPWB_AGY_BIN: 'C:/stand-in/agy-shim.exe' });
+	it('⛔ under --conditions=janumipwb-source it gets past D11, and refuses JPWB_AGY_BIN before loading a transport (D12)', () => {
+		const r = cli(['--conditions=janumipwb-source'], { JPWB_AGY_BIN: 'C:/stand-in/agy-shim.exe' });
 		expect(r.status, r.err).toBe(2);
 		expect(r.err).not.toContain('REG-D-072 D11');
 		expect(r.err).toContain('JPWB_AGY_BIN is set');
@@ -1232,7 +1232,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			];
 			// ⚠ ASYNCHRONOUS, because the stand-in answers from THIS process: a synchronous spawn would block it.
 			const r = await new Promise<{ status: number | null; err: string }>((resolve) => {
-				const child = spawn(BUN, ['--conditions=source', 'scripts/reviewer-qual/run.ts', ...command], {
+				const child = spawn(BUN, ['--conditions=janumipwb-source', 'scripts/reviewer-qual/run.ts', ...command], {
 					cwd: REPO,
 					env: hermeticEnv(),
 					windowsHide: true
