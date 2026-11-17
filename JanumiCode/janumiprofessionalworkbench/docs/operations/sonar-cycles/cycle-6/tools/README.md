@@ -4,10 +4,10 @@ Twenty of the forty tool files cycle 6 ran from the lead's session scratch folde
 for byte on 2026-11-17 by package S1, so that the method does not rest on a temporary folder again: earlier
 cycles' tools did not survive (cycle 1's scratch folders remain as ten empty directories, CM-17, and `mk_waves.py`
 replaced a lost `mk-waves.cjs`). They are records, not live tooling. They read the old runner's output
-(`worklist.json`, `ledger.json`),
-which S1's runner replaced; paths inside them are the cycle's worktree, `E:/Projects/hestami-sonar`; and nothing
-runs them. Two were ported, and the first package that runs a fix cycle adapts what else it uses
-(`docs/_working/ROADMAP-toolchain-and-sonar.md`, S1).
+(`worklist.json`, `ledger.json`), which S1's runner replaced. Their paths are those of the cycle's own worktree and of
+the main checkout on the operator's machine, kept as they ran: four of them name those folders (`check_wave.py`,
+`mk_waves.py`, `run_step.ps1` and `tierD/review/c6-d.workflow.js`). Nothing runs them. Two were ported, and the first
+package that runs a fix cycle adapts what else it uses (`docs/_working/ROADMAP-toolchain-and-sonar.md`, S1).
 
 | Tool | Bytes | SHA-256 | What it did in cycle 6 | Status and successor |
 | --- | --- | --- | --- | --- |
