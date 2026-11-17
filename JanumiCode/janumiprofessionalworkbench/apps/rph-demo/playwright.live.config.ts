@@ -37,7 +37,7 @@ export default defineConfig({
 		trace: 'retain-on-failure',
 		screenshot: 'only-on-failure'
 	},
-	projects: [{ name: 'edge', use: { ...devices['Desktop Chrome'], channel: 'msedge' } }],
+	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 	webServer: {
 		// Keep the server as Playwright's direct child so Windows teardown cannot strand a Vite listener. A live
 		// calibration still requires the test harness mode and therefore must not reuse an arbitrary dev server.

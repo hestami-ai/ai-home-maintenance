@@ -10,7 +10,9 @@ import { forgetLiveBackendSelections } from '../../verif/live-backend-isolation'
 //   2. semantic — DOM roles/text (the control exists, the Charter label is right, no dead-ends)
 //   3. truth    — the /__introspect endpoint's event-log/object state matches what the UI claims (INV-5)
 //
-// The browser is the SYSTEM Edge (Chromium) via `channel`, so no Playwright browser download is required.
+// The browser is Playwright's own Chromium, the revision the locked @playwright/test bundles (JAN-TOOLCUR T6; the
+// matrix's e2eBrowser row, which `toolchain:check` holds every config to): not the system Edge, which updates itself.
+// A fresh machine installs it once with `node node_modules/@playwright/test/cli.js install chromium`.
 // RPH_DEMO_MODE=test makes the server spin up a fresh, deterministic engine per boot (see
 // src/lib/server/workbench.ts): a throwaway temp SQLite DB + an injected monotonic clock and ULID sequence,
 // which keeps ids and screenshots stable and diffable.
@@ -52,7 +54,7 @@ export default defineConfig({
 		trace: 'retain-on-failure',
 		screenshot: 'only-on-failure'
 	},
-	projects: [{ name: 'edge', use: { ...devices['Desktop Chrome'], channel: 'msedge' } }],
+	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 	webServer: {
 		// Playwright owns the Vite process directly so teardown can terminate the complete server process on
 		// Windows. Reusing an arbitrary dev server would silently bypass RPH_DEMO_MODE=test and invalidate the

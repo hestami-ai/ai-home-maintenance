@@ -2,7 +2,8 @@
  * Regenerate the matrix's GENERATED fields (JAN-TOOLCUR D-7; roadmap T0), and the table on the human page.
  *
  * Generated: each package row's declared ranges (manifest directory -> range), its hoisted lock version and its nested
- * copies (lock key -> version), and the day-to-day Node, read from `.node-version`. Every other field — the
+ * copies (lock key -> version), the day-to-day Node, read from `.node-version`, and the e2e browser's facts (roadmap
+ * T6: the locked `@playwright/test`, and the Chromium revision and version its `browsers.json` names). Every other field — the
  * hand-written judgments and the observed machine versions — is kept exactly as it stands. Rows keep their order and
  * keys their place, and the maps it writes are sorted, so the output depends only on the inputs: generating twice gives
  * the same bytes (roadmap T0's exit criterion), which `--check` asserts.
@@ -18,6 +19,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { e2eBrowserFacts } from './e2e-browser.js';
 import { copiesOf, parseLockfile, type Lockfile } from './lockfile.js';
 import { parseMatrix } from './matrix.js';
 import { externalDeclarations, makeReader, parseOverrides, readManifest, workspaceDirs, type TreeReader } from './tree.js';
@@ -33,11 +35,18 @@ function sortedRecord(entries: Iterable<[string, string]>): Record<string, strin
 	return out;
 }
 
+/** ⭐ (roadmap T6) The e2e browser's facts: the locked @playwright/test, and the Chromium it bundles. */
+function regenerateE2eBrowser(row: Record<string, unknown> | undefined, reader: TreeReader, lock: Lockfile): void {
+	if (row === undefined) throw new Error('the matrix has no e2eBrowser row');
+	Object.assign(row, e2eBrowserFacts(reader, lock));
+}
+
 /** The matrix text with its generated fields recomputed from the tree. Throws, naming the input, when one is unusable. */
 export function regenerate(reader: TreeReader, matrixText: string): string {
 	const raw = JSON.parse(matrixText) as {
 		node?: Record<string, unknown>;
 		packages?: Record<string, unknown>[];
+		e2eBrowser?: Record<string, unknown>;
 	};
 	const lockText = reader.read('bun.lock');
 	if (lockText === undefined) throw new Error('bun.lock is missing');
@@ -66,6 +75,7 @@ export function regenerate(reader: TreeReader, matrixText: string): string {
 		row.locked = hoisted.version;
 		row.nested = sortedRecord(copies.filter((c) => c.parent !== '').map((c): [string, string] => [c.key, c.version]));
 	}
+	regenerateE2eBrowser(raw.e2eBrowser, reader, lock);
 	const text = `${JSON.stringify(raw, null, '\t')}\n`;
 	parseMatrix(text);
 	return text;
@@ -104,7 +114,10 @@ export function regeneratePage(pageText: string, matrixText: string): string {
 		const pin = t.check === 'none' ? 'observed' : `observed, ${t.check} checked`;
 		lines.push(`| ${cell(t.component)} | ${cell(t.group)} | ${pin} | ${cell(t.observed)} (${t.date}) | — | ${cell(t.detail)} |`);
 	}
+	const e = m.e2eBrowser;
+	const e2eConfigs = `configs: ${e.configs.join(', ')}`;
 	lines.push(
+		`| e2e browser | ${cell(e.group)} | Playwright's own, checked | @playwright/test ${e.playwright}: Chromium ${e.browserVersion} (revision ${e.revision}; headless shell ${e.headlessShellRevision}) | — | ${cell(e2eConfigs)} |`,
 		`| VS Code | ${cell(m.vscode.group)} | floor | ${m.vscode.floor}: Electron ${m.vscode.floorElectron}, Node ${m.vscode.floorNode} | — | ${cell(m.vscode.source)} |`,
 		'',
 		TABLE_END
