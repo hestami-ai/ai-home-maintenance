@@ -148,7 +148,7 @@ and the order of the first upgrades, as a preview for the roadmap.
   none of `packageManager`, `engines` or `devEngines`. Bun PR #46656 (open) says *"Bun never reads either field, so
   `bun install` and `bun run check` on bun 1.4.3 print nothing."* (https://api.github.com/repos/oven-sh/bun/pulls/46656);
   `devEngines` support is open issue #26512 (critic C5, F2).
-- Node: `package.json:66-68` (~~`:64-66`~~ until package T0, `8cc18d7e`, added lines above it) `"engines": { "node": ">=22" }`. No `.nvmrc`, `.node-version`, `.tool-versions` or
+- Node: `package.json:66-68` (as it read until package T1a, `03ce3314`, raised the floor; ~~`:64-66`~~ until package T0, `8cc18d7e`, added lines above it) `"engines": { "node": ">=22" }`. No `.nvmrc`, `.node-version`, `.tool-versions` or
   volta field is tracked (`git ls-files`, 0 hits).
 - The only check is `.github/workflows/ci.yml:14-16` (`bun-version: 1.3.14`), and that workflow never runs. The
   repository root's workflow triggers only on `paths: ['JanumiCode/janumicode/**']`
@@ -645,7 +645,7 @@ and the order of the first upgrades, as a preview for the roadmap.
 | --- | --- | --- |
 | Runtimes | Node: the floor in `engines`, plus the exact day-to-day version in `.node-version`. Bun: exact. | Bun reads none of `packageManager`, `engines` or `devEngines` (F-2), so `toolchain:check` enforces both (D-9). |
 | The compiler | Exact. | F-6. |
-| `@types/node` | Exact, at the newest 24.x types release whose minor is not above the floor's (24.15); the roadmap checks which releases exist. Today's 24.13.3 qualifies. | A caret range (`package.json:49` `"^24.0.0"`; ~~`:47`~~ until package T0, `8cc18d7e`, added lines above it) lets `bun update` take 24.19.2, which may describe APIs above the floor; accepted correction 2 says the types match the floor (D-5). |
+| `@types/node` | Exact, at the newest 24.x types release whose minor is not above the floor's (24.15); the roadmap checks which releases exist. Today's 24.13.3 qualifies. | A caret range (`package.json:49` `"^24.0.0"`, as it read until package T1a, `03ce3314`, pinned it exactly; ~~`:47`~~ until package T0, `8cc18d7e`, added lines above it) lets `bun update` take 24.19.2, which may describe APIs above the floor; accepted correction 2 says the types match the floor (D-5). |
 | Packages that put breaking changes in patch or minor releases | Exact, with a changelog read on every bump. | pi-coding-agent in patches: 0.80.7, 0.80.8, 0.84.3, 1.0.3 and 1.5.1 (F-13). typebox must equal Pi's pin. Playwright in minors (F-13). |
 | Tools whose output an instrument pins, byte for byte or by count | Exact: prettier (`gen:check`), zod (the committed JSON Schemas), vitest and @vitest/coverage-v8 (the coverage thresholds and the per-file floor). | F-11. |
 | A dependency that is exact today | Stays exact until a decision loosens it; the roadmap records its reason, or that none was found. Today: @dagrejs/dagre, @statelyai/graph, @xstate/svelte, elkjs and xstate (`apps/rph-demo/package.json:22`, `:32`, `:33`, `:35`, `:38`) and fast-check (`packages/rph-domain/package.json:34`). | Loosening a pin weakens a judgment (I7). elkjs, for one, is tied to 0.11's entry layout (`apps/rph-demo/vite.config.ts:19-22`). |

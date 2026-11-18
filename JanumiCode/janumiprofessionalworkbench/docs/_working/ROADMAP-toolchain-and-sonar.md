@@ -198,7 +198,7 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
 
 - **Scope.** D-1's floor and D-8's types: `engines.node` becomes `">=24.15.0"`, and `@types/node` is pinned exactly at the newest 24.x types release whose minor is at most 15 (`docs/_working/DESIGN-toolchain-currency.md:795`, "The floor `">=24.15.0"`"; `:648`). The day-to-day 24.22.3 is already recorded by T0 and already runs on the machine, so D-12's prerequisite, "the machine's Node moves from 24.11.1 to 24.22.3" (`:796`), is met. better-sqlite3 is not upgraded.
 - **Depends on.** T0 (landed 2026-11-16, `53c078bb`). And REG-F-501's CONTROL holding on 24.15.0: ~~as `REG-D-160` restated it (`dd23ebba`), it fails there and on 24.11.1, which still reset, and passes on 24.22.3 (measured 2026-11-13, one run per build; §4, N0). The sponsor confirmed `REG-D-160` in the JAN-EXEC session before the 8th paid run, in a question that did not mention that failure, and then left the CONTROL to that session (2026-11-13), which has the measurements, proposes any change and brings it to the sponsor. Until a change is ruled and lands, T1a's floor lane meets that red, so T1a cannot meet its exit on the 24.15.0 zip; if no change comes, T1a needs its own answer for this test.~~ **Met, 2026-11-16.** The change came: the sponsor adopted the CONTROL `REG-D-161` owed (`REG-D-165`), and package L17a (`dae58ae3`, design D83) restated it by Node release line, expecting the reset before each line's first release with the keep-alive agent's pending-read check (24.22.1 on 24.x) and the request answered on a new connection from it. On the landed tree the test file passes on the official 24.15.0 zip, on 24.11.1 and on 24.22.3, 2 of 2 each (T0's second documents commit records the runs).
-- **Required changes (files, by path).** The root `package.json` (`engines.node`; `@types/node` exact, today `"^24.0.0"` at `package.json:49` (~~`:47`~~ until package T0, `8cc18d7e`, added lines above it), TOOLCUR's §6 map at `docs/_working/DESIGN-toolchain-currency.md:912`), `bun.lock`, `scripts/toolchain/matrix.json` (the floor and its cross-row values), `docs/operations/toolchain.md`, the review report and the register. Which types releases exist between 24.13.3 and 24.19.2 "was not checked" (`docs/_working/DESIGN-toolchain-currency.md:996-998`). T1a lists the non-deprecated releases through minor 15 from the registry, saves the list, and takes the newest. 24.13.3 qualifies (`:648`, "Today's 24.13.3 qualifies"); it is not called the newest without that list.
+- **Required changes (files, by path).** The root `package.json` (`engines.node`; `@types/node` exact, today `"^24.0.0"` at `package.json:49` (as it read until this package, `03ce3314`, pinned it; ~~`:47`~~ until package T0, `8cc18d7e`, added lines above it), TOOLCUR's §6 map at `docs/_working/DESIGN-toolchain-currency.md:912`), `bun.lock`, `scripts/toolchain/matrix.json` (the floor and its cross-row values), `docs/operations/toolchain.md`, the review report and the register. Which types releases exist between 24.13.3 and 24.19.2 "was not checked" (`docs/_working/DESIGN-toolchain-currency.md:996-998`). T1a lists the non-deprecated releases through minor 15 from the registry, saves the list, and takes the newest. 24.13.3 qualifies (`:648`, "Today's 24.13.3 qualifies"); it is not called the newest without that list.
 - **Invariants kept.** I1 to I5 and I7 (`docs/_working/DESIGN-toolchain-currency.md:879-892`). Raising the floor applies R1 (I7, `:891`, "Moving a value as an existing ruling directs").
 - **Tests and predicted RED, with why.** TOOLCUR's floor-mode row: on the official Node 24.0.0 zip, floor mode fails, naming the floor 24.15.0 (`docs/_working/DESIGN-toolchain-currency.md:935`). The cross-row row (`:937`) and the normal-mode row re-run on the real pins. The two keep-alive tests, run alone outside the gate, fail on 24.0.0 and pass on 24.15.0 (`:936`, "Run outside the gate"): TOOLCUR inferred that red from Node's docs, and N0's matrix observed it, with `4e05ee0d`'s files as with N0's; T1a records it again as its own. Run again on the landed tree before T1a's changes (2026-11-16, each log's first line its Node's own version): on 24.0.0 the two tests of `apps/rph-demo/src/lib/server/harness-keep-alive.test.ts` that read `keepAliveTimeoutBuffer` fail, 2 of the two files' 7, and all 7 pass on 24.15.0 and on 24.22.3; `harness-keep-alive-connection.test.ts` passes on all three, its CONTROL expecting each line's outcome since L17a. Native loading, `dist` bytes and test counts are compared before and after with `compare-builds.ts`.
 - **Ordinary re-baselines in the same commit.** Generated and observed matrix rows; the §6 writers, with the counts before and after.
@@ -217,6 +217,7 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
 - **Governed items that need a ruling.** The sponsor's go-ahead for the between-run landing. An Edge mandate found outside the repository returns the choice to the lead.
 - **Prohibited shortcuts.** An opportunistic Playwright upgrade; qualifying the switch with a paid run; still describing Edge as the e2e browser afterwards.
 - **Exit criterion.** Gate, browser identity and floor lane pass. Extra: `mutants:changed --run` on the config edits; a scan of the three changed configs with the existing runner, or not run with its reason (S1 is not yet in JPWB). The live-lane configuration change is recorded without claiming a paid-run result. The scan covers every TypeScript file T6 changes (the configs, the toolchain scripts, the new spec and the test file), run as T1a ran its own.
+- **Landed (2026-11-17).** In the T6-to-TS4 stack, `d595cad0`; its checks after the landing are recorded under TS4.
 
 ### TS1 · Security: the in-range refresh of the vulnerable copies
 
@@ -230,6 +231,7 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
 - **Governed items that need a ruling.** None of §1's pins moves; a moved reviewer fingerprint stops the package (I3).
 - **Prohibited shortcuts.** A fresh re-resolution or `bun update` (both move packages no advisory names); a release the cooldown holds without its recorded exclusion; widening a declared range.
 - **Exit criterion.** `bun audit` shows TS1's 32 advisories gone and none new; the gate and the floor lane pass; the currency report records what remains, each with what unblocks it.
+- **Landed (2026-11-17).** In the T6-to-TS4 stack, `d595cad0`; its checks after the landing are recorded under TS4.
 
 ### TS2 · Security: zod 4.6.7
 
@@ -243,6 +245,7 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
 - **Governed items that need a ruling.** A moved reviewer fingerprint stops the package (I3).
 - **Prohibited shortcuts.** Regenerating the schemas without reading their diff; leaving one manifest behind; a fresh re-resolution.
 - **Exit criterion.** zod's advisory gone from `bun audit`; `gen:check` current with the schema diff explained; the gate and the floor lane pass.
+- **Landed (2026-11-17).** In the T6-to-TS4 stack, `d595cad0`; its checks after the landing are recorded under TS4.
 
 ### TS3 · Security: SvelteKit 2.70.4
 
@@ -256,6 +259,7 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
 - **Governed items that need a ruling.** None of §1's pins moves.
 - **Prohibited shortcuts.** SvelteKit 3; vite 8 or vite-plugin-svelte 7 (T3a's); moving svelte or the adapter with it.
 - **Exit criterion.** The three advisories gone; the gate and the floor lane pass.
+- **Landed (2026-11-17).** In the T6-to-TS4 stack, `d595cad0`; its checks after the landing are recorded under TS4.
 
 ### TS4 · Security: vitest 4.1.12
 
@@ -269,6 +273,9 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
 - **Governed items that need a ruling.** None of §1's pins moves; a moved reviewer fingerprint stops the package (I3).
 - **Prohibited shortcuts.** vitest 5; vitest's vite above 8.1 (8.3.7 is what a fresh resolution would take); taking a moved count without its explanation.
 - **Exit criterion.** The eight advisories gone; the counts compared and every difference explained; the gate and the floor lane pass.
+- **Landed (2026-11-17), with T6 to TS3, as one stack.** `d595cad0`, the JAN-EXEC lead's fast-forward of `jan-exec/phase7c` from `e467df96`, at the sponsor's go-ahead: TS4's tip `74e72aad` merged onto the main line's `e467df96` (`1c87d28b`), then a documents commit. The checks §1 rule 9 runs after a landing, on its tree (`9239e19c`), found nothing to file:
+  - *The floor lane*, on the official Node 24.15.0 zip (`node --version` v24.15.0 in the run), 2026-11-17 22:33:52Z to 23:45:56Z (it began on that tree before the push): GATE EXIT 0, every count the normal gate's on the same tree.
+  - *The 245 mutation guards over the code package L17b1 changed*, under the stack's tools: the 243 that `mutants:changed` selects over `74e72aad..d595cad0`, and the 2 more the every-path rule adds, in `scripts/phase7/`. On three lanes, 2026-11-17 23:46:21Z to 2026-11-18 01:22:47Z: all 245 KILLED, each id with exactly one verdict.
 
 ### S1 · Move the Sonar method into JPWB
 
@@ -356,6 +363,7 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
 
     Beside them, for S2: the engine has no `typescript:S1481`, since SonarJS 14.4.0.46458 lists S1481 for JavaScript alone, yet the plugin's recommended set reports `sonarjs/no-unused-vars` on TypeScript files.
   - *The Sonar scan of S1's changed analysable files* (the five new files under `scripts/sonar/` and `scripts/toolchain/check.ts`, `generate.ts` and `matrix.ts`), with S1's runner. The first scan found 7. Four were fixed: a redundant type alias, swapped argument names, a nested template literal, and a `require.main` comparison the engine reads as always false. The last scan finds 3, each S4036 at a `git` spawned by name, kept with its reason at the site, cycle 6's convention, as T0 kept its own.
+- **Landed (2026-11-17), `44b8482e`.** The JAN-EXEC lead's fast-forward of `jan-exec/phase7c` from `d595cad0`, at the sponsor's go-ahead: the landing method (`006d3248`), S1's documents commit and package (`282bf57b`, `1b6cc06b`), and `44b8482e`, which took this session's machine folder names out of its own prose. The checks §1 rule 9 runs after a landing were owed nothing: a fast-forward leaves no main-line side to check, and S1's exit criterion names no floor lane.
 
 ### S5 · The exception register and the marker proof
 
@@ -403,10 +411,11 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
   - The page: a hand-edited copy fails, naming the command; the page written into a `mkdtempSync` folder equals the committed bytes.
   - The live lint cases above, each alone.
   - The CONTROL first: the real tree passes every check.
-- **Built (2026-11-18).** As planned above, with three additions, each named here:
+- **Built (2026-11-18).** As planned above, with ~~three~~ four additions, each named here:
   - *The comment reader's own defect, found by its planned reds.* On the first run, the 16 reds whose fault was a line added at the end of a fixture file stayed green. TypeScript hangs a documentation block at the end of a file on the end-of-file token as JSDoc; the walk counted that JSDoc as the token's child, so it never reached the token or the comments before it. The walk now leaves JSDoc children out, and a reader case holds it: a documentation block at the end of a file, with two comments after it.
   - *V-9's record tied to the engine.* A test fails when an engine run in the register's `markerProof` ran under another engine or Node than the matrix pins, with its own control. The marker form is the engine's behaviour, so an engine change proves it again.
   - *The design's F-5* quotes the procedure's words at `docs/operations/sonarqube.md:100-103`, which S5 replaced; that citation is dated in place.
+  - *The fixture's rulings, declared (the first gate's finding).* The first gate stopped at `test:dist`: `verif/register-citations.test.ts` fails on a REG id that code cites and no canon document defines, and the fixture decision register's rulings were such ids. They are `REG-D-990` to `REG-D-998`, declared by name in that test's SYNTHETIC set with the reason, beside `REG-D-999`, already there, the ruling the fixture register lacks. The same gate found the census one test file short: it had been regenerated before S5's test file was staged, and it counts the test files it leaves out.
 
   What was measured:
   - *Committed*, in `verif/sonar-exceptions.test.ts`, 86 tests: the CONTROLs on the real tree and on the fixture; V-8's four limbs; each other field of §7.4; the approval's faults; the join's; eleven directive forms; V-10 in four spellings and the engine's rule; the pins; the comment reader; the page; the dates; V-9's lint channel, live; and the record. Each red asserts its one message.
