@@ -12,6 +12,9 @@ import type { EngineHandle } from '@janumipwb/rph-engine';
 import { listByType } from '@janumipwb/rph-engine';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { oneJsonObject, stageJsonOf } from './assurance-stage-records.js';
+import { isAssuranceStageExchange } from './assurance-stage-roles.js';
+import { storedButUnnamed, verifiedBytes } from '../execution/verified-bytes.js';
+import { describedThrow } from '../described-throw.js';
 
 /** One record a chapter is given: its id, and a line saying what it is. */
 export interface ChapterRecord {
@@ -109,9 +112,87 @@ export async function chapterRecordsOf(
 						(findings.length > 0 ? `; the host's findings on it: ${bounded(findings.join('; '))}` : '')
 				});
 			}
+		} else if (type === 'MODEL_EXCHANGE' && executorTryOf(state, units)) {
+			// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173` (5)) — EACH EXECUTOR TRY SINCE THE LAST CHAPTER, by its exchange's id.
+			records.push(await executorTryRecord(engine, store, id, state, titleOf));
 		}
 	}
 	return records;
+}
+
+/**
+ * ⭐ Package L17b3 (D89) — one executor try as a chapter's record, its id the exchange's: its unit, the commands it ran with their exits, and its
+ * answer, cut at `STAGE_RECORD_BOUND` and said so.
+ */
+async function executorTryRecord(
+	engine: EngineHandle,
+	store: ArtifactStore,
+	id: string,
+	state: Record<string, unknown>,
+	titleOf: (unitId: string) => string
+): Promise<ChapterRecord> {
+	const unitId = str(state.subjectObjectId);
+	const commands = commandsOfTry(engine, id, unitId);
+	const ran = commands.length > 0 ? commands.join('; ') : 'none recorded';
+	// ⭐ The lead's ruling 7 (§16; L17C-07) — ~~`answer === undefined ? 'none recorded' : …`~~: the answer line, unrecorded and unreadable told apart.
+	return { id, text: `executor try of "${titleOf(unitId)}" (${unitId}): the commands it ran: ${ran}; its answer: ${await triedAnswerLine(store, state)}` };
+}
+
+/** ⭐ Package L17b3 (D89) — whether an exchange is an executor try of a unit of the Undertaking: the EXECUTION plane's, the assurance stage's left out. */
+function executorTryOf(state: Record<string, unknown>, units: ReadonlyMap<string, unknown>): boolean {
+	return state.plane === 'EXECUTION' && units.has(str(state.subjectObjectId)) && !isAssuranceStageExchange(state);
+}
+
+/**
+ * ⭐ Package L17b3 (D89) — the commands a try ran, each `<argv joined> (exit <n>)` (the lead's accepted form): the host's command evidence of the unit's
+ * steps proposed after the try's exchange and before the unit's next executor exchange — the order the page records a try in.
+ */
+function commandsOfTry(engine: EngineHandle, exchangeId: string, unitId: string): string[] {
+	const stepIds = new Set(
+		listByType(engine, 'EXECUTION_PLAN')
+			.filter((p) => p.state.workUnitId === unitId)
+			.flatMap((p) => ((p.state.steps as { id?: unknown }[] | undefined) ?? []).map((s) => str(s.id)))
+	);
+	const events = engine.readAllEvents();
+	const from = events.findIndex((e) => e.aggregateId === exchangeId);
+	const out: string[] = [];
+	for (const e of events.slice(from + 1)) {
+		const state = (engine.loadObject(e.aggregateId)?.state ?? {}) as Record<string, unknown>;
+		if (state.objectType === 'MODEL_EXCHANGE' && state.subjectObjectId === unitId && e.aggregateId !== exchangeId && !isAssuranceStageExchange(state)) break;
+		if (state.objectType !== 'EVIDENCE' || e.eventType !== 'EvidenceProposed') continue;
+		const ref = (state.contentReference ?? {}) as { command?: unknown; exitCode?: unknown; producingExecutionAttemptId?: unknown };
+		if (!Array.isArray(ref.command) || !stepIds.has(str(ref.producingExecutionAttemptId).split('#')[0] ?? '')) continue;
+		out.push(`${ref.command.map(str).join(' ')} (exit ${typeof ref.exitCode === 'number' ? ref.exitCode : 'none: ended by a signal'})`);
+	}
+	return out;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89, and the lead's ruling 7 (§16; the independent review's L17C-07) — A TRY'S ANSWER LINE, what
+ * follows "its answer: " in its record for the writer: its raw output where it verifies, else its answer span where that does, cut at
+ * `STAGE_RECORD_BOUND` and said so; `none recorded` only where neither reference is `STORED`; where one is and nothing verifies, *"it could not be
+ * read: <why>"* — never an unreadable answer said to be none. ⛔ It does not throw: a store that throws is a reference that could not be read.
+ */
+export async function triedAnswerLine(store: ArtifactStore, state: Record<string, unknown>): Promise<string> {
+	const unreadable: string[] = [];
+	for (const field of ['rawOutputBeforeCoercionRef', 'answerSpanRef'] as const) {
+		const ref = (state[field] ?? {}) as { status?: unknown; storageKey?: unknown; contentHash?: unknown };
+		// ⭐ The lead's ruling 5 of §23 (the lead's O-2) — ~~a reference not STORED, or STORED without a key or a hash, passed over~~: only one not
+		// STORED is passed over; a STORED one that names no storage key or content hash cannot be read, and the line says so.
+		if (ref.status !== 'STORED') continue;
+		if (typeof ref.storageKey !== 'string' || typeof ref.contentHash !== 'string') {
+			unreadable.push(storedButUnnamed(field === 'rawOutputBeforeCoercionRef' ? 'raw output' : 'answer span', ref));
+			continue;
+		}
+		try {
+			const v = await verifiedBytes(store, ref.storageKey, ref.contentHash, 'the answer');
+			if (v.ok) return bounded(v.value);
+			unreadable.push(v.refusedBecause);
+		} catch (e) {
+			unreadable.push(describedThrow(e));
+		}
+	}
+	return unreadable.length === 0 ? 'none recorded' : `it could not be read: ${unreadable.join('; ')}`;
 }
 
 /** Each assessment's criterion results not MET or NOT_APPLICABLE, from its `AssuranceCriterionEvaluated` events, the last of each criterion's. */

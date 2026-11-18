@@ -35,14 +35,14 @@ import {
 	SettingsManager
 } from '@earendil-works/pi-coding-agent';
 import { answerFromTurnEnd } from './backing-tool.js';
-import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
+import type { AdapterToolObservation, DroppedReply, ToolInvocationResult } from './backing-tool.js';
 import {
 	producerWorkingDirectory,
 	type ExecutorSessionPlace,
 	type ProducerSession,
 	type ProducerSessionContext
 } from '../execution/producer-session.js';
-import { sessionFilesIn, supplyCutOffResults, twoSessionFilesRefusal } from '../execution/executor-session.js';
+import { sessionFileHoldings, sessionFilesIn, supplyCutOffResults, twoSessionFilesRefusal } from '../execution/executor-session.js';
 import {
 	createMaterializedInputRecorder,
 	type PayloadHookHost
@@ -85,9 +85,10 @@ function resolveExecutingModel(modelRegistry: ModelRegistry, configured: string)
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4); `REG-D-169`) — THE PI SESSION A PLACE NAMES. In memory: `SessionManager.inMemory()`,
  * byte for byte as before. In a folder: the unit's one file REOPENED, its working folder the workspace it works in now (a continued run's copy may
- * lie elsewhere), and a result appended for any call its stopped step never answered (`supplyCutOffResults`); its predecessor's file FORKED, the new
- * header naming the parent; or a NEW file, which Pi writes at the first answer (`session-manager.js`, `_persist`). ⛔ A folder holding more than one
- * session file is refused, naming it — here too, since it is read again as the session opens.
+ * lie elsewhere), and a result appended for any call its stopped step never answered (`supplyCutOffResults`); ~~its predecessor's file FORKED, the new
+ * header naming the parent;~~ ⭐ (package L17b3, design D89: nothing forks, and a file naming a parent is refused as it reopens) or a NEW file, which
+ * Pi writes at the first answer (`session-manager.js`, `_persist`). ⛔ A folder holding more than one session file is refused, naming it — here too,
+ * since it is read again as the session opens.
  */
 export function executorSessionManager(place: ExecutorSessionPlace, cwd: string): SessionManager {
 	if (place.kind === 'IN_MEMORY') return SessionManager.inMemory();
@@ -99,6 +100,8 @@ export function executorSessionManager(place: ExecutorSessionPlace, cwd: string)
 			throw new Error(
 				`the session folder ${place.folder} no longer holds the file this step was to reopen (${opening.file}), so its conversation cannot be continued (design D85).`
 			);
+		// ⭐ Package L17b3 (D89) — checked again as it opens: a file whose header names a parent is refused, never reopened as the unit's own.
+		sessionFileHoldings(opening.file);
 		const reopened = SessionManager.open(opening.file, undefined, cwd);
 		supplyCutOffResults(reopened);
 		return reopened;
@@ -107,11 +110,8 @@ export function executorSessionManager(place: ExecutorSessionPlace, cwd: string)
 		throw new Error(
 			`the session folder ${place.folder} already holds a session file, so a new one cannot be opened beside it (design D85).`
 		);
-	if (opening.kind === 'FORK') {
-		const forked = SessionManager.forkFrom(opening.from, cwd, place.folder);
-		supplyCutOffResults(forked);
-		return forked;
-	}
+	// ⭐⭐ Package L17b3 — design D89 (`REG-D-173`) — ~~`if (opening.kind === 'FORK') { SessionManager.forkFrom(opening.from, cwd, place.folder); … }`~~:
+	// nothing forks; a replacement's first step opens a new file of its own.
 	return SessionManager.create(cwd, place.folder);
 }
 
@@ -199,7 +199,8 @@ export async function openPiExecutionSession(
 	// structure whose emptiness is a ratified guarantee.
 	const processRuns = createProcessRunObserver();
 	const tools = mintExecutionTools({
-		ports: { workspace: context.workspace, runner: context.runner, processRuns },
+		// ⭐ Package L17b3 (D89) — and the record a replacement's tool reads, where one is handed in (its tool minted only then, and under its grant).
+		ports: { workspace: context.workspace, runner: context.runner, processRuns, ...(context.earlierAttempt ? { earlierAttempt: context.earlierAttempt } : {}) },
 		grantedCapabilities: context.grantedCapabilities,
 		// ⛔ `B-1` — THE STATUS TRAVELS WITH THE LIST, because a REVOKED binding still lists what it granted.
 		bindingAuthorizationStatus: context.bindingAuthorizationStatus
@@ -283,13 +284,19 @@ export async function openPiExecutionSession(
 
 	return {
 		retainsHistory: true,
+		// ⭐ Package L17b3 (D89) — the tools this session minted, as the record names them (`mintedToolNames`, above).
+		mintedToolNames,
 		lastTurnObservation: () => lastTurn,
 		// ⭐ PHASE 5 — SESSION-SCOPED, LIKE THE TOOL-CALL OBSERVER AND FOR THE SAME REASON: a turn's runs are
 		// a SLICE of this, and slicing needs the whole. The caller reads it after the turn it cares about.
 		processRuns: () => processRuns.observed(),
 		dispose: () => session.dispose(),
 		async turn(text: string): Promise<ToolInvocationResult> {
-			let answer = '';
+			// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D92 (`REG-F-651`) — ~~`let answer = '';`, every text delta of the try joined~~: EACH ASSISTANT
+			// MESSAGE'S TEXT KEPT APART, from its start to its end, its stop read at its END (D91: a provider's stream starts each message with stop
+			// `stop`), and how Pi went on after it where the adapter saw it (`auto_retry_start`, or `compaction_end` with `willRetry`).
+			const messages: GatheredMessage[] = [];
+			let current: GatheredMessage | undefined;
 			let reasoning = '';
 			// ⭐⭐ `JAN-NOANS` — WHAT THE TURN ENDED AS, WHICH THIS ADAPTER IS THE ONLY PARTY IN A POSITION TO KNOW.
 			//
@@ -328,15 +335,34 @@ export async function openPiExecutionSession(
 				// ⭐ THE TERMINAL FACT. `stopReason` is `'stop' | 'length' | 'toolUse' | 'error' | 'aborted'` and
 				// `errorMessage` carries the provider's own sentence. Read here and classified below, because a
 				// turn that ends in `error` must never be reported as a producer that chose to say nothing.
+				if (event.type === 'message_start') {
+					if ((event.message as { role?: string }).role === 'assistant') {
+						current = { text: '', ended: false };
+						messages.push(current);
+					}
+					return;
+				}
 				if (event.type === 'message_end') {
 					const m = event.message as { role?: string; stopReason?: string; errorMessage?: string };
-					if (m.role === 'assistant' && typeof m.stopReason === 'string')
+					if (m.role === 'assistant' && typeof m.stopReason === 'string') {
 						ended = { stopReason: m.stopReason, ...(m.errorMessage ? { errorMessage: m.errorMessage } : {}) };
+						// ⭐ D91, D92 — the message's stop as its END gives it, never as its start did.
+						const message = current ?? openMessage(messages);
+						message.stopReason = m.stopReason;
+						if (m.errorMessage) message.errorMessage = m.errorMessage;
+						message.ended = true;
+						current = undefined;
+					}
+					return;
+				}
+				// ⭐ D92 — how Pi went on after a reply of a kind it does not replay: its retry, with its attempt, or a compaction that retries.
+				if (event.type === 'auto_retry_start' || event.type === 'compaction_end') {
+					wentOn(messages, event as { type: string; attempt?: unknown; willRetry?: unknown });
 					return;
 				}
 				if (event.type !== 'message_update') return;
 				const e = event.assistantMessageEvent;
-				if (e.type === 'text_delta') answer += e.delta;
+				if (e.type === 'text_delta') (current ?? (current = openMessage(messages))).text += e.delta;
 				// ⭑ CAPTURED, NOT SOLICITED. With `thinkingLevel: 'off'` this stays empty; a model that
 				// volunteers reasoning anyway is recorded as an OBSERVED presence, because silently discarding
 				// it is the undeclared omission `REG-D-057` forbids.
@@ -363,6 +389,9 @@ export async function openPiExecutionSession(
 			const turnInputs = inputs.captured().slice(before);
 			const composite = turnInputs.at(-1)?.payload;
 
+			// ⭐⭐ Package L17b3 — design D92 — the answer leaves out each reply Pi dropped to go on, recorded beside it; every other reply's text
+			// stays, joined as today; and the stops of the messages it was gathered from go with it (D91).
+			const { answer, droppedReplies, gatheredFrom } = gatheredAnswer(messages);
 			// ⭐⭐ `JAN-NOANS` — THE ANSWER, OR A STATED REASON THERE IS NONE.
 			const classified = answerFromTurnEnd(answer, ended);
 
@@ -413,8 +442,73 @@ export async function openPiExecutionSession(
 									'Reporting NONE_OBSERVED here would assert that a model was watched and called ' +
 									`nothing. The turn ended instead as: ${classified.cause}.`
 							},
-				...(composite === undefined ? {} : { materializedInput: JSON.stringify(composite) })
+				...(composite === undefined ? {} : { materializedInput: JSON.stringify(composite) }),
+				...(droppedReplies.length === 0 ? {} : { droppedReplies }),
+				...(gatheredFrom === undefined ? {} : { gatheredFrom })
 			};
 		}
+	};
+}
+
+/** ⭐ Package L17b3 (D92) — one assistant message of a try, as the adapter gathers it: its text, its stop and error at its end, how Pi went on. */
+interface GatheredMessage {
+	text: string;
+	ended: boolean;
+	stopReason?: string;
+	errorMessage?: string;
+	wentOnBy?: 'RETRY' | 'COMPACTION';
+	attempt?: number;
+}
+
+/** A message opened where its deltas or its end arrived without its start, so no text is lost. */
+function openMessage(messages: GatheredMessage[]): GatheredMessage {
+	const message: GatheredMessage = { text: '', ended: false };
+	messages.push(message);
+	return message;
+}
+
+/** D85's predicate — whether Pi sends a message again: not one that ended in an error or was aborted (`transform-messages.js`). */
+const replayedByPi = (stopReason: string | undefined): boolean => stopReason !== 'error' && stopReason !== 'aborted';
+
+/** ⭐ D92 — Pi went on after the last ended reply of a kind it does not replay: by its retry (`auto_retry_start`), or a compaction that retries. */
+function wentOn(messages: GatheredMessage[], event: { readonly type: string; readonly attempt?: unknown; readonly willRetry?: unknown }): void {
+	const last = messages.at(-1);
+	if (last === undefined || !last.ended || replayedByPi(last.stopReason)) return;
+	if (event.type === 'auto_retry_start') {
+		last.wentOnBy = 'RETRY';
+		if (typeof event.attempt === 'number') last.attempt = event.attempt;
+	} else if (event.willRetry === true) last.wentOnBy = 'COMPACTION';
+}
+
+/**
+ * ⭐⭐ D92'S GATHERING — a try's answer from its messages: a reply of a kind Pi does not replay that another reply in the same prompt followed
+ * leaves the answer, recorded beside it with its error, how Pi went on and its place (its ordinal among the try's replies, dropped and kept alike);
+ * every other reply's text stays, joined as today; the last reply stays whatever its stop. ⭐ D91 — the stops of the messages the answer was
+ * gathered from (each kept one that carried text), or none at all where one of them never ended, so the step sends the work again.
+ */
+function gatheredAnswer(messages: readonly GatheredMessage[]): {
+	readonly answer: string;
+	readonly droppedReplies: readonly DroppedReply[];
+	readonly gatheredFrom: readonly { readonly stopReason: string }[] | undefined;
+} {
+	const droppedReplies: DroppedReply[] = [];
+	const kept: GatheredMessage[] = [];
+	messages.forEach((m, i) => {
+		if (i < messages.length - 1 && m.ended && (m.stopReason === 'error' || m.stopReason === 'aborted'))
+			droppedReplies.push({
+				text: m.text,
+				stopReason: m.stopReason,
+				...(m.errorMessage ? { errorMessage: m.errorMessage } : {}),
+				wentOnBy: m.wentOnBy ?? 'NOT_SEEN',
+				...(m.attempt === undefined ? {} : { attempt: m.attempt }),
+				place: i + 1
+			});
+		else kept.push(m);
+	});
+	const withText = kept.filter((m) => m.text !== '');
+	return {
+		answer: kept.map((m) => m.text).join(''),
+		droppedReplies,
+		gatheredFrom: withText.every((m) => m.stopReason !== undefined) ? withText.map((m) => ({ stopReason: m.stopReason! })) : undefined
 	};
 }

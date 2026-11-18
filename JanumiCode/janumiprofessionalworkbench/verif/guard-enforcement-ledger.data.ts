@@ -281,7 +281,9 @@ export const GUARD_LEDGER: Readonly<Record<string, GuardRow>> = {
 	["requested capability is NOT granted capability; capability scope must be explicit (§22.1)"]: {
 		disposition: "ENFORCED",
 		evidence: "Both limbs are evaluated on the write path of this exact arrow. LIMB 1 ('requested is NOT granted'): the granted set is read from the command payload SEPARATELY from the request (packages/rph-application/src/handlers/runtime-binding.ts:184-185) and `grantedWithinRequest` (packages/rph-domain/src/execution.ts:393) REFUSES at runtime-binding.ts:204 with 'AuthorizeRuntimeBinding blocked (RPH_CAPABILITY_NOT_REQUESTED)'; and the arrow's TARGET is derived by `authorizationOutcome` (:124-129, `targetStates: ['AUTHORIZED','PARTIALLY_AUTHORIZED']`), so REQUESTED -> AUTHORIZED is reachable only when the grant actually COVERS the request — a narrower grant lands PARTIALLY_AUTHORIZED instead. LIMB 2 ('scope must be explicit'): a capability-less request is refused at creation, runtime-binding.ts:48-54 ('the request names no capability'), so the granted set is always compared against a non-empty explicit request. Live pipeline coverage: packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts:88 (kill), :103 (no partial write), :114/:122/:132 (three CONTROLs proving it discriminates), :166 (names every unrequested capability); packages/rph-application/src/handlers/partauth-derived-outcome.test.ts:86 (a covering grant yields AUTHORIZED).",
-		enforcingSite: "packages/rph-application/src/handlers/runtime-binding.ts:204",
+		// ⭐ JAN-EXEC Phase 7, package L17b3 — the lead's ruling 15 (§16): ~~`runtime-binding.ts:204`~~, the grant check's line at the base, which the
+		// package moves (D89's policy resolution before it); the evidence above is a historical account, left as found.
+		enforcingSite: "packages/rph-application/src/handlers/runtime-binding.ts:240",
 		enforcingAnchor: "AuthorizeRuntimeBinding blocked (${check.errorCode})"
 	},
 	["Required evidence available or deficit explicitly recorded"]: {

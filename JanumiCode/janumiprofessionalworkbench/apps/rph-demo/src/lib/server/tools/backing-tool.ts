@@ -319,6 +319,34 @@ export interface ToolInvocationResult {
 	 * `freeTierRefusalsOf`.
 	 */
 	readonly freeTierRefusals?: FreeTierRefusals;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D92 (`REG-F-651`; the lead's ruling 4 on Stage 0) — EACH REPLY PI DROPPED TO GO ON within this
+	 * try, in the order they arrived: a reply of a kind Pi does not replay (it ended in an error, or was aborted) that another reply in the same
+	 * prompt followed, by Pi's retry or its overflow recovery. Its text is NOT in `answer` or `rawOutput`: the model's conversation does not hold
+	 * it, and the step records it beside the exchange (`dropped-replies.ts`). `undefined` where the try dropped none.
+	 */
+	readonly droppedReplies?: readonly DroppedReply[];
+	/**
+	 * ⭐⭐ Package L17b3 — design D91 (the lead's ruling 11 on Stage 0) — THE STOPS OF THE MESSAGES THE ANSWER WAS GATHERED FROM, as the adapter read
+	 * them at each message's END, in order, a dropped reply's never among them. The step asks of each whether Pi replays it (D85's predicate); an
+	 * adapter that cannot say leaves it `undefined`, and the work is then sent again (the fail-safe).
+	 */
+	readonly gatheredFrom?: readonly { readonly stopReason: string }[];
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D92 (`REG-F-651`; the lead's rulings 4 on Stage 0 and §7.4 (3)) — ONE REPLY PI DROPPED TO GO ON:
+ * its text, its stop (`error` or `aborted`), Pi's error message where it gave one, how Pi went on (`RETRY` on `auto_retry_start`, with its attempt;
+ * `COMPACTION` on `compaction_end` with `willRetry`; `NOT_SEEN` where the adapter saw neither), and its PLACE — its ordinal among the try's
+ * assistant replies, dropped and kept counted alike, in the order they arrived.
+ */
+export interface DroppedReply {
+	readonly text: string;
+	readonly stopReason: 'error' | 'aborted';
+	readonly errorMessage?: string;
+	readonly wentOnBy: 'RETRY' | 'COMPACTION' | 'NOT_SEEN';
+	readonly attempt?: number;
+	readonly place: number;
 }
 
 /**

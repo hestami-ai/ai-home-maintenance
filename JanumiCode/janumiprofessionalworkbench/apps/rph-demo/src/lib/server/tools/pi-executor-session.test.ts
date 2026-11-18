@@ -1,7 +1,8 @@
 // ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`DESIGN-data-flow-order-and-deliverable-review.md` §12.39; `REG-D-167` (4); `REG-D-169`) — THE
 // EXECUTOR'S SESSION KEPT WITH THE RUN, AS PI ITSELF KEEPS AND READS IT: created in the unit's folder at its first step, its working-directory line
-// the workspace; reopened after a restart, its history whole; forked for a replacement; a call its stopped step never answered given a recorded
-// result; two files refused; and, with no durable store, held in memory as before.
+// the workspace; reopened after a restart, its history whole; ~~forked for a replacement~~ ⭐ a replacement's a new session of its own, and a file
+// naming a parent refused at its reopening (package L17b3, design D89); a call its stopped step never answered given a recorded result; two files
+// refused; and, with no durable store, held in memory as before.
 //
 // ⭑ WHAT IT DRIVES: `openPiExecutionSession` itself, with the place its opener is handed (reading 3: its third argument) — Pi's real session
 // manager, settings, loader and session, and the recorder on its `onPayload` — and reads the request each turn recorded (its materialized input).
@@ -22,7 +23,7 @@ import { convertResponsesMessages, convertResponsesTools } from '@earendil-works
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 import type { ProcessRunner, Workspace } from '@janumipwb/rph-ports';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { CUT_OFF_RESULT, sessionFilesIn } from '../execution/executor-session.js';
+import { CUT_OFF_RESULT, parentedSessionFileRefusal, sessionFilesIn } from '../execution/executor-session.js';
 import { IN_MEMORY_SESSION, type ExecutorSessionPlace, type ProducerSessionContext } from '../execution/producer-session.js';
 import { isToolInvocationResult } from './backing-tool.js';
 import { openPiExecutionSession } from './pi-executor.js';
@@ -190,28 +191,48 @@ describe('⭐⭐ L17b1 (D85) — a unit’s session, kept with the run as Pi’s
 		]);
 	});
 
-	it('⛔ RED FIRST — a replacement’s first request holds its predecessor’s conversation as Pi builds it from the forked file, then its own instruction and the feedback', async () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173`): ~~'⛔ RED FIRST — a replacement’s first request holds its
+	// predecessor’s conversation as Pi builds it from the forked file, then its own instruction and the feedback'~~, its place ~~`{ kind: 'FORK', from:
+	// from!, predecessorId: 'pwu_old', heldFindings: false, returnedAnswer: true }`~~, its request ~~`['Write the Source.', 'The superseded Source.',
+	// first]`~~ and its header ~~`[resolve(from!), resolve(WORKSPACE)]`~~ (~~'the forked file does not name its parent and the workspace'~~) — nothing
+	// forks since D89: a replacement's first step opens a NEW file in its own folder, and its first request is its own first turn alone. The promise
+	// kept: the successor's folder holds one file of its own, its working folder the workspace, and the predecessor's file is left byte for byte.
+	it('⭐ a replacement’s first request is its own first turn alone, from a new file in its own folder that names no parent; its predecessor’s file is left byte for byte (D89)', async () => {
 		await turnAt(durable('pwu_old', { kind: 'NEW' }), 'Write the Source.', 'The superseded Source.');
 		const [from] = sessionFilesIn(join(SESSIONS, 'executor', 'pwu_old'));
 		const before = readFileSync(from!, 'utf8');
 		const first = 'Write the Source.\n\nHolistic feedback — what the assurance of this Undertaking’s work has recorded since this work was last done:';
 
-		const sent = await turnAt(
-			durable('pwu_new2', { kind: 'FORK', from: from!, predecessorId: 'pwu_old', heldFindings: false, returnedAnswer: true }),
-			first,
-			'The new Source.'
+		const sent = await turnAt(durable('pwu_new2', { kind: 'NEW' }), first, 'The new Source.');
+
+		expect(textsOf(sent.input), 'the request holds more than the successor’s own first turn').toEqual([first]);
+		const own = sessionFilesIn(join(SESSIONS, 'executor', 'pwu_new2'));
+		expect(own.length, 'the successor’s folder does not hold one file').toBe(1);
+		const header = JSON.parse(readFileSync(own[0]!, 'utf8').split('\n')[0]!) as { parentSession?: string; cwd?: string };
+		expect([header.parentSession, header.cwd], 'the successor’s file names a parent, or not the workspace').toEqual([undefined, resolve(WORKSPACE)]);
+		expect(readFileSync(from!, 'utf8'), 'the predecessor’s file was changed').toBe(before);
+	});
+
+	it('⛔ RED FIRST — a session file whose header names a parent — a fork, which no step makes since D89 — is refused at its reopening, naming it and its parent, never read as the unit’s own (D89)', async () => {
+		await turnAt(durable('pwu_par_old', { kind: 'NEW' }), 'Write the Source.', 'The superseded Source.');
+		const [parent] = sessionFilesIn(join(SESSIONS, 'executor', 'pwu_par_old'));
+		// ⭑ A fork as package L17b1's made one: Pi's own `forkFrom`, the file in the successor's folder, its header naming the parent.
+		const folder = join(SESSIONS, 'executor', 'pwu_par_new');
+		SessionManager.forkFrom(parent!, WORKSPACE, folder);
+		const [file] = sessionFilesIn(folder);
+		const before = readFileSync(file!, 'utf8');
+
+		const settled = await openPiExecutionSession(context, MODEL, durable('pwu_par_new', { kind: 'REOPEN', file: file!, held: HELD })).then(
+			(s) => {
+				s.dispose();
+				return 'opened';
+			},
+			(e: unknown) => (e instanceof Error ? e.message : String(e))
 		);
 
-		expect(textsOf(sent.input), 'the request does not hold the predecessor’s turn and answer, then the successor’s first turn').toEqual([
-			'Write the Source.',
-			'The superseded Source.',
-			first
-		]);
-		const forked = sessionFilesIn(join(SESSIONS, 'executor', 'pwu_new2'));
-		expect(forked.length, 'the successor’s folder does not hold one file').toBe(1);
-		const header = JSON.parse(readFileSync(forked[0]!, 'utf8').split('\n')[0]!) as { parentSession?: string; cwd?: string };
-		expect([header.parentSession, header.cwd], 'the forked file does not name its parent and the workspace').toEqual([resolve(from!), resolve(WORKSPACE)]);
-		expect(readFileSync(from!, 'utf8'), 'the predecessor’s file was changed by the fork').toBe(before);
+		expect(settled, 'a file naming a parent was reopened as the unit’s own').toContain('names a parent session');
+		expect(settled, 'the refusal does not name the file and its parent').toBe(parentedSessionFileRefusal(file!, resolve(parent!)));
+		expect(readFileSync(file!, 'utf8'), 'the refused file was changed').toBe(before);
 	});
 
 	it('⛔ RED FIRST — a session file cut in the middle of a tool call is reopened with a recorded result for the call, which the request carries in Pi’s place', async () => {

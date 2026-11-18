@@ -81,6 +81,7 @@ import {
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import { resolveContextPolicy } from './context-policy.js';
 import { splitExecutionEnvelope } from './execution-contract.js';
+import { verifiedBytes } from './verified-bytes.js';
 import type { RerunWorkAfter } from './recovery-authority.js';
 
 /** The two re-runs a REPLAN Decision may select (RD4). ⭑ Free strings: `Decision.selectedOption` is `z.string()`. */
@@ -848,28 +849,10 @@ export async function rebuildProducingTurn(
 }
 
 /**
- * Bytes from the content store, re-hashed against the hash their record names — or why not. ⭐⭐ Package L15 — D69 — exported: the
- * route reads a unit's accepted work product through it before writing it to the unit's file, as this rebuild reads one.
+ * Bytes from the content store, re-hashed against the hash their record names — or why not. ⭐⭐ Package L15 — D69 — exported. ⭐ Package L17b3 (D89) —
+ * moved whole to `verified-bytes.ts`, so the record's reader can read through it where this module cannot load; re-exported here, unchanged.
  */
-export async function verifiedBytes(
-	store: ArtifactStore,
-	storageKey: string,
-	contentHash: string,
-	what: string
-): Promise<Rebuilt<string>> {
-	const bytes = await store.get(storageKey);
-	if (bytes === undefined)
-		return {
-			ok: false,
-			refusedBecause: `${what} at '${storageKey}' are not in the content store.`
-		};
-	if (sha256(bytes) !== contentHash)
-		return {
-			ok: false,
-			refusedBecause: `${what} at '${storageKey}' hash to ${sha256(bytes)}, not the ${contentHash} its record names.`
-		};
-	return { ok: true, value: bytes };
-}
+export { verifiedBytes };
 
 /**
  * ⭐ RD7 — THE EXECUTION EXCHANGE THAT PRODUCED A WORK PRODUCT: the LAST one of the unit recorded BEFORE the work product,

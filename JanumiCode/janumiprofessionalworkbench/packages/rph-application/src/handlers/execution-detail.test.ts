@@ -9,6 +9,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtures.js';
 import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
+// ⭐ RESTATED IN FORM 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173` (2)): every `RequestRuntimeBinding` here names its
+// step's context policy, a field the command now requires, and the test's store holds that policy (`holdDefaultContextPolicy`), as the handler
+// refuses one it does not hold. Arrangement only: what each test checks is unchanged.
+import { HELD_CONTEXT_POLICY_ID, holdDefaultContextPolicy } from './__tests__/context-policy-fixture.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5FAV';
@@ -161,6 +165,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			now: () => TS,
 			newEventId: () => `e${++seq}`
 		}).as(TEST_CRED.human);
+		holdDefaultContextPolicy(engine, TS);
 		seedFloorPolicies(engine); // floor assessments below cite floor.* policies — now they must exist
 		dispatch(
 			'CaptureIntent',
@@ -313,7 +318,8 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 					runtimeBindingId: BIND,
 					executionStepId: STEP,
 					roleId: 'architect',
-					requestedCapabilities: [{ capability: 'file-system' }]
+					requestedCapabilities: [{ capability: 'file-system' }],
+					contextAssemblyPolicyId: HELD_CONTEXT_POLICY_ID
 				},
 				BIND,
 				'RUNTIME_BINDING'

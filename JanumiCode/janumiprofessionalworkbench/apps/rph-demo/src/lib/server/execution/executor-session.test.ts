@@ -1,28 +1,31 @@
 // ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`DESIGN-data-flow-order-and-deliverable-review.md` §12.39; `REG-D-167` (4); `REG-D-169`) — WHERE
-// EACH EXECUTOR SESSION IS KEPT AND HOW IT OPENS, READ FROM ITS FOLDER; the result a stopped step's unanswered call is given; and the note a
-// replacement whose predecessor left no session records for the run report.
+// EACH EXECUTOR SESSION IS KEPT AND HOW IT OPENS, READ FROM ITS FOLDER; the result a stopped step's unanswered call is given; ~~and the note a
+// replacement whose predecessor left no session records for the run report~~ ⭐ and, since package L17b3 (design D89, `REG-D-173`), no fork and no
+// note: a replacement opens a new session of its own, a file naming a parent is refused, and D91's question of a reopened file — whether it holds
+// the reviewed answer — is asked of the reviewed try's own messages.
 //
 // ⭑ WHAT MUST HOLD (D85, the sponsor's `REG-D-169`, the lead's rulings): with a durable store, a unit's session is Pi's own file in
-// `<D>.sessions/executor/<unit id>/` — created at the unit's first step, reopened at every later step, forked from its predecessor's at a
-// replacement's first step; two files in a folder are refused, naming it; with no durable store, held in memory as before. A call the stopped
-// step never answered is given a recorded result saying the stop cut it off (the lead's ruling).
+// `<D>.sessions/executor/<unit id>/` — created at the unit's first step, reopened at every later step, ~~forked from its predecessor's at a
+// replacement's first step~~ ⭐ a replacement's first step a unit's first step like any other (D89); two files in a folder are refused, naming it;
+// with no durable store, held in memory as before. A call the stopped step never answered is given a recorded result saying the stop cut it off
+// (the lead's ruling).
 // ⭑ PI-FREE: the session files here are Pi's JSON lines, written by the test as Pi writes them (`session-manager.js`); Pi's own reading of them is
 // `pi-executor-session.test.ts`'s.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import { afterAll, describe, expect, it } from 'vitest';
+// ⭐ L17b3 (D89) — the fork's readers and its note go with the fork, their imports struck: ~~`forkedHistoryHeldFindings`, `historyAnswered`,
+// `PREDECESSOR_WITHOUT_SESSION_SCHEMA`, `predecessorWithoutSessionNameOf`, `recordPredecessorWithoutSession`~~, ~~`createInMemoryArtifactStore`~~
+// (the note's store). The module is read whole once, to say they are gone.
+import * as executorSessionModule from './executor-session.js';
 import {
 	CARRIED_FINDINGS_LINE,
 	CUT_OFF_RESULT,
 	executorSessionPlaceOf,
 	FEEDBACK_HEADING,
-	forkedHistoryHeldFindings,
-	historyAnswered,
-	PREDECESSOR_WITHOUT_SESSION_SCHEMA,
-	predecessorWithoutSessionNameOf,
-	recordPredecessorWithoutSession,
+	parentedSessionFileRefusal,
+	reviewedTryHeld,
 	sessionFileHoldings,
 	sessionFilesIn,
 	supplyCutOffResults,
@@ -133,11 +136,14 @@ describe('⭐⭐ L17b1 (D85) — the sessions root and a session’s folder', ()
 });
 
 describe('⭐⭐ L17b1 (D85; REG-D-169) — where a unit’s step opens its executor session', () => {
+	// ⭐ RESTATED IN FORM 2026-11-17 (package L17b3, D89): a place is the unit's alone — ~~`executorSessionPlaceOf(undefined, 'pwu_1', undefined)`~~,
+	// ~~`executorSessionPlaceOf(undefined, 'pwu_2', 'pwu_1')`~~ — no predecessor is handed in, since nothing forks; the replacement's limb kept, a
+	// replacement a unit like any other.
 	it('⭑ CONTROL — with no durable store, the session is held in memory, byte for byte as before', () => {
-		expect(executorSessionPlaceOf(undefined, 'pwu_1', undefined), 'a store with no durable path keeps no session file').toEqual({
+		expect(executorSessionPlaceOf(undefined, 'pwu_1'), 'a store with no durable path keeps no session file').toEqual({
 			kind: 'IN_MEMORY'
 		});
-		expect(executorSessionPlaceOf(undefined, 'pwu_2', 'pwu_1'), 'a replacement with no durable path keeps none either').toEqual({
+		expect(executorSessionPlaceOf(undefined, 'pwu_2'), 'a replacement with no durable path keeps none either').toEqual({
 			kind: 'IN_MEMORY'
 		});
 	});
@@ -146,54 +152,54 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — where a unit’s step opens its exec
 		const root = sessionsRoot();
 		const folder = sessionFolderOf(root, 'executor', 'pwu_1');
 
-		expect(executorSessionPlaceOf(root, 'pwu_1', undefined), 'a unit’s first step does not open a new file').toEqual({
+		// ⭐ L17b3 (D89) — each call restated in form: ~~`executorSessionPlaceOf(root, 'pwu_1', undefined)`~~, the predecessor no argument.
+		expect(executorSessionPlaceOf(root, 'pwu_1'), 'a unit’s first step does not open a new file').toEqual({
 			kind: 'DURABLE',
 			folder,
 			opening: { kind: 'NEW' }
 		});
 		const first = sessionFile(folder, '2026-11-16T00-00-00-000Z_aaa.jsonl', [userEntry('u1', 'Write the Source.')]);
-		expect(executorSessionPlaceOf(root, 'pwu_1', undefined), 'a later step does not reopen the unit’s one file').toEqual({
+		expect(executorSessionPlaceOf(root, 'pwu_1'), 'a later step does not reopen the unit’s one file').toEqual({
 			kind: 'DURABLE',
 			folder,
 			// ⭐ RESTATED for the review's defects 1 and 8: the place carries what the file holds, read from it — here one user turn, no answer.
 			opening: { kind: 'REOPEN', file: first, held: HOLDS_A_TURN }
 		});
 		sessionFile(folder, '2026-11-16T00-00-01-000Z_bbb.jsonl', []);
-		expect(executorSessionPlaceOf(root, 'pwu_1', undefined), 'two session files were not refused').toEqual({
+		expect(executorSessionPlaceOf(root, 'pwu_1'), 'two session files were not refused').toEqual({
 			refusedBecause: twoSessionFilesRefusal(folder, 2)
 		});
 		expect(twoSessionFilesRefusal(folder, 2), 'the refusal does not name the folder').toContain(folder);
 		expect(sessionFilesIn(folder).length, 'arrangement: the folder holds two files').toBe(2);
 	});
 
-	it('⛔ RED FIRST — a replacement’s first step FORKS its predecessor’s one file; with none, it starts NEW and says whose session it lacks; two are refused', () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173`): ~~'⛔ RED FIRST — a replacement’s first step FORKS its
+	// predecessor’s one file; with none, it starts NEW and says whose session it lacks; two are refused'~~, its places ~~`{ kind: 'NEW',
+	// predecessorWithoutSession: 'pwu_1' }`~~ and ~~`{ kind: 'FORK', from: file, predecessorId: 'pwu_1', heldFindings: false, returnedAnswer: false }`~~,
+	// and its refusal of two predecessor files ~~`{ refusedBecause: twoSessionFilesRefusal(theirs, 2) }`~~ — nothing forks since D89: a replacement's
+	// first step opens a NEW file in its own folder whatever its predecessor's folder holds, which no step reads, and which is left byte for byte. The
+	// promise kept: a replacement's first step opens its session in its own folder, the predecessor's never written to.
+	it('⭐ a replacement’s first step opens a NEW file in its own folder, whatever its predecessor’s folder holds — none, one or two — and leaves that folder byte for byte (D89)', () => {
 		const root = sessionsRoot();
 		const own = sessionFolderOf(root, 'executor', 'pwu_2');
 		const theirs = sessionFolderOf(root, 'executor', 'pwu_1');
+		const NEW = { kind: 'DURABLE', folder: own, opening: { kind: 'NEW' } };
 
-		expect(executorSessionPlaceOf(root, 'pwu_2', 'pwu_1'), 'a predecessor with no file is not said').toEqual({
-			kind: 'DURABLE',
-			folder: own,
-			opening: { kind: 'NEW', predecessorWithoutSession: 'pwu_1' }
-		});
+		expect(executorSessionPlaceOf(root, 'pwu_2'), 'a replacement whose predecessor left no file did not open a new file of its own').toEqual(NEW);
 		const file = sessionFile(theirs, '2026-11-16T00-00-00-000Z_aaa.jsonl', [userEntry('u1', 'Write the Source.')]);
-		expect(executorSessionPlaceOf(root, 'pwu_2', 'pwu_1'), 'the replacement does not fork its predecessor’s file').toEqual({
-			kind: 'DURABLE',
-			folder: own,
-			// ⭐ RESTATED for the review's defect 8: and whether that conversation returned a work product — one user turn, none.
-			opening: { kind: 'FORK', from: file, predecessorId: 'pwu_1', heldFindings: false, returnedAnswer: false }
-		});
+		const before = readFileSync(file, 'utf8');
+		expect(executorSessionPlaceOf(root, 'pwu_2'), 'a replacement whose predecessor left a file did not open a new file of its own').toEqual(NEW);
 		sessionFile(theirs, '2026-11-16T00-00-01-000Z_bbb.jsonl', []);
-		expect(executorSessionPlaceOf(root, 'pwu_2', 'pwu_1'), 'two predecessor files were not refused, naming their folder').toEqual({
-			refusedBecause: twoSessionFilesRefusal(theirs, 2)
-		});
+		expect(executorSessionPlaceOf(root, 'pwu_2'), 'a replacement whose predecessor left two files did not open a new file of its own').toEqual(NEW);
+		expect([readFileSync(file, 'utf8'), sessionFilesIn(theirs).length], 'the predecessor’s folder was changed').toEqual([before, 2]);
 	});
 
+	// ⭐ RESTATED IN FORM 2026-11-17 (package L17b3, D89): ~~`executorSessionPlaceOf(root, 'pwu_2', 'pwu_1')`~~, the predecessor no argument.
 	it('⭑ CONTROL — a replacement’s later step reopens its own file, never its predecessor’s', () => {
 		const root = sessionsRoot();
 		sessionFile(sessionFolderOf(root, 'executor', 'pwu_1'), '2026-11-16T00-00-00-000Z_aaa.jsonl', [userEntry('u1', 'Write the Source.')]);
 		const mine = sessionFile(sessionFolderOf(root, 'executor', 'pwu_2'), '2026-11-16T00-00-02-000Z_ccc.jsonl', [userEntry('u2', 'Again.')]);
-		expect(executorSessionPlaceOf(root, 'pwu_2', 'pwu_1'), 'the replacement’s own file is not the one reopened').toEqual({
+		expect(executorSessionPlaceOf(root, 'pwu_2'), 'the replacement’s own file is not the one reopened').toEqual({
 			kind: 'DURABLE',
 			folder: sessionFolderOf(root, 'executor', 'pwu_2'),
 			opening: { kind: 'REOPEN', file: mine, held: HOLDS_A_TURN }
@@ -205,18 +211,31 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — where a unit’s step opens its exec
 		mkdirSync(join(root, 'executor'), { recursive: true });
 		const own = sessionFolderOf(root, 'executor', 'pwu_1');
 		writeFileSync(own, 'a file where the unit’s folder should be');
-		expect(() => executorSessionPlaceOf(root, 'pwu_1', undefined), 'a folder that cannot be listed read as holding no session').toThrow(
+		expect(() => executorSessionPlaceOf(root, 'pwu_1'), 'a folder that cannot be listed read as holding no session').toThrow(
 			`the session folder ${own} cannot be listed`
 		);
+		// ⭐ RESTATED 2026-11-17 (package L17b3, D89): ~~`expect(() => executorSessionPlaceOf(root, 'pwu_10', 'pwu_9'), 'a predecessor’s folder that cannot be
+		// listed read as one that left no session').toThrow(`the session folder ${theirs} cannot be listed`)`~~ — no step lists a predecessor's folder since
+		// D89: the replacement opens a new file of its own, whatever that folder is.
 		const theirs = sessionFolderOf(root, 'executor', 'pwu_9');
 		writeFileSync(theirs, 'a file where the predecessor’s folder should be');
-		expect(() => executorSessionPlaceOf(root, 'pwu_10', 'pwu_9'), 'a predecessor’s folder that cannot be listed read as one that left no session').toThrow(
-			`the session folder ${theirs} cannot be listed`
-		);
+		expect(executorSessionPlaceOf(root, 'pwu_10'), 'a replacement read its predecessor’s folder').toEqual({
+			kind: 'DURABLE',
+			folder: sessionFolderOf(root, 'executor', 'pwu_10'),
+			opening: { kind: 'NEW' }
+		});
 		expect(sessionFilesIn(join(root, 'executor', 'pwu_none')), 'a folder that does not exist is not read as none').toEqual([]);
 	});
 
-	it('⛔ RED FIRST — what a reopened file holds is read from it: its own answer or none, its findings, D77’s feedback, and the conversation it was forked from (the review’s defects 1 and 8)', () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'… and the conversation it was forked from (the review’s defects 1 and
+	// 8)'~~, the two forks' holdings ~~`{ returnedAnswer: false, ownFindings: false, crossUnitFeedback: true, forkedFrom: { predecessorId: 'pwu_1',
+	// heldFindings: false, returnedAnswer: true } }`~~ and ~~`{ returnedAnswer: true, ownFindings: false, crossUnitFeedback: false, forkedFrom: {
+	// predecessorId: 'pwu_5', heldFindings: true, returnedAnswer: false } }`~~, the reopened fork's place ~~`{ kind: 'REOPEN', file: forked, held:
+	// sessionFileHoldings(forked) }`~~ and the stopped try's fork ~~`{ kind: 'FORK', from: stopped, predecessorId: 'pwu_3', heldFindings: false,
+	// returnedAnswer: false }`~~ — no step forks since D89, and a file whose header names a parent, which only package L17b1's fork wrote, is refused,
+	// naming it and its parent, never read as the unit's own. The promise kept: what a unit's own file holds is read from it, and one that cannot be read
+	// refuses.
+	it('⛔ RED FIRST — what a reopened file holds is read from it: its own answer or none, its findings, D77’s feedback; ~~and the conversation it was forked from~~ ⭐ a file whose header names a parent refused, naming it and its parent (the review’s defects 1 and 8; D89)', () => {
 		const root = sessionsRoot();
 		const parent = sessionFile(sessionFolderOf(root, 'executor', 'pwu_1'), 'p.jsonl', [userEntry('u1', 'Write the Source.'), assistantEntry('a1', 'stop')]);
 		const forked = forkedFile(sessionFolderOf(root, 'executor', 'pwu_2'), 'f.jsonl', parent, [
@@ -249,31 +268,30 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — where a unit’s step opens its exec
 		// ~~`.toEqual([true, false, true])`~~.
 		expect(
 			[parent, forked, carried, forkedAnswered, repaired, absent].map((f) => readOrRefusal(f, sessionFileHoldings)),
-			'what each file holds'
+			'what each file holds, a file naming a parent refused'
 		).toEqual([
 			{ returnedAnswer: true, ownFindings: false, crossUnitFeedback: false },
-			{ returnedAnswer: false, ownFindings: false, crossUnitFeedback: true, forkedFrom: { predecessorId: 'pwu_1', heldFindings: false, returnedAnswer: true } },
+			// ⭐ L17b3 (D89) — a file whose header names a parent refuses, naming it and its parent.
+			expect.stringContaining(`the session file ${forked} names a parent session (${parent})`),
 			{ returnedAnswer: false, ownFindings: true, crossUnitFeedback: false },
-			{ returnedAnswer: true, ownFindings: false, crossUnitFeedback: false, forkedFrom: { predecessorId: 'pwu_5', heldFindings: true, returnedAnswer: false } },
+			expect.stringContaining(`the session file ${forkedAnswered} names a parent session (${carried})`),
 			{ returnedAnswer: true, ownFindings: true, crossUnitFeedback: false },
 			// ⭑ What cannot be read refuses, naming it and why.
 			expect.stringContaining(`the session file ${absent} cannot be read (ENOENT: `)
 		]);
-		expect(
-			[historyAnswered(parent), historyAnswered(carried), readOrRefusal(absent, historyAnswered)],
-			'whether each conversation returned a work product, one that cannot be read refused'
-		).toEqual([true, false, expect.stringContaining(`the session file ${absent} cannot be read (ENOENT: `)]);
-		expect(executorSessionPlaceOf(root, 'pwu_2', 'pwu_1'), 'the reopened fork’s place does not carry what it holds').toEqual({
-			kind: 'DURABLE',
-			folder: sessionFolderOf(root, 'executor', 'pwu_2'),
-			opening: { kind: 'REOPEN', file: forked, held: sessionFileHoldings(forked) }
-		});
-		// ⭑ A predecessor whose try stopped in its first tool call returned no work product: its fork says so.
-		const stopped = sessionFile(sessionFolderOf(root, 'executor', 'pwu_3'), 's.jsonl', [userEntry('u1', 'Write the Tests.'), assistantEntry('a1', 'toolUse')]);
-		expect(executorSessionPlaceOf(root, 'pwu_4', 'pwu_3'), 'the fork of a stopped try is said to hold a work product').toEqual({
+		// ⭐ L17b3 (D89) — struck with the fork's reader: ~~`expect([historyAnswered(parent), historyAnswered(carried), readOrRefusal(absent,
+		// historyAnswered)], 'whether each conversation returned a work product, one that cannot be read refused').toEqual([true, false,
+		// expect.stringContaining(…)])`~~ — its promise is the `returnedAnswer` above, each file's own.
+		expect(parentedSessionFileRefusal(forked, parent), 'the refusal of a file naming a parent').toBe(
+			`the session file ${forked} names a parent session (${parent}): a fork of another unit's session, which no step makes since design D89 — refused rather than read as this unit's own (design D89).`
+		);
+		expect(() => executorSessionPlaceOf(root, 'pwu_2'), 'a reopened fork was read as the unit’s own').toThrow(parentedSessionFileRefusal(forked, parent));
+		// ⭑ A predecessor whose try stopped in its first tool call: its replacement opens a new file of its own (D89).
+		sessionFile(sessionFolderOf(root, 'executor', 'pwu_3'), 's.jsonl', [userEntry('u1', 'Write the Tests.'), assistantEntry('a1', 'toolUse')]);
+		expect(executorSessionPlaceOf(root, 'pwu_4'), 'the replacement of a stopped try did not open a new file of its own').toEqual({
 			kind: 'DURABLE',
 			folder: sessionFolderOf(root, 'executor', 'pwu_4'),
-			opening: { kind: 'FORK', from: stopped, predecessorId: 'pwu_3', heldFindings: false, returnedAnswer: false }
+			opening: { kind: 'NEW' }
 		});
 	});
 
@@ -289,12 +307,10 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — where a unit’s step opens its exec
 			[cut, silent, blank].map((f) => sessionFileHoldings(f).returnedAnswer),
 			'an answer cut at the length limit read as none, or a stop that said nothing read as an answer'
 		).toEqual([true, false, false]);
-		expect([cut, silent, blank].map((f) => historyAnswered(f)), 'a forked conversation’s answer read by its stop').toEqual([true, false, false]);
-		expect(executorSessionPlaceOf(root, 'pwu_next', 'pwu_cut'), 'the fork of a cut answer is said to hold no work product').toEqual({
-			kind: 'DURABLE',
-			folder: sessionFolderOf(root, 'executor', 'pwu_next'),
-			opening: { kind: 'FORK', from: cut, predecessorId: 'pwu_cut', heldFindings: false, returnedAnswer: true }
-		});
+		// ⭐ RESTATED IN FORM 2026-11-17 (package L17b3, D89) — the fork's limbs struck, with the fork: ~~`expect([cut, silent, blank].map((f) =>
+		// historyAnswered(f)), 'a forked conversation’s answer read by its stop').toEqual([true, false, false])`~~; ~~`expect(executorSessionPlaceOf(root,
+		// 'pwu_next', 'pwu_cut'), 'the fork of a cut answer is said to hold no work product').toEqual({ …, opening: { kind: 'FORK', from: cut, predecessorId:
+		// 'pwu_cut', heldFindings: false, returnedAnswer: true } })`~~. The promise kept: the unit's own file's answer, read by its text, above.
 	});
 
 	it('⛔ RED FIRST — what a session holds is what Pi will send: a message Pi does not replay, `aborted` or `error`, holds no answer, whatever its text (the lead’s ruling on the re-check’s A)', () => {
@@ -308,18 +324,22 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — where a unit’s step opens its exec
 			[aborted, errored].map((f) => sessionFileHoldings(f).returnedAnswer),
 			'a message Pi does not replay read as an answer the session holds'
 		).toEqual([false, false]);
-		expect([aborted, errored].map((f) => historyAnswered(f)), 'a forked conversation’s unreplayed message read as its answer').toEqual([false, false]);
-		expect(executorSessionPlaceOf(root, 'pwu_next', 'pwu_errored'), 'the fork of an errored answer is said to hold a work product').toEqual({
-			kind: 'DURABLE',
-			folder: sessionFolderOf(root, 'executor', 'pwu_next'),
-			opening: { kind: 'FORK', from: errored, predecessorId: 'pwu_errored', heldFindings: false, returnedAnswer: false }
-		});
+		// ⭐ RESTATED IN FORM 2026-11-17 (package L17b3, D89) — the fork's limbs struck, with the fork: ~~`expect([aborted, errored].map((f) =>
+		// historyAnswered(f)), 'a forked conversation’s unreplayed message read as its answer').toEqual([false, false])`~~;
+		// ~~`expect(executorSessionPlaceOf(root, 'pwu_next', 'pwu_errored'), 'the fork of an errored answer is said to hold a work product').toEqual({ …,
+		// opening: { kind: 'FORK', from: errored, predecessorId: 'pwu_errored', heldFindings: false, returnedAnswer: false } })`~~. The promise kept: the
+		// unit's own file, above.
 		// ⭑ CONTROL: the same text, ended as Pi replays it, is an answer the session holds.
 		const kept = own('pwu_kept', assistantSaying('a1', 'length', '{"workProduct": {"document": "The reader reads the whole inp'));
 		expect(sessionFileHoldings(kept).returnedAnswer, 'arrangement: a replayed message with that text is an answer').toBe(true);
 	});
 
-	it('⛔ RED FIRST — a forked history is said to hold review findings when it holds a second user turn, or a first turn carrying findings; else not', () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'⛔ RED FIRST — a forked history is said to hold review findings when
+	// it holds a second user turn, or a first turn carrying findings; else not'~~, ~~`.map((f) => readOrRefusal(f, forkedHistoryHeldFindings))`~~,
+	// ~~`.toEqual([false, true, true, true, expect.stringContaining(…)])`~~ — the forked history's reader goes with the fork. The promise kept, of a unit's
+	// own file as its later step reopens it: a second user turn and RD8's carried findings are its own findings, D77's feedback the loop's, a plain turn
+	// neither, and an unreadable file refuses.
+	it('⭑ CONTROL — a unit’s own file is read to hold its own findings when it holds a second user turn, or a first turn carrying findings; D77’s feedback as the loop’s; else neither (D89)', () => {
 		const folder = join(sessionsRoot(), 'held');
 		const plain = sessionFile(folder, 'plain.jsonl', [userEntry('u1', 'Write the Source.')]);
 		const repaired = sessionFile(folder, 'repaired.jsonl', [userEntry('u1', 'Write the Source.'), userEntry('u2', 'Produce it again.')]);
@@ -329,13 +349,32 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — where a unit’s step opens its exec
 		// and why — never read as holding no findings. The superseded words, struck: ~~`.map((f) => forkedHistoryHeldFindings(f))`~~,
 		// ~~`.toEqual([false, true, true, true, false])`~~.
 		const absent = join(folder, 'absent.jsonl');
+		/** A file's own findings and the loop's feedback, as the reader holds them, or its refusal's words. */
+		const findingsOf = (f: string) => {
+			const held = readOrRefusal(f, sessionFileHoldings);
+			return typeof held === 'string' ? held : [held.ownFindings, held.crossUnitFeedback];
+		};
 		expect(
-			[plain, repaired, carried, fed, absent].map((f) => readOrRefusal(f, forkedHistoryHeldFindings)),
-			'which histories hold findings: a plain turn, a repair turn, RD8’s carried findings, D77’s feedback, an unreadable file'
-		).toEqual([false, true, true, true, expect.stringContaining(`the session file ${absent} cannot be read (ENOENT: `)]);
+			[plain, repaired, carried, fed, absent].map(findingsOf),
+			'which files hold findings: a plain turn, a repair turn, RD8’s carried findings, D77’s feedback, an unreadable file'
+		).toEqual([
+			[false, false],
+			[true, false],
+			[true, false],
+			[false, true],
+			expect.stringContaining(`the session file ${absent} cannot be read (ENOENT: `)
+		]);
 	});
 
-	it('⛔ RED FIRST — a session file the step would reopen or fork that cannot be read refuses the step, naming it and why — never read as holding everything, nor as holding no findings; a reopened fork whose parent cannot be read is held, as before, to hold everything its parent could (the lead’s ruling (e) on the review’s third re-check)', () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'⛔ RED FIRST — a session file the step would reopen or fork that cannot
+	// be read refuses the step, naming it and why — never read as holding everything, nor as holding no findings; a reopened fork whose parent cannot be
+	// read is held, as before, to hold everything its parent could (…)'~~, its fork limb ~~`expect(() => executorSessionPlaceOf(root, 'pwu_10', 'pwu_9'),
+	// 'a predecessor’s file the step would fork read though it cannot be').toThrow(…)`~~, its readers ~~`readOrRefusal(theirs, historyAnswered)`~~ and
+	// ~~`readOrRefusal(theirs, forkedHistoryHeldFindings)`~~, and its CONTROL ~~'a reopened fork whose parent cannot be read refused, or held short'~~
+	// ~~`.toEqual({ returnedAnswer: false, ownFindings: true, crossUnitFeedback: false, forkedFrom: { predecessorId: 'pwu_3', heldFindings: true,
+	// returnedAnswer: true } })`~~ — no step forks or reads a predecessor's file since D89, and a file naming a parent is refused whether its parent is
+	// there or gone. The promise kept: a file the step would reopen that cannot be read refuses the step, naming it and why, by every reader left.
+	it('⛔ RED FIRST — a session file the step would reopen that cannot be read refuses the step, naming it and why — never read as holding everything, nor as holding no findings; ~~a reopened fork whose parent cannot be read is held, as before, to hold everything its parent could~~ ⭐ a file naming a parent, its parent gone, refused as a fork (the lead’s ruling (e) on the review’s third re-check; D89)', () => {
 		const root = sessionsRoot();
 		// ⭑ A file that cannot be read: a folder where Pi's file would be, named as Pi names one, so the folder's listing finds it and its read fails.
 		const unreadable = (unitId: string): string => {
@@ -344,32 +383,25 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — where a unit’s step opens its exec
 			return file;
 		};
 		const own = unreadable('pwu_1');
-		expect(() => executorSessionPlaceOf(root, 'pwu_1', undefined), 'a file the step would reopen read though it cannot be').toThrow(
+		expect(() => executorSessionPlaceOf(root, 'pwu_1'), 'a file the step would reopen read though it cannot be').toThrow(
 			`the session file ${own} cannot be read (EISDIR: `
 		);
 		const theirs = unreadable('pwu_9');
-		expect(() => executorSessionPlaceOf(root, 'pwu_10', 'pwu_9'), 'a predecessor’s file the step would fork read though it cannot be').toThrow(
-			`the session file ${theirs} cannot be read (EISDIR: `
-		);
+		// ⭑ D91's reader of a reopened file refuses one that cannot be read as well: `reviewedTryHeld`'s own test, below.
 		expect(
-			[readOrRefusal(own, sessionFileHoldings), readOrRefusal(theirs, historyAnswered), readOrRefusal(theirs, forkedHistoryHeldFindings)],
+			[readOrRefusal(own, sessionFileHoldings), readOrRefusal(theirs, sessionFileHoldings)],
 			'a reader read a file that cannot be read as holding everything, or as holding no findings'
 		).toEqual([
 			expect.stringContaining(`the session file ${own} cannot be read (EISDIR: `),
-			expect.stringContaining(`the session file ${theirs} cannot be read (EISDIR: `),
 			expect.stringContaining(`the session file ${theirs} cannot be read (EISDIR: `)
 		]);
-		// ⭑ CONTROL: a reopened fork whose parent's file cannot be read — the parent gone — is not refused: the fork's own file holds the entries Pi copied,
-		// and what it was forked from is held to hold everything its parent could.
+		// ⭐ L17b3 (D89) — a reopened fork whose parent's file is gone is refused as any fork is: its header names a parent, whatever is left of it.
 		const parent = sessionFile(sessionFolderOf(root, 'executor', 'pwu_3'), 'p.jsonl', [userEntry('u1', 'Write the Source.')]);
 		const forked = forkedFile(sessionFolderOf(root, 'executor', 'pwu_4'), 'f.jsonl', parent, [userEntry('u2', 'Write the Source.')]);
 		rmSync(parent);
-		expect(readOrRefusal(forked, sessionFileHoldings), 'a reopened fork whose parent cannot be read refused, or held short').toEqual({
-			returnedAnswer: false,
-			ownFindings: true,
-			crossUnitFeedback: false,
-			forkedFrom: { predecessorId: 'pwu_3', heldFindings: true, returnedAnswer: true }
-		});
+		expect(readOrRefusal(forked, sessionFileHoldings), 'a reopened fork whose parent is gone was read as the unit’s own').toEqual(
+			expect.stringContaining(`the session file ${forked} names a parent session (${parent})`)
+		);
 	});
 
 	it('⛔ RED FIRST — each refusal describes whatever value its read threw, through the one describer and the one reader of a code: a value that cannot be described, or a revoked Proxy, is said to be one, never thrown (the lead’s ruling (k) on the review’s fifth re-check)', () => {
@@ -472,23 +504,140 @@ describe('⭐⭐ L17b1 (D85, the lead’s ruling) — a call its stopped step ne
 	});
 });
 
-describe('⭐⭐ L17b1 (D85) — a replacement whose predecessor left no session records it, for the run report', () => {
-	it('⛔ RED FIRST — a note bound to the unit’s name on the content plane, naming its predecessor; recorded again, it names the same entry', async () => {
-		const store = createInMemoryArtifactStore();
-		await recordPredecessorWithoutSession(store, 'tnt-test', { unitId: 'pwu_2', predecessorId: 'pwu_1' });
-		const ref = await store.resolveName(predecessorWithoutSessionNameOf('tnt-test', 'pwu_2'));
-		expect(ref, 'no note is bound to the unit’s name').toBeDefined();
-		const note = JSON.parse((await store.get(ref!.storageKey)) ?? '{}') as Record<string, unknown>;
-		expect([note.schema, note.unitId, note.predecessorId], 'the note does not name the unit and its predecessor').toEqual([
-			PREDECESSOR_WITHOUT_SESSION_SCHEMA,
-			'pwu_2',
-			'pwu_1'
-		]);
-		expect(String(note.statement), 'the note does not say the session began as a new unit’s').toContain('began as a new unit');
+// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173`): ~~'⭐⭐ L17b1 (D85) — a replacement whose predecessor left no
+// session records it, for the run report'~~, ~~'⛔ RED FIRST — a note bound to the unit’s name on the content plane, naming its predecessor; recorded
+// again, it names the same entry'~~, its body ~~`await recordPredecessorWithoutSession(store, 'tnt-test', { unitId: 'pwu_2', predecessorId: 'pwu_1' });
+// const ref = await store.resolveName(predecessorWithoutSessionNameOf('tnt-test', 'pwu_2')); … expect([note.schema, note.unitId, note.predecessorId],
+// …).toEqual([PREDECESSOR_WITHOUT_SESSION_SCHEMA, 'pwu_2', 'pwu_1']); expect(String(note.statement), …).toContain('began as a new unit'); …`~~ — the
+// note said that a replacement began as a new unit for want of a predecessor's session to fork; since D89 every replacement begins so, so nothing
+// is noted, and the note's writer, its name and its schema go with the fork's code. The promise left: none of the three is exported.
+describe('⭐⭐ L17b3 (D89) — ~~a replacement whose predecessor left no session records it, for the run report~~ ⭐ no replacement notes a missing fork', () => {
+	it('⛔ RED FIRST — the fork’s note is gone with the fork: no writer, name or schema of it is exported', () => {
+		const exported = executorSessionModule as unknown as Record<string, unknown>;
+		expect(exported.recordPredecessorWithoutSession, 'the fork’s note is still written').toBeUndefined();
+		expect(
+			['predecessorWithoutSessionNameOf', 'PREDECESSOR_WITHOUT_SESSION_SCHEMA', 'forkedHistoryHeldFindings', 'historyAnswered'].filter((name) => name in exported),
+			'the fork’s note or its readers are still exported'
+		).toEqual([]);
+	});
+});
 
-		await recordPredecessorWithoutSession(store, 'tnt-test', { unitId: 'pwu_2', predecessorId: 'pwu_1' });
-		expect((await store.resolveName(predecessorWithoutSessionNameOf('tnt-test', 'pwu_2')))?.storageKey, 'the second record rebound the name').toBe(
-			ref!.storageKey
-		);
+describe('⭐⭐ L17b3 (D89, D91) — what a reopened file holds of the record’s line, and of the reviewed try', () => {
+	/** D89's sentence for a line of one unit with a record, a faulty successor's, as a replacement's first turn says it. */
+	const LINE =
+		'The unit this one replaces, "Source" (pwu_1), was worked on before, and its conversation is on the record. You can read it with the read_earlier_attempt tool. ' +
+		'The feedback above says what that work got wrong; read the record only if you need more detail than the feedback gives — it shows what was tried and failed, ' +
+		'so that you do not try it again, unless something material has changed that would let it succeed now.';
+
+	// ⭐⭐ RESTATED 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — the lead's ruling 4, §16; the independent review's L17C-04): ~~'… holds the line, so a
+	// later step on it does not say it again; a file told nothing of a record holds no line (D89)'~~, read by ~~a phrase found anywhere in a turn
+	// (`with the read_earlier_attempt tool`)~~ — the line is held only where a user turn ENDS with the exact sentence the step would say, after the
+	// blank line the step puts before it (`sessionFileHoldings(file, sentence)`), or with the no-record sentence as its whole last paragraph. The
+	// promise kept: a file whose first turn said the line holds it, and a file told nothing of a record holds none.
+	it('⛔ RED FIRST — a file whose first turn ENDS with the line’s exact sentence — or with the no-record sentence as its last paragraph — holds the line, so a later step on it does not say it again; a turn that only mentions the tool, or holds the sentence elsewhere, or another line’s, holds none (D89; the lead’s ruling 4)', () => {
+		const folder = join(sessionsRoot(), 'line');
+		const told = sessionFile(folder, 'told.jsonl', [
+			userEntry('u1', `Write the Source.\n\n${FEEDBACK_HEADING}\n- Chapter art_1:\n\n${LINE}`),
+			assistantEntry('a1', 'stop')
+		]);
+		const toldNone = sessionFile(folder, 'none.jsonl', [
+			userEntry('u1', `Write the Source.\n\n${FEEDBACK_HEADING}\n- Chapter art_1:\n\nThe unit this one replaces left no recorded conversation.`),
+			assistantEntry('a1', 'stop')
+		]);
+		const plain = sessionFile(folder, 'plain.jsonl', [userEntry('u1', 'Write the Source.'), assistantEntry('a1', 'stop')]);
+		// ⭐ The lead's ruling 4 — a turn that only MENTIONS the tool (an instruction about it, under a narrower grant that said no sentence); one that
+		// holds the sentence and goes on after it; and one that ends with another line's sentence.
+		const mentions = sessionFile(folder, 'mentions.jsonl', [
+			userEntry('u1', 'Write the Source. Document how to work with the read_earlier_attempt tool.'),
+			assistantEntry('a1', 'stop')
+		]);
+		const within = sessionFile(folder, 'within.jsonl', [userEntry('u1', `Write the Source.\n\n${LINE}\n\nThen write the Tests.`), assistantEntry('a1', 'stop')]);
+		const another = sessionFile(folder, 'another.jsonl', [userEntry('u1', `Write the Source.\n\n${LINE.replace('pwu_1', 'pwu_9')}`), assistantEntry('a1', 'stop')]);
+		// ~~`expect(sessionFileHoldings(told).heldLine, …).toBe(true)`~~ — the sentence the step would say, given:
+		expect(sessionFileHoldings(told, LINE).heldLine, 'a file whose first turn ended with the line’s sentence is not read to hold the line').toBe(true);
+		expect(
+			// ~~`[sessionFileHoldings(toldNone).heldLine, sessionFileHoldings(plain).heldLine]`~~
+			[sessionFileHoldings(toldNone, LINE).heldLine, sessionFileHoldings(plain, LINE).heldLine],
+			'a file told that no record was left, or told nothing of a record, read to hold the line'
+		).toEqual([true, undefined]);
+		expect(
+			[mentions, within, another].map((f) => sessionFileHoldings(f, LINE).heldLine),
+			'a turn that only mentions the tool, holds the sentence elsewhere, or ends with another line’s, read to hold the line (the lead’s ruling 4)'
+		).toEqual([undefined, undefined, undefined]);
+		expect(sessionFileHoldings(told).heldLine, 'a file read with no sentence to say held the line by its record sentence (the lead’s ruling 4)').toBeUndefined();
+	});
+
+	it('⛔ RED FIRST — whether a reopened file holds the reviewed answer is asked of its messages after the reviewed try’s own turn: each that carried text replayed, HELD; any not, NOT_HELD; the turn not in the file, NOT_SHOWN; a file that cannot be read refuses (D91)', () => {
+		const folder = join(sessionsRoot(), 'reviewed');
+		const TURN = 'Write the Tests.';
+		const held = sessionFile(folder, 'held.jsonl', [userEntry('u1', TURN), assistantSaying('a1', 'stop', 'The tests.')]);
+		const ended = sessionFile(folder, 'ended.jsonl', [userEntry('u1', TURN), assistantSaying('a1', 'error', 'The tests, cut.')]);
+		const aborted = sessionFile(folder, 'aborted.jsonl', [userEntry('u1', TURN), assistantSaying('a1', 'aborted', 'The tests, cut.')]);
+		// ⭑ A reply Pi dropped to go on, kept in its history: the answer may have been gathered from it (an answer recorded before D92).
+		const dropped = sessionFile(folder, 'dropped.jsonl', [
+			userEntry('u1', TURN),
+			assistantSaying('a1', 'error', 'PARTIAL '),
+			assistantSaying('a2', 'stop', 'The tests.')
+		]);
+		// ⭑ An errored message with no text carried none into the answer.
+		const silent = sessionFile(folder, 'silent.jsonl', [userEntry('u1', TURN), assistantSaying('a1', 'error', ''), assistantSaying('a2', 'stop', 'The tests.')]);
+		// ⭑ An earlier answer held and the reviewed one not: never asked of the history as a whole.
+		const earlier = sessionFile(folder, 'earlier.jsonl', [
+			userEntry('u0', 'Write the Source.'),
+			assistantSaying('a0', 'stop', 'The Source.'),
+			userEntry('u1', TURN),
+			assistantSaying('a1', 'error', 'The tests, cut.')
+		]);
+		const elsewhere = sessionFile(folder, 'elsewhere.jsonl', [userEntry('u0', 'Write the Source.'), assistantSaying('a0', 'stop', 'The Source.')]);
+		const absent = join(folder, 'absent.jsonl');
+		// ⭐ The independent review's L17-09 — two user entries equal to the reviewed turn: no single match, so which try was reviewed cannot be shown.
+		const twice = sessionFile(folder, 'twice.jsonl', [
+			userEntry('u1', TURN),
+			assistantSaying('a1', 'stop', 'The tests.'),
+			userEntry('u2', TURN),
+			assistantSaying('a2', 'stop', 'The tests again.')
+		]);
+		// ⭐ L17-09 — the reviewed try's messages end at the next user entry: a later try's errored answer is not the reviewed one's.
+		const bounded = sessionFile(folder, 'bounded.jsonl', [
+			userEntry('u1', TURN),
+			assistantSaying('a1', 'stop', 'The tests.'),
+			userEntry('u2', 'Write the Lint.'),
+			assistantSaying('a2', 'error', 'The lint, cut.')
+		]);
+
+		expect(reviewedTryHeld(held, TURN), 'a file whose reviewed answer Pi replays is not read to hold it').toBe('HELD');
+		expect(
+			[held, ended, aborted, dropped, silent, earlier, elsewhere, absent].map((f) => readOrRefusal(f, (file) => reviewedTryHeld(file, TURN))),
+			'whether each file holds the reviewed answer'
+		).toEqual([
+			'HELD',
+			'NOT_HELD',
+			'NOT_HELD',
+			'NOT_HELD',
+			'HELD',
+			'NOT_HELD',
+			'NOT_SHOWN',
+			expect.stringContaining(`the session file ${absent} cannot be read (ENOENT: `)
+		]);
+		expect(
+			[twice, bounded].map((f) => readOrRefusal(f, (file) => reviewedTryHeld(file, TURN))),
+			'a turn found twice was read as one try, or the reviewed try’s messages ran past the next user entry (the review’s L17-09)'
+		).toEqual(['NOT_SHOWN', 'HELD']);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — the lead's ruling 2 (§16; the independent review's L17C-02): A REVIEWED TURN FOLLOWED BY NO MESSAGE THAT
+	// CARRIED TEXT before the next user entry shows nothing the session holds of the reviewed answer — the user entry alone, or an answer whose line the
+	// reader skips (a truncated line, as Pi itself would skip it) — so it is NOT_SHOWN, and the work is sent again; never HELD.
+	it('⛔ RED FIRST — a reviewed turn followed by no message that carried text — the user entry alone, or an answer whose line the reader skips — is NOT_SHOWN, never HELD (the lead’s ruling 2)', () => {
+		const folder = join(sessionsRoot(), 'unshown');
+		const TURN = 'Write the Tests.';
+		const alone = sessionFile(folder, 'alone.jsonl', [userEntry('u1', TURN)]);
+		const truncated = sessionFile(folder, 'truncated.jsonl', [userEntry('u1', TURN)]);
+		// ⭑ The answer's line cut where a killed write would cut it: JSON that does not parse, which the reader skips, as Pi's own reader does.
+		writeFileSync(truncated, `${readFileSync(truncated, 'utf8')}${JSON.stringify(assistantSaying('a1', 'stop', 'The tests.')).slice(0, 60)}\n`);
+		expect(
+			[alone, truncated].map((f) => reviewedTryHeld(f, TURN)),
+			'a reviewed turn followed by no message that carried text was read to hold the reviewed answer'
+		).toEqual(['NOT_SHOWN', 'NOT_SHOWN']);
 	});
 });

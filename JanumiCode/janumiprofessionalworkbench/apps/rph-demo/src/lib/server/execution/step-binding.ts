@@ -58,8 +58,10 @@
 // declare a REQUIRES as a USES and buy itself a step that runs without the thing it needs — the self-consistency
 // defect `R11`'s `W1` records, one plane over. `stepBindingFor` derives BOTH the needs and the wire request from
 // ONE table, so they cannot disagree.
+import { DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID, LOOP_CONTEXT_ASSEMBLY_POLICY_ID } from '@janumipwb/rph-application';
 import type { CapabilityRequest, RequestRuntimeBindingPayload } from '@janumipwb/rph-contracts';
 import { canReuseBindingForNewAttempt, capabilityAuthorized } from '@janumipwb/rph-domain';
+import { EARLIER_ATTEMPT_CAPABILITY } from './earlier-attempt-record.js';
 
 /**
  * How a step needs a capability — the distinction `RPH-EXE-004`'s two readings turn on.
@@ -136,7 +138,8 @@ const PROCESS_EXECUTION = Object.freeze({
 	capability: 'process-execution',
 	// ⛔⛔ R12, AS DATA. Driven, not reasoned: `file-system` withheld, `process-execution` granted, and the
 	// model wrote outside the workspace through the child. `network` follows for the same reason.
-	subsumes: ['file-system', 'network'] as readonly string[],
+	// ⭐ Package L17b3 (D89) — and `earlier-attempt-record`: a command the server's user runs reads the record store's files as well (R12; `REG-F-624`).
+	subsumes: ['file-system', 'network', EARLIER_ATTEMPT_CAPABILITY] as readonly string[],
 	note:
 		'COINED under the JAN-EXECGOV G-1 grant (one capability per step type that a model invocation actually ' +
 		'needs, named in the vocabulary with its note). The corpus names no capability for starting a process. ' +
@@ -152,6 +155,24 @@ const PROCESS_EXECUTION = Object.freeze({
 		"⭑ The only claimed boundary is R9's deployment tier — OpenSandbox / OpenShell / container isolation — " +
 		'NOT this code. It stays a separate capability solely so a grant can express "may write, may not run"; ' +
 		'the converse, "may run, may not write", is NOT an expressible state.'
+});
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (§12.43, "The tool"; `REG-D-173` (4)) — COINED, the lead's: the read-only tool over the
+ * record of the units a replacement replaces (`read_earlier_attempt`). A replacement's step USES it, in its needs alone; no other step asks for it.
+ */
+const EARLIER_ATTEMPT_RECORD = Object.freeze({
+	capability: EARLIER_ATTEMPT_CAPABILITY,
+	// ⭑ SUBSUMES NOTHING. Reading the record of earlier units starts nothing, writes nothing and opens no socket.
+	subsumes: [] as readonly string[],
+	note:
+		'COINED under design D89 (REG-D-173 (4)): it authorises ONE tool, `read_earlier_attempt`, read-only, minted for a replacement\'s steps ' +
+		'alone, which serves the recorded conversations of the units the replacement replaces, as the Governed Stream recorded them, in parts, ' +
+		'each read recorded before it is served. USED, never REQUIRED: a grant that leaves it out is a lawful narrower grant, and the step runs ' +
+		'as any step does — no tool, no sentence of the record, no pair of it declared. ' +
+		'⛔ R12: it is SUBSUMED BY `process-execution` — a command the server\'s user runs can read the record store\'s files — so the grant ' +
+		'confines nothing: the tool is the declared and recorded way to the record, a command the undeclared way any step has whose executor ' +
+		'mints the command tool under that grant (REG-F-624; design D88).'
 });
 
 /**
@@ -183,7 +204,7 @@ export const STEP_CAPABILITY_VOCABULARY: readonly {
 	 * what the model can REACH, which is a different question and the one `R12` answers.
 	 */
 	readonly subsumes: readonly string[];
-}[] = Object.freeze([NETWORK, FILE_SYSTEM, PROCESS_EXECUTION]);
+}[] = Object.freeze([NETWORK, FILE_SYSTEM, PROCESS_EXECUTION, EARLIER_ATTEMPT_RECORD]);
 
 /**
  * What a `MODEL_INVOCATION` step discharged by a MODEL needs — the ONE table the wire request, the refusal and
@@ -195,6 +216,15 @@ const MODEL_INVOCATION_NEEDS: readonly StepCapabilityNeed[] = Object.freeze([
 	{ ...PROCESS_EXECUTION, need: 'USES' as const }
 ]);
 
+/**
+ * ⭐⭐ Package L17b3 — design D89 — what a REPLACEMENT's model step needs: the three, and the record's capability, USED (the lead's ruling 9 on
+ * Stage 0: a second needs table beside the first, so no other step asks for it).
+ */
+const REPLACEMENT_MODEL_INVOCATION_NEEDS: readonly StepCapabilityNeed[] = Object.freeze([
+	...MODEL_INVOCATION_NEEDS,
+	{ ...EARLIER_ATTEMPT_RECORD, need: 'USES' as const }
+]);
+
 /** What a step's binding must ask for, and on whose behalf. ⛔ PAYLOAD-SHAPED — see `StepBinding`. */
 export interface StepBindingRequest {
 	readonly runtimeBindingId: string;
@@ -202,6 +232,11 @@ export interface StepBindingRequest {
 	/** `PWU_TYPE.workDischarge` — the type's own statement of who does this work. */
 	readonly roleId: string;
 	readonly requestedCapabilities: readonly CapabilityRequest[];
+	/**
+	 * ⭐⭐ Package L17b3 — design D89 (`REG-D-173` (2)) — the context assembly policy the binding names, which governs its step's context:
+	 * `ctx-default-loop` for a step the loop's material reaches, `ctx-default` for every other (`contextPolicyIdForStep`).
+	 */
+	readonly contextAssemblyPolicyId: string;
 }
 
 /**
@@ -258,10 +293,12 @@ void _thePayloadFitsTheRequest;
  */
 function boundStep(
 	stepType: string,
-	workDischarge: string | undefined
+	workDischarge: string | undefined,
+	replacement: boolean
 ): { readonly roleId: string; readonly needs: readonly StepCapabilityNeed[] } | undefined {
 	if (stepType !== 'MODEL_INVOCATION' || workDischarge !== 'MODEL') return undefined;
-	return { roleId: workDischarge, needs: MODEL_INVOCATION_NEEDS };
+	// ⭐ Package L17b3 (D89) — a replacement's step uses the record's capability too.
+	return { roleId: workDischarge, needs: replacement ? REPLACEMENT_MODEL_INVOCATION_NEEDS : MODEL_INVOCATION_NEEDS };
 }
 
 /**
@@ -286,9 +323,11 @@ export function stepBindingFor(
 	stepType: string,
 	workDischarge: string | undefined,
 	runtimeBindingId: string,
-	executionStepId: string
+	executionStepId: string,
+	// ⭐⭐ Package L17b3 — design D89 — the step's context policy, and whether it is a replacement's: both read by the page before it dispatches.
+	step: { readonly contextAssemblyPolicyId: string; readonly replacement: boolean }
 ): StepBinding | undefined {
-	const bound = boundStep(stepType, workDischarge);
+	const bound = boundStep(stepType, workDischarge, step.replacement);
 	if (bound === undefined) return undefined;
 	return {
 		request: {
@@ -296,10 +335,26 @@ export function stepBindingFor(
 			executionStepId,
 			roleId: bound.roleId,
 			// ⭑ DERIVED, so the wire request and the REQUIRES/USES table are one statement written once.
-			requestedCapabilities: bound.needs.map((n) => ({ capability: n.capability }))
+			requestedCapabilities: bound.needs.map((n) => ({ capability: n.capability })),
+			contextAssemblyPolicyId: step.contextAssemblyPolicyId
 		},
 		capabilityNeeds: bound.needs
 	};
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (§12.43, "The loop's steps and the binding"; `REG-D-173` (2)) — THE BINDING'S POLICY CHOICE,
+ * the one pure function every minting site reads (`beginExecuteSteps`, the plan revision, the rework plan): `ctx-default-loop` for each step the
+ * loop's material reaches — every step of a replacement, whose session holds the record's tool; a step that carries D77's feedback; a step on a
+ * session that holds that feedback — and `ctx-default` for every other. A turn that declares a pair its step's policy does not hold is refused
+ * before its render, so a binding that names the narrower policy fails closed.
+ */
+export function contextPolicyIdForStep(step: {
+	readonly replacement: boolean;
+	readonly carriesFeedback: boolean;
+	readonly sessionHoldsFeedback: boolean;
+}): string {
+	return step.replacement || step.carriesFeedback || step.sessionHoldsFeedback ? LOOP_CONTEXT_ASSEMBLY_POLICY_ID : DEFAULT_CONTEXT_ASSEMBLY_POLICY_ID;
 }
 
 /**

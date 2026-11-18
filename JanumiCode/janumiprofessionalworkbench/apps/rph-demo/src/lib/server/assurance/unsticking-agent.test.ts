@@ -13,7 +13,9 @@ describe('⭐⭐ L17b1 (D75) — the Unsticking Agent’s prompt and answer', ()
 			rejectedUnit: { id: 'pwu_ver', title: 'Verification' },
 			recurrence: [{ id: 'obs_1', statement: 'The standard-input mode fails again, as it did in the round before.' }],
 			narrative: [{ id: 'art_ch1', failing: false, statements: [{ text: 'Source was replaced once.', cites: ['dec_1'] }] }],
-			earlier: [{ id: 'art_dx0', kind: 'fault-diagnosis', text: '{"named":"pwu_src"}' }]
+			earlier: [{ id: 'art_dx0', kind: 'fault-diagnosis', text: '{"named":"pwu_src"}' }],
+			// ⭐ L17b3 (D89) — arrangement: the prompt is handed the record's files, none here; `L17b3 (D89)` below holds what it says of them.
+			recordFiles: []
 		});
 
 		for (const part of [
@@ -25,6 +27,32 @@ describe('⭐⭐ L17b1 (D75) — the Unsticking Agent’s prompt and answer', ()
 			STEP_BACK_FORM
 		])
 			expect(prompt, `the prompt does not hold: ${part}`).toContain(part);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173` (5)): on a recurrence, the Unsticking Agent is given the recorded conversations of
+	// the rejected unit and of each unit the recurrence names, files in its copy as the Hypothesizer's are, named in its prompt after the earlier rounds;
+	// the words are the builder's (`l17b3-facts.md` §4.2), the Hypothesizer's own.
+	it('⛔ RED FIRST — L17b3 (D89): it names the recorded conversation of the rejected unit and of each unit the recurrence names, a file in its copy; and says where none was written', () => {
+		const args = {
+			rejectedUnit: { id: 'pwu_ver', title: 'Verification' },
+			recurrence: [{ id: 'obs_1', statement: 'The standard-input mode fails again, as it did in the round before.' }],
+			narrative: [],
+			earlier: []
+		};
+		const HEADING = 'The recorded conversations of these units’ work, as the Governed Stream recorded them, each a file in your copy of the workspace:';
+		const prompt = unstickingPrompt({
+			...args,
+			recordFiles: [
+				{ unitId: 'pwu_ver', title: 'Verification', file: '.jpwb/record/verification--pwu_ver.md' },
+				{ unitId: 'pwu_src', title: 'Source', file: '.jpwb/record/source--pwu_src.md' }
+			]
+		});
+		for (const part of [
+			'- pwu_ver "Verification": .jpwb/record/verification--pwu_ver.md',
+			`${HEADING}\n- pwu_ver "Verification": .jpwb/record/verification--pwu_ver.md\n- pwu_src "Source": .jpwb/record/source--pwu_src.md\n\nReply with ONE JSON object`
+		])
+			expect(prompt, `the prompt does not name the record’s files: ${part}`).toContain(part);
+		expect(unstickingPrompt({ ...args, recordFiles: [] }), 'a prompt given no record file does not say none was written').toContain(`${HEADING}\n- (none recorded)`);
 	});
 
 	it('⛔ RED FIRST — the answer’s questions and facts are read, each fact with its source; an answer that is not one JSON object is not read', () => {

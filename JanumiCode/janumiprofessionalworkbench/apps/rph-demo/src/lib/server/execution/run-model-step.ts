@@ -45,6 +45,8 @@ import type { ExecutorSessionPlace, ProducerSession } from './producer-session.j
 import { CARRIED_FINDINGS_LINE } from './executor-session.js';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { recordExchanges } from '../assurance/exchange-recorder.js';
+import { droppedRepliesBesideExchange, firstMexIs } from './dropped-replies.js';
+import { NO_RECORD_SENTENCE } from './earlier-attempt-record.js';
 
 export interface RunModelStepInput {
 	readonly subject: InvocationSubject;
@@ -137,6 +139,21 @@ export interface RunModelStepInput {
 	 */
 	readonly stillHeld?: { readonly holds: SessionHolds; readonly feedback?: TurnFeedback };
 	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173` (3), (4)) — THE RECORD OF THE UNITS A REPLACEMENT REPLACES, AS THE PAGE HANDS
+	 * IT: the sentence its first turn says of them (on a session that does not already hold it; absent on a later try), whether the record's tool
+	 * was minted, and what that record holds. Every turn of a session that holds the tool declares the record's pairs (`crossUnitSources`); with no
+	 * tool minted, no record is in reach — no sentence (but the no-record one, which needs none), no pair. Absent for a unit that is not a replacement.
+	 */
+	readonly earlierAttempt?: EarlierAttemptReach;
+	/**
+	 * ⭐⭐ Package L17b3 — design D91 (`REG-F-649`) — THE WORK A TURN CARRYING FINDINGS SENDS AGAIN, its session not holding it: the reviewed work
+	 * product, read back from the content plane and checked against its hash; its rationale where the retained span gives it back; and whether the
+	 * session still holds an EARLIER answer of the step Pi replays (so a repair that sends the work alone still holds a rationale). The page decides
+	 * and reads; the step places it — first in a repair turn, after the instruction on a one-shot session's repair and on a reopened file's first
+	 * turn — and declares it. Absent where the session holds the reviewed answer.
+	 */
+	readonly resend?: ResendWork;
+	/**
 	 * ⭑ CP-04 — the policy this deployment operates under, RESOLVED, not an id.
 	 *
 	 * ⛔ Required, so that *"resolve the policy and ignore it"* is not expressible here either. Resolution is
@@ -200,7 +217,7 @@ export type StepBindingFacts =
 	  };
 
 /**
- * What this call will place in front of the producer, beyond the rendered instruction.
+ * What a turn carrying findings assembles about its own unit's work.
  *
  * ⭑⭑ DERIVED FROM THE TWO FACTS THAT DECIDE IT, not declared by a caller who might get it wrong. A repair turn
  * carries the findings; and when the session REMEMBERS, the producer's context on that turn also holds its own
@@ -209,12 +226,25 @@ export type StepBindingFacts =
  *
  * ⚠ NOTHING IS ASSEMBLED ON TRY 1 BEYOND THE INSTRUCTION, even with a remembering session: a fresh session has
  * no prior turns to hold. Listing them anyway would be a claim about material that does not exist.
+ *
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D91 (`REG-F-649`) — AND WHAT IT SENDS AGAIN, IT DECLARES (`resend`): the work product, at
+ * THIS_WORK_UNIT; the rationale only where it went beside it, or where the session still holds an earlier answer of the step Pi replays (on a
+ * session that keeps its history) — never one it did not send and the session does not hold.
  */
 export function assembledSources(
 	priorFindings: readonly unknown[] | undefined,
-	retainsHistory: boolean
+	retainsHistory: boolean,
+	resend?: ResendWork
 ): readonly ContextSourceRule[] {
 	if (!priorFindings?.length) return [];
+	if (resend !== undefined)
+		return [
+			{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+			{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+			...(resend.rationale !== undefined || (retainsHistory && resend.sessionHoldsAnEarlierAnswer)
+				? ([{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }] as const)
+				: [])
+		];
 	return [
 		{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
 		...(retainsHistory
@@ -234,22 +264,24 @@ export function assembledSources(
  */
 function turnAssembles(input: RunModelStepInput): readonly ContextSourceRule[] {
 	// ⭐⭐ Package L17b1 — the independent review's defect 1 — and a later try on a session that keeps its history declares the other units' material
-	// that session still holds from before the step and from its first turn (`stillHeld`): a fork's conversation, D77's cross-unit feedback. Its own
-	// unit's earlier work its repair turn declares, as before. Every turn on a session that holds nothing of the kind is declared byte for byte as before.
+	// that session still holds from before the step and from its first turn (`stillHeld`): D77's cross-unit feedback. ⭐⭐ Package L17b3 — design D89 —
+	// ~~a fork's conversation~~, and the record a replacement's tool reads, on EVERY turn of a session that holds the tool, read or not (`REG-D-170`).
 	const held = input.stillHeld !== undefined && input.session.retainsHistory ? crossUnitSources(input.stillHeld.holds, input.stillHeld.feedback) : [];
-	return unionOfSources(turnOwnSources(input), held);
+	return unionOfSources(unionOfSources(turnOwnSources(input), held), recordSources(input.earlierAttempt));
 }
 
 /** What this turn itself assembles: a repair turn's held attempt, a first turn's holdings and carried material, or a re-run's carried findings. */
 function turnOwnSources(input: RunModelStepInput): readonly ContextSourceRule[] {
 	if (input.priorFindings?.length)
-		return assembledSources(input.priorFindings, input.session.retainsHistory);
+		return assembledSources(input.priorFindings, input.session.retainsHistory, input.resend);
 	// ⭐⭐ Package L17b1 — D85, `REG-D-169`, `REG-D-170` — a first turn on a session that already holds work, or one carrying D77's feedback,
-	// declares what it holds and carries (`firstTurnSources`); every other first turn is declared byte for byte as before.
-	if (input.sessionHolds.kind !== 'NOTHING' || input.feedback !== undefined)
-		return firstTurnSources(input.sessionHolds, input.carriedFindings ?? [], input.feedback);
+	// declares what it holds and carries (`firstTurnSources`); ⭐ package L17b3 — and one handed a record, or the work sent again; every other first
+	// turn is declared byte for byte as before.
+	if (input.sessionHolds.kind !== 'NOTHING' || input.feedback !== undefined || input.earlierAttempt !== undefined || input.resend !== undefined)
+		return firstTurnSources(input.sessionHolds, input.carriedFindings ?? [], input.feedback, input.earlierAttempt, input.resend);
 	return assembledSources(input.carriedFindings, false);
 }
+
 
 /** ⭐ Package L17b1 — `a`, then each pair of `b` not in it: one declaration per pair, in the order first declared. */
 function unionOfSources(a: readonly ContextSourceRule[], b: readonly ContextSourceRule[]): readonly ContextSourceRule[] {
@@ -259,7 +291,11 @@ function unionOfSources(a: readonly ContextSourceRule[], b: readonly ContextSour
 }
 
 /**
- * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`) — WHAT A STEP'S SESSION HOLDS WHEN ITS FIRST TURN IS SENT (`RunModelStepInput`).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`) — WHAT A STEP'S SESSION ALREADY HOLDS WHEN ITS FIRST TURN IS SENT: nothing (a session
+ * held in memory, a new file), or the unit's own earlier steps (its one file reopened). ⭐⭐ Package L17b3 — design D89 (`REG-D-173`) —
+ * ~~`| ({ kind: 'PREDECESSOR' } & HeldPredecessor)`, and a reopened fork's `predecessor`~~: nothing forks, so no session holds another unit's
+ * conversation; a replacement's record of the units it replaces is in reach through its tool (`earlierAttempt`), and a reopened file says whether
+ * its first turn already told it of that record (`heldLine`), so a later step on it does not say it again.
  */
 export type SessionHolds =
 	| { readonly kind: 'NOTHING' }
@@ -271,23 +307,13 @@ export type SessionHolds =
 			readonly ownFindings: boolean;
 			/** ⭐ The independent review's defect 1 — whether an earlier turn of its own carried D77's feedback, which may hold other units' findings. */
 			readonly crossUnitFeedback: boolean;
-			/** ⭐ The independent review's defect 1 — where the file began as a fork, the conversation it was forked from, which it still holds. */
-			readonly predecessor?: HeldPredecessor;
-	  }
-	| ({ readonly kind: 'PREDECESSOR' } & HeldPredecessor);
-
-/** ⭐ Package L17b1 — the conversation of the unit a session was forked from, which the session holds: whose, and what it holds. */
-export interface HeldPredecessor {
-	readonly title: string;
-	readonly unitId: string;
-	readonly heldFindings: boolean;
-	/** ⭐ The independent review's defect 8 — whether that conversation returned a work product. */
-	readonly returnedAnswer: boolean;
-}
+			/** ⭐ Package L17b3 (D89) — a first turn on the file told it of the record's line. */
+			readonly heldLine?: true;
+	  };
 
 /**
- * ⭐⭐ Package L17b1 — design D77 — the feedback a first turn carries, rendered; and whether it carries another unit's findings or the assurance
- * stage's records, which it then declares as findings at THIS_UNDERTAKING (`REG-D-170`).
+ * ⭐⭐ Package L17b1 — design D77 — the holistic feedback a first turn carries: its text, and whether it carries other units' material (`crossUnit`),
+ * which the turn then declares at THIS_UNDERTAKING.
  */
 export interface TurnFeedback {
 	readonly text: string;
@@ -295,24 +321,40 @@ export interface TurnFeedback {
 }
 
 /**
- * ⭐⭐ Package L17b1 — D85, `REG-D-169` — WHAT A FIRST TURN ON A SESSION THAT HOLDS WORK, OR CARRYING D77's FEEDBACK, DECLARES: a re-run's carried
- * finding; the unit's own earlier work product and rationale where its one session was reopened (`assembledSources(…, true)`'s pairs, as a repair
- * turn on a remembering session declares them); and the cross-unit pairs where it carries another unit's material (`crossUnitSources`).
+ * ⭐⭐ Package L17b3 — design D89 — WHAT THE PAGE HANDS A REPLACEMENT'S STEP OF THE RECORD OF THE UNITS IT REPLACES: the sentence its first turn says
+ * (absent on a later try, whose session holds it), whether the record's tool was minted, and what that record holds (`recordHoldings`).
+ */
+export interface EarlierAttemptReach {
+	readonly sentence?: string;
+	readonly toolMinted: boolean;
+	readonly holds: { readonly answer: boolean; readonly findings: boolean };
+}
+
+/** ⭐⭐ Package L17b3 — design D91 — the work a turn carrying findings sends again, as the page read it back (`RunModelStepInput.resend`). */
+export interface ResendWork {
+	readonly workProduct: string;
+	readonly rationale?: string;
+	readonly sessionHoldsAnEarlierAnswer: boolean;
+}
+
+/**
+ * ⭐⭐ Package L17b1 — `REG-D-170` — WHAT A FIRST TURN DECLARES OF WHAT ITS SESSION HOLDS AND WHAT IT CARRIES: a re-run's carried findings, the unit's
+ * own earlier work on a reopened file (THIS_WORK_UNIT), and other units' material (`crossUnitSources`, THIS_UNDERTAKING). ⭐⭐ Package L17b3 — and
+ * the record a replacement's tool reads (D89), and the work it sends again (D91, `resend`).
  */
 export function firstTurnSources(
 	holds: SessionHolds,
 	carried: readonly unknown[],
-	feedback: TurnFeedback | undefined
+	feedback: TurnFeedback | undefined,
+	earlierAttempt?: EarlierAttemptReach,
+	resend?: ResendWork
 ): readonly ContextSourceRule[] {
 	const own: ContextSourceRule[] = [];
 	if (carried.length > 0) own.push({ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' });
-	return unionOfSources(own, [...ownHeldSources(holds), ...crossUnitSources(holds, feedback)]);
+	return unionOfSources(own, [...ownHeldSources(holds), ...resendSources(resend), ...crossUnitSources(holds, feedback, earlierAttempt)]);
 }
 
-/**
- * ⭐⭐ Package L17b1 — the independent review's defect 8 — WHAT A SESSION'S OWN EARLIER TURNS HOLD, AS DECLARED, read from the file: the work product and
- * rationale they returned, where they returned one — a try stopped in its first tool call returned none — and the findings they carried.
- */
+/** What a reopened file of the unit's own holds of its earlier work: its work product and rationale where it returned one, its own findings. */
 function ownHeldSources(holds: SessionHolds): ContextSourceRule[] {
 	const own: ContextSourceRule[] = [];
 	if (holds.kind !== 'THIS_UNIT') return own;
@@ -322,26 +364,40 @@ function ownHeldSources(holds: SessionHolds): ContextSourceRule[] {
 	return own;
 }
 
+/** ⭐ Package L17b3 (D91) — what the work sent again puts in front of the model: the work product, and its rationale where one went or is held. */
+function resendSources(resend: ResendWork | undefined): ContextSourceRule[] {
+	if (resend === undefined) return [];
+	return [
+		{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+		...(resend.rationale !== undefined || resend.sessionHoldsAnEarlierAnswer ? ([{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }] as const) : [])
+	];
+}
+
 /**
- * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — `REG-D-170` — THE ONE PLACE A TURN DECLARES ANOTHER UNIT'S RATIONALE OR FINDINGS (PRIOR_RATIONALE and
- * PRIOR_REVIEW_FINDING at THIS_UNDERTAKING), which the policy every new binding names permits (`LOOP_CONTEXT_ASSEMBLY_POLICY`): a forked successor's
- * first turn — its predecessor's work product and rationale, and its findings where that conversation held any — and a turn carrying D77's feedback
- * from another unit or the assurance stage. ⭐ The independent review's defect 1 — and every later turn on a session that still holds either: a later
- * try on one that keeps its history (`stillHeld`), a later step on a reopened fork, or on a file an earlier turn of which carried the feedback. ⭐ Its
- * defect 8 — another unit's work product and rationale only where its conversation returned one. ⛔ NO OTHER TURN: the census holds it
- * (`verif/context-pair-census.test.ts`).
+ * ⭐⭐ Package L17b3 — design D89 (`REG-D-170`) — WHAT THE RECORD A REPLACEMENT'S TOOL READS HOLDS, DECLARED AT THIS_UNDERTAKING on every turn of a
+ * session that holds the tool, read or not: `PRIOR_WORK_PRODUCT` and `PRIOR_RATIONALE` where it holds a predecessor's answer, `PRIOR_REVIEW_FINDING`
+ * where it holds findings or the loop's feedback a predecessor was given. With no tool minted, nothing is in reach, and nothing is declared.
  */
-export function crossUnitSources(holds: SessionHolds, feedback: TurnFeedback | undefined): readonly ContextSourceRule[] {
+function recordSources(earlierAttempt: EarlierAttemptReach | undefined): ContextSourceRule[] {
+	if (earlierAttempt?.toolMinted !== true) return [];
 	const out: ContextSourceRule[] = [];
-	// ⭐ The independent review's defect 1 — the predecessor's conversation the session holds: a fork's, and a reopened fork's still.
-	const theirs = holds.kind === 'PREDECESSOR' ? holds : holds.kind === 'THIS_UNIT' ? holds.predecessor : undefined;
-	if (theirs !== undefined) {
-		// ⭐ The independent review's defect 8 — its work product and rationale where it returned them.
-		if (theirs.returnedAnswer)
-			out.push({ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_UNDERTAKING' }, { source: 'PRIOR_RATIONALE', scope: 'THIS_UNDERTAKING' });
-		if (theirs.heldFindings) out.push({ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' });
-	}
-	// ⭐ The independent review's defect 1 — D77's feedback this turn carries, or an earlier turn of the reopened file carried.
+	if (earlierAttempt.holds.answer)
+		out.push({ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_UNDERTAKING' }, { source: 'PRIOR_RATIONALE', scope: 'THIS_UNDERTAKING' });
+	if (earlierAttempt.holds.findings) out.push({ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' });
+	return out;
+}
+
+/**
+ * ⭐⭐ Package L17b1 — the independent review's defect 1 — THE OTHER UNITS' MATERIAL A TURN'S SESSION HOLDS OR ITS FIRST TURN CARRIES, at THIS_UNDERTAKING:
+ * D77's cross-unit feedback, carried or held by a reopened file. ⭐⭐ Package L17b3 — design D89 — ~~a fork's conversation~~: the record a
+ * replacement's tool reads (`recordSources`) in its place; D77's feedback declares `PRIOR_REVIEW_FINDING` at THIS_UNDERTAKING, as before, once.
+ */
+export function crossUnitSources(
+	holds: SessionHolds,
+	feedback: TurnFeedback | undefined,
+	earlierAttempt?: EarlierAttemptReach
+): readonly ContextSourceRule[] {
+	const out = recordSources(earlierAttempt);
 	const heldFeedback = holds.kind === 'THIS_UNIT' && holds.crossUnitFeedback;
 	if ((feedback?.crossUnit === true || heldFeedback) && !out.some((r) => r.source === 'PRIOR_REVIEW_FINDING'))
 		out.push({ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' });
@@ -349,44 +405,25 @@ export function crossUnitSources(holds: SessionHolds, feedback: TurnFeedback | u
 }
 
 /**
- * ⭐⭐ Package L17b1 — D85 (`REG-D-169`) — WHAT A SESSION HOLDS, FROM WHERE IT IS KEPT AND HOW IT OPENS: nothing in memory or in a new file; the unit's
- * earlier steps in its reopened file; its predecessor's conversation in a fork, titled by `titleOf`.
+ * ⭐⭐ Package L17b1 — design D85 — WHAT A STEP'S SESSION HOLDS, read from its place: nothing in memory or in a new file; the unit's own in its reopened
+ * file, as the file's holdings say. ⭐ Package L17b3 (D89) — ~~`titleOf`, a fork's predecessor~~: the place alone; the record's line where the file holds it.
  */
-export function sessionHoldsOf(place: ExecutorSessionPlace, titleOf: (unitId: string) => string): SessionHolds {
+export function sessionHoldsOf(place: ExecutorSessionPlace): SessionHolds {
 	if (place.kind === 'IN_MEMORY') return { kind: 'NOTHING' };
 	const opening = place.opening;
-	// ⭐ The independent review's defects 1 and 8 — a reopened file holds what it was read to hold (`sessionFileHoldings`): its own answer or none, its
-	// findings, D77's feedback, and the conversation it was forked from, where it began as a fork.
 	if (opening.kind === 'REOPEN') {
 		const held = opening.held;
-		const theirs = held.forkedFrom;
 		return {
 			kind: 'THIS_UNIT',
 			returnedAnswer: held.returnedAnswer,
 			ownFindings: held.ownFindings,
 			crossUnitFeedback: held.crossUnitFeedback,
-			...(theirs === undefined
-				? {}
-				: {
-						predecessor: {
-							title: titleOf(theirs.predecessorId),
-							unitId: theirs.predecessorId,
-							heldFindings: theirs.heldFindings,
-							returnedAnswer: theirs.returnedAnswer
-						}
-					})
+			...(held.heldLine === true ? { heldLine: true as const } : {})
 		};
 	}
-	if (opening.kind === 'FORK')
-		return {
-			kind: 'PREDECESSOR',
-			title: titleOf(opening.predecessorId),
-			unitId: opening.predecessorId,
-			heldFindings: opening.heldFindings,
-			returnedAnswer: opening.returnedAnswer
-		};
 	return { kind: 'NOTHING' };
 }
+
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package L15 — design D69 (`REG-D-159`; `REG-F-358`) — WHAT A STEP WHOSE INSTRUCTION NAMES ACCEPTED WORK
@@ -424,26 +461,23 @@ function firstTurn(
 }
 
 /**
- * ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`, the sponsor's ruling: a unit's later step continues its saved conversation) — A FIRST
- * TURN ON A SESSION THAT ALREADY HOLDS WORK: the instruction, then — in place of RD8's *"This is a fresh session: …"* — what the session holds, then
- * what to do. ⭑ On the session held in memory (`firstTurn`), RD8's words byte for byte.
+ * ⭐⭐ Package L17b1 — design D85 — A FIRST TURN ON A SESSION THAT ALREADY HOLDS WORK: the instruction, a re-run's carried findings, what the session
+ * holds, then the ask. ⭐⭐ Package L17b3 — design D89 — ~~a fork's sentence naming whose conversation it holds~~: no session holds another unit's.
+ * ⭐⭐ Design D91 — and where the reviewed answer is not one the session holds (`resend`), the work it judged after the instruction and before the
+ * findings, D85's order otherwise kept, the sentence on what the session holds saying the reviewed work is the one given above.
  */
 function heldFirstTurn(
 	instruction: string,
 	carried: readonly { readonly code: string; readonly statement: string }[],
-	holds: Exclude<SessionHolds, { readonly kind: 'NOTHING' }>
+	holds: Exclude<SessionHolds, { readonly kind: 'NOTHING' }>,
+	resend: ResendWork | undefined
 ): string {
 	const findings = carried.length === 0 ? [] : ['', CARRIED_FINDINGS_LINE, ...carried.map((f) => `- ${f.code}: ${f.statement}`)];
 	let held: string;
-	// ⭐ The independent review's defect 8 — what the session holds, as the file was read: a work product returned, or none — a try stopped in its first
-	// tool call returned none, and is never said to have.
-	if (holds.kind === 'PREDECESSOR')
+	if (carried.length > 0 && resend !== undefined)
 		held =
-			`This session holds the conversation of the unit this one replaces, "${holds.title}" (${holds.unitId}): the turns above are its work, ` +
-			(holds.returnedAnswer
-				? 'with the work product it returned, its rationale and any review findings it was given.'
-				: 'which stopped before it returned a work product, with any review findings it was given.') +
-			' That work was superseded, and this unit takes its place.';
+			'This session holds that attempt: the turns above are your earlier work on this unit; the work product the review judged is the one given above, ' +
+			'which the conversation does not hold.';
 	else if (carried.length > 0)
 		held =
 			'This session holds that attempt: the turns above are your earlier work on this unit, ' +
@@ -453,38 +487,66 @@ function heldFirstTurn(
 			? 'This session holds your earlier attempt at this work: the turns above, with the work product you returned and your rationale. ' +
 				'That attempt stopped before it was accepted.'
 			: 'This session holds your earlier attempt at this work: the turns above. That attempt stopped before it returned a work product.';
-	let ask: string[];
-	if (carried.length > 0)
-		ask = [
-			'Produce the work product again, addressing these findings. Do not argue with them and do not',
-			'restate them back; if you believe a finding is mistaken, say so in your rationale.'
-		];
-	else if (holds.kind === 'PREDECESSOR')
-		ask = ['Produce this unit’s work product for the instruction above; files that work wrote may still be in the workspace.'];
-	else ask = ['Produce the work product for the instruction above; files your earlier attempt wrote may still be in the workspace.'];
-	return [instruction, ...findings, '', held, ...ask].join('\n');
+	const ask =
+		carried.length > 0
+			? [
+					'Produce the work product again, addressing these findings. Do not argue with them and do not',
+					'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+				]
+			: ['Produce the work product for the instruction above; files your earlier attempt wrote may still be in the workspace.'];
+	return [instruction, ...(resend === undefined ? [] : ['', resentBlock(resend)]), ...findings, '', held, ...ask].join('\n');
 }
 
-/** ⭐⭐ Package L17b1 — the first turn: RD8's on a session that holds nothing (`firstTurn`), else what the session holds; then D77's feedback. */
+/**
+ * ⭐⭐ Package L17b3 — design D91 (the builder's words, §4.2) — THE WORK THE REVIEW JUDGED, SENT AGAIN: its introduction, the work product, and its
+ * rationale where one went, each block parted from the next by one blank line.
+ */
+function resentBlock(resend: ResendWork): string {
+	return [
+		'The work product the review judged is below. This conversation does not hold it, so it is given again here:',
+		'',
+		resend.workProduct,
+		...(resend.rationale === undefined ? [] : ['', 'Its rationale, as you gave it with that work product:', '', resend.rationale])
+	].join('\n');
+}
+
+/**
+ * ⭐⭐ Package L17b1 — the first turn: RD8's on a session that holds nothing (`firstTurn`), else what the session holds; then D77's feedback.
+ * ⭐⭐ Package L17b3 — design D89 — then the record's sentence, last, after a blank line: said where the session does not already hold it (a reopened
+ * file's `heldLine`), and only where the record's tool was minted — the no-record sentence apart, which needs no tool.
+ */
 function firstTurnFor(instruction: string, input: RunModelStepInput): string {
 	const carried = input.carriedFindings ?? [];
 	const head =
-		input.sessionHolds.kind === 'NOTHING' ? firstTurn(instruction, carried) : heldFirstTurn(instruction, carried, input.sessionHolds);
-	return input.feedback === undefined ? head : `${head}\n\n${input.feedback.text}`;
+		input.sessionHolds.kind === 'NOTHING'
+			? firstTurn(instruction, carried)
+			: heldFirstTurn(instruction, carried, input.sessionHolds, input.resend);
+	const fed = input.feedback === undefined ? head : `${head}\n\n${input.feedback.text}`;
+	const sentence = input.earlierAttempt?.sentence;
+	const heldLine = input.sessionHolds.kind === 'THIS_UNIT' && input.sessionHolds.heldLine === true;
+	const inReach = input.earlierAttempt?.toolMinted === true || sentence === NO_RECORD_SENTENCE;
+	return sentence === undefined || heldLine || !inReach ? fed : `${fed}\n\n${sentence}`;
 }
 
-/** The turn this call sends: a repair turn when prior findings arrived, otherwise `firstTurn`. */
+/**
+ * The turn this call sends: a repair turn when prior findings arrived, otherwise `firstTurn`. ⭐⭐ Package L17b3 — design D91 — a repair whose
+ * session does not hold the reviewed answer sends the work again first (`resend`); on a session that keeps no history, which holds neither the work
+ * nor the instruction, the instruction first, then the work, then the findings.
+ */
 function stepTurnText(input: RunModelStepInput, instruction: string): string {
-	return input.priorFindings?.length
-		? [
-				'An independent assurance review of the work product you just produced found the following:',
-				...input.priorFindings.map((f) => `- ${f.code}: ${f.statement}`),
-				'',
-				'Produce the work product again, addressing these findings. Do not argue with them and do not',
-				'restate them back; if you believe a finding is mistaken, say so in your rationale.'
-			].join('\n')
-		: firstTurnFor(instruction, input);
+	if (!input.priorFindings?.length) return firstTurnFor(instruction, input);
+	const repair = [
+		'An independent assurance review of the work product you just produced found the following:',
+		...input.priorFindings.map((f) => `- ${f.code}: ${f.statement}`),
+		'',
+		'Produce the work product again, addressing these findings. Do not argue with them and do not',
+		'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+	].join('\n');
+	if (input.resend === undefined) return repair;
+	const resent = `${resentBlock(input.resend)}\n\n${repair}`;
+	return input.session.retainsHistory ? resent : `${instruction}\n\n${resent}`;
 }
+
 
 /** A thrown value's message: an Error's own message, anything else stringified. */
 function thrownMessage(e: unknown): string {
@@ -532,6 +594,11 @@ export type RunModelStepOutcome =
 			readonly rationale?: ProfessionalRationaleSummary;
 			/** Set when the execution contract was not honoured, in terms a record can carry. */
 			readonly rationaleShortfall?: string;
+			/**
+			 * ⭐⭐ Package L17b3 — design D91 — the stops of the messages the try's answer was gathered from, as the adapter read them at each
+			 * message's end; absent where the adapter gave none (a bare answer, or a result without them), and the page then sends the work again.
+			 */
+			readonly gatheredFrom?: readonly { readonly stopReason: string }[];
 	  }
 	| { readonly ran: false; readonly refusedBecause: string };
 
@@ -737,6 +804,10 @@ export async function runModelInvocationStep(
 	// mints the zero-byte artifact: gating after it would record the object and then decline to use it.
 	if (!adapterAnswer.arrived) {
 		const respondedAt = input.now();
+		// ⭐ The lead's ruling 3 (§16; the independent review's L17C-03) — THE REPLIES PI DROPPED ARE RECORDED BESIDE AN EXCHANGE WHOSE ANSWER DID NOT ARRIVE
+		// TOO, under the exchange's own id, its no-answer detail joined by the same sentence (D92).
+		const besideNoAnswer = await droppedRepliesBeside(input, produced);
+		const noAnswer = noAnswerOutcome(adapterAnswer);
 		await captureTry({
 			store: input.store,
 			sink,
@@ -755,7 +826,8 @@ export async function runModelInvocationStep(
 			attemptOrdinal: 1,
 			requestedAt,
 			respondedAt,
-			parseOutcome: noAnswerOutcome(adapterAnswer),
+			// ⭐ The lead's ruling 3 — ~~the no-answer outcome alone~~: its detail joined by the dropped replies' sentence, where any were dropped.
+			parseOutcome: besideNoAnswer === undefined ? noAnswer : { ...noAnswer, detail: [noAnswer.detail, besideNoAnswer.sentence].filter(Boolean).join(' ') },
 			// ⭑ `EXPECTED_BUT_UNRETAINED`, THE SAME MEMBER THE `catch` ARM USES AND FOR THE SAME REASON. This
 			// step OWED a work product and none exists. ⛔ What it must never do is what the live run did:
 			// declare `WHOLE_ANSWER_SPAN` over `sha256:e3b0c442…` — the empty string — and thereby name an
@@ -777,7 +849,8 @@ export async function runModelInvocationStep(
 			),
 			promptTemplateFingerprint: plan.fingerprint
 		});
-		record(input, sink);
+		// ⭐ The lead's ruling 3 — under the exchange's own id, minted for the record beside it where one was made; else minted here, as before.
+		record(input, sink, besideNoAnswer?.aggregateId);
 		return {
 			ran: false,
 			refusedBecause: noAnswerRefusal(adapterAnswer)
@@ -812,6 +885,11 @@ export async function runModelInvocationStep(
 				evidence: produced.identityEvidence
 			}
 		: { modelId: input.modelId, providerId: input.providerId };
+	// ⭐⭐ Package L17b3 — design D92 (`REG-F-651`; the lead's ruling 4 on Stage 0) — EACH REPLY PI DROPPED TO GO ON, RECORDED BESIDE THE EXCHANGE
+	// first, under the exchange's own id (minted here only then, so a try with none records byte for byte what it recorded before), and the
+	// exchange's detail naming where it is kept, its hash and its size.
+	const beside = await droppedRepliesBeside(input, produced);
+	const parseOutcome = describeWorkProductDerivation(envelope);
 	await captureTry({
 		store: input.store,
 		sink,
@@ -837,7 +915,7 @@ export async function runModelInvocationStep(
 		// the answer half WAS the work product, false the moment it became the envelope.
 		// ⚠ E-5 NO LONGER CARRIES THE ADDRESS — `R11` MOVED IT TO A TYPED FIELD. What stays here is E-5's own
 		// job: the outcome member and, on the shortfall arm, the producer's own words for what went wrong.
-		parseOutcome: describeWorkProductDerivation(envelope),
+		parseOutcome: beside === undefined ? parseOutcome : { ...parseOutcome, detail: [parseOutcome.detail, beside.sentence].filter(Boolean).join(' ') },
 		// ⭐⭐ R11 — THE RELATION, TYPED. Phase 0 took away the guarantee that `art.storageKey ===
 		// answerSpanRef.storageKey`; this is what replaces it, and it is now a field a reader can query rather
 		// than a tag they must grep for inside a sentence.
@@ -856,7 +934,7 @@ export async function runModelInvocationStep(
 		promptTemplateFingerprint: plan.fingerprint
 	});
 
-	const recording = record(input, sink);
+	const recording = record(input, sink, beside?.aggregateId);
 
 	return {
 		ran: true,
@@ -882,13 +960,29 @@ export async function runModelInvocationStep(
 		},
 		identityEvidence: produced?.identityEvidence ?? 'HOST_CONFIGURED',
 		...(envelope.rationale ? { rationale: envelope.rationale } : {}),
-		...(envelope.shortfall ? { rationaleShortfall: envelope.shortfall } : {})
+		...(envelope.shortfall ? { rationaleShortfall: envelope.shortfall } : {}),
+		// ⭐ Package L17b3 (D91) — the stops of the messages the answer was gathered from, where the adapter gave them.
+		...(produced?.gatheredFrom === undefined ? {} : { gatheredFrom: produced.gatheredFrom })
 	};
+}
+
+/**
+ * ⭐ Package L17b3 (D92) — the try's dropped replies recorded beside its exchange, under an aggregate id minted for the exchange now (so the record
+ * names it before the exchange is dispatched), and the sentence its detail gains; `undefined` where the try dropped none. ⭐ The lead's ruling 11
+ * (§16) — by the one writer an assurance-stage helper's exchange uses too (`droppedRepliesBesideExchange`).
+ */
+async function droppedRepliesBeside(
+	input: RunModelStepInput,
+	produced: ToolInvocationResult | undefined
+): Promise<{ readonly aggregateId: string; readonly sentence: string } | undefined> {
+	return droppedRepliesBesideExchange(input.store, input.tenantPrefix, input.newId, produced?.droppedReplies ?? []);
 }
 
 function record(
 	input: RunModelStepInput,
-	sink: ReturnType<typeof createExchangeSink>
+	sink: ReturnType<typeof createExchangeSink>,
+	/** ⭐ Package L17b3 (D92) — the exchange's aggregate id where it was minted already, for the record beside it; else minted here, as before. */
+	preMinted?: string
 ): { recorded: number; aggregateIds: string[] } {
 	const aggregateIds: string[] = [];
 	const outcome = recordExchanges(
@@ -905,8 +999,11 @@ function record(
 			subjectObjectId: input.subject.id,
 			subjectObjectType: 'PROFESSIONAL_WORK_UNIT',
 			subjectSemanticVersion: input.subjectSemanticVersion,
-			newId: input.newId
+			newId: preMinted === undefined ? input.newId : firstMexIs(preMinted, input.newId)
 		}
 	);
 	return { recorded: outcome.recorded, aggregateIds };
 }
+
+// ⭐ Package L17b3 (D92) — ~~the id minter whose first `mex` is the exchange's, here~~: `firstMexIs`, in `dropped-replies.ts`, which a helper's exchange
+// uses too (the lead's ruling 11).

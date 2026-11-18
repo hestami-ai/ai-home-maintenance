@@ -2486,6 +2486,12 @@
 					"required": true,
 					"type": "CapabilityRequest[]",
 					"note": "complex placeholder"
+				},
+				{
+					"field": "contextAssemblyPolicyId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref (policyId of a CONTEXT_ASSEMBLY_POLICY): the policy that governs the step's context (DOC-002 §22, ICP-04); the handler refuses one the store does not hold as a policy. Authored, package L17b3 (design D89, REG-D-173 (2))"
 				}
 			]
 		},
@@ -7453,6 +7459,12 @@
 					"type": "enum",
 					"enumRef": "AuthorizationStatusSchema",
 					"note": "=REQUESTED; requested!=granted"
+				},
+				{
+					"field": "contextAssemblyPolicyId",
+					"required": false,
+					"type": "string",
+					"note": "id-ref: the policy the binding names, written on every new event; optional so every event recorded before package L17b3 still parses and replays (design D89)"
 				}
 			]
 		},

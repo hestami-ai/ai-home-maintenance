@@ -115,8 +115,10 @@ export async function openReplayExecutionSession(
 	const processRuns = createProcessRunObserver();
 	// ⭑ THE REAL TOOLS, MINTED FOR THE STEP'S CURRENT GRANT — so a grant that changed since the recording mints another
 	// surface, and a recorded call to a tool no longer minted is observed FAILED, as Pi reports an unknown tool, and stales.
+	// ⭐ Package L17b3 — the lead's ruling 12 (§16; the review's question 4, L17C-12) — and the record's tool as the live step mints it: from the context's
+	// record (`earlierAttempt`), under the grant — so a recorded replacement step's tools are keyed as the live step offered them.
 	const tools = mintExecutionTools({
-		ports: { workspace: context.workspace, runner: context.runner, processRuns },
+		ports: { workspace: context.workspace, runner: context.runner, processRuns, ...(context.earlierAttempt === undefined ? {} : { earlierAttempt: context.earlierAttempt }) },
 		grantedCapabilities: context.grantedCapabilities,
 		bindingAuthorizationStatus: context.bindingAuthorizationStatus
 	});
@@ -135,6 +137,10 @@ export async function openReplayExecutionSession(
 	return {
 		// ⭑ The recorded session held its history (Pi's); a replay returns the recorded answer to each turn in order.
 		retainsHistory: true,
+		// ⭐ Package L17b3 (D89) — ~~a replay mints no tool: it answers each turn from the record, and no model can call one, the record's among them~~ ⭐
+		// the lead's ruling 12: the tools it minted, as the field says — real tools for the step's grant, the record's among them where the context
+		// hands in a record — so the page says the record's sentence on a replayed replacement's first turn, as the live step did.
+		mintedToolNames,
 		lastTurnObservation: () => lastTurn,
 		processRuns: () => processRuns.observed(),
 		dispose: () => undefined,

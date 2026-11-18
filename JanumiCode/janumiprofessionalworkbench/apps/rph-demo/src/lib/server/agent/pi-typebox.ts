@@ -19,6 +19,8 @@ export function toTypeBox(spec: ParamSpec): TSchema {
 	for (const [key, def] of Object.entries(spec)) {
 		let t: TSchema;
 		if (def.type === 'boolean') t = Type.Boolean({ description: def.description });
+		// ⭐ Package L17b3 (D89) — an integer is an integer to the model (the record tool's `part`).
+		else if (def.type === 'integer') t = Type.Integer({ description: def.description });
 		else if (def.type === 'string[]')
 			t = Type.Array(Type.String(), { description: def.description });
 		else if (def.type === 'object[]' && def.items)

@@ -370,19 +370,22 @@ describe('⭐ the STAND-IN — the gate’s fixture executor survives, and is pr
 // ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4)) — THE PLACE A UNIT'S SESSION IS KEPT REACHES PI'S OPENER AS IT WAS HANDED, and no
 // other executor is handed it: the stand-in's, agy's and a replay's keep no session.
 describe('⭐⭐ L17b1 (D85) — the opener passes the session’s place on to Pi’s, untouched', () => {
-	it('⛔ RED FIRST — a durable place, a fork’s, reaches Pi’s opener as it was handed', async () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'⛔ RED FIRST — a durable place, a fork’s, reaches Pi’s opener as it was
+	// handed'~~, its opening ~~`{ kind: 'FORK', from: 'C:/run/demo.sqlite.sessions/executor/pwu_old/a.jsonl', predecessorId: 'pwu_old', heldFindings:
+	// false, returnedAnswer: true }`~~ (~~'⭐ The review's defect 8 — the place says whether the forked conversation returned a work product; the opener
+	// passes it on untouched.'~~) — no place forks since D89. The promise kept with the fullest place left: a reopened file, with what it holds, the
+	// record's line among it, reaches Pi's opener as it was handed.
+	it('⭐ a durable place — a reopened file’s, with what it holds — reaches Pi’s opener as it was handed (D89)', async () => {
 		const opened = oneShotSession(async () => 'unused');
 		const openPi = vi.fn(async () => opened);
 		const place: ExecutorSessionPlace = {
 			kind: 'DURABLE',
 			folder: 'C:/run/demo.sqlite.sessions/executor/pwu_new',
 			opening: {
-				kind: 'FORK',
-				from: 'C:/run/demo.sqlite.sessions/executor/pwu_old/a.jsonl',
-				predecessorId: 'pwu_old',
-				heldFindings: false,
-				// ⭐ The review's defect 8 — the place says whether the forked conversation returned a work product; the opener passes it on untouched.
-				returnedAnswer: true
+				kind: 'REOPEN',
+				file: 'C:/run/demo.sqlite.sessions/executor/pwu_new/a.jsonl',
+				// ⭐ The place says what the file holds, the record's line among it (D89); the opener passes it on untouched.
+				held: { returnedAnswer: true, ownFindings: false, crossUnitFeedback: true, heldLine: true }
 			}
 		};
 

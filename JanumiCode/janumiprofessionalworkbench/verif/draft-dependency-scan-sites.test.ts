@@ -172,9 +172,9 @@ const DECLARED_SCAN_SITES: Record<
 		why: "No draft reads it. `earlierRoundsOf` names the Undertaking's units, so the Unsticking Agent is shown the earlier rounds' diagnoses and tactic records — on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is."
 	},
 	'apps/rph-demo/src/lib/server/assurance/narrative-chapter.ts :: listByType': {
-		calls: 1,
+		calls: 2,
 		class: 'ADVISORY',
-		why: "No draft reads it. `chapterRecordsOf` gives the narrative writer the Undertaking's records since the last chapter, each with its id (design D76), when a person presses the assurance stage — on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is."
+		why: "No draft reads it. `chapterRecordsOf` gives the narrative writer the Undertaking's records since the last chapter, each with its id (design D76), when a person presses the assurance stage — on the canonical store, never in an authoring turn. ⭐ Package L17b3 (design D89) — and the second, `commandsOfTry`, reads a unit's execution plans for its steps' ids, so each executor try's line names the commands it ran, the same store, the same press. It is in this file set only because `assurance/**` is."
 	},
 	'apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts :: listAssessments': {
 		calls: 1,

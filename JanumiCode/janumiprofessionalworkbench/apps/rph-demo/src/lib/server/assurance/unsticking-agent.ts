@@ -18,6 +18,8 @@ export function unstickingPrompt(u: {
 	readonly recurrence: readonly { readonly id: string; readonly statement: string }[];
 	readonly narrative: readonly { readonly id: string; readonly failing: boolean; readonly statements: readonly ChapterStatement[] }[];
 	readonly earlier: readonly { readonly id: string; readonly kind: string; readonly text: string }[];
+	/** ⭐⭐ Package L17b3 — design D89 (`REG-D-173` (5)) — the recorded conversations written into the helper's copy, each named here. */
+	readonly recordFiles: readonly { readonly unitId: string; readonly title: string; readonly file: string }[];
 }): string {
 	const narrative = u.narrative.flatMap((c) =>
 		c.failing
@@ -38,6 +40,9 @@ export function unstickingPrompt(u: {
 		'',
 		'The earlier rounds’ diagnoses and tactic records:',
 		...(u.earlier.length > 0 ? u.earlier.map((e) => `- [${e.id}] ${e.kind}: ${e.text}`) : ['- (none)']),
+		'',
+		'The recorded conversations of these units’ work, as the Governed Stream recorded them, each a file in your copy of the workspace:',
+		...(u.recordFiles.length > 0 ? u.recordFiles.map((r) => `- ${r.unitId} "${r.title}": ${r.file}`) : ['- (none recorded)']),
 		'',
 		'Reply with ONE JSON object and nothing else, in this form:',
 		STEP_BACK_FORM

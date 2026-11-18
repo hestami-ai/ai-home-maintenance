@@ -31,7 +31,9 @@ describe('⭐⭐ L17b1 (D74, D87) — the Hypothesizer’s prompt', () => {
 			narrative: [
 				{ id: 'art_ch1', failing: false, statements: [{ text: 'Source was accepted.', cites: ['pwu_src'] }] },
 				{ id: 'art_ch0', failing: true, statements: [] }
-			]
+			],
+			// ⭐ L17b3 (D89) — arrangement: the prompt is handed the record's files, none here; `L17b3 (D89)` below holds what it says of them.
+			recordFiles: []
 		});
 
 		for (const part of [
@@ -47,6 +49,34 @@ describe('⭐⭐ L17b1 (D74, D87) — the Hypothesizer’s prompt', () => {
 			DIAGNOSIS_FORM
 		])
 			expect(prompt, `the prompt does not hold: ${part}`).toContain(part);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173` (5)): the Hypothesizer is given the recorded conversation of the rejected unit and of
+	// each candidate, as the Governed Stream recorded it, a file in its copy of the shared workspace (`.jpwb/record/<slug>--<unit id>.md`), named in its
+	// prompt; the words are the builder's (`l17b3-facts.md` §4.2).
+	it('⛔ RED FIRST — L17b3 (D89): it names the recorded conversation of each candidate, a file in its copy; and says where none was written', () => {
+		const args = {
+			rejectedUnit: { id: 'pwu_ver', title: 'Verification' },
+			failedCriteria: [{ code: 'RC-01', statement: 'The standard-input mode exits 1.' }],
+			candidates: CANDIDATES,
+			narrative: []
+		};
+		const HEADING = 'The recorded conversations of these units’ work, as the Governed Stream recorded them, each a file in your copy of the workspace:';
+		const prompt = hypothesizerPrompt({
+			...args,
+			recordFiles: [
+				{ unitId: 'pwu_ver', title: 'Verification', file: '.jpwb/record/verification--pwu_ver.md' },
+				{ unitId: 'pwu_src', title: 'Source', file: '.jpwb/record/source--pwu_src.md' }
+			]
+		});
+		for (const part of [
+			'- pwu_ver "Verification": .jpwb/record/verification--pwu_ver.md',
+			`${HEADING}\n- pwu_ver "Verification": .jpwb/record/verification--pwu_ver.md\n- pwu_src "Source": .jpwb/record/source--pwu_src.md\n\nThe narrative memory`
+		])
+			expect(prompt, `the prompt does not name the record’s files: ${part}`).toContain(part);
+		expect(hypothesizerPrompt({ ...args, recordFiles: [] }), 'a prompt given no record file does not say none was written').toContain(
+			`${HEADING}\n- (none recorded)`
+		);
 	});
 });
 

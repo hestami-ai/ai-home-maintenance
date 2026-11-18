@@ -184,6 +184,42 @@ describe('⭐⭐ GRANT BY ABSENCE — an unauthorised tool is never minted', () 
 	});
 });
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (§12.43; `REG-D-173` (4)) — `read_earlier_attempt`, THE RECORD'S READ-ONLY TOOL, MINTED FOR A
+// REPLACEMENT'S STEPS ALONE: where the grant names `earlier-attempt-record`, by the exact membership every tool here is minted on, AND the ports hand
+// in a record to read (the port the page builds for a replacement's step). `process-execution` subsumes the capability as data (R12), and that
+// confines nothing here: a grant without the capability mints no record tool.
+describe('⭐⭐ L17b3 (D89) — read_earlier_attempt is minted only under its grant and with a record to read', () => {
+	/** A record to read: one replaced unit with a recorded conversation, each read recorded. */
+	const port = {
+		readerUnitId: 'pwu_src2',
+		attemptKey: 'step_1#1',
+		currentTry: () => 1,
+		units: [{ unitId: 'pwu_src', title: 'Source Construction', state: 'REJECTED', hasRecord: true }],
+		conversationOf: async () => ({ unitId: 'pwu_src', title: 'Source Construction', exchanges: [] }),
+		record: async () => ({ recorded: true, storageKey: 'k1' })
+	};
+	const mintedWith = (granted: readonly string[], earlierAttempt: unknown, status: string = AUTHORIZED) =>
+		mintExecutionTools({
+			ports: { workspace: deliverable(), runner: recordingRunner(), ...(earlierAttempt === undefined ? {} : { earlierAttempt }) } as never,
+			grantedCapabilities: granted,
+			bindingAuthorizationStatus: status
+		}).map((t) => t.name);
+
+	it('⛔ RED FIRST — the grant and a record mint it beside the others; the grant without a record, a record without the grant, or a revoked binding, never', () => {
+		const ALL = ['network', 'file-system', 'process-execution', 'earlier-attempt-record'];
+		expect(
+			[
+				mintedWith(ALL, port),
+				mintedWith(['earlier-attempt-record'], port),
+				mintedWith(ALL, undefined),
+				mintedWith(['network', 'file-system', 'process-execution'], port),
+				mintedWith(ALL, port, 'REVOKED')
+			],
+			'the record’s tool is not minted under its grant with a record, or is minted without either, or under a revoked binding'
+		).toEqual([['write_file', 'run_command', 'read_earlier_attempt'], ['read_earlier_attempt'], ['write_file', 'run_command'], ['write_file', 'run_command'], []]);
+	});
+});
+
 describe('⭐⭐ THE R11-OWED RULING — a host may not mint a name the record plane cannot hold', () => {
 	// ⛔ `R11` recorded this as owed to *"the increment that first HAS a tool surface"*: a host that mints a name
 	// `RecordPlaneNameSchema` refuses makes the WHOLE exchange record unwritable, because a call to a minted tool

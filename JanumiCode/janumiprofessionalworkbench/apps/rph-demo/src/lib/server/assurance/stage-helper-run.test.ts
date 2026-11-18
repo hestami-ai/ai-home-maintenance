@@ -9,6 +9,7 @@
 // ⭑ THE PRODUCER IS SCRIPTED OVER THE HOST'S REAL TOOLS: the opener a test hands in mints `write_file` and `run_command` for the context's grant over
 // the context's own ports (`mintExecutionTools`), and its turn calls them as a model would — so the copy, the runner and the observer are the
 // product's. ⛔ No model: nothing is sent; one real process runs, `node --version`, in the copy.
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -20,6 +21,9 @@ import type { ExecutorSessionPlace, ProducerSession, ProducerSessionContext } fr
 import { sessionFolderOf } from '../execution/workspace-host.js';
 import { mintExecutionTools } from '../tools/execution-tool-surface.js';
 import { createProcessRunObserver } from '../tools/process-run-observer.js';
+// ⭐ L17b3 — the lead's ruling 11: a helper's dropped replies, by the executor's writer.
+import { droppedRepliesNameOf } from '../execution/dropped-replies.js';
+import type { DroppedReply } from '../tools/backing-tool.js';
 import { HELPER_INVOKER } from './assurance-stage-roles.js';
 import { runStageHelper, type HelperRun } from './stage-helper-run.js';
 
@@ -63,6 +67,7 @@ function arrange(script: (tools: ReturnType<typeof mintExecutionTools>, context:
 			});
 			return {
 				retainsHistory: true,
+				mintedToolNames: [], // ⭐ L17b3 (D89) — arrangement: the session says the tools it minted (none), as every `ProducerSession` now does.
 				turn: async () => {
 					await script(tools, context);
 					return JSON.stringify({ named: null, hypotheses: [], confidence: 'unsure', guidance: '' });
@@ -83,7 +88,9 @@ function arrange(script: (tools: ReturnType<typeof mintExecutionTools>, context:
 		shared,
 		executor: { kind: 'PI', modelId: 'faux/model' },
 		prompt: 'You are the Hypothesizer.',
-		parse: () => ({ outcome: 'PARSED', detail: 'read as a diagnosis' })
+		parse: () => ({ outcome: 'PARSED', detail: 'read as a diagnosis' }),
+		// ⭐ L17b3 (D89) — arrangement: the record's files written into the copy before the turn, none here; `L17b3 (D89)` below holds them.
+		recordFiles: []
 	};
 	return { at, dir, shared, opened, exchanges, steps, deps, run, disposed: () => disposed };
 }
@@ -122,6 +129,28 @@ describe('⭐⭐ L17b1 (D74, D75) — a helper runs in a copy of the shared work
 		const out = await runStageHelper(a.run, a.deps);
 
 		expect(out.ran && out.sharedChanged, 'the shared workspace’s changes are not named').toEqual(['leaked.txt', 'src/reader.ts']);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173` (5)): the recorded conversations a helper is given are written into ITS copy before
+	// its turn — never into the shared workspace, so no unit's workspace and no review holds them — and go with the copy after (D74).
+	it('⛔ RED FIRST — L17b3 (D89): the record’s files are in the copy at the helper’s turn, never in the shared workspace, and go with the copy', async () => {
+		const TEXT = 'part 1 of 1\nThe recorded conversation of "Source" (pwu_src), as the Governed Stream recorded it: 1 exchange(s).\n';
+		let atTheTurn: { readonly exists: boolean; readonly text?: string } = { exists: false };
+		const a = arrange(async (_tools, context) => {
+			const file = join(context.workspace.directoryPath!, '.jpwb', 'record', 'source--pwu_src.md');
+			atTheTurn = existsSync(file) ? { exists: true, text: readFileSync(file, 'utf8') } : { exists: false };
+		});
+
+		const out = await runStageHelper({ ...a.run, recordFiles: [{ path: '.jpwb/record/source--pwu_src.md', text: TEXT }] }, a.deps);
+
+		expect(out.ran, out.ran ? '' : out.why).toBe(true);
+		expect(atTheTurn.exists, 'the record’s file was not in the copy at the helper’s turn').toBe(true);
+		expect(atTheTurn.text, 'the record’s file does not hold the rendering it was given').toBe(TEXT);
+		expect(
+			[existsSync(join(a.dir, '.jpwb', 'record')), existsSync(`${a.dir}.hypothesizer-asm_round`)],
+			'a record file reached the shared workspace, or the copy holding it was left'
+		).toEqual([false, false]);
+		expect(out.ran && out.sharedChanged, 'the shared workspace was read as changed').toEqual([]);
 	});
 
 	it('⛔ RED FIRST — its exchange is on the EXECUTION plane under its own role, its subject the round’s opening verdict, never the rejected unit', async () => {
@@ -335,5 +364,72 @@ describe('⭐⭐ L17b1 (D74, D75) — a helper runs in a copy of the shared work
 
 		await runStageHelper(a.run, { ...a.deps, sessionsRoot: undefined });
 		expect(a.opened[0]?.place, 'with no durable store the session was not held in memory').toEqual({ kind: 'IN_MEMORY' });
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — the lead's ruling 11 (§16; the independent review's question 3, L17C-11) — A HELPER'S DROPPED REPLIES ARE
+// RECORDED BESIDE ITS EXCHANGE. The Hypothesizer and the Unsticking Agent run on Pi's adapter, so since D92 a reply Pi dropped leaves their answers
+// too; each helper's exchange records them beside it, by the same writer and sentence as an executor try's (`recordDroppedReplies`,
+// `droppedRepliesSentence`), under the exchange's own id. A helper's turn with none records byte for byte as today.
+describe('⭐⭐ L17b3 (D92; the lead’s ruling 11) — a helper’s dropped replies, recorded beside its exchange', () => {
+	const DIAGNOSIS = JSON.stringify({ named: null, hypotheses: [], confidence: 'unsure', guidance: '' });
+	const DROPPED: readonly DroppedReply[] = [
+		{ text: 'PARTIAL the diagnosis before the break.', stopReason: 'error', errorMessage: '503 Service Unavailable', wentOnBy: 'RETRY', attempt: 1, place: 1 }
+	];
+	/**
+	 * ⭐ The record of a helper turn with no dropped reply — its exchange's payload and aggregate id, as one sha256 — measured at the base's code
+	 * (`44b8482e` and the package as staged at `e7af50fb`), before ruling 11's code: a probe of this very case, run alone (`l17b3-facts.md` §19).
+	 */
+	const HELPER_RECORD_TODAY = '677f2bec079a2beb7718668439957ed5784c6307573a901affa2278ec7e38fac';
+	/** One helper run whose turn answers as Pi's adapter does — the diagnosis, and `dropped` beside it where given: what it dispatched, and its store. */
+	async function helperAnswering(dropped?: readonly DroppedReply[]) {
+		const a = arrange();
+		const dispatched: { readonly payload: RecordModelExchangePayload; readonly aggregateId: string }[] = [];
+		const open = a.deps.openPi;
+		const out = await runStageHelper(a.run, {
+			...a.deps,
+			dispatchExchange: (payload: RecordModelExchangePayload, aggregateId: string) => {
+				dispatched.push({ payload, aggregateId });
+				return { status: 'ACCEPTED' };
+			},
+			openPi: async (context: ProducerSessionContext, modelId: string, place: ExecutorSessionPlace): Promise<ProducerSession> => {
+				const session = await open(context, modelId, place);
+				return {
+					...session,
+					turn: async () => ({
+						answer: { arrived: true as const, text: DIAGNOSIS },
+						rawOutput: DIAGNOSIS,
+						producer: { agentId: 'assurance-stage.hypothesizer', modelId: 'faux/model', providerId: 'pi' },
+						identityEvidence: 'PROVIDER_REPORTED' as const,
+						observedToolCalls: { canObserve: true as const, mintedToolNames: [], calls: [] },
+						...(dropped === undefined ? {} : { droppedReplies: dropped })
+					})
+				};
+			}
+		} as never);
+		return { out, dispatched, store: a.deps.store };
+	}
+
+	it('⛔ RED FIRST — a helper’s turn whose result carries a reply Pi dropped records it beside the helper’s exchange, as an executor try’s is: bound to the exchange’s name, the detail naming where (the lead’s ruling 11)', async () => {
+		const { out, dispatched, store } = await helperAnswering(DROPPED);
+		expect(out.ran, out.ran ? '' : out.why).toBe(true);
+		expect(dispatched.length, 'arrangement: one exchange').toBe(1);
+		const { payload, aggregateId } = dispatched[0]!;
+		const ref = await store.resolveName(droppedRepliesNameOf('tnt-test', aggregateId));
+		const detail = String((payload as { parseOutcome?: { detail?: unknown } }).parseOutcome?.detail ?? '');
+		expect(
+			[ref !== undefined, ref !== undefined && detail.includes(ref.storageKey), detail.startsWith('read as a diagnosis')],
+			'the helper’s dropped reply is not recorded beside its exchange, or the exchange’s detail does not name where'
+		).toEqual([true, true, true]);
+		const bytes = ref === undefined ? '{}' : ((await store.get(ref.storageKey)) ?? '{}');
+		expect(JSON.parse(bytes), 'the record does not hold the dropped reply under its schema').toEqual({ schema: 'jpwb.dropped-replies/1', exchangeId: aggregateId, replies: DROPPED });
+	});
+
+	it('⭑ CONTROL — a helper’s turn with no dropped reply records its exchange byte for byte as today, and nothing beside it (the lead’s ruling 11)', async () => {
+		const { out, dispatched, store } = await helperAnswering();
+		expect([out.ran, dispatched.length], 'arrangement: the helper ran, one exchange').toEqual([true, 1]);
+		const digest = createHash('sha256').update(JSON.stringify(dispatched), 'utf8').digest('hex');
+		expect(digest, 'the exchange of a helper turn with no dropped reply moved from today’s').toBe(HELPER_RECORD_TODAY);
+		expect(await store.resolveName(droppedRepliesNameOf('tnt-test', dispatched[0]!.aggregateId)), 'a record was bound for a turn that dropped nothing').toBeUndefined();
 	});
 });

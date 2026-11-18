@@ -20,6 +20,7 @@
 import type { AdapterToolObservation, ToolInvocationResult } from '../tools/backing-tool.js';
 import type { ProcessRunner, Workspace } from '@janumipwb/rph-ports';
 import type { ProcessRunObservation } from '../tools/process-run-observer.js';
+import type { EarlierAttemptPort } from './earlier-attempt-record.js';
 import { OBSERVED_PROCESS_RUN_LIMIT } from '../tools/process-run-observer.js';
 
 export interface ProducerSession {
@@ -72,6 +73,12 @@ export interface ProducerSession {
 	 * none. They implement this interface with INDEPENDENT turns and say so here.
 	 */
 	readonly retainsHistory: boolean;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 — THE TOOLS THIS SESSION MINTED, as its executor says them: what the model could call,
+	 * the record's tool among them where its grant names it and a record to read was handed in. ⛔ REQUIRED: a one-shot call says `[]`, so the
+	 * step knows no record was put within the model's reach (no sentence, no pair declared).
+	 */
+	readonly mintedToolNames: readonly string[];
 }
 
 /**
@@ -130,6 +137,11 @@ export interface ProducerSessionContext extends ProducerSessionPorts {
 	 * no honest default — `'AUTHORIZED'` would silently arm every caller that forgot.
 	 */
 	readonly bindingAuthorizationStatus: string;
+	/**
+	 * ⭐⭐ Package L17b3 — design D89 (`REG-D-173` (4)) — the record a replacement's tool reads (`earlier-attempt-record.ts`), handed in for a
+	 * replacement's steps alone; with it and its grant the executor mints `read_earlier_attempt`. Absent, no record is in reach.
+	 */
+	readonly earlierAttempt?: EarlierAttemptPort;
 }
 
 /**
@@ -142,21 +154,17 @@ export type ExecutorSessionPlace =
 	| { readonly kind: 'DURABLE'; readonly folder: string; readonly opening: SessionOpening };
 
 /**
- * ⭐ D85 — how a durable session opens: a new file (a unit's first step; `predecessorWithoutSession` where it replaces a unit that left none); the
+ * ⭐ D85 — how a durable session opens: a new file (a unit's first step; ~~`predecessorWithoutSession` where it replaces a unit that left none~~ ⭐ a replacement's too, D89); the
  * unit's one file reopened (its later steps, `REG-D-169`); or its predecessor's forked (a replacement's first step), `heldFindings` saying whether
  * that history held review findings (`REG-D-170`). ⭐ The independent review's defects 1 and 8 — and what the file holds, read before it opens: a
  * reopened file's holdings (`held`), a fork's whether its conversation returned a work product (`returnedAnswer`).
  */
 export type SessionOpening =
-	| { readonly kind: 'NEW'; readonly predecessorWithoutSession?: string }
-	| { readonly kind: 'REOPEN'; readonly file: string; readonly held: SessionFileHoldings }
-	| {
-			readonly kind: 'FORK';
-			readonly from: string;
-			readonly predecessorId: string;
-			readonly heldFindings: boolean;
-			readonly returnedAnswer: boolean;
-	  };
+	// ⭐ Package L17b3 (D89) — ~~`readonly predecessorWithoutSession?: string`~~: nothing forks, so no successor is said to have started without one.
+	| { readonly kind: 'NEW' }
+	| { readonly kind: 'REOPEN'; readonly file: string; readonly held: SessionFileHoldings };
+// ⭐⭐ Package L17b3 — design D89 (`REG-D-173`) — ~~`| { kind: 'FORK'; from; predecessorId; heldFindings; returnedAnswer }`~~: nothing forks; a
+// replacement's first step opens a NEW file of its own, and the record of the units it replaces is in reach through its tool.
 
 /**
  * ⭐⭐ Package L17b1 — the independent review's defects 1 and 8 — WHAT A SESSION FILE HOLDS, read from it (`executor-session.ts`,
@@ -167,7 +175,9 @@ export interface SessionFileHoldings {
 	readonly returnedAnswer: boolean;
 	readonly ownFindings: boolean;
 	readonly crossUnitFeedback: boolean;
-	readonly forkedFrom?: { readonly predecessorId: string; readonly heldFindings: boolean; readonly returnedAnswer: boolean };
+	// ⭐ Package L17b3 (D89) — ~~`readonly forkedFrom?: { predecessorId; heldFindings; returnedAnswer }`~~: a file naming a parent is refused.
+	/** ⭐ Package L17b3 (D89) — a first turn on the file told it of the record's line, so a later step on it does not say it again. */
+	readonly heldLine?: true;
 }
 
 /** ⭐ D85 — a session held in memory, byte for byte as before package L17b1: the place where there is no durable store. */
@@ -271,6 +281,8 @@ export function oneShotSession(
 		// ⭐ Package L — D8: and it wrote nothing, which is a measurement too (`ProcessRunObservation.writes`).
 		processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: OBSERVED_PROCESS_RUN_LIMIT, writes: [] }),
 		dispose: () => undefined,
-		retainsHistory: false
+		retainsHistory: false,
+		// ⭐ Package L17b3 (D89) — a one-shot call mints no tool, so no record is put within the model's reach.
+		mintedToolNames: []
 	};
 }

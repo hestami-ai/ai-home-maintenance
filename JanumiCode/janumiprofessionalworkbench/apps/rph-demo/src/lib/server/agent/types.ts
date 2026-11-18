@@ -83,7 +83,13 @@ export interface AuthoringAgent {
 // (concern 1: the field descriptions come from the shared @janumipwb/rph-authoring help), with no runtime schema
 // translation risk.
 
-export type ParamType = 'string' | 'boolean' | 'string[]' | 'object[]';
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (the lead's ruling 2 on Stage 0) — THE VOCABULARY AS A VALUE, so a test can walk every type
+ * and each mapper is held to give it the kind it names; `integer` added for the record tool's `part` (`read_earlier_attempt`), mapped to an
+ * integer by both mappers (`pi-typebox.ts`, `pi-agent.ts`), never the string their last branch gives a type it does not know.
+ */
+export const PARAM_TYPES = ['string', 'boolean', 'string[]', 'object[]', 'integer'] as const;
+export type ParamType = (typeof PARAM_TYPES)[number];
 
 export interface ParamDef {
 	readonly type: ParamType;

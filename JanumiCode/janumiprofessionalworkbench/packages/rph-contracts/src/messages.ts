@@ -608,7 +608,8 @@ export const RequestRuntimeBindingPayloadSchema = z.strictObject({
 	runtimeBindingId: z.string(),
 	executionStepId: z.string(),
 	roleId: z.string(),
-	requestedCapabilities: z.array(CapabilityRequestSchema)
+	requestedCapabilities: z.array(CapabilityRequestSchema),
+	contextAssemblyPolicyId: z.string()
 });
 export type RequestRuntimeBindingPayload = z.infer<typeof RequestRuntimeBindingPayloadSchema>;
 export const AuthorizeRuntimeBindingPayloadSchema = z.strictObject({
@@ -1741,7 +1742,8 @@ export const RuntimeBindingRequestedPayloadSchema = z.strictObject({
 	modelSelectionPolicy: ModelSelectionPolicySchema.optional(),
 	requestedCapabilities: z.array(CapabilityRequestSchema),
 	sandboxPolicy: SandboxPolicySchema.optional(),
-	authorizationStatus: AuthorizationStatusSchema
+	authorizationStatus: AuthorizationStatusSchema,
+	contextAssemblyPolicyId: z.string().optional()
 });
 export type RuntimeBindingRequestedPayload = z.infer<typeof RuntimeBindingRequestedPayloadSchema>;
 export const RuntimeCapabilityRevokedPayloadSchema = z.strictObject({

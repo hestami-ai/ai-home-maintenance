@@ -49,6 +49,7 @@ import {
 import { runStageHelper } from './stage-helper-run.js';
 import { readStepBack, unstickingPrompt } from './unsticking-agent.js';
 import { NARRATIVE_WRITER_INVOKER } from './assurance-stage-roles.js';
+import { recordFilePath, recordRowsOf, renderUnitConversation, unitConversationOf } from '../execution/earlier-attempt-record.js';
 
 /** ⭐ D76 — the policy the writer's ASSURANCE-plane exchange names: its chapter is that policy's optional evidence `EV-22-02`, "Narrative memories". */
 export const HISTORIAN_POLICY_ID = 'pol_historical_consistency';
@@ -371,6 +372,7 @@ async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: Ass
 	else {
 		// ⭐ The independent review's defect 4, and its re-check (E) — a helper's failure anywhere, its session's close included, is returned as that
 		// part's (`runStageHelper`), and the stage goes on.
+		const hypothesizerRecords = await recordFilesOf(engine, store, deps.tenantPrefix, candidates.map((c) => c.id));
 		const helper = await runStageHelper(
 			{
 				role: 'hypothesizer',
@@ -379,7 +381,9 @@ async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: Ass
 				undertakingId,
 				shared: shared.workspace,
 				executor,
-				prompt: hypothesizerPrompt({ rejectedUnit: { id: pwuId, title: str(unit.title) }, failedCriteria: findings, candidates, narrative }),
+				prompt: hypothesizerPrompt({ rejectedUnit: { id: pwuId, title: str(unit.title) }, failedCriteria: findings, candidates, narrative, recordFiles: hypothesizerRecords.named }),
+				// ⭐ Package L17b3 (D89; `REG-D-173` (5)) — the recorded conversations of the rejected unit and of each candidate, in its copy.
+				recordFiles: hypothesizerRecords.files,
 				parse: (a) => {
 					const r = readDiagnosis(a, candidateIds, []);
 					return r.ok ? { outcome: 'PARSED', detail: 'read as a diagnosis' } : { outcome: 'JSON_PARSE_FAILED', detail: r.why };
@@ -424,6 +428,8 @@ async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: Ass
 	else if (!shared.ok) parts.push(await record(STAGE_PART.STEP_BACK, 'not-run', JSON.stringify({ notRun: shared.why }), [shared.why]));
 	else {
 		const earlier = await earlierRoundsOf(engine, store, undertakingId, roundId);
+		// ⭐ Package L17b3 (D89; `REG-D-173` (5)) — the recorded conversations of the rejected unit and of each unit the recurrence names (its subjects).
+		const unstickingRecords = await recordFilesOf(engine, store, deps.tenantPrefix, [pwuId, ...recurrenceSubjectsOf(engine, recurrence)]);
 		const helper = await runStageHelper(
 			{
 				role: 'unsticking',
@@ -432,7 +438,14 @@ async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: Ass
 				undertakingId,
 				shared: shared.workspace,
 				executor,
-				prompt: unstickingPrompt({ rejectedUnit: { id: pwuId, title: str(unit.title) }, recurrence, narrative: await chaptersOf(engine, store, undertakingId), earlier }),
+				prompt: unstickingPrompt({
+					rejectedUnit: { id: pwuId, title: str(unit.title) },
+					recurrence,
+					narrative: await chaptersOf(engine, store, undertakingId),
+					earlier,
+					recordFiles: unstickingRecords.named
+				}),
+				recordFiles: unstickingRecords.files,
 				parse: (a) => {
 					const r = readStepBack(a);
 					return r.ok ? { outcome: 'PARSED', detail: 'read as a step-back' } : { outcome: 'JSON_PARSE_FAILED', detail: r.why };
@@ -494,4 +507,39 @@ async function earlierRoundsOf(
 		out.push({ id: r.artifactId, kind: r.part, text: json === undefined ? `(${r.status}, unreadable)` : JSON.stringify(json).slice(0, 2000) });
 	}
 	return out;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173` (5); the lead's ruling §10.1 (2)) — THE RECORDED CONVERSATIONS A HELPER JUDGES FROM:
+ * each of `unitIds` that left an executor exchange, rendered from the record by the one renderer (its parts joined by a blank line, their headings
+ * kept), as the files written into the helper's copy and the lines its prompt names them by; a unit that left none has no file.
+ */
+async function recordFilesOf(
+	engine: EngineHandle,
+	store: ArtifactStore,
+	tenantPrefix: string,
+	unitIds: readonly string[]
+): Promise<{
+	readonly files: readonly { readonly path: string; readonly text: string }[];
+	readonly named: readonly { readonly unitId: string; readonly title: string; readonly file: string }[];
+}> {
+	const rows = recordRowsOf(engine);
+	const files: { path: string; text: string }[] = [];
+	const named: { unitId: string; title: string; file: string }[] = [];
+	for (const unitId of [...new Set(unitIds)]) {
+		const conversation = await unitConversationOf(rows, store, tenantPrefix, unitId);
+		if (conversation.exchanges.length === 0) continue;
+		const file = recordFilePath(conversation.title, unitId);
+		files.push({ path: file, text: renderUnitConversation(conversation).join('\n\n') });
+		named.push({ unitId, title: conversation.title, file });
+	}
+	return { files, named };
+}
+
+/** ⭐ Package L17b3 (D89; §10.1 (2)) — the units a round's recurrences name: their observations' subjects, read structurally, each once, in order. */
+function recurrenceSubjectsOf(engine: EngineHandle, recurrence: readonly { readonly id: string }[]): string[] {
+	return recurrence.flatMap((r) => {
+		const subjects = (engine.loadObject(r.id)?.state as { subjectObjectIds?: unknown } | undefined)?.subjectObjectIds;
+		return Array.isArray(subjects) ? subjects.filter((s): s is string => typeof s === 'string') : [];
+	});
 }

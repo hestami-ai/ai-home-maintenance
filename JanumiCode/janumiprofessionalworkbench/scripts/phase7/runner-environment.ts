@@ -10,7 +10,7 @@
 //   · `INHERITED_ENVIRONMENT_NAMES` — `apps/rph-demo/src/lib/server/execution/child-process-runner.ts:327-352`, applied
 //     by `childEnvironment` (`:441-447`): a name is kept when it matches the list CASE-INSENSITIVELY (Windows's names are
 //     case-insensitive: `Path` is `PATH`).
-//   · `EXECUTION_COMMAND_TIMEOUT_MS` — `apps/rph-demo/src/lib/server/tools/execution-tool-surface.ts:127`, the deadline
+//   · `EXECUTION_COMMAND_TIMEOUT_MS` — `apps/rph-demo/src/lib/server/tools/execution-tool-surface.ts:133`, the deadline
 //     `run_command` hands the runner for every model-chosen command.
 // ⛔ A MIRROR ROTS SILENTLY, so it is held: `verif/phase7-rerun-commands.test.ts` reads both declarations back out of the
 // product's source at the lines `MIRRORED_FROM` cites and requires them equal to these. An edit to either list, or a move
@@ -24,7 +24,7 @@
 /** Where each mirrored value is declared in the product, by the line its declaration starts on. */
 export const MIRRORED_FROM = {
 	environment: { file: 'apps/rph-demo/src/lib/server/execution/child-process-runner.ts', line: 327 },
-	timeout: { file: 'apps/rph-demo/src/lib/server/tools/execution-tool-surface.ts', line: 127 }
+	timeout: { file: 'apps/rph-demo/src/lib/server/tools/execution-tool-surface.ts', line: 133 }
 } as const;
 
 /** The variable names a model-run command's child may see — `child-process-runner.ts:327-352`, exactly. */
@@ -55,7 +55,7 @@ export const INHERITED_ENVIRONMENT_NAMES: readonly string[] = [
 	'TZ'
 ];
 
-/** How long a model-chosen command may run before the runner kills it — `execution-tool-surface.ts:127`. */
+/** How long a model-chosen command may run before the runner kills it — `execution-tool-surface.ts:133`. */
 export const EXECUTION_COMMAND_TIMEOUT_MS = 120_000;
 
 /** `parent`, cut to the allowlist as `childEnvironment` cuts it: by name, case-insensitively, defined values only. */

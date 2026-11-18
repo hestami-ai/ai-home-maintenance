@@ -23,6 +23,10 @@ import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+// ⭐ RESTATED IN FORM 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173` (2)): every `RequestRuntimeBinding` here names its
+// step's context policy, a field the command now requires, and the test's store holds that policy (`holdDefaultContextPolicy`), as the handler
+// refuses one it does not hold. Arrangement only: what each test checks is unchanged.
+import { HELD_CONTEXT_POLICY_ID, holdDefaultContextPolicy } from './__tests__/context-policy-fixture.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
@@ -101,6 +105,7 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		holdDefaultContextPolicy(engine, TS);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
@@ -156,7 +161,8 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 					runtimeBindingId: BINDING,
 					executionStepId: sid(1),
 					roleId: 'role-executor',
-					requestedCapabilities: [{ capability: 'file-system' }]
+					requestedCapabilities: [{ capability: 'file-system' }],
+					contextAssemblyPolicyId: HELD_CONTEXT_POLICY_ID
 				},
 				BINDING,
 				'RUNTIME_BINDING'

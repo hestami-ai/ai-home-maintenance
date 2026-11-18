@@ -11,13 +11,18 @@
 // suite retypes: a test that restated the table would go green on a table that had drifted.
 import { describe, expect, it } from 'vitest';
 import {
+	contextPolicyIdForStep,
 	STEP_CAPABILITY_VOCABULARY,
 	stepBindingFor,
 	stepCapabilityRefusal
 } from './step-binding.js';
 
+// ⭐ RESTATED IN FORM 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173` (2)): ~~`stepBindingFor(stepType, discharge, 'bind_1',
+// 'step_1')`~~ — a binding's request names its context policy, and whether its step is a replacement's, which the page decides before it
+// dispatches; every case below that is not about them is a step of a unit that is not a replacement, bound to `ctx-default`.
+const STEP_OUTSIDE_THE_LOOP = { contextAssemblyPolicyId: 'ctx-default', replacement: false } as const;
 const req = (stepType: string, discharge: string | undefined) =>
-	stepBindingFor(stepType, discharge, 'bind_1', 'step_1');
+	stepBindingFor(stepType, discharge, 'bind_1', 'step_1', STEP_OUTSIDE_THE_LOOP);
 
 const MODEL_STEP = () => req('MODEL_INVOCATION', 'MODEL')!;
 
@@ -125,7 +130,9 @@ describe('EG-02 — the binding a step needs', () => {
 		// the thing it described. THE MUTANT: empty `subsumes` on `process-execution` — the vocabulary goes back
 		// to presenting three independent capabilities and nothing turns red.
 		const byId = new Map(STEP_CAPABILITY_VOCABULARY.map((v) => [v.capability, v]));
-		expect([...byId.get('process-execution')!.subsumes].sort()).toEqual(['file-system', 'network']);
+		// ⭐ RESTATED 2026-11-17 (package L17b3, D89): ~~`.toEqual(['file-system', 'network'])`~~ — the record's capability is one more a command the
+		// server's user runs can reach (it can read the record store's files), so `process-execution` subsumes it, declared as data as R12 asks.
+		expect([...byId.get('process-execution')!.subsumes].sort()).toEqual(['earlier-attempt-record', 'file-system', 'network']);
 		// ⭑ AND THE CONVERSE IS NOT CLAIMED. `file-system` subsuming `process-execution` would say writing a
 		// file starts a process, which is false and would make "may write, may not run" meaningless.
 		expect(byId.get('file-system')!.subsumes).toEqual([]);
@@ -237,5 +244,64 @@ describe('EG-03 / Phase 3 — REQUIRES refuses the step, USES does not', () => {
 			expect(stepCapabilityRefusal(MODEL_STEP(), [near], AUTHORIZED), near).toMatch(
 				/does not grant 'network'/
 			);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (§12.43; `REG-D-173` (2), (4)) — A REPLACEMENT'S STEP USES ONE MORE CAPABILITY, AND EVERY BINDING
+// NAMES ITS CONTEXT POLICY: `earlier-attempt-record`, which the record's read-only tool is minted under, USES — so a grant that leaves it out is a lawful
+// narrower one and the step runs as today, with no tool — in the one table the request, the refusal and the minted tools are decided from; and the
+// loop's policy for every step the loop's material reaches, the default for every other, decided by the page before it dispatches.
+describe('⭐⭐ L17b3 (D89) — a replacement’s capability, and the binding’s context policy', () => {
+	const REPLACEMENT = { contextAssemblyPolicyId: 'ctx-default-loop', replacement: true } as const;
+	const replacementStep = () => stepBindingFor('MODEL_INVOCATION', 'MODEL', 'bind_2', 'step_2', REPLACEMENT)!;
+
+	it('⛔ RED FIRST — a replacement’s step USES `earlier-attempt-record`, after the three; its request is its needs; a grant without it refuses nothing; no other step asks for it', () => {
+		const step = replacementStep();
+		expect(step.capabilityNeeds.map((n) => [n.capability, n.need]), 'a replacement’s step does not use the record’s capability').toEqual([
+			['network', 'REQUIRES'],
+			['file-system', 'USES'],
+			['process-execution', 'USES'],
+			['earlier-attempt-record', 'USES']
+		]);
+		expect(step.request.requestedCapabilities, 'the request is not the needs').toEqual(step.capabilityNeeds.map((n) => ({ capability: n.capability })));
+		expect(stepCapabilityRefusal(step, ['network', 'file-system', 'process-execution'], AUTHORIZED), 'a lawful narrower grant refused the step').toBeUndefined();
+		expect(MODEL_STEP().capabilityNeeds.map((n) => n.capability), 'a step that is not a replacement’s asks for the record’s capability').toEqual([
+			'network',
+			'file-system',
+			'process-execution'
+		]);
+	});
+
+	it('⛔ RED FIRST — `earlier-attempt-record` is in the vocabulary, with its note, subsuming nothing', () => {
+		const entry = STEP_CAPABILITY_VOCABULARY.find((v) => v.capability === 'earlier-attempt-record');
+		expect(entry, 'the record’s capability is not in the vocabulary').toBeDefined();
+		expect(entry!.note.length, 'it has no note').toBeGreaterThan(0);
+		expect(entry!.subsumes, 'it is said to subsume a capability').toEqual([]);
+		// ⭑ Its note says what the grant does not confine: a command the server's user runs reaches the record store too (R12; `REG-F-624`).
+		expect(entry!.note, 'its note does not say that process-execution reaches the record too').toMatch(/process-execution/);
+	});
+
+	it('⛔ RED FIRST — the request names the context policy the page chose for its step', () => {
+		expect(
+			[req('MODEL_INVOCATION', 'MODEL')!.request.contextAssemblyPolicyId, replacementStep().request.contextAssemblyPolicyId],
+			'the request does not name its step’s context policy'
+		).toEqual(['ctx-default', 'ctx-default-loop']);
+	});
+
+	it('⛔ RED FIRST — the loop’s policy for every step the loop’s material reaches — a replacement’s, a step carrying the loop’s feedback, a step on a session that holds it — and the default for every other', () => {
+		const kinds = [
+			{ replacement: true, carriesFeedback: false, sessionHoldsFeedback: false },
+			{ replacement: false, carriesFeedback: true, sessionHoldsFeedback: false },
+			{ replacement: false, carriesFeedback: false, sessionHoldsFeedback: true },
+			{ replacement: true, carriesFeedback: true, sessionHoldsFeedback: true },
+			{ replacement: false, carriesFeedback: false, sessionHoldsFeedback: false }
+		];
+		expect(kinds.map((k) => contextPolicyIdForStep(k)), 'a step is bound to a policy its kind does not call for').toEqual([
+			'ctx-default-loop',
+			'ctx-default-loop',
+			'ctx-default-loop',
+			'ctx-default-loop',
+			'ctx-default'
+		]);
 	});
 });

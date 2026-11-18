@@ -327,7 +327,9 @@ async function aUnitWaitingAfterARefusedReview() {
 	const planA = mintUiId('plan');
 	const stepA = mintUiId('step');
 	const bindA = mintUiId('bind');
-	const binding = stepBindingFor('MODEL_INVOCATION', 'MODEL', bindA, stepA)!;
+	// ⭐ RESTATED IN FORM (package L17b3, design D89): ~~`stepBindingFor('MODEL_INVOCATION', 'MODEL', bindA, stepA)`~~ — a binding names its context
+	// policy, required; a step outside the loop, as this one is, names `ctx-default`.
+	const binding = stepBindingFor('MODEL_INVOCATION', 'MODEL', bindA, stepA, { contextAssemblyPolicyId: 'ctx-default', replacement: false })!;
 	expect(
 		batch([
 			['BeginPwuShaping', PWU, pwuId, {}],
@@ -585,7 +587,8 @@ describe('⭐ R-1a (REG-D-104 (1), REG-F-511) — the plan-revision chain, from 
 		const planB = mintUiId('plan');
 		const stepB = mintUiId('step');
 		const bindB = mintUiId('bind');
-		const binding = stepBindingFor('MODEL_INVOCATION', 'MODEL', bindB, stepB)!;
+		// ⭐ RESTATED IN FORM (package L17b3, design D89): ~~`stepBindingFor('MODEL_INVOCATION', 'MODEL', bindB, stepB)`~~ — as above.
+		const binding = stepBindingFor('MODEL_INVOCATION', 'MODEL', bindB, stepB, { contextAssemblyPolicyId: 'ctx-default', replacement: false })!;
 
 		const chain = batch([
 			...decision(

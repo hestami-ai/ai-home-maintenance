@@ -35,7 +35,9 @@ import {
 	type ProducerSessionContext
 } from '../execution/producer-session.js';
 import { sessionFolderOf } from '../execution/workspace-host.js';
-import { isToolInvocationResult } from '../tools/backing-tool.js';
+// ⭐ L17b3 — the lead's ruling 11: a helper's dropped replies recorded beside its exchange, by the executor try's writer and sentence (D92).
+import { droppedRepliesBesideExchange, firstMexIs } from '../execution/dropped-replies.js';
+import { isToolInvocationResult, type DroppedReply } from '../tools/backing-tool.js';
 import { governedToolCallReport } from '../tools/observed-tool-calls.js';
 import type { StageStep } from './assurance-stage-records.js';
 import { HELPER_INVOKER } from './assurance-stage-roles.js';
@@ -69,6 +71,12 @@ export interface HelperRun {
 	readonly shared: Workspace;
 	readonly executor: RunnableExecutorSelection;
 	readonly prompt: string;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173` (5)) — the recorded conversations of the units the helper judges, each written into
+	 * ITS COPY of the shared workspace at its path before its turn (`.jpwb/record/<slug>--<unit id>.md`), so no unit's workspace and no review holds
+	 * them; they go with the copy. ⛔ REQUIRED, `[]` where there is none.
+	 */
+	readonly recordFiles: readonly { readonly path: string; readonly text: string }[];
 	/** How the caller reads the answer, for the exchange's parse outcome. */
 	readonly parse: (answer: string) => { readonly outcome: 'PARSED' | 'JSON_PARSE_FAILED'; readonly detail: string };
 }
@@ -158,6 +166,12 @@ export async function runStageHelper(run: HelperRun, deps: HelperDeps): Promise<
 			purgeability: 'PURGEABLE_AT_EXPIRY',
 			directoryPath: copyDir
 		});
+		// ⭐⭐ Package L17b3 — design D89 — the recorded conversations the helper judges from, written into its copy before its turn; one that cannot be
+		// written fails the helper, said, as any failure of its run does.
+		for (const f of run.recordFiles) {
+			const written = await copy.writeFile(f.path, f.text);
+			if (!written.written) throw new Error(`the record file ${f.path} could not be written into its copy: ${written.refusedBecause}`);
+		}
 		const output = createFilesystemWorkspace({
 			ownerKind: 'UNDERTAKING',
 			ownerId: run.undertakingId,
@@ -182,6 +196,8 @@ export async function runStageHelper(run: HelperRun, deps: HelperDeps): Promise<
 		let producer = { modelId: run.executor.modelId, providerId: 'pi' };
 		let identity: 'PROVIDER_REPORTED' | undefined;
 		let failure: string | undefined;
+		// ⭐ The lead's ruling 11 (§16; the independent review's question 3) — the replies Pi dropped to go on in the helper's turn, as its adapter gives them.
+		let dropped: readonly DroppedReply[] = [];
 		try {
 			const returned = await session.turn(run.prompt);
 			if (isToolInvocationResult(returned)) {
@@ -191,6 +207,7 @@ export async function runStageHelper(run: HelperRun, deps: HelperDeps): Promise<
 				materialized = returned.materializedInput;
 				producer = { modelId: returned.producer.modelId, providerId: returned.producer.providerId };
 				identity = returned.identityEvidence === 'PROVIDER_REPORTED' ? 'PROVIDER_REPORTED' : undefined;
+				dropped = returned.droppedReplies ?? [];
 			} else {
 				arrived = returned.trim() !== '';
 				answer = returned;
@@ -201,6 +218,13 @@ export async function runStageHelper(run: HelperRun, deps: HelperDeps): Promise<
 		}
 		const observation = session.processRuns();
 		const parsed = arrived ? run.parse(answer) : undefined;
+		// ⭐ The lead's ruling 11 — the dropped replies recorded beside the exchange first, under the exchange's own id minted for it then only (so a turn
+		// with none records byte for byte as before), by the executor try's writer; the exchange's detail joined by the same sentence (D92).
+		const beside = await droppedRepliesBesideExchange(deps.store, deps.tenantPrefix, deps.newId, dropped);
+		const outcomeOfTheTurn = parsed ?? {
+			outcome: failure === undefined ? ('EMPTY_RESPONSE' as const) : ('NOT_ATTEMPTED' as const),
+			detail: failure === undefined ? `The ${run.role} returned no answer.` : `The ${run.role}'s call failed: ${failure}`
+		};
 		// ── The exchange: the EXECUTION plane, its own role, the round's verdict its subject (reading 8).
 		const sink = createExchangeSink();
 		await captureTry({
@@ -216,10 +240,10 @@ export async function runStageHelper(run: HelperRun, deps: HelperDeps): Promise<
 			attemptOrdinal: 1,
 			requestedAt,
 			respondedAt: deps.now(),
-			parseOutcome: parsed ?? {
-				outcome: failure === undefined ? 'EMPTY_RESPONSE' : 'NOT_ATTEMPTED',
-				detail: failure === undefined ? `The ${run.role} returned no answer.` : `The ${run.role}'s call failed: ${failure}`
-			},
+			parseOutcome:
+				beside === undefined
+					? outcomeOfTheTurn
+					: { ...outcomeOfTheTurn, detail: [outcomeOfTheTurn.detail, beside.sentence].filter(Boolean).join(' ') },
 			workProductDerivation: {
 				relation: 'NO_WORK_PRODUCT_EXPECTED',
 				reason: `The assurance stage's ${run.role} (design D74, D75): its answer is advice about the work, never work product.`
@@ -233,7 +257,8 @@ export async function runStageHelper(run: HelperRun, deps: HelperDeps): Promise<
 			subjectObjectId: run.roundId,
 			subjectObjectType: 'ASSURANCE_ASSESSMENT',
 			subjectSemanticVersion: run.roundVersion,
-			newId: deps.newId
+			// ⭐ The lead's ruling 11 — the exchange under the id its dropped replies' record names, where one was made; else minted here, as before.
+			newId: beside === undefined ? deps.newId : firstMexIs(beside.aggregateId, deps.newId)
 		});
 		for (const f of recorded.failures) limitations.push(`its exchange could not be recorded: ${f}`);
 		// ── Its commands, captured as a unit's are, with no floor (reading 9).

@@ -5,6 +5,7 @@
 // the previous chapter; it answers one JSON object in the chapter's form; the check is that it parses, that each statement cites at least one id,
 // and that every cited id is among the records it was given — each failed limb named. The stand-in writer, test mode's alone, restates each record
 // and passes the check. The chapter's place in the stage — first, recorded, a failing one recorded as failing — is `assurance-stage.route.test.ts`'s.
+import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import { describe, expect, it } from 'vitest';
 import {
 	CHAPTER_FORM,
@@ -12,6 +13,7 @@ import {
 	narrativeChapterPrompt,
 	readNarrativeChapter,
 	standInChapter,
+	triedAnswerLine,
 	type ChapterRecord
 } from './narrative-chapter.js';
 
@@ -122,5 +124,68 @@ describe('⭐⭐ L17b1 (D76) — the answer read, and its deterministic check', 
 	it('⭑ CONTROL — the stand-in writer’s chapter, one statement per record citing it, passes the check', () => {
 		const stood = checkNarrativeChapter(standInChapter(1, RECORDS, null), GIVEN);
 		expect([stood.failures, stood.statements.length], 'the stand-in’s chapter fails its own check').toEqual([[], RECORDS.length]);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — the lead's ruling 7 (§16; the independent review's L17C-07) — THE WRITER'S ANSWER LINE OF AN EXECUTOR TRY
+// (`triedAnswerLine`, what follows "its answer: " in the try's record): `none recorded` only where neither answer reference is `STORED`; where one is
+// and nothing verifies, the line says the answer could not be read, and why; the verified answer span still stands in for a raw output that does not
+// verify. Each over an in-memory content store and an exchange's state, as the record holds them.
+describe('⭐⭐ L17b3 (D89; the lead’s ruling 7) — the writer’s answer line of an executor try', () => {
+	const TENANT = 'tnt-test';
+	async function storedRef(store: ReturnType<typeof createInMemoryArtifactStore>, bytes: string) {
+		const ref = await store.put({ tenantPrefix: TENANT, bytes, mediaType: 'text/plain', purgeability: 'RETAINED_BY_PARTICIPATION' });
+		return { status: 'STORED', storageKey: ref.storageKey, contentHash: ref.contentHash, byteSize: ref.byteSize };
+	}
+	const NOT_STORED = { status: 'NOT_CAPTURED', reason: 'no answer bytes arrived' };
+
+	it('⛔ RED FIRST — a recorded answer that cannot be read is said to be unreadable, and why — its bytes missing, or not matching their hash — never “none recorded” (the lead’s ruling 7)', async () => {
+		const store = createInMemoryArtifactStore();
+		const raw = await storedRef(store, 'The raw output, whole.');
+		const missing = { ...raw, storageKey: 'no-such-key' };
+		const tampered = { ...raw, contentHash: `sha256:${'0'.repeat(64)}` };
+		const lines = [
+			await triedAnswerLine(store, { rawOutputBeforeCoercionRef: missing, answerSpanRef: NOT_STORED }),
+			await triedAnswerLine(store, { rawOutputBeforeCoercionRef: tampered, answerSpanRef: NOT_STORED }),
+			await triedAnswerLine(store, { rawOutputBeforeCoercionRef: NOT_STORED, answerSpanRef: tampered }),
+			await triedAnswerLine(store, { rawOutputBeforeCoercionRef: missing, answerSpanRef: tampered })
+		];
+		expect(lines.map((l) => l.startsWith('it could not be read: ')), 'a recorded answer that cannot be read was not said to be unreadable').toEqual([true, true, true, true]);
+		expect(
+			[lines[0]!.includes('are not in the content store'), lines[1]!.includes('not the sha256:'), lines[2]!.includes('not the sha256:'), lines[3]!.includes('; ')],
+			'the line does not say why the answer could not be read'
+		).toEqual([true, true, true, true]);
+	});
+
+	it('⭑ CONTROL — neither answer reference stored is “none recorded”; a raw output that verifies is the answer; one that does not falls back to an answer span that does (the lead’s ruling 7)', async () => {
+		const store = createInMemoryArtifactStore();
+		const raw = await storedRef(store, 'The raw output, whole.');
+		const span = await storedRef(store, 'The answer span.');
+		const tampered = { ...raw, contentHash: `sha256:${'0'.repeat(64)}` };
+		expect(
+			[
+				await triedAnswerLine(store, { rawOutputBeforeCoercionRef: NOT_STORED, answerSpanRef: NOT_STORED }),
+				await triedAnswerLine(store, {}),
+				await triedAnswerLine(store, { rawOutputBeforeCoercionRef: raw, answerSpanRef: span }),
+				await triedAnswerLine(store, { rawOutputBeforeCoercionRef: tampered, answerSpanRef: span })
+			],
+			'an answer line moved'
+		).toEqual(['none recorded', 'none recorded', 'The raw output, whole.', 'The answer span.']);
+	});
+
+	// ⭐ L17b3 — the lead's ruling 5 of §23 (the lead's O-2) — ~~a reference not STORED, or STORED without a key or a hash, passed over~~: only one not
+	// STORED is passed over; a STORED one that names no storage key or content hash cannot be read, and the line says so.
+	it('⛔ RED FIRST — a recorded answer whose reference is STORED but names no storage key or content hash cannot be read, and the line says so — never “none recorded” (the lead’s ruling 5 of §23)', async () => {
+		const store = createInMemoryArtifactStore();
+		const raw = await storedRef(store, 'The raw output, whole.');
+		const lines = [
+			await triedAnswerLine(store, { rawOutputBeforeCoercionRef: { status: 'STORED' }, answerSpanRef: NOT_STORED }),
+			await triedAnswerLine(store, { rawOutputBeforeCoercionRef: { status: 'STORED', storageKey: raw.storageKey }, answerSpanRef: NOT_STORED })
+		];
+		expect(lines.map((l) => l.startsWith('it could not be read: ')), 'a STORED reference that names no key or hash was passed over').toEqual([true, true]);
+		expect(
+			[lines[0]!.includes('no storage key and no content hash'), lines[1]!.includes('names no content hash')],
+			'the line does not say what the reference fails to name'
+		).toEqual([true, true]);
 	});
 });

@@ -30,12 +30,17 @@ import type { AuthoringAgent, AuthoringToolDescriptor, EmitFn, ParamSpec } from 
 import { piToolExecutionSucceeded, toPiToolResult } from './pi-tool-result.js';
 import { closedResourceLoaderOptions } from '../tools/pi-executor-resources.js';
 
-/** Map our flat param spec onto a TypeBox object schema (optional wrapper for non-required params). */
-function toTypeBox(spec: ParamSpec): TSchema {
+/**
+ * Map our flat param spec onto a TypeBox object schema (optional wrapper for non-required params). ⭐ Package L17b3 (D89; the lead's ruling 2 on
+ * Stage 0) — exported, so its parity with the execution surface's mapper (`pi-typebox.ts`) is held by a test (`pi-typebox-parity.test.ts`); an
+ * `integer` mapped to an integer as that one maps it.
+ */
+export function toTypeBox(spec: ParamSpec): TSchema {
 	const props: Record<string, TSchema> = {};
 	for (const [key, def] of Object.entries(spec)) {
 		let t: TSchema;
 		if (def.type === 'boolean') t = Type.Boolean({ description: def.description });
+		else if (def.type === 'integer') t = Type.Integer({ description: def.description });
 		else if (def.type === 'string[]')
 			t = Type.Array(Type.String(), { description: def.description });
 		else if (def.type === 'object[]' && def.items)

@@ -19,6 +19,11 @@
 // the page, the producer still the harness's scripted one, Pi selected by the environment.
 // ⭑ THE HELPERS ON PI are pressed directly (`runAssuranceStage`) over the route's own store: the route's executor is the stand-in, and a helper
 // runs on Pi alone, in a copy of a FILESYSTEM workspace, its opener a scripted session.
+// ⭐ PACKAGE L17b3 (designs D89 to D92) — THREE MORE SEAMS, each named where it is: every producer's context kept (`seam.contexts`), and the tools the
+// scripted producer minted said as Pi's adapter says them — the record's tool under its grant with a record to read (`mintedToolNames`); the scripted
+// producer answering as Pi's adapter does, with the stops of the messages its answer was gathered from, where a case gives them (`seam.gatheredFrom`),
+// or as a result with no such field — the fail-safe's case (the lead's ruling 2 on Stage 1's writing); and a content-store key a case makes unreadable
+// (`seam.unreadable`, `getArtifactStore`). A helper's copy is listed at its turn (`onPi`'s `recordFiles`).
 // ⛔ HERMETIC: devin's exec seam starts nothing; no process is started; PATH finds no program; the decision model is the product's double.
 import { vi } from 'vitest';
 
@@ -78,6 +83,43 @@ const seam = vi.hoisted(() => ({
 	throwBatch: undefined as
 		| undefined
 		| { readonly when: (commands: readonly { readonly commandType: string }[]) => boolean; readonly error: unknown },
+	/** ⭐ L17b3 (D89) — each context a producer the route opened was handed, in order (the opener's first argument): its grant, and the record's port. */
+	contexts: [] as unknown[],
+	/**
+	 * ⭐ L17b3 (D91) — set, the scripted producer answers its session's `n`th turn as Pi's adapter does: a result, these the stops of the messages it
+	 * gathered its answer from (`gatheredFrom`), or no such field where this gives none — the fail-safe's case. Unset, a bare string, as before.
+	 */
+	gatheredFrom: undefined as undefined | ((n: number) => readonly { readonly stopReason: string }[] | undefined),
+	/** ⭐ L17b3 (D91) — set, the content store answers nothing for a key this answers true for, as a store that lost its bytes does. */
+	unreadable: undefined as undefined | ((storageKey: string) => boolean),
+	/** ⭐ L17b3 (the review's L17-10) — set, the content store answers these bytes for a key, in place of its own: bytes present that do not match their hash. */
+	tampered: undefined as undefined | ((storageKey: string) => string | undefined),
+	/** ⭐ L17b3 (the review's L17-08) — set, the scripted producer's answer is this of the envelope it would give: prose about it, say. */
+	answerShape: undefined as undefined | ((envelope: string) => string),
+	/** ⭐ L17b3 (the review's L17-05) — set, the commands the scripted producer ran this turn, each with its exit, through the host's real observer. */
+	runs: undefined as undefined | (() => readonly { readonly argv: readonly string[]; readonly exitCode: number }[]),
+	/** ⭐ L17b3 (the review's L17-05) — set, the scripted producer's work product's document is this of the one it would give. */
+	documentOf: undefined as undefined | ((document: string) => string),
+	/** ⭐ L17b3 (the review's L17-14) — set, the page's batch is dispatched, and then throws this where `when` answers true: committed, and an exception after. */
+	throwAfterCommit: undefined as
+		| undefined
+		| { readonly when: (commands: readonly { readonly commandType: string }[]) => boolean; readonly error: unknown },
+	/** ⭐ L17b3 (the review's L17-14) — what a step did on its way out, in order: each close of a producer, each take at a step's end, each failure asked for. */
+	trace: [] as string[],
+	/** ⭐ L17b3 (the lead's ruling §10.1 (4)) — set, a try of the unit this answers a reason for is refused before its exchange is captured, for that reason. */
+	refuseStepOf: undefined as undefined | ((pwuId: string) => string | undefined),
+	/** ⭐ L17b3 (the lead's ruling 5) — set, reading a replaced unit's recorded conversation throws this value, as a store that cannot be read throws. */
+	conversationThrows: undefined as undefined | { readonly value: unknown },
+	/** ⭐ L17b3 (the lead's §18.2 (1)) — set, reading a unit's governing declared policies throws this value. */
+	// ⭐ The lead's ruling 4 of §23 — ~~`{ readonly value: unknown }`~~: and where `onlyWithin` names a function, only a read made within it
+	// (`reviewCriteriaOf`, the criteria's reader), so D71's offer, which reads the same policies before it, reads them whole.
+	criteriaThrows: undefined as undefined | { readonly value: unknown; readonly onlyWithin?: string },
+	/** ⭐ L17b3 (the lead's §18.2 (2)) — set, reading a step's attempt throws this value, as an event log that cannot be read throws. */
+	attemptKeyThrows: undefined as undefined | { readonly value: unknown },
+	/** ⭐ L17b3 (the lead's §18.2 (3)) — set, resolving a step's context policy throws this value. */
+	policyThrows: undefined as undefined | { readonly value: unknown },
+	/** ⭐ L17b3 (the lead's ruling 1 of §23) — set, opening the producer throws this value, before anything of its session is made. */
+	openThrows: undefined as undefined | { readonly value: unknown },
 	/** What the declared reviewer answers a policy's review: set in `beforeEach`, every criterion MET. */
 	answer: (() => {
 		throw new Error('arrangement: no declared answer set');
@@ -135,13 +177,32 @@ vi.mock('../workbench.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../workbench.js')>();
 	return {
 		...actual,
+		// ⭐ L17b3 (D91) — THE CONTENT STORE, a key a case makes unreadable answering nothing, as a store that lost its bytes does; every other read the store's own.
+		getArtifactStore: vi.fn(() => {
+			const store = actual.getArtifactStore();
+			// ⭑ A proxy, every other member the store's own, bound to it — so a store whose methods are a class's keeps them.
+			return new Proxy(store, {
+				get: (target, property) => {
+					// ⭐ L17-10 — and a key a case tampers with answering other bytes, as a store whose bytes no longer match their hash does.
+					if (property === 'get')
+						return async (key: string) => (seam.unreadable?.(key) === true ? undefined : (seam.tampered?.(key) ?? target.get(key)));
+					const value: unknown = Reflect.get(target, property, target);
+					return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+				}
+			});
+		}),
 		dispatchBatch: vi.fn((commands: Parameters<typeof actual.dispatchBatch>[0]) => {
 			// ⭐ The lead's ruling (c) on the review's third re-check — a batch a case makes throw, as a store that cannot be written throws.
+			// ⭐ L17b3 (the review's L17-14) — each failure asked for, in the step's trace, before anything answers it.
+			if (commands.some((c) => c.commandType === 'FailExecutionStep')) seam.trace.push('fail-request');
 			if (seam.throwBatch?.when(commands as never) === true) throw seam.throwBatch.error;
 			const why = seam.refuseBatch?.(commands as never);
-			return why === undefined
-				? actual.dispatchBatch(commands)
-				: ({ ok: false, results: [{ status: 'REJECTED', error: { message: why } }], failedIndex: 0 } as unknown as ReturnType<typeof actual.dispatchBatch>);
+			if (why !== undefined)
+				return { ok: false, results: [{ status: 'REJECTED', error: { message: why } }], failedIndex: 0 } as unknown as ReturnType<typeof actual.dispatchBatch>;
+			const committed = actual.dispatchBatch(commands);
+			// ⭐ L17b3 (the review's L17-14) — a batch committed, and an exception after it, where a case says so.
+			if (seam.throwAfterCommit?.when(commands as never) === true) throw seam.throwAfterCommit.error;
+			return committed;
 		})
 	};
 });
@@ -179,6 +240,8 @@ vi.mock('./successor-feedback.js', async (importOriginal) => {
 		...actual,
 		takeTacticRecord: vi.fn(async (deps: Parameters<typeof actual.takeTacticRecord>[0], t: Parameters<typeof actual.takeTacticRecord>[1]) => {
 			seam.takes.push(t.stepEnded);
+			// ⭐ L17b3 (the review's L17-14) — a take at the step's end, in the step's trace.
+			if (t.stepEnded) seam.trace.push('take-at-end');
 			const answered = seam.takeAnswer?.(t.stepEnded);
 			return answered === undefined ? actual.takeTacticRecord(deps, t) : (answered as Awaited<ReturnType<typeof actual.takeTacticRecord>>);
 		})
@@ -192,8 +255,70 @@ vi.mock('./run-model-step.js', async (importOriginal) => {
 		...actual,
 		runModelInvocationStep: vi.fn(async (input: Parameters<typeof actual.runModelInvocationStep>[0]) => {
 			seam.stepInputs.push(input);
+			// ⭐ L17b3 (the lead's ruling §10.1 (4)) — a try a case refuses before its exchange is captured, standing in for the step's own refusals
+			// before its render (`run-model-step.ts`: the binding's, `stepCapabilityRefusal`; the plan's, `prepareModelInvocation` not ready).
+			const refusal = seam.refuseStepOf?.(String((input as { readonly subject?: { readonly id?: unknown } }).subject?.id ?? ''));
+			if (refusal !== undefined) return { ran: false as const, refusedBecause: refusal };
 			return actual.runModelInvocationStep(input);
 		})
+	};
+});
+
+// ⭐ L17b3 (the lead's ruling 5 and §18.2) — FOUR READS A CASE CAN MAKE THROW, each passed through otherwise: a replaced unit's recorded conversation,
+// a unit's governing declared policies, a step's attempt, and a step's context policy.
+vi.mock('./earlier-attempt-record.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('./earlier-attempt-record.js')>();
+	return {
+		...actual,
+		unitConversationOf: vi.fn(async (...args: Parameters<typeof actual.unitConversationOf>) => {
+			if (seam.conversationThrows !== undefined) throw seam.conversationThrows.value;
+			return actual.unitConversationOf(...args);
+		})
+	};
+});
+vi.mock('../assurance/declared-policy-signoff.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../assurance/declared-policy-signoff.js')>();
+	/** ⭐ L17b3 (the lead's ruling 4 of §23) — whether this read is made within the function `name`: its frame on the stack, read whole. */
+	const calledWithin = (name: string): boolean => {
+		const limit = Error.stackTraceLimit;
+		Error.stackTraceLimit = 100;
+		try {
+			return (new Error('where this read is made').stack ?? '').includes(`at ${name} (`);
+		} finally {
+			Error.stackTraceLimit = limit;
+		}
+	};
+	return {
+		...actual,
+		governingDeclaredPolicies: vi.fn((...args: Parameters<typeof actual.governingDeclaredPolicies>) => {
+			// ⭐ The lead's ruling 4 of §23 — ~~`if (seam.criteriaThrows !== undefined) throw …`~~: and, where the case says, only within the reader it names.
+			if (seam.criteriaThrows !== undefined && (seam.criteriaThrows.onlyWithin === undefined || calledWithin(seam.criteriaThrows.onlyWithin)))
+				throw seam.criteriaThrows.value;
+			return actual.governingDeclaredPolicies(...args);
+		})
+	};
+});
+vi.mock('./stopped-unit-recovery.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('./stopped-unit-recovery.js')>();
+	return {
+		...actual,
+		attemptKeyOf: vi.fn((...args: Parameters<typeof actual.attemptKeyOf>) => {
+			if (seam.attemptKeyThrows !== undefined) throw seam.attemptKeyThrows.value;
+			return actual.attemptKeyOf(...args);
+		})
+	};
+});
+vi.mock('./context-policy.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('./context-policy.js')>();
+	return {
+		...actual,
+		// ⭐ L17b3 (the lead's ruling 1 of §23) — ~~`vi.fn(…)`~~: a plain function, so the value a case throws reaches the page as thrown. Vitest's spy
+		// reads a thrown value (`error instanceof TypeError`), and a revoked `Proxy` throws as it is read, so through the spy the page was handed that
+		// TypeError, never the value (§26).
+		resolveContextPolicy: (...args: Parameters<typeof actual.resolveContextPolicy>) => {
+			if (seam.policyThrows !== undefined) throw seam.policyThrows.value;
+			return actual.resolveContextPolicy(...args);
+		}
 	};
 });
 
@@ -204,19 +329,69 @@ vi.mock('./model.js', async (importOriginal) => {
 		...actual,
 		// ⭑ A SCRIPTED PRODUCER OVER THE HOST'S REAL OBSERVER: it writes nothing, and answers the execution contract's envelope, its work
 		// product one JSON object naming its SESSION's number and the turn's first line — so a re-run's work is not the first attempt's.
-		getExecutionSession: vi.fn(() => async (_context: unknown, place?: unknown) => {
+		// ⭐ L17b3 — ~~`async (_context: unknown, place?: unknown)`~~: the context kept (`seam.contexts`), for the tools the producer mints from it.
+		getExecutionSession: vi.fn(() => async (context: unknown, place?: unknown) => {
+			// ⭐ L17b3 (the lead's ruling 1 of §23) — an opening that throws the case's value, as a refused sandbox throws.
+			if (seam.openThrows !== undefined) throw seam.openThrows.value;
 			seam.places.push(place);
+			seam.contexts.push(context);
 			const observer = createProcessRunObserver();
 			seam.opens += 1;
 			const session = seam.opens;
+			// ⭐ L17b3 (D89) — the tools it minted, as Pi's adapter says them: the record's tool where the grant names its capability and the context
+			// hands in a record to read (`mintExecutionTools`'s rule); no tool of the workspace's, since this producer writes nothing.
+			const opened = (context ?? {}) as { readonly grantedCapabilities?: readonly string[]; readonly earlierAttempt?: unknown };
+			const mintedToolNames =
+				(opened.grantedCapabilities ?? []).includes('earlier-attempt-record') && opened.earlierAttempt !== undefined ? ['read_earlier_attempt'] : [];
+			// ⭐ L17b3 (D91) — its turns counted, so a case can answer each as Pi's adapter does.
+			let turnsTaken = 0;
 			return {
+				mintedToolNames,
 				turn: async (text: string) => {
 					seam.turns.push(text);
 					await seam.onTurn?.(text);
-					return JSON.stringify({
-						workProduct: { document: `ATTEMPT ${session}: ${text.split('\n')[0]}` },
+					turnsTaken += 1;
+					// ⭐ L17b3 (the review's L17-05) — the commands a case says it ran this turn, each through the host's real observer, as a model's would be.
+					for (const run of seam.runs?.() ?? [])
+						observer.ran({
+							argv: [...run.argv],
+							exitCode: run.exitCode,
+							timedOut: false,
+							durationMs: 7,
+							outputComplete: true,
+							omittedRegions: [],
+							retention: {
+								retained: true,
+								workspaceOwnerId: 'und_l17b3',
+								purgeability: 'PURGEABLE_AT_EXPIRY',
+								stdoutPath: 'captures/l17b3/stdout.txt',
+								stderrPath: 'captures/l17b3/stderr.txt',
+								omittedRegions: [],
+								omissionsPath: 'captures/l17b3/omissions.json'
+							},
+							stdout: '',
+							stderr: ''
+						});
+					const document = `ATTEMPT ${session}: ${text.split('\n')[0]}`;
+					const envelope = JSON.stringify({
+						// ⭐ L17b3 (the review's L17-05) — ~~`document: \`ATTEMPT ${session}: ${text.split('\n')[0]}\``~~ as the case gives it, else as before.
+						workProduct: { document: seam.documentOf?.(document) ?? document },
 						rationale: { rationale: 'An account.', assumptions: [], limitations: [], residualUncertainty: [] }
 					});
+					// ⭐ L17b3 (the review's L17-08) — as the case shapes it, else the envelope alone, as before.
+					const answer = seam.answerShape?.(envelope) ?? envelope;
+					// ⭐ L17b3 (D91) — where a case sets `seam.gatheredFrom`, the answer as Pi's adapter gives it: a result, with the stops of the messages it
+					// was gathered from where the case gives them, and without the field where it gives none. Unset, a bare string, as before.
+					if (seam.gatheredFrom === undefined) return answer;
+					const gatheredFrom = seam.gatheredFrom(turnsTaken);
+					return {
+						answer: { arrived: true as const, text: answer },
+						rawOutput: answer,
+						producer: { agentId: 'execution.model-invocation', modelId: 'faux/model', providerId: 'faux' },
+						identityEvidence: 'PROVIDER_REPORTED' as const,
+						observedToolCalls: { canObserve: false as const, reason: 'a scripted fixture observes no tool calls' },
+						...(gatheredFrom === undefined ? {} : { gatheredFrom })
+					};
 				},
 				lastTurnObservation: () => ({ canObserve: false, reason: 'a scripted fixture observes no tool calls' }),
 				processRuns: () => {
@@ -228,6 +403,8 @@ vi.mock('./model.js', async (importOriginal) => {
 				// ⭐ The lead's ruling (b) — each close counted, and one a case makes throw, as Pi's `cleanupSessionResources` throws an `AggregateError`.
 				dispose: () => {
 					seam.disposes += 1;
+					// ⭐ L17b3 (the review's L17-14) — each close, in the step's trace.
+					seam.trace.push('close');
 					if (seam.disposeThrows !== undefined) throw seam.disposeThrows.error;
 				},
 				retainsHistory: true
@@ -290,7 +467,8 @@ vi.mock('../assurance/decision-model.js', async (importOriginal) => {
 	return { ...(await importOriginal<typeof import('../assurance/decision-model.js')>()), configuredIndications: () => TEST_INDICATIONS };
 });
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { RecordModelExchangePayload } from '@janumipwb/rph-contracts';
@@ -305,9 +483,12 @@ import { resolveUndertakingSandbox, sessionFolderOf } from './workspace-host.js'
 import { runAssuranceStage } from '../assurance/assurance-stage.js';
 import { chapterRecordsOf } from '../assurance/narrative-chapter.js';
 import { HELPER_INVOKER, NARRATIVE_WRITER_INVOKER } from '../assurance/assurance-stage-roles.js';
+// ⭐ L17b3 (the review's L17-04) — the page's own demo policy, for an assessment of two units a recurrence can be recorded on.
+import { DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD, DEMO_POLICY_VERSION } from '../assurance/demo-policy.js';
 import { createProcessRunObserver } from '../tools/process-run-observer.js';
 import { admittedViewRef, readDeliverableView } from './deliverable-view.js';
-import { CARRIED_FINDINGS_LINE, FEEDBACK_HEADING, predecessorWithoutSessionNameOf } from './executor-session.js';
+// ⭐ L17b3 (D89) — ~~`predecessorWithoutSessionNameOf`~~: the fork's note goes with the fork; its name is restated where the case says nothing is noted.
+import { CARRIED_FINDINGS_LINE, FEEDBACK_HEADING } from './executor-session.js';
 import { createFilesystemWorkspace } from './filesystem-workspace.js';
 import type { ProducerSession, ProducerSessionContext } from './producer-session.js';
 import { successorRoundOf, tacticRecordNotice, tacticRecordPath, tacticRecordRequest, takeTacticRecord } from './successor-feedback.js';
@@ -553,7 +734,8 @@ const TYPES = (specPolicies: readonly string[] = [], buildPolicies: readonly str
 ];
 
 type Fixture = Awaited<ReturnType<typeof instantiated>>;
-type Action = 'beginExecute' | 'recordAssurance' | 'markSatisfied' | 'rerunRejectedWork' | 'sendWorkBack' | 'runAssuranceStage';
+// ⭐ L17b3 (the review's L17-06, L17-09) — and RD8's re-run of a stopped unit (`rerunWork`), the binding's third minting site.
+type Action = 'beginExecute' | 'recordAssurance' | 'markSatisfied' | 'rerunRejectedWork' | 'sendWorkBack' | 'runAssuranceStage' | 'rerunWork';
 
 /** The unit titled `title` that is CURRENT — after a replacement, one title names an old unit and its successor. */
 const currentOf = (u: Fixture, title: string) => {
@@ -668,6 +850,23 @@ const saidOf = (e: unknown): string => {
 		return '(a value the test cannot describe)';
 	}
 };
+/**
+ * ⭐ L17b3 (the review's L17-18) — the declared reviews shown, as one sha256: each test-mode id (`mintUiId`'s `<prefix>_<26 characters>`) renamed
+ * `<prefix>_#<n>` in the order it first appears, every other byte as shown.
+ */
+const declaredReviewsDigest = (shown: readonly { readonly policyId: string; readonly prompt: string; readonly content: string }[]): string => {
+	const names = new Map<string, string>();
+	const normalized = JSON.stringify(shown).replaceAll(/\b([a-z]+)_0{6}[0-9A-Z]{20}\b/g, (id: string, prefix: string) => {
+		if (!names.has(id)) names.set(id, `${prefix}_#${names.size + 1}`);
+		return names.get(id)!;
+	});
+	return createHash('sha256').update(normalized, 'utf8').digest('hex');
+};
+/**
+ * ⭐ L17b3 (the review's L17-18) — that digest for the CONTROL's fixture, measured at the base, `44b8482e`, before any of the package's code: the
+ * CONTROL run alone, twice, each giving this (`l17b3-facts.md` §8.4).
+ */
+const DECLARED_REVIEWS_TODAY = 'b649d695b6d38440dc7949df41e90b133f74886551bd85610b5b2b85a6053e01';
 /** The stage's records of a part, as their SOURCE evidence names them. */
 const stageEvidenceOf = (part: string) =>
 	listByType(getEngine(), 'EVIDENCE').filter(
@@ -690,7 +889,14 @@ function onPi(answers: { readonly diagnosis: string; readonly stepBack: string }
 	mkdirSync(join(dir, 'src'), { recursive: true });
 	writeFileSync(join(dir, 'src', 'reader.ts'), 'export const read = () => "";\n');
 	const shared = createFilesystemWorkspace({ ownerKind: 'UNDERTAKING', ownerId: 'und', purgeability: 'RETAINED_BY_PARTICIPATION', directoryPath: dir });
-	const asked: { readonly dir: string | undefined; readonly prompt: string }[] = [];
+	/** ⭐ L17b3 (D89) — and, at each helper's turn, the record's files its copy holds (`.jpwb/record/`). */
+	// ⭐ L17-04 — and what each of those files holds (`recordTexts`, by its name), so a file under its expected name but of the wrong unit is seen.
+	const asked: {
+		readonly dir: string | undefined;
+		readonly prompt: string;
+		readonly recordFiles: readonly string[];
+		readonly recordTexts: Readonly<Record<string, string>>;
+	}[] = [];
 	const deps = {
 		engine: getEngine(),
 		store: getArtifactStore(),
@@ -705,8 +911,16 @@ function onPi(answers: { readonly diagnosis: string; readonly stepBack: string }
 		sessionsRoot: join(TMP, `case-${tmpCase}`, 'demo.sqlite.sessions'),
 		openPi: async (context: ProducerSessionContext): Promise<ProducerSession> => ({
 			retainsHistory: true,
+			mintedToolNames: [], // ⭐ L17b3 (D89) — arrangement: the session says the tools it minted (none), as every `ProducerSession` now does.
 			turn: async (prompt: string) => {
-				asked.push({ dir: context.workspace.directoryPath, prompt });
+				const records = join(context.workspace.directoryPath ?? '', '.jpwb', 'record');
+				const recordFiles = existsSync(records) ? readdirSync(records).sort() : [];
+				asked.push({
+					dir: context.workspace.directoryPath,
+					prompt,
+					recordFiles,
+					recordTexts: Object.fromEntries(recordFiles.map((f) => [f, readFileSync(join(records, f), 'utf8')]))
+				});
 				return prompt.includes('You are the Hypothesizer') ? answers.diagnosis : answers.stepBack;
 			},
 			lastTurnObservation: () => ({ canObserve: false, reason: 'a scripted fixture observes no tool calls' }),
@@ -1281,6 +1495,12 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 			expect(d.prompt, `${d.policyId}’s prompt carries the narrative`).not.toContain('narrative memory');
 			expect(d.content, `${d.policyId}’s content carries the narrative`).not.toContain(FEEDBACK_HEADING);
 		}
+		// ⭐ STRENGTHENED 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — the independent review's L17-18; D89: "a declared review's prompt byte for byte
+		// today's"): the two negative checks above kept, and every declared review this fixture shows — its policy, its prompt and the work it is
+		// shown — held whole against TODAY'S, measured at the base (`44b8482e`) by this very fixture before any of the package's code
+		// (`l17b3-facts.md` §8): one sha256 over them, each minted id renamed in the order it first appears, so an id minted elsewhere does not move it.
+		const digest = declaredReviewsDigest(shown);
+		expect(digest, `a declared review’s prompt, or the work it is shown, is not byte for byte today’s (this run’s digest: ${digest})`).toBe(DECLARED_REVIEWS_TODAY);
 	});
 });
 
@@ -1981,7 +2201,9 @@ describe('⭐⭐ L17b1 (D77, reading 16) — each successor’s first turn, and 
 	});
 });
 
-describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable store and Pi, each step’s session is kept, reopened and forked', () => {
+// ⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'… each step’s session is kept, reopened and forked'~~ — no step forks since
+// D89: a replacement's session is a new one, as any unit's first step's.
+describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable store and Pi, each step’s session is kept and reopened ~~and forked~~ ⭐ — a replacement’s new, as any unit’s (D89)', () => {
 	/** A serving store's sessions root for one case, and Pi selected (its producer still the harness's scripted one, which writes no file). */
 	const durableOnPi = (): string => {
 		const root = join(TMP, `sessions-${++tmpCase}`, 'demo.sqlite.sessions');
@@ -1990,12 +2212,16 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 		vi.stubEnv('JPWB_EXECUTOR_MODEL', 'faux/model');
 		return root;
 	};
-	/** A session file in `folder`, as Pi writes one: its header and one turn. */
-	const sessionFileIn = (folder: string, name = '2026-11-16T00-00-00-000Z_s.jsonl'): string => {
+	/**
+	 * A session file in `folder`, as Pi writes one: its header and one turn. ⭐ AMENDED IN FORM AT STAGE 2 (package L17b3, design D91; `l17b3-facts.md`
+	 * §12): the turn's text may be given (`turnText`, `'Write the work.'` where it is not, as before) — D91 finds the reviewed try in a reopened file by
+	 * its turn's text, so a case about a file holding the unit's reviewed try writes that try's own turn, as Pi would have.
+	 */
+	const sessionFileIn = (folder: string, name = '2026-11-16T00-00-00-000Z_s.jsonl', turnText = 'Write the work.'): string => {
 		mkdirSync(folder, { recursive: true });
 		const file = join(folder, name);
 		const header = { type: 'session', version: 3, id: 's', timestamp: '2026-11-16T00:00:00.000Z', cwd: TMP };
-		const turn = { type: 'message', id: 'u1', parentId: null, timestamp: '2026-11-16T00:00:01.000Z', message: { role: 'user', content: [{ type: 'text', text: 'Write the work.' }], timestamp: 1 } };
+		const turn = { type: 'message', id: 'u1', parentId: null, timestamp: '2026-11-16T00:00:01.000Z', message: { role: 'user', content: [{ type: 'text', text: turnText }], timestamp: 1 } };
 		// ⭐ The review's defect 8 — and its answer, as an earlier step that returned a work product left it (`stopReason` "stop").
 		const answer = { type: 'message', id: 'a1', parentId: 'u1', timestamp: '2026-11-16T00:00:02.000Z', message: { role: 'assistant', content: [{ type: 'text', text: 'The work.' }], stopReason: 'stop', timestamp: 2 } };
 		writeFileSync(file, `${JSON.stringify(header)}\n${JSON.stringify(turn)}\n${JSON.stringify(answer)}\n`);
@@ -2018,7 +2244,12 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 			opening: { kind: 'NEW' }
 		});
 		const folder = sessionFolderOf(root, 'executor', r.ids.verification);
-		const file = sessionFileIn(folder);
+		// ⭐ RESTATED IN FORM AT STAGE 2 (package L17b3, design D91): ~~`sessionFileIn(folder)`~~, a file whose one turn is `'Write the work.'` — under D91 a
+		// reopened file whose user entries hold no turn equal to the reviewed try's cannot show that it holds the reviewed answer, so the work is sent
+		// again and the held sentence says so (that case is D91's own test, beside). The promise kept: a file holding the unit's reviewed try, its answer
+		// one Pi replays — its turn the reviewed try's own, as Pi writes it — is reopened, and its first turn says what it holds.
+		const reviewedTurn = seam.turns.filter((t) => t.startsWith('Write the Verification.')).at(-1) ?? '(no turn of Verification was sent)';
+		const file = sessionFileIn(folder, undefined, reviewedTurn);
 		const places = seam.places.length;
 		const turns = seam.turns.length;
 
@@ -2038,10 +2269,21 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 		expect(turn, 'the reopened session’s turn says it is fresh').not.toContain('This is a fresh session');
 	});
 
-	it('⛔ RED FIRST — a replacement’s first step forks its predecessor’s file, its first turn saying whose conversation it holds; a predecessor with none starts new, and that is recorded for the run report', async () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173`): ~~'⛔ RED FIRST — a replacement’s first step forks its
+	// predecessor’s file, its first turn saying whose conversation it holds; a predecessor with none starts new, and that is recorded for the run report'~~,
+	// its places ~~`opening: { kind: 'FORK', from, predecessorId: r.ids.source, heldFindings: false, returnedAnswer: true }`~~ (~~'the new Source did not
+	// fork its predecessor’s file'~~) and ~~`opening: { kind: 'NEW', predecessorWithoutSession: r.ids.tests }`~~ (~~'a successor whose predecessor left no
+	// file did not start new, saying so'~~), its turn's words ~~`This session holds the conversation of the unit this one replaces, "Source" (…)`~~ (~~'the
+	// forked turn does not say whose conversation it holds'~~), and its note ~~`expect(await getArtifactStore().resolveName(predecessorWithoutSessionNameOf(
+	// 'tnt-local', tests2)), 'no note is recorded for the run report').toBeDefined()`~~ — nothing forks since D89: a replacement's first step opens a new
+	// file of its own, whatever its predecessor left, its predecessor's file left byte for byte, and its first turn says the record of the unit it replaces
+	// is in reach; nothing is noted, since every replacement begins so. The promise kept: a replacement's first step has a session in its own folder, and
+	// its first turn names the unit it replaces.
+	it('⛔ RED FIRST — a replacement’s first step opens a NEW file of its own, its predecessor’s left byte for byte, its first turn saying the record of the unit it replaces is in reach; one whose predecessor left no file opens one too, and nothing is noted (D89)', async () => {
 		const root = durableOnPi();
 		const r = await verificationRejected();
 		const from = sessionFileIn(sessionFolderOf(root, 'executor', r.ids.source));
+		const before = readFileSync(from, 'utf8');
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const source2 = currentOf(r.u, 'Source').id;
 		let places = seam.places.length;
@@ -2049,14 +2291,14 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 
 		expect((await press(r.u, 'beginExecute', { pwuId: source2 })).error, 'the new Source did not run').toBeUndefined();
 
-		expect(seam.places[places], 'the new Source did not fork its predecessor’s file').toEqual({
+		expect(seam.places[places], 'the new Source did not open a new file of its own').toEqual({
 			kind: 'DURABLE',
 			folder: sessionFolderOf(root, 'executor', source2),
-			// ⭐ RESTATED for the review's defect 8: and whether the forked conversation returned a work product.
-			opening: { kind: 'FORK', from, predecessorId: r.ids.source, heldFindings: false, returnedAnswer: true }
+			opening: { kind: 'NEW' }
 		});
-		expect(seam.turns[turns] ?? '', 'the forked turn does not say whose conversation it holds').toContain(
-			`This session holds the conversation of the unit this one replaces, "Source" (${r.ids.source})`
+		expect(readFileSync(from, 'utf8'), 'the predecessor’s file was changed').toBe(before);
+		expect(seam.turns[turns] ?? '', 'the new Source’s first turn does not say the record of the unit it replaces is in reach').toContain(
+			`The unit this one replaces, "Source" (${r.ids.source}), was worked on before, and its conversation is on the record.`
 		);
 		for (const action of ['recordAssurance', 'markSatisfied'] as const)
 			expect((await press(r.u, action, { pwuId: source2 })).error, `arrangement: ${action} on the new Source`).toBeUndefined();
@@ -2065,12 +2307,13 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 
 		expect((await press(r.u, 'beginExecute', { pwuId: tests2 })).error, 'the new Tests did not run').toBeUndefined();
 
-		expect(seam.places[places], 'a successor whose predecessor left no file did not start new, saying so').toEqual({
+		expect(seam.places[places], 'a successor whose predecessor left no file did not open a new file of its own').toEqual({
 			kind: 'DURABLE',
 			folder: sessionFolderOf(root, 'executor', tests2),
-			opening: { kind: 'NEW', predecessorWithoutSession: r.ids.tests }
+			opening: { kind: 'NEW' }
 		});
-		expect(await getArtifactStore().resolveName(predecessorWithoutSessionNameOf('tnt-local', tests2)), 'no note is recorded for the run report').toBeDefined();
+		// ⭑ The note's name as package L17b1 bound it (`predecessorWithoutSessionNameOf`, gone with the fork), restated: nothing is bound to it now.
+		expect(await getArtifactStore().resolveName(`tnt-local/executor-session/${tests2}/predecessor-without-session`), 'a note was recorded for a missing fork').toBeUndefined();
 	});
 
 	it('⛔ RED FIRST — two session files in a unit’s folder refuse its start before anything is dispatched, naming the folder', async () => {
@@ -2088,7 +2331,13 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 		expect(getEngine().readAllEvents().length, 'the refused start dispatched something').toBe(events);
 	});
 
-	it('⛔ RED FIRST — a later try on a forked session is handed what its session held when the step began, and its first turn’s feedback, which it declares (the review’s defect 1)', async () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'⛔ RED FIRST — a later try on a forked session is handed what its session
+	// held when the step began, and its first turn’s feedback, which it declares (the review’s defect 1)'~~, its expectation ~~`[undefined, 'PREDECESSOR',
+	// r.ids.source, true]`~~ (~~'the later try is not handed what its forked session holds'~~) — a replacement's session is a new one since D89, holding
+	// nothing when its step begins; what puts another unit's work in reach is the record's tool, on every turn of that session. The promise kept: a later
+	// try is handed what its session held when the step began, and its first turn's feedback; and now the record its session's tool reads, its sentence
+	// said on the first turn alone.
+	it('⛔ RED FIRST — a later try on a replacement’s session is handed what its session held when the step began — ~~a fork~~ ⭐ nothing — and its first turn’s feedback, ⭐ and the record its session’s tool reads, which it declares (the review’s defect 1; D89)', async () => {
 		const root = durableOnPi();
 		const r = await verificationRejected();
 		sessionFileIn(sessionFolderOf(root, 'executor', r.ids.source));
@@ -2113,12 +2362,23 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 
 		const tries = seam.stepInputs.slice(inputs) as {
 			readonly stillHeld?: { readonly holds: { readonly kind: string; readonly unitId?: string }; readonly feedback?: { readonly crossUnit: boolean } };
+			readonly earlierAttempt?: { readonly sentence?: string; readonly toolMinted: boolean; readonly holds: { readonly answer: boolean; readonly findings: boolean } };
 		}[];
 		expect(tries.length, 'arrangement: the floor’s finding sent no second try').toBe(2);
 		expect(
-			[tries[0]?.stillHeld, tries[1]?.stillHeld?.holds.kind, tries[1]?.stillHeld?.holds.unitId, tries[1]?.stillHeld?.feedback?.crossUnit],
-			'the later try is not handed what its forked session holds'
-		).toEqual([undefined, 'PREDECESSOR', r.ids.source, true]);
+			[tries[0]?.stillHeld, tries[1]?.stillHeld?.holds.kind, tries[1]?.stillHeld?.feedback?.crossUnit],
+			'the later try is not handed what its session held when the step began and its first turn’s feedback'
+		).toEqual([undefined, 'NOTHING', true]);
+		expect(
+			[
+				tries[0]?.earlierAttempt?.toolMinted,
+				typeof tries[0]?.earlierAttempt?.sentence,
+				tries[1]?.earlierAttempt?.toolMinted,
+				tries[1]?.earlierAttempt?.sentence,
+				tries[1]?.earlierAttempt?.holds.answer
+			],
+			'a try of the replacement is not handed the record its session’s tool reads, the sentence on its first try alone'
+		).toEqual([true, 'string', true, undefined, true]);
 	});
 
 	it('⛔ RED FIRST — the session place’s refusal describes whatever value is thrown, through the one describer: a sessions root that throws a value that cannot be described refuses the re-run, said, never an escape (the lead’s ruling (k) on the review’s fifth re-check)', async () => {
@@ -2148,6 +2408,1245 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 	});
 });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — designs D89, D90 and D91, through the page ───────────────────────────────────────────────────────────────
+
+/** ⭐ L17b3 (D89) — the context policy the binding of each of the unit's steps names, in the order its plans were made (a step names its binding). */
+const bindingPoliciesOf = (pwuId: string): string[] =>
+	listByType(getEngine(), 'EXECUTION_PLAN')
+		.filter((p) => p.state.workUnitId === pwuId)
+		.flatMap((p) => ((p.state.steps as { runtimeBindingId?: unknown }[] | undefined) ?? []).map((s) => s.runtimeBindingId))
+		.filter((id): id is string => typeof id === 'string')
+		.map((id) => String(getObject(getEngine(), id)?.contextAssemblyPolicyId ?? ''));
+
+describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s policy, the record’s sentence, and the record the roles are given', () => {
+	it('⛔ RED FIRST — the page names each step’s context policy: ctx-default for a step outside the loop; ctx-default-loop for a replacement’s, and for D71’s re-run in place where the round’s stage ran; ctx-default for that re-run where it did not (REG-D-173 (2))', async () => {
+		const sent = await verificationRejected();
+		expect((await sendBackToSource(sent)).error, 'arrangement: the act').toBeUndefined();
+		const source2 = currentOf(sent.u, 'Source').id;
+		expect((await press(sent.u, 'beginExecute', { pwuId: source2 })).error, 'arrangement: the new Source ran').toBeUndefined();
+		const staged = await verificationRejected();
+		seam.review = chapterAnswering;
+		expect((await press(staged.u, 'runAssuranceStage', { pwuId: staged.ids.verification })).error, 'arrangement: the stage').toBeUndefined();
+		seam.onTurn = writesItsTacticRecord(staged.u);
+		expect((await press(staged.u, 'rerunRejectedWork', { pwuId: staged.ids.verification, rationale: 'Re-run it.' })).error, 'arrangement: the re-run after the stage').toBeUndefined();
+		seam.onTurn = undefined;
+		const plain = await verificationRejected();
+		expect((await press(plain.u, 'rerunRejectedWork', { pwuId: plain.ids.verification, rationale: 'Re-run it.' })).error, 'arrangement: the re-run with no stage').toBeUndefined();
+
+		expect(
+			[
+				bindingPoliciesOf(sent.ids.spec),
+				bindingPoliciesOf(sent.ids.verification),
+				bindingPoliciesOf(source2),
+				bindingPoliciesOf(staged.ids.verification),
+				bindingPoliciesOf(plain.ids.verification)
+			],
+			'a step is bound to a policy its kind does not call for'
+		).toEqual([['ctx-default'], ['ctx-default'], ['ctx-default-loop'], ['ctx-default', 'ctx-default-loop'], ['ctx-default', 'ctx-default']]);
+	});
+
+	it('⛔ RED FIRST — a replacement’s first turn ends with the record’s sentence, naming the unit it replaces, its step granted the record’s capability and handed the record; a unit that is not a replacement is given neither (D89)', async () => {
+		const r = await verificationRejected();
+		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
+		const source2 = currentOf(r.u, 'Source').id;
+		const contexts = seam.contexts.length;
+		const turns = seam.turns.length;
+
+		expect((await press(r.u, 'beginExecute', { pwuId: source2 })).error, 'the new Source did not run').toBeUndefined();
+
+		const SENTENCE =
+			`The unit this one replaces, "Source" (${r.ids.source}), was worked on before, and its conversation is on the record. You can read it with the read_earlier_attempt tool. ` +
+			'The feedback above says what that work got wrong; read the record only if you need more detail than the feedback gives — it shows what was tried and failed, ' +
+			'so that you do not try it again, unless something material has changed that would let it succeed now.';
+		expect((seam.turns[turns] ?? '').endsWith(`\n\n${SENTENCE}`), 'the replacement’s first turn does not end with the record’s sentence').toBe(true);
+		const opened = (i: number) => seam.contexts[i] as { readonly grantedCapabilities?: readonly string[]; readonly earlierAttempt?: { readonly units?: readonly { readonly unitId: string }[] } };
+		expect(
+			[opened(contexts).grantedCapabilities?.includes('earlier-attempt-record'), opened(contexts).earlierAttempt?.units?.map((x) => x.unitId)],
+			'the replacement’s step was not granted the record’s capability, or not handed the record of the unit it replaces'
+		).toEqual([true, [r.ids.source]]);
+		expect(
+			[opened(0).grantedCapabilities?.includes('earlier-attempt-record'), opened(0).earlierAttempt],
+			'a unit that is not a replacement was granted the record’s capability or handed a record'
+		).toEqual([false, undefined]);
+	});
+
+	// ⭐⭐ The lead's ruling §10.1 (4) — L17-01 THROUGH THE PAGE: a replaced unit that left NO executor exchange. A try refused before its exchange is
+	// captured leaves none — the step's own refusals before its render (`run-model-step.ts`: the binding's, `stepCapabilityRefusal`; the plan's,
+	// `prepareModelInvocation` not ready; a throw and a turn with no answer each record one), stood in for at the step's seam (`seam.refuseStepOf`) —
+	// and the reach takes a started unit in whatever state (D72): Docs, started and refused, reached by the work sent back to the Specification.
+	it('⛔ RED FIRST — a replacement whose line left no record, through the page: its first turn ends with the no-record sentence, it is given no tool, and its step is handed no pair of the record (D89; the review’s L17-01; §10.1 (4))', async () => {
+		const u = await instantiated(TYPES());
+		await acceptAll(u, ['Specification', 'Source', 'Tests', 'Lint', 'Build']);
+		const docs = u.unitOf('Docs').id;
+		seam.refuseStepOf = (pwuId) => (pwuId === docs ? 'a try refused before its render (arrangement)' : undefined);
+		const refused = await press(u, 'beginExecute', { pwuId: docs });
+		seam.refuseStepOf = undefined;
+		expect(refused.error ?? '', 'arrangement: Docs started, its only try refused').toContain('a try refused before its render (arrangement)');
+		expect(listByType(getEngine(), 'MODEL_EXCHANGE').filter((x) => x.state.subjectObjectId === docs).length, 'arrangement: Docs left no exchange').toBe(0);
+		const verification = u.unitOf('Verification').id;
+		expect((await press(u, 'beginExecute', { pwuId: verification })).error, 'arrangement: Verification ran').toBeUndefined();
+		const cov = policyOf(COVERAGE).criteria.map((c) => c.id);
+		seam.answer = (policyId) =>
+			policyId === COVERAGE ? answerOf(COVERAGE, { 0: ['NOT_MET', 'The reader cannot read a pipe.'] }, cov[0]) : answerOf(policyId);
+		await press(u, 'recordAssurance', { pwuId: verification });
+		seam.answer = (policyId) => answerOf(policyId);
+		expect(axesOf(verification)[2], 'arrangement: Verification rejected').toBe('REJECTED');
+		const sent = await press(u, 'sendWorkBack', { pwuId: verification, targetId: u.unitOf('Specification').id, rationale: TYPED });
+		expect(sent.error, 'arrangement: the work sent back to the Specification').toBeUndefined();
+		const docs2 = currentOf(u, 'Docs').id;
+		expect(docs2, 'arrangement: Docs replaced').not.toBe(docs);
+		const spec2 = currentOf(u, 'Specification').id;
+		for (const action of ['beginExecute', 'recordAssurance', 'markSatisfied'] as const)
+			expect((await press(u, action, { pwuId: spec2 })).error, `arrangement: the new Specification — ${action}`).toBeUndefined();
+		const [turns, contexts, inputs] = [seam.turns.length, seam.contexts.length, seam.stepInputs.length];
+
+		expect((await press(u, 'beginExecute', { pwuId: docs2 })).error, 'the new Docs did not run').toBeUndefined();
+
+		const NO_RECORD = 'The unit this one replaces left no recorded conversation.';
+		expect((seam.turns[turns] ?? '').endsWith(`\n\n${NO_RECORD}`), 'the first turn of a replacement whose line left no record does not end with the no-record sentence').toBe(true);
+		const context = seam.contexts[contexts] as { readonly earlierAttempt?: unknown } | undefined;
+		const input = seam.stepInputs[inputs] as { readonly earlierAttempt?: unknown } | undefined;
+		expect(
+			[context?.earlierAttempt, input?.earlierAttempt],
+			'a replacement whose line left no record was handed a record to read, or its step a pair of the record'
+		).toEqual([undefined, { sentence: NO_RECORD, toolMinted: false, holds: { answer: false, findings: false } }]);
+	});
+
+	// ⭐⭐ STRENGTHENED 2026-11-18 (the independent review's L17-05): ~~one chapter, `expect.arrayContaining(tries)`, and a line holding `ATTEMPT`~~ —
+	// TWO chapters, the first over every try before it and the second over the tries since it alone, each set exact; the later try's line its unit,
+	// the commands it ran with their exits (`<argv joined> (exit <n>)`, my form) and its answer cut at `STAGE_RECORD_BOUND` and said so. The promise
+	// kept: the writer is given the tries by their exchanges' ids, each line naming its unit and holding its answer.
+	it('⛔ RED FIRST — the narrative writer is given each executor try since the last chapter, by its exchange’s id: the first chapter every try before it, the second only those since; a try’s line its unit, the commands it ran with their exits, and its answer, cut at 2,000 characters and said so (D89; the review’s L17-05)', async () => {
+		const r = await verificationRejected();
+		seam.review = chapterAnswering;
+		/** The executor tries on the record, by id: each EXECUTION exchange of a unit's model invocation. */
+		const tryIds = (): string[] =>
+			listByType(getEngine(), 'MODEL_EXCHANGE')
+				.filter((x) => x.state.plane === 'EXECUTION' && String(x.state.invokerId ?? '').startsWith('execution.model-invocation'))
+				.map((x) => x.id);
+		const writerPrompts = (): string[] => seam.prompts.filter((p) => p.includes(WRITER_PROMPT));
+		const before = tryIds();
+		expect(before.length, 'arrangement: executor tries on the record').toBeGreaterThan(0);
+
+		expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, 'arrangement: the first round’s stage').toBeUndefined();
+
+		// ⭑ A later try: D71's re-run in place, which runs two commands, one failing, and answers past the bound; its sign-off rejected again — a second round.
+		seam.onTurn = writesItsTacticRecord(r.u);
+		seam.runs = () => [
+			{ argv: ['node', '--test'], exitCode: 1 },
+			{ argv: ['node', 'bin/wf.js', '-'], exitCode: 0 }
+		];
+		seam.documentOf = (document) => `${document} ${'R'.repeat(2_400)} PAST-THE-BOUND`;
+		expect((await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it with the findings.' })).error, 'arrangement: the re-run').toBeUndefined();
+		seam.onTurn = undefined;
+		seam.runs = undefined;
+		seam.documentOf = undefined;
+		const since = tryIds().filter((id) => !before.includes(id));
+		expect(since.length, 'arrangement: the re-run’s try on the record').toBeGreaterThan(0);
+		const cov = policyOf(COVERAGE).criteria.map((c) => c.id);
+		seam.answer = (policyId) =>
+			policyId === COVERAGE ? answerOf(COVERAGE, { 0: ['NOT_MET', 'The standard-input mode still exits 1.'] }, cov[0]) : answerOf(policyId);
+		await press(r.u, 'recordAssurance', { pwuId: r.ids.verification });
+		seam.answer = (policyId) => answerOf(policyId);
+		expect(axesOf(r.ids.verification)[2], 'arrangement: the re-run rejected again, a second round').toBe('REJECTED');
+
+		expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, 'arrangement: the second round’s stage').toBeUndefined();
+
+		const [first, second] = writerPrompts();
+		const triesIn = (prompt: string | undefined): string[] => recordIdsOf(prompt ?? '').filter((id) => tryIds().includes(id)).sort();
+		expect([triesIn(first), triesIn(second)], 'a chapter was not given exactly the executor tries since the chapter before it').toEqual([[...before].sort(), [...since].sort()]);
+		const later = since.at(-1)!;
+		const line = (second ?? '').split('\n').find((l) => l.startsWith(`- [${later}] `)) ?? '';
+		expect(
+			[
+				line.includes(`"Verification" (${r.ids.verification})`),
+				line.includes('node --test (exit 1)'),
+				line.includes('node bin/wf.js - (exit 0)'),
+				line.includes('ATTEMPT'),
+				line.includes('… (cut at 2000 characters)'),
+				line.includes('PAST-THE-BOUND')
+			],
+			'a try’s line does not name its unit, the commands it ran with their exits, or its answer cut at the bound and said so'
+		).toEqual([true, true, true, true, true, false]);
+	});
+
+	// ⭐⭐ STRENGTHENED 2026-11-18 (the independent review's L17-04): ~~two names `expect.arrayContaining`, the prompt naming them, the shared workspace
+	// clean~~ — the stage run on a recurrence over Verification and Docs, so the two helpers' sets differ: the Hypothesizer's copy holding EXACTLY the
+	// rejected unit's and each candidate's record (D72's candidates: the Specification, Build, Source, Tests and Lint), Docs and the root not among
+	// them; the Unsticking Agent's EXACTLY the rejected unit's and the recurrence's other unit's, Docs (D75), no candidate among them; each file the
+	// unit's rendering from the record, read at the helper's turn; each named in its prompt; each copy removed after, and the shared workspace clean.
+	// ⭑ "The units the recurrence names" read as its subjects (an observation's, inherited from its assessment, `assurance.ts`'s
+	// `recordAssuranceObservation`) — my reading, said in §8. ⭑ A file holds the unit's parts joined by a blank line — mine, said in §8.
+	it('⛔ RED FIRST — on Pi, the Hypothesizer is given the recorded conversations of the rejected unit and of each candidate, and the Unsticking Agent, on a recurrence, those of the rejected unit and of each unit the recurrence names — exactly those, each file the unit’s rendering from the record, named in its prompt, the copies removed after; none reaches the shared workspace (D89; REG-D-173 (5); the review’s L17-04)', async () => {
+		const r = await verificationRejected();
+		seam.review = chapterAnswering;
+		// ⭑ The recurrence's assessment under the page's own demo policy, as its evidence journey opens one (`openAssessmentFor`) — never under one of
+		// Verification's declared policies, where a further request would unseat its REJECTED verdict (`declared-assurance.ts`, its header's item 1).
+		if (getObject(getEngine(), DEMO_POLICY_ID) === undefined)
+			for (const [commandType, payload] of [
+				['CreateAssurancePolicy', DEMO_POLICY_PAYLOAD],
+				['ActivateAssurancePolicy', { policyId: DEMO_POLICY_ID }]
+			] as const)
+				expect(dispatch(commandType, 'ASSURANCE_POLICY', DEMO_POLICY_ID, payload).status, `arrangement: ${commandType}`).toBe('ACCEPTED');
+		const assessmentId = mintUiId('asm');
+		const versionOf = (id: string) => Number((getObject(getEngine(), id) ?? {}).semanticVersion ?? 1);
+		const requested = dispatch('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			assessmentId,
+			assurancePolicyId: DEMO_POLICY_ID,
+			policyVersion: DEMO_POLICY_VERSION,
+			subjectObjectIds: [r.ids.verification, r.ids.docs],
+			subjectSemanticVersions: { [r.ids.verification]: versionOf(r.ids.verification), [r.ids.docs]: versionOf(r.ids.docs) },
+			claimIds: []
+		});
+		expect(requested.status, `arrangement: an assessment of Verification and Docs — ${requested.error?.message ?? ''}`).toBe('ACCEPTED');
+		const recurrence = dispatch('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', mintUiId('obs'), {
+			assessmentId,
+			observationType: 'FINDING',
+			findingCode: 'KNOWN_FAILURE_RECURRENCE',
+			severity: 'INFORMATIONAL',
+			statement: 'The standard-input mode fails again, and the documented usage with it.'
+		});
+		expect(recurrence.status, `arrangement: the recurrence — ${recurrence.error?.message ?? ''}`).toBe('ACCEPTED');
+		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+
+		const done = await runAssuranceStage(r.ids.verification, pi.deps);
+
+		expect('parts' in done && done.parts.map((p) => [p.part, p.status]), 'arrangement: both helpers ran').toEqual([
+			['narrative-chapter', 'recorded'],
+			['fault-diagnosis', 'recorded'],
+			['step-back', 'recorded']
+		]);
+		const fileOf = (title: string, id: string) => `${title.toLowerCase()}--${id}.md`;
+		const hypothesizer = [
+			['Verification', r.ids.verification],
+			['Specification', r.ids.spec],
+			['Build', r.ids.build],
+			['Source', r.ids.source],
+			['Tests', r.ids.tests],
+			['Lint', r.ids.lint]
+		] as const;
+		const unsticking = [
+			['Verification', r.ids.verification],
+			['Docs', r.ids.docs]
+		] as const;
+		expect(
+			[pi.asked[0]?.recordFiles, pi.asked[1]?.recordFiles],
+			'a helper’s copy did not hold exactly the records of the units it judges at its turn'
+		).toEqual([hypothesizer.map(([t, id]) => fileOf(t, id)).sort(), unsticking.map(([t, id]) => fileOf(t, id)).sort()]);
+		for (const [i, set] of [hypothesizer, unsticking].entries())
+			for (const [title, id] of set)
+				expect(pi.asked[i]?.prompt, `a helper’s prompt does not name the record of ${title}`).toContain(`- ${id} "${title}": .jpwb/record/${fileOf(title, id)}`);
+		expect(
+			pi.asked.map((a) => existsSync(a.dir ?? '')),
+			'a helper’s copy, and the record files in it, was not removed after its turn'
+		).toEqual([false, false]);
+		expect(existsSync(join(pi.dir, '.jpwb', 'record')), 'a record file reached the shared workspace').toBe(false);
+		// ⭑ Each file the unit's own rendering, from the record — read through the renderer the tool serves (imported here, at the case, so the file loads
+		// before the package's module exists).
+		const record = await import('./earlier-attempt-record.js');
+		const rows = record.recordRowsOf(getEngine());
+		for (const [i, set] of [hypothesizer, unsticking].entries())
+			for (const [title, id] of set)
+				expect(pi.asked[i]?.recordTexts[fileOf(title, id)], `the file of ${title} is not its recorded conversation, rendered`).toBe(
+					record.renderUnitConversation(await record.unitConversationOf(rows, getArtifactStore(), 'tnt-local', id)).join('\n\n')
+				);
+	});
+
+	// ⭐⭐ The independent review's L17-06 — THE BINDING'S POLICY AT EVERY MINTING SITE: RD8's re-run of a stopped unit (`rerunWork`, the page's plan
+	// revision) by the same rule as Begin & Execute and D71's re-run — ctx-default for a unit outside the loop, ctx-default-loop for a replacement's
+	// every step; and a step on a reopened file that holds D77's feedback bound to ctx-default-loop at D71's re-run and at RD8's (REG-D-173 (2)).
+	/** The floor's review of a try's work product failing at its transport, while `down()` says so: the unit stops, waiting (RD3). */
+	const transportDownWhile = (down: () => boolean) => {
+		seam.review = (prompt) => {
+			if (down() && prompt.includes('The WORK PRODUCT to review')) throw new Error('devin exited with code 1: connection reset by peer');
+			return chapterAnswering(prompt);
+		};
+	};
+	/** `pwuId`'s first step stopped at its review's transport, then RD8's re-run of it: what the re-run answered. */
+	async function stoppedThenRerun(u: Fixture, pwuId: string, beforeRerun?: () => void) {
+		let down = true;
+		transportDownWhile(() => down);
+		const first = await press(u, 'beginExecute', { pwuId });
+		expect(first.error ?? '', 'arrangement: the step stopped at its review’s transport').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		down = false;
+		beforeRerun?.();
+		return press(u, 'rerunWork', { pwuId, rationale: 'The reviewer failed at the transport; run the work again.' });
+	}
+	it('⛔ RED FIRST — RD8’s re-run of a stopped unit names its step’s policy by the same rule: ctx-default for a unit outside the loop, ctx-default-loop for a replacement’s (the review’s L17-06; REG-D-173 (2))', async () => {
+		const { u, spec } = await aSpecification();
+		expect((await stoppedThenRerun(u, spec)).advanced, 'arrangement: the Specification’s work re-run').toBe('work-rerun');
+		const r = await verificationRejected();
+		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
+		const source2 = currentOf(r.u, 'Source').id;
+		expect((await stoppedThenRerun(r.u, source2)).advanced, 'arrangement: the new Source’s work re-run').toBe('work-rerun');
+
+		expect([bindingPoliciesOf(spec), bindingPoliciesOf(source2)], 'RD8’s re-run bound its step to a policy its kind does not call for').toEqual([
+			['ctx-default', 'ctx-default'],
+			['ctx-default-loop', 'ctx-default-loop']
+		]);
+	});
+
+	it('⛔ RED FIRST — a step on a reopened file that holds D77’s feedback is bound to ctx-default-loop: at D71’s re-run with no stage run, and at RD8’s re-run of a unit outside the loop (the review’s L17-06; D89)', async () => {
+		const root = durableHere();
+		const holdingFeedback = (pwuId: string) =>
+			sessionFileWith(sessionFolderOf(root, 'executor', pwuId), [
+				{ user: `Write the work.\n\n${FEEDBACK_HEADING}\n- The round’s failed criterion.`, assistant: 'The work.', stopReason: 'stop' }
+			]);
+		const r = await verificationRejected();
+		holdingFeedback(r.ids.verification);
+		expect((await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it.' })).error, 'arrangement: the re-run').toBeUndefined();
+		const { u, spec } = await aSpecification();
+		expect((await stoppedThenRerun(u, spec, () => holdingFeedback(spec))).advanced, 'arrangement: the work re-run').toBe('work-rerun');
+
+		expect(
+			[bindingPoliciesOf(r.ids.verification), bindingPoliciesOf(spec)],
+			'a step on a reopened file holding the loop’s feedback was not bound to the loop’s policy'
+		).toEqual([
+			['ctx-default', 'ctx-default-loop'],
+			['ctx-default', 'ctx-default-loop']
+		]);
+	});
+
+	// ⭐ L17b3 — the lead's ruling 4 (§16; the independent review's L17C-04), THROUGH THE PAGE: a replacement's later step reads its reopened file against
+	// the sentence its step would say (`sessionPlaceFor`, `executorSessionPlaceOf(root, unit, sentence)`), so a file whose first turn ended with it is not
+	// told again, and one whose first turn did not is. ⭑ Written after the code, for the round's mutant P6X-L17B3-M60 (the page passing no sentence),
+	// which no test reached: run-model-step's own test of ruling 4 reads its file through `executorSessionPlaceOf` itself, never through the page.
+	it('⭑ CONTROL — a replacement’s later step on its reopened file does not say the record’s sentence again where the file’s first turn ended with it, and says it where the first turn did not (the lead’s ruling 4)', async () => {
+		const root = durableHere();
+		/** A replacement's first step, stopped at its review's transport; its file as Pi leaves one, its first turn as sent or without the sentence; then RD8's re-run's first turn. */
+		const laterTurn = async (toldInFile: boolean) => {
+			const r = await verificationRejected();
+			expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
+			const source2 = currentOf(r.u, 'Source').id;
+			const sentence =
+				`The unit this one replaces, "Source" (${r.ids.source}), was worked on before, and its conversation is on the record. You can read it with the read_earlier_attempt tool. ` +
+				'The feedback above says what that work got wrong; read the record only if you need more detail than the feedback gives — it shows what was tried and failed, ' +
+				'so that you do not try it again, unless something material has changed that would let it succeed now.';
+			const turns = seam.turns.length;
+			let first = '';
+			let rerunFrom = 0;
+			const rerun = await stoppedThenRerun(r.u, source2, () => {
+				first = seam.turns[turns] ?? '';
+				rerunFrom = seam.turns.length;
+				const inFile = toldInFile ? first : first.slice(0, first.length - `\n\n${sentence}`.length);
+				sessionFileWith(sessionFolderOf(root, 'executor', source2), [{ user: inFile, assistant: 'The work.', stopReason: 'stop' }]);
+			});
+			expect(first.endsWith(`\n\n${sentence}`), 'arrangement: the replacement’s first turn ended with the record’s sentence').toBe(true);
+			expect(rerun.advanced, 'arrangement: the new Source’s work re-run').toBe('work-rerun');
+			return { again: seam.turns[rerunFrom] ?? '', sentence };
+		};
+		const told = await laterTurn(true);
+		const untold = await laterTurn(false);
+
+		expect(told.again.includes(told.sentence), 'a replacement’s later step on a file whose first turn ended with the record’s sentence said it again').toBe(false);
+		expect(
+			untold.again.endsWith(`\n\n${untold.sentence}`),
+			'a replacement’s later step on a file whose first turn did not end with the record’s sentence did not say it'
+		).toBe(true);
+	});
+});
+
+/** ⭐ L17b3 (the review's L17-06, L17-09) — a serving store's sessions root for one case, and Pi selected (its producer still the scripted one, which writes no file). */
+function durableHere(): string {
+	const root = join(TMP, `sessions-${++tmpCase}`, 'demo.sqlite.sessions');
+	seam.sessionsRoot = root;
+	vi.stubEnv('JPWB_EXECUTOR', 'pi');
+	vi.stubEnv('JPWB_EXECUTOR_MODEL', 'faux/model');
+	return root;
+}
+
+/**
+ * ⭐ L17b3 (the review's L17-06, L17-09) — a session file in `folder`, as Pi writes one: its header, then each turn's user entry and its answer, ended
+ * as `stopReason` says, each the child of the one before (L17b1's `sessionFileIn`, its turns given).
+ */
+// ⭐ L17b3 (the lead's ruling 2) — a turn may be given with no answer (`assistant` absent): its user entry alone, as Pi's file holds one whose answer
+// never landed; every other turn as before.
+function sessionFileWith(folder: string, turns: readonly { readonly user: string; readonly assistant?: string; readonly stopReason?: string }[]): string {
+	mkdirSync(folder, { recursive: true });
+	const file = join(folder, '2026-11-16T00-00-00-000Z_s.jsonl');
+	const lines: unknown[] = [{ type: 'session', version: 3, id: 's', timestamp: '2026-11-16T00:00:00.000Z', cwd: TMP }];
+	let parentId: string | null = null;
+	for (const [i, t] of turns.entries()) {
+		const u: { readonly id: string } & Record<string, unknown> = { type: 'message', id: `u${i + 1}`, parentId, timestamp: '2026-11-16T00:00:01.000Z', message: { role: 'user', content: [{ type: 'text', text: t.user }], timestamp: 1 } };
+		const a: { readonly id: string } & Record<string, unknown> = {
+			type: 'message',
+			id: `a${i + 1}`,
+			parentId: u.id,
+			timestamp: '2026-11-16T00:00:02.000Z',
+			message: { role: 'assistant', content: [{ type: 'text', text: t.assistant }], stopReason: t.stopReason, timestamp: 2 }
+		};
+		lines.push(...(t.assistant === undefined ? [u] : [u, a]));
+		parentId = t.assistant === undefined ? u.id : a.id;
+	}
+	writeFileSync(file, `${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
+	return file;
+}
+
+/** ⭐ L17b3 (D90, D91) — a fresh Undertaking of the fixture PWA, and its Specification, a model's unit no other depends on yet. */
+async function aSpecification(): Promise<{ readonly u: Fixture; readonly spec: string }> {
+	const u = await instantiated(TYPES());
+	return { u, spec: u.unitOf('Specification').id };
+}
+/** ⭐ L17b3 (D90) — whether a batch asks to record a step's failure. */
+const failing = (commands: readonly { readonly commandType: string }[]): boolean => commands.some((c) => c.commandType === 'FailExecutionStep');
+/** ⭐ L17b3 (D90) — whether a batch records a try's work product. */
+const recordingTheWorkProduct = (commands: readonly { readonly commandType: string; readonly payload: Record<string, unknown> }[]): boolean =>
+	commands.some((c) => c.commandType === 'RecordArtifact' && c.payload.artifactType === 'work-product');
+
+describe('⭐⭐ L17b3 (D90; REG-F-650) — a started model step records its failure on every way out of a try', () => {
+	it('⛔ RED FIRST — a work product the record refuses fails the step with its reason, and the refusal still answers the page', async () => {
+		const { u, spec } = await aSpecification();
+		seam.refuseBatch = (commands) => (recordingTheWorkProduct(commands) ? 'the store refused the work product' : undefined);
+
+		const begun = await press(u, 'beginExecute', { pwuId: spec });
+
+		expect((begun.error ?? '').split(':')[0], 'arrangement: the work product’s record was refused').toBe('Recording the work product failed');
+		expect(latestStepOf(spec), 'the step was left RUNNING, or failed with no reason').toEqual({
+			stepState: 'FAILED',
+			failed: [expect.stringContaining('the store refused the work product')]
+		});
+	});
+
+	it('⛔ RED FIRST — a command the evidence join refuses fails the step with its reason, and the refusal still answers the page', async () => {
+		const { u, spec } = await aSpecification();
+		seam.refuseJoin = 'the evidence batch was refused';
+
+		const begun = await press(u, 'beginExecute', { pwuId: spec });
+
+		expect(begun.error ?? '', 'arrangement: the evidence was refused').toContain('could not be recorded as evidence: the evidence batch was refused');
+		expect(latestStepOf(spec), 'the step was left RUNNING, or failed with no reason').toEqual({
+			stepState: 'FAILED',
+			failed: [expect.stringContaining('the evidence batch was refused')]
+		});
+	});
+
+	it('⛔ RED FIRST — an exception that escapes a try fails the step, the exception described, and still goes on as the same value', async () => {
+		const { u, spec } = await aSpecification();
+		const escaped = new Error('the process runs could not be read');
+		seam.processRunsThrows = { value: escaped };
+
+		const caught = await press(u, 'beginExecute', { pwuId: spec }).then(
+			() => 'returned',
+			(e: unknown) => e
+		);
+
+		expect(caught, 'the exception that escaped is not the one thrown').toBe(escaped);
+		expect(latestStepOf(spec), 'the step was left RUNNING, or failed with no reason').toEqual({
+			stepState: 'FAILED',
+			failed: [expect.stringContaining('the process runs could not be read')]
+		});
+	});
+
+	it('⛔ RED FIRST — the two refusals’ failure, refused or thrown by the store, is said beside the refusal, the refusal’s own reason still the answer, and nothing escapes', async () => {
+		const seen: { readonly error: string; readonly thrown: string }[] = [];
+		for (const [way, recording] of [
+			['work-product', 'refused'],
+			['work-product', 'throws'],
+			['evidence', 'refused'],
+			['evidence', 'throws']
+		] as const) {
+			const { u, spec } = await aSpecification();
+			seam.refuseBatch = (commands) => {
+				if (way === 'work-product' && recordingTheWorkProduct(commands)) return 'the store refused the work product';
+				return recording === 'refused' && failing(commands) ? 'the store refused the failure' : undefined;
+			};
+			if (way === 'evidence') seam.refuseJoin = 'the evidence batch was refused';
+			if (recording === 'throws') seam.throwBatch = { when: failing, error: new Error('the store could not be written') };
+
+			seen.push(
+				await press(u, 'beginExecute', { pwuId: spec }).then(
+					(p) => ({ error: p.error ?? '', thrown: '' }),
+					(e: unknown) => ({ error: '', thrown: saidOf(e) })
+				)
+			);
+
+			seam.refuseBatch = undefined;
+			seam.refuseJoin = undefined;
+			seam.throwBatch = undefined;
+			expect(latestStepOf(spec).stepState, `arrangement: nothing could record ${way}’s failure`).toBe('RUNNING');
+		}
+
+		expect(seen.map((s) => s.thrown), 'a failure the store threw on escaped in the refusal’s place').toEqual(['', '', '', '']);
+		// ⭐ STRENGTHENED 2026-11-18 (the independent review's L17-13): ~~`s.error.split(':')[0]` and two `includes`~~ — each answer whole: the refusal with
+		// its own reason, then the recording's failure beside it (the page's `batchError` form, `<command>: <message>`, for one the store refused; the one
+		// describer's for one it threw), so a refusal that lost its reason is seen.
+		const workProduct = 'Recording the work product failed: RecordArtifact: the store refused the work product';
+		const evidence = 'The model ran 0 command(s) and one could not be recorded as evidence: the evidence batch was refused';
+		expect(seen.map((s) => s.error), 'the refusal with its own reason is not the answer, or the failure’s recording is not said beside it').toEqual([
+			`${workProduct} — and the failure could not be recorded: FailExecutionStep: the store refused the failure`,
+			`${workProduct} — and the failure could not be recorded: the store could not be written`,
+			`${evidence} — and the failure could not be recorded: FailExecutionStep: the store refused the failure`,
+			`${evidence} — and the failure could not be recorded: the store could not be written`
+		]);
+	});
+
+	it('⛔ RED FIRST — an exception’s failure, refused or thrown by the store, is named on the exception, which still goes on as the same value', async () => {
+		const seen: { readonly same: boolean; readonly message: string; readonly step: unknown }[] = [];
+		for (const recording of ['refused', 'throws'] as const) {
+			const { u, spec } = await aSpecification();
+			const escaped = new Error('the process runs could not be read');
+			seam.processRunsThrows = { value: escaped };
+			if (recording === 'refused') seam.refuseBatch = (commands) => (failing(commands) ? 'the store refused the failure' : undefined);
+			else seam.throwBatch = { when: failing, error: new Error('the store could not be written') };
+
+			const caught = await press(u, 'beginExecute', { pwuId: spec }).then(
+				() => 'returned',
+				(e: unknown) => e
+			);
+
+			seam.processRunsThrows = undefined;
+			seam.refuseBatch = undefined;
+			seam.throwBatch = undefined;
+			seen.push({ same: caught === escaped, message: escaped.message, step: latestStepOf(spec).stepState });
+		}
+
+		expect(seen.map((s) => s.same), 'the exception that escaped is not the one thrown').toEqual([true, true]);
+		// ⭐ AMENDED AT STAGE 2 (the builder's instrument defect, of L17-13's class; `l17b3-facts.md` §12): ~~`'the failure could not be recorded: the store
+		// refused the failure'`~~ — a recording the store refuses is said in the page's form, `<command>: <message>` (`batchError`), as package N's refused
+		// recordings are said (D90) and as the two refusals' test pins it; a thrown one by the one describer. Red at the base either way: nothing is named.
+		expect(
+			[
+				seen[0]!.message.includes('the failure could not be recorded: FailExecutionStep: the store refused the failure'),
+				seen[1]!.message.includes('the failure could not be recorded: the store could not be written')
+			],
+			'the failure’s recording is not named on the exception'
+		).toEqual([true, true]);
+		expect(seen.map((s) => [s.message.startsWith('the process runs could not be read'), s.step]), 'the exception’s own message was replaced, or a failure was recorded').toEqual([
+			[true, 'RUNNING'],
+			[true, 'RUNNING']
+		]);
+	});
+
+	it('⛔ RED FIRST — the refused invocation’s failure, refused or thrown by the store, is said beside its refusal, never in its place (the lead’s ruling 13)', async () => {
+		const seen: { readonly error: string; readonly thrown: string }[] = [];
+		for (const recording of ['refused', 'throws'] as const) {
+			const { u, spec } = await aSpecification();
+			seam.onTurn = async () => {
+				throw new Error('the provider is unreachable');
+			};
+			if (recording === 'refused') seam.refuseBatch = (commands) => (failing(commands) ? 'the store refused the failure' : undefined);
+			else seam.throwBatch = { when: failing, error: new Error('the store could not be written') };
+
+			seen.push(
+				await press(u, 'beginExecute', { pwuId: spec }).then(
+					(p) => ({ error: p.error ?? '', thrown: '' }),
+					(e: unknown) => ({ error: '', thrown: saidOf(e) })
+				)
+			);
+
+			seam.onTurn = undefined;
+			seam.refuseBatch = undefined;
+			seam.throwBatch = undefined;
+		}
+
+		expect(seen.map((s) => s.thrown), 'a failure the store threw on escaped in the refusal’s place').toEqual(['', '']);
+		// ⭐ STRENGTHENED 2026-11-18 (the independent review's L17-13): ~~the prefix and two `includes`~~ — each answer whole, the invocation's own reason
+		// (`the provider is unreachable`, as the scripted turn threw it) kept before the recording's failure.
+		const refused = 'The model invocation did not run: The model call failed: the provider is unreachable';
+		expect(seen.map((s) => s.error), 'the refused invocation with its own reason is not the answer, or its failure’s recording is not said beside it').toEqual([
+			`${refused} — and the failure could not be recorded: FailExecutionStep: the store refused the failure`,
+			`${refused} — and the failure could not be recorded: the store could not be written`
+		]);
+	});
+
+	// ⭐ STRENGTHENED 2026-11-18 (the independent review's L17-14): ~~the failure EVENTS counted~~ — the `FailExecutionStep` REQUESTS counted, so a
+	// second request the store refused is seen; and a third case, package N's failure RECORDED and an exception after it (the batch committed, then
+	// throwing), so the catch meets a step whose failure is already on the record. The promises kept: recorded once; asked once, the exception going on.
+	it('⭑ CONTROL — a step whose failure was asked for on its way out is not failed again: package N’s failure, recorded once; and one whose recording threw, asked once, the exception going on', async () => {
+		const recorded = await aSpecification();
+		seam.onTurn = async () => {
+			seam.listThrows = 'a file was removed between the walk and its stat';
+		};
+		let requested = 0;
+		seam.refuseBatch = (commands) => {
+			if (failing(commands)) requested += 1;
+			return undefined;
+		};
+		await press(recorded.u, 'beginExecute', { pwuId: recorded.spec });
+		seam.listThrows = undefined;
+		seam.refuseBatch = undefined;
+		expect(latestStepOf(recorded.spec), 'package N’s failure was not recorded once').toEqual({
+			stepState: 'FAILED',
+			failed: ["the host could not read the unit's workspace after try 1: a file was removed between the walk and its stat"]
+		});
+		expect(requested, 'the step’s failure was asked for more than once').toBe(1);
+
+		// ⭑ Package N's failure recorded, and an exception after it: the batch committed, then throwing, as a store that wrote and then failed would.
+		const committed = await aSpecification();
+		seam.onTurn = async () => {
+			seam.listThrows = 'a file was removed between the walk and its stat';
+		};
+		let asked2 = 0;
+		const afterTheCommit = new Error('the store wrote the failure, then could not be read back');
+		seam.throwAfterCommit = {
+			when: (commands) => {
+				if (!failing(commands)) return false;
+				asked2 += 1;
+				return true;
+			},
+			error: afterTheCommit
+		};
+		const caught2 = await press(committed.u, 'beginExecute', { pwuId: committed.spec }).then(
+			() => 'returned',
+			(e: unknown) => e
+		);
+		seam.onTurn = undefined;
+		seam.listThrows = undefined;
+		seam.throwAfterCommit = undefined;
+		expect(
+			[caught2 === afterTheCommit, asked2, latestStepOf(committed.spec).failed.length],
+			'a step whose failure was on the record was failed again, or the exception after it did not go on'
+		).toEqual([true, 1, 1]);
+
+		const threw = await aSpecification();
+		// ⭑ Package N's failure again, its own recording throwing as a store that cannot be written does: the exception the catch sees.
+		seam.onTurn = async () => {
+			seam.listThrows = 'a file was removed between the walk and its stat';
+		};
+		let asked = 0;
+		const afterItsEnd = new Error('the store could not be written');
+		seam.throwBatch = {
+			when: (commands) => {
+				if (!failing(commands)) return false;
+				asked += 1;
+				return true;
+			},
+			error: afterItsEnd
+		};
+		const caught = await press(threw.u, 'beginExecute', { pwuId: threw.spec }).then(
+			() => 'returned',
+			(e: unknown) => e
+		);
+		seam.onTurn = undefined;
+		seam.listThrows = undefined;
+		seam.throwBatch = undefined;
+		expect([caught === afterItsEnd, asked], 'the step’s failure was asked for again, or the exception did not go on').toEqual([true, 1]);
+	});
+
+	// ⭐⭐ The independent review's L17-14 — THE ORDER D90 STATES, and only it: each way's failure asked for after the step's end (the producer's close,
+	// and its last take where it takes one) and before the page is answered, or the exception goes on.
+	it('⛔ RED FIRST — each way out asks for the step’s failure after the step’s end and before its answer: a work product refused, a command’s evidence refused, an exception (D90; the review’s L17-14)', async () => {
+		const orders: unknown[] = [];
+		for (const way of ['work-product', 'evidence', 'exception'] as const) {
+			const { u, spec } = await aSpecification();
+			if (way === 'work-product') seam.refuseBatch = (commands) => (recordingTheWorkProduct(commands) ? 'the store refused the work product' : undefined);
+			if (way === 'evidence') seam.refuseJoin = 'the evidence batch was refused';
+			if (way === 'exception') seam.processRunsThrows = { value: new Error('the process runs could not be read') };
+			seam.trace.length = 0;
+
+			await press(u, 'beginExecute', { pwuId: spec }).then(
+				() => undefined,
+				() => undefined
+			);
+			seam.trace.push('answered');
+
+			seam.refuseBatch = undefined;
+			seam.refuseJoin = undefined;
+			seam.processRunsThrows = undefined;
+			const at = (what: string) => seam.trace.indexOf(what);
+			const lastEnd = Math.max(seam.trace.lastIndexOf('close'), seam.trace.lastIndexOf('take-at-end'));
+			orders.push([way, at('fail-request') > lastEnd && lastEnd >= 0, at('fail-request') >= 0 && at('fail-request') < at('answered')]);
+		}
+		expect(orders, 'a way out did not ask for the failure after the step’s end, or not before it answered').toEqual([
+			['work-product', true, true],
+			['evidence', true, true],
+			['exception', true, true]
+		]);
+	});
+
+	it('⭑ CONTROL — a try that reaches its review records what it records today: its step SUCCEEDED, no failure recorded', async () => {
+		const { u, spec } = await aSpecification();
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+		expect(latestStepOf(spec), 'a try that reached its review recorded a failure').toEqual({ stepState: 'SUCCEEDED', failed: [] });
+	});
+});
+
+describe('⭐⭐ L17b3 (D91; REG-F-649) — through the page: a repair after an answer its session does not hold sends the reviewed work again', () => {
+	const INTRO = 'The work product the review judged is below. This conversation does not hold it, so it is given again here:';
+	const RATIONALE_LINE = 'Its rationale, as you gave it with that work product:';
+	const REPAIR_OPENING = 'An independent assurance review of the work product you just produced found the following:';
+	/**
+	 * The floor refuses each try's work product with as many open findings as `perTry` says — none, a clean review — in order (package N's arrangement);
+	 * `afterReview` runs after the try it names is reviewed.
+	 */
+	const floorRefusing = (perTry: readonly number[], afterReview?: (reviewed: number) => void) => {
+		let reviewed = 0;
+		seam.review = (prompt) => {
+			if (!prompt.includes('The WORK PRODUCT to review')) return undefined;
+			const open = perTry[reviewed] ?? 0;
+			reviewed += 1;
+			afterReview?.(reviewed);
+			if (open === 0) return undefined;
+			const ids = [...prompt.matchAll(/^- ([A-Za-z0-9_-]+): .* \[if unmet: [A-Z]+\]$/gm)].map((m) => m[1]!);
+			return JSON.stringify({
+				findings: ids.map((id, i) =>
+					i < open ? { criterionId: id, failed: true, statement: `The work misses point ${i + 1}.`, severity: 'BLOCKING' } : { criterionId: id, failed: false, statement: 'met' }
+				),
+				recommendation: 'REJECTED',
+				residualUncertainty: []
+			});
+		};
+	};
+	/** The stops a try's answer was gathered from, by the try: each one message, ended as `stops` says (`stop` past its end). */
+	const gatheredFromEach = (stops: readonly (readonly string[])[]) => {
+		seam.gatheredFrom = (n) => (stops[n - 1] ?? ['stop']).map((stopReason) => ({ stopReason }));
+	};
+	/** The resend the page handed a try, as the step's input carries it. */
+	const resendOf = (input: unknown) =>
+		(input as { readonly resend?: { readonly workProduct: string; readonly rationale?: string; readonly sessionHoldsAnEarlierAnswer: boolean } }).resend;
+	/** The storage key a reference the latest EXECUTION exchange of `pwuId` holds names (`answerSpanRef`), or its last work product's. */
+	const spanKeyOfTheLatestTry = (pwuId: string): string | undefined => {
+		const x = listByType(getEngine(), 'MODEL_EXCHANGE')
+			.filter((e) => e.state.plane === 'EXECUTION' && e.state.subjectObjectId === pwuId)
+			.at(-1);
+		return (x?.state.answerSpanRef as { readonly storageKey?: string } | undefined)?.storageKey;
+	};
+	const workProductKeyOf = (pwuId: string): string | undefined =>
+		listByType(getEngine(), 'ARTIFACT')
+			.filter((a) => a.state.artifactType === 'work-product' && a.state.producingPwuId === pwuId)
+			.map((a) => String(a.state.storageKey))
+			.at(-1);
+
+	it('⛔ RED FIRST — a repair after an answer that ended in an error sends the reviewed work before its findings, its rationale beside it (D91)', async () => {
+		const { u, spec } = await aSpecification();
+		// ⭐ L17-10 — the reviewed try's work product's bytes, read from the store as the review left them, independently of the page.
+		let reviewedKey: string | undefined;
+		floorRefusing([1], (reviewed) => {
+			if (reviewed === 1) reviewedKey = workProductKeyOf(spec);
+		});
+		gatheredFromEach([['error']]);
+		const turns = seam.turns.length;
+		const inputs = seam.stepInputs.length;
+
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+		const repair = seam.turns[turns + 1] ?? '';
+		expect(repair, 'the repair did not send the reviewed work first').toContain(`${INTRO}\n\n`);
+		expect(
+			[repair.startsWith(INTRO), repair.includes('ATTEMPT 1: Write the Specification.'), repair.includes(RATIONALE_LINE), repair.includes('An account.'), repair.indexOf(REPAIR_OPENING) > repair.indexOf('ATTEMPT 1')],
+			'the repair does not open with the work the review judged, its rationale beside it, the findings after'
+		).toEqual([true, true, true, true, true]);
+		expect(resendOf(seam.stepInputs[inputs + 1])?.sessionHoldsAnEarlierAnswer, 'the session was said to hold an earlier answer').toBe(false);
+		// ⭐ STRENGTHENED 2026-11-18 (the independent review's L17-10): ~~a substring of the work~~ — the reviewed bytes whole, as the store holds them: the
+		// step's input carries them, and the turn sends them, between the introduction and the rationale's line.
+		const reviewed = (await getArtifactStore().get(reviewedKey ?? '')) ?? '(the reviewed work product is not in the store)';
+		expect(
+			[resendOf(seam.stepInputs[inputs + 1])?.workProduct, repair.startsWith(`${INTRO}\n\n${reviewed}\n\n${RATIONALE_LINE}\n\n`)],
+			'the work sent again is not the reviewed work product’s bytes, whole'
+		).toEqual([reviewed, true]);
+	});
+
+	it('⛔ RED FIRST — a repair after an aborted answer sends it too', async () => {
+		const { u, spec } = await aSpecification();
+		floorRefusing([1]);
+		gatheredFromEach([['aborted']]);
+		const turns = seam.turns.length;
+
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+		expect((seam.turns[turns + 1] ?? '').startsWith(`${INTRO}\n\n`), 'the repair did not send the reviewed work first').toBe(true);
+	});
+
+	it('⛔ RED FIRST — a try whose answer was gathered from a reply Pi does not replay and the one after it sends the work too: every message the answer was gathered from is asked', async () => {
+		const { u, spec } = await aSpecification();
+		floorRefusing([1]);
+		gatheredFromEach([['error', 'stop']]);
+		const turns = seam.turns.length;
+
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+		expect((seam.turns[turns + 1] ?? '').startsWith(`${INTRO}\n\n`), 'the repair did not send the reviewed work first').toBe(true);
+	});
+
+	it('⛔ RED FIRST — a session that holds an earlier answer but not the reviewed one sends the reviewed one, saying the session holds an earlier answer', async () => {
+		const { u, spec } = await aSpecification();
+		// ⭑ Two findings, then one: the trend converges, so a third try is allowed (`mayRetry`).
+		floorRefusing([2, 1]);
+		gatheredFromEach([['stop'], ['error']]);
+		const turns = seam.turns.length;
+		const inputs = seam.stepInputs.length;
+
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+		expect(seam.stepInputs.length - inputs, 'arrangement: three tries').toBe(3);
+		expect(
+			[resendOf(seam.stepInputs[inputs + 1]), resendOf(seam.stepInputs[inputs + 2])?.sessionHoldsAnEarlierAnswer],
+			'the repair after a replayed answer sent it again, or the one after an errored answer did not say the session holds an earlier one'
+		).toEqual([undefined, true]);
+		const third = seam.turns[turns + 2] ?? '';
+		expect([third.startsWith(`${INTRO}\n\n`), third.includes(`ATTEMPT 1: ${REPAIR_OPENING}`)], 'the third try was not sent the second’s work, the work the review judged').toEqual([
+			true,
+			true
+		]);
+	});
+
+	it('⛔ RED FIRST — a retained answer span that cannot be read back to give the reviewed work product sends the work product alone, no rationale declared', async () => {
+		const { u, spec } = await aSpecification();
+		floorRefusing([1], (reviewed) => {
+			if (reviewed !== 1) return;
+			const span = spanKeyOfTheLatestTry(spec);
+			seam.unreadable = (key) => key === span;
+		});
+		gatheredFromEach([['error']]);
+		const turns = seam.turns.length;
+		const inputs = seam.stepInputs.length;
+
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+		const repair = seam.turns[turns + 1] ?? '';
+		expect([repair.startsWith(`${INTRO}\n\n`), repair.includes(RATIONALE_LINE), resendOf(seam.stepInputs[inputs + 1])?.rationale], 'the work product did not go alone').toEqual([
+			true,
+			false,
+			undefined
+		]);
+	});
+
+	it('⛔ RED FIRST — a work product that cannot be read back whole fails the step with its reason (D90), never a turn without it', async () => {
+		const { u, spec } = await aSpecification();
+		floorRefusing([1], (reviewed) => {
+			if (reviewed !== 1) return;
+			const key = workProductKeyOf(spec);
+			seam.unreadable = (k) => k === key;
+		});
+		gatheredFromEach([['error']]);
+		const turns = seam.turns.length;
+
+		const begun = await press(u, 'beginExecute', { pwuId: spec });
+
+		expect([seam.turns.length - turns, (begun.error ?? '').includes('could not be read back')], 'a repair was sent without the work, or the step’s failure does not say why').toEqual([1, true]);
+		expect(latestStepOf(spec), 'the step was not failed with its reason').toEqual({ stepState: 'FAILED', failed: [expect.stringContaining('could not be read back')] });
+	});
+
+	// ⭐ The independent review's L17-10 — bytes PRESENT that do not match their hash, never sent as the reviewed work: the work product's, failing the
+	// step (D90); the retained span's, the work product going alone (D91).
+	it('⛔ RED FIRST — a work product whose bytes are present but do not match their hash fails the step with its reason (D90), never a turn with them (the review’s L17-10)', async () => {
+		const { u, spec } = await aSpecification();
+		floorRefusing([1], (reviewed) => {
+			if (reviewed !== 1) return;
+			const key = workProductKeyOf(spec);
+			seam.tampered = (k) => (k === key ? 'bytes the model never wrote' : undefined);
+		});
+		gatheredFromEach([['error']]);
+		const turns = seam.turns.length;
+
+		const begun = await press(u, 'beginExecute', { pwuId: spec });
+
+		expect(
+			[seam.turns.length - turns, seam.turns.some((t) => t.includes('bytes the model never wrote')), (begun.error ?? '').includes('could not be read back')],
+			'a repair was sent, or sent the bytes that do not verify, or the step’s failure does not say why'
+		).toEqual([1, false, true]);
+		expect(latestStepOf(spec), 'the step was not failed with its reason').toEqual({ stepState: 'FAILED', failed: [expect.stringContaining('could not be read back')] });
+	});
+
+	it('⛔ RED FIRST — a retained answer span whose bytes are present but do not match their hash sends the work product alone, no rationale declared (the review’s L17-10)', async () => {
+		const { u, spec } = await aSpecification();
+		floorRefusing([1], (reviewed) => {
+			if (reviewed !== 1) return;
+			const span = spanKeyOfTheLatestTry(spec);
+			seam.tampered = (k) => (k === span ? JSON.stringify({ workProduct: 'other work', rationale: { rationale: 'TAMPERED account.' } }) : undefined);
+		});
+		gatheredFromEach([['error']]);
+		const turns = seam.turns.length;
+		const inputs = seam.stepInputs.length;
+
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+		const repair = seam.turns[turns + 1] ?? '';
+		expect(
+			[repair.startsWith(`${INTRO}\n\n`), repair.includes(RATIONALE_LINE), repair.includes('TAMPERED'), resendOf(seam.stepInputs[inputs + 1])?.rationale],
+			'the work product did not go alone, or the span’s bytes that do not verify were sent'
+		).toEqual([true, false, false, undefined]);
+	});
+
+	// ⭐ The independent review's L17-08 — a span READABLE and verified, whose split does not give back the reviewed bytes: an answer of prose and an
+	// envelope, whose work product is the whole answer (`splitExecutionEnvelope` reads no JSON object in it) while the span retained is the envelope
+	// alone (`exchange-capture.ts`, `splitAnswerSpan`), so the span's work product is not the reviewed one (D91, "since a retained span can hold an
+	// envelope apart from prose the work product kept").
+	it('⛔ RED FIRST — a retained span that reads and verifies but whose split does not give back the reviewed work product sends the work product alone, no rationale declared (D91; the review’s L17-08)', async () => {
+		const { u, spec } = await aSpecification();
+		seam.answerShape = (envelope) => `Here is the specification, as the envelope below gives it.\n${envelope}`;
+		let reviewedKey: string | undefined;
+		floorRefusing([1], (reviewed) => {
+			if (reviewed === 1) reviewedKey = workProductKeyOf(spec);
+		});
+		gatheredFromEach([['error']]);
+		const turns = seam.turns.length;
+		const inputs = seam.stepInputs.length;
+
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+		const reviewed = (await getArtifactStore().get(reviewedKey ?? '')) ?? '(the reviewed work product is not in the store)';
+		expect(reviewed.startsWith('Here is the specification'), 'arrangement: the reviewed work product is the whole answer, its prose kept').toBe(true);
+		const repair = seam.turns[turns + 1] ?? '';
+		expect(
+			[repair.startsWith(`${INTRO}\n\n${reviewed}`), repair.includes(RATIONALE_LINE), resendOf(seam.stepInputs[inputs + 1])?.rationale],
+			'the work product did not go alone, its bytes whole'
+		).toEqual([true, false, undefined]);
+	});
+
+	// ⭐⭐ The lead's ruling 2 on Stage 1's writing (`l17b3-facts.md` §5.2) — THE FAIL-SAFE, ITS OWN TEST: where which messages an answer was gathered
+	// from cannot be shown, the work is sent again (D91), so a producer that keeps its history and gives no stops is never read as holding the reviewed
+	// answer. Both shapes of "none": an adapter's result without the field, and a bare string. ⭑ Its mutant (Stage 3): the absent field read as held.
+	it('⛔ RED FIRST — the fail-safe: a repair after an answer whose session keeps its history but gives no stops of the messages it was gathered from sends the work again — a result without the field, or a bare string (D91)', async () => {
+		const opened: boolean[] = [];
+		for (const answering of [() => undefined, undefined] as const) {
+			const { u, spec } = await aSpecification();
+			floorRefusing([1]);
+			seam.gatheredFrom = answering;
+			const turns = seam.turns.length;
+
+			expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+			opened.push((seam.turns[turns + 1] ?? '').startsWith(`${INTRO}\n\n`));
+		}
+		expect(opened, 'the repair did not send the reviewed work first').toEqual([true, true]);
+	});
+
+	it('⭑ CONTROL — a repair after an answer its session holds — every message it was gathered from one Pi replays — is today’s: no work sent again', async () => {
+		const { u, spec } = await aSpecification();
+		floorRefusing([1]);
+		gatheredFromEach([['stop']]);
+		const turns = seam.turns.length;
+		const inputs = seam.stepInputs.length;
+
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+		expect([resendOf(seam.stepInputs[inputs + 1]), (seam.turns[turns + 1] ?? '').startsWith(REPAIR_OPENING)], 'a repair after a replayed answer moved').toEqual([undefined, true]);
+	});
+
+	// ⭐⭐ The independent review's L17-09 — ON D85'S REOPENED FILE, THROUGH THE PAGE: the reviewed try found in the file by its turn's text (the one user
+	// entry equal to it), its messages those after it up to the next user entry (§2.11 (10), ruled), and the work sent again after the instruction and
+	// before the findings where one of them Pi does not replay — at D71's re-run and at RD8's. The file is written by hand, as Pi writes one (the scripted
+	// producer writes none), its user entries the record's turns.
+	const HELD_SENTENCE = 'the work product the review judged is the one given above, which the conversation does not hold.';
+	/** Verification rejected on a durable store, its reviewed turn's text, and its reviewed work product's bytes as the store holds them. */
+	async function verificationRejectedDurably() {
+		const root = durableHere();
+		const r = await verificationRejected();
+		const reviewedTurn = seam.turns.filter((t) => t.startsWith('Write the Verification.')).at(-1) ?? '(no turn of Verification was sent)';
+		const work = (await getArtifactStore().get(workProductKeyOf(r.ids.verification) ?? '')) ?? '(the reviewed work product is not in the store)';
+		return { root, r, reviewedTurn, work, folder: sessionFolderOf(root, 'executor', r.ids.verification) };
+	}
+	/** D71's re-run of Verification: its first turn, and the input the page handed its step. */
+	async function rerunInPlace(r: Awaited<ReturnType<typeof verificationRejected>>) {
+		const [turns, inputs] = [seam.turns.length, seam.stepInputs.length];
+		expect((await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it with the findings.' })).error, 'arrangement: the re-run').toBeUndefined();
+		return { turn: seam.turns[turns] ?? '', input: seam.stepInputs[inputs] };
+	}
+
+	it('⛔ RED FIRST — D71’s re-run on a reopened file whose reviewed answer Pi does not replay sends the reviewed work, whole, after the instruction and before the findings, and says the reviewed work is the one given above (D91; the review’s L17-09)', async () => {
+		const d = await verificationRejectedDurably();
+		sessionFileWith(d.folder, [{ user: d.reviewedTurn, assistant: 'The work.', stopReason: 'error' }]);
+
+		const { turn, input } = await rerunInPlace(d.r);
+
+		expect(
+			[turn.startsWith(`${d.reviewedTurn}\n\n${INTRO}\n\n${d.work}\n\n`), turn.indexOf(INTRO) < turn.indexOf(CARRIED_FINDINGS_LINE), turn.includes(HELD_SENTENCE), resendOf(input)?.workProduct],
+			'the reopened first turn did not send the reviewed work, whole, after the instruction and before the findings, saying so'
+		).toEqual([true, true, true, d.work]);
+	});
+
+	it('⛔ RED FIRST — RD8’s re-run on a reopened file, after the step stopped, whose reviewed answer Pi does not replay sends the reviewed work after the instruction and before the findings (D91; the review’s L17-09)', async () => {
+		const root = durableHere();
+		const { u, spec } = await aSpecification();
+		// ⭑ Two tries, each refused with one finding: no convergence, so the loop ends and the unit waits with the findings (`mayRetry`).
+		floorRefusing([1, 1]);
+		gatheredFromEach([['stop'], ['stop']]);
+		const turns = seam.turns.length;
+		const stopped = await press(u, 'beginExecute', { pwuId: spec });
+		expect([seam.turns.length - turns, (getObject(getEngine(), spec) ?? {}).executionState], `arrangement: two tries, then the unit waits — ${stopped.error ?? ''}`).toEqual([2, 'WAITING']);
+		const [first, second] = [seam.turns[turns] ?? '', seam.turns[turns + 1] ?? ''];
+		const work = (await getArtifactStore().get(workProductKeyOf(spec) ?? '')) ?? '(the reviewed work product is not in the store)';
+		sessionFileWith(sessionFolderOf(root, 'executor', spec), [
+			{ user: first, assistant: 'The first work.', stopReason: 'stop' },
+			{ user: second, assistant: 'The second work.', stopReason: 'error' }
+		]);
+		seam.review = undefined;
+		seam.gatheredFrom = undefined;
+		const [before, inputs] = [seam.turns.length, seam.stepInputs.length];
+
+		expect((await press(u, 'rerunWork', { pwuId: spec, rationale: 'Run the work again with the findings.' })).advanced, 'arrangement: the work re-run').toBe('work-rerun');
+
+		const turn = seam.turns[before] ?? '';
+		expect(
+			[turn.startsWith(`${first}\n\n${INTRO}\n\n${work}\n\n`), turn.indexOf(INTRO) < turn.indexOf(CARRIED_FINDINGS_LINE), turn.includes(HELD_SENTENCE), resendOf(seam.stepInputs[inputs])?.workProduct],
+			'RD8’s reopened first turn did not send the reviewed work after the instruction and before the findings, saying so'
+		).toEqual([true, true, true, work]);
+	});
+
+	it('⛔ RED FIRST — the reviewed try found only by ONE user entry equal to its turn: no such entry, or two, and the work is sent again; its messages end at the next user entry, so a later try’s error does not send it (D91, §2.11 (10); the review’s L17-09)', async () => {
+		const sent: boolean[] = [];
+		for (const arrangement of ['no-match', 'two-matches', 'later-error'] as const) {
+			const d = await verificationRejectedDurably();
+			const answered = (user: string, stopReason: string) => ({ user, assistant: 'The work.', stopReason });
+			sessionFileWith(
+				d.folder,
+				arrangement === 'no-match'
+					? [answered('A turn the record does not hold.', 'stop')]
+					: arrangement === 'two-matches'
+						? [answered(d.reviewedTurn, 'stop'), answered(d.reviewedTurn, 'stop')]
+						: [answered(d.reviewedTurn, 'stop'), answered('A later turn on the file.', 'error')]
+			);
+			const { input } = await rerunInPlace(d.r);
+			sent.push(resendOf(input) !== undefined);
+		}
+		expect(sent, 'the work was not sent again where no single user entry is the reviewed turn, or was sent for a later try’s error').toEqual([true, true, false]);
+	});
+
+	it('⭑ CONTROL — D71’s re-run on a reopened file whose reviewed answer Pi replays sends nothing again: its first turn as today (D91; the review’s L17-09)', async () => {
+		const d = await verificationRejectedDurably();
+		sessionFileWith(d.folder, [{ user: d.reviewedTurn, assistant: 'The work.', stopReason: 'stop' }]);
+
+		const { turn, input } = await rerunInPlace(d.r);
+
+		expect(
+			[resendOf(input), turn.includes(INTRO), turn.includes('This session holds that attempt: the turns above are your earlier work on this unit, with the work product you returned and your rationale.')],
+			'a re-run on a file whose reviewed answer Pi replays moved'
+		).toEqual([undefined, false, true]);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — the lead's ruling 2 (§16; the independent review's L17C-02) — A FILE OR A STEP THAT SHOWS NO REVIEWED ANSWER.
+	// On a reopened file, the reviewed turn's user entry followed by no message that carried text is NOT_SHOWN, so the work is sent again; within a
+	// step, an empty `gatheredFrom` cannot show which messages the answer was gathered from, so the work is sent again.
+	it('⛔ RED FIRST — D71’s re-run on a reopened file whose reviewed turn is followed by no answer sends the reviewed work again: the file shows no reviewed answer (the lead’s ruling 2)', async () => {
+		const d = await verificationRejectedDurably();
+		// ⭑ The reviewed turn's user entry alone, as Pi's file holds one whose answer never landed.
+		sessionFileWith(d.folder, [{ user: d.reviewedTurn }]);
+
+		const { turn, input } = await rerunInPlace(d.r);
+
+		expect(
+			[resendOf(input)?.workProduct, turn.startsWith(`${d.reviewedTurn}\n\n${INTRO}\n\n${d.work}\n\n`)],
+			'a reopened file that shows no reviewed answer was read to hold it, and the work not sent again'
+		).toEqual([d.work, true]);
+	});
+
+	it('⛔ RED FIRST — within a step, a try whose answer was gathered from no message it can show (`gatheredFrom: []`) has the reviewed work sent again with its repair (the lead’s ruling 2)', async () => {
+		const { u, spec } = await aSpecification();
+		floorRefusing([1]);
+		gatheredFromEach([[]]);
+		const turns = seam.turns.length;
+
+		expect((await press(u, 'beginExecute', { pwuId: spec })).error, 'the step did not run').toBeUndefined();
+
+		expect((seam.turns[turns + 1] ?? '').startsWith(`${INTRO}\n\n`), 'the repair did not send the reviewed work first').toBe(true);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — the lead's ruling 5 and §18.2 (§16, §18; the independent review's L17C-05; D90, as the lead amends it) — EVERY
+// WAY OUT OF A STARTED MODEL STEP, THE READS BEFORE ITS TRY LOOP AMONG THEM. A read after the start that throws — the record of the units a replacement
+// replaces, the step's attempt — fails the step once with its described reason, said beside where its recording is refused or throws, no producer
+// end where none opened, the page answered with the reason; a read the start does not depend on — the criteria the unit's declared reviews judge it
+// by — is made before the start, so a throw starts nothing; and the two refusals before the loop (the policy unresolved, the producer not opened) say
+// a failure the store refused or threw on recording beside the refusal, in D90's form, never in its place.
+describe('⭐⭐ L17b3 (D90; the lead’s ruling 5 and §18.2) — the reads before a started step’s try loop: none escapes, none leaves the step RUNNING', () => {
+	/** What a press answered: its error, or what escaped it. */
+	const answered = (pressed: Promise<{ readonly error?: string }>) =>
+		pressed.then(
+			(p) => ({ error: p.error ?? '', thrown: '' }),
+			(e: unknown) => ({ error: '', thrown: saidOf(e) })
+		);
+
+	it('⛔ RED FIRST — a replacement’s record that cannot be read after its step started fails the step once with the reason, and the page answers with it; no producer opened (the lead’s ruling 5)', async () => {
+		const r = await verificationRejected();
+		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
+		const source2 = currentOf(r.u, 'Source').id;
+		const [opens, trace] = [seam.opens, seam.trace.length];
+		seam.conversationThrows = { value: new Error('the record’s store could not be read') };
+
+		const said = await answered(press(r.u, 'beginExecute', { pwuId: source2 }));
+
+		seam.conversationThrows = undefined;
+		expect(
+			[said.thrown, said.error.includes('the record of the units this one replaces could not be read: the record’s store could not be read'), latestStepOf(source2)],
+			'the record’s failure escaped, or the step was left RUNNING, or failed with no reason'
+		).toEqual(['', true, { stepState: 'FAILED', failed: [expect.stringContaining('the record’s store could not be read')] }]);
+		expect([seam.trace.slice(trace), seam.opens - opens], 'the step’s failure was not asked for once, or a producer opened').toEqual([['fail-request'], 0]);
+	});
+
+	// ⭐⭐ RESTATED 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — the lead's ruling 4 of §23; the re-check's L17R-05 and the lead's O-3): ~~'… no step
+	// RUNNING, and the page answers with the reason — at Begin & Execute and at RD8’s re-run (the lead’s §18.2 (1))'~~ — "not RUNNING" alone is met
+	// by a step that started and then failed: Begin & Execute's limb now holds too that no plan was made and no step exists for the unit, and D71's
+	// re-run is added, its criteria's read failing as the person re-runs it, no plan made and no Decision recorded. Every expectation of the old
+	// limbs kept, byte for byte.
+	it('⛔ RED FIRST — the criteria a unit’s declared reviews judge it by, if they cannot be read, refuse its start: no step RUNNING, no plan made, and the page answers with the reason — at Begin & Execute, where no step exists, at RD8’s re-run, and at D71’s re-run, where no Decision is recorded (the lead’s §18.2 (1); ruling 4 of §23)', async () => {
+		const begin = await aSpecification();
+		// ⭐ The lead's ruling 4 of §23 — the unit's plans before it, so a plan made is seen.
+		const beginPlansBefore = listByType(getEngine(), 'EXECUTION_PLAN').filter((p) => p.state.workUnitId === begin.spec).length;
+		seam.criteriaThrows = { value: new Error('the governing policies could not be read') };
+		const begun = await answered(press(begin.u, 'beginExecute', { pwuId: begin.spec }));
+		seam.criteriaThrows = undefined;
+
+		// ⭑ RD8's re-run of a stopped unit: its first step stopped at its review's transport, then the criteria's read failing as the person re-runs it.
+		const rd8 = await aSpecification();
+		let down = true;
+		seam.review = (prompt) => {
+			if (down && prompt.includes('The WORK PRODUCT to review')) throw new Error('devin exited with code 1: connection reset by peer');
+			return chapterAnswering(prompt);
+		};
+		expect((await press(rd8.u, 'beginExecute', { pwuId: rd8.spec })).error ?? '', 'arrangement: the step stopped at its review’s transport').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		down = false;
+		const plansBefore = listByType(getEngine(), 'EXECUTION_PLAN').filter((p) => p.state.workUnitId === rd8.spec).length;
+		seam.criteriaThrows = { value: new Error('the governing policies could not be read') };
+		const rerun = await answered(press(rd8.u, 'rerunWork', { pwuId: rd8.spec, rationale: 'The reviewer failed at the transport; run the work again.' }));
+		seam.criteriaThrows = undefined;
+
+		expect(
+			[begun.thrown, begun.error.includes('the governing policies could not be read'), latestStepOf(begin.spec).stepState !== 'RUNNING'],
+			'Begin & Execute escaped, or left its step RUNNING, or did not answer with the reason'
+		).toEqual(['', true, true]);
+		expect(
+			[
+				rerun.thrown,
+				rerun.error.includes('the governing policies could not be read'),
+				latestStepOf(rd8.spec).stepState !== 'RUNNING',
+				listByType(getEngine(), 'EXECUTION_PLAN').filter((p) => p.state.workUnitId === rd8.spec).length
+			],
+			'RD8’s re-run escaped, left a step RUNNING, did not answer with the reason, or started a plan'
+		).toEqual(['', true, true, plansBefore]);
+		// ⭐ The lead's ruling 4 of §23 — Begin & Execute made no plan, and no step exists for the unit: "not RUNNING" alone is met by a step that
+		// started and then failed.
+		expect(
+			[listByType(getEngine(), 'EXECUTION_PLAN').filter((p) => p.state.workUnitId === begin.spec).length, latestStepOf(begin.spec).stepState],
+			'Begin & Execute made a plan, or a step exists for the unit'
+		).toEqual([beginPlansBefore, undefined]);
+
+		// ⭐ The lead's ruling 4 of §23 — D71's re-run: a unit its declared reviews rejected, the criteria's read failing as the person re-runs it — that
+		// read alone (`onlyWithin`), so the offer, which reads the same policies first, reads them whole.
+		const d71 = await verificationRejected();
+		const [d71PlansBefore, decisionsBefore] = [
+			listByType(getEngine(), 'EXECUTION_PLAN').filter((p) => p.state.workUnitId === d71.ids.verification).length,
+			listByType(getEngine(), 'DECISION').length
+		];
+		seam.criteriaThrows = { value: new Error('the governing policies could not be read'), onlyWithin: 'reviewCriteriaOf' };
+		const rejectedRerun = await answered(press(d71.u, 'rerunRejectedWork', { pwuId: d71.ids.verification, rationale: 'Re-run it with the findings.' }));
+		seam.criteriaThrows = undefined;
+		expect(
+			[
+				rejectedRerun.thrown,
+				rejectedRerun.error.includes('the criteria its declared reviews will judge it by could not be read: the governing policies could not be read'),
+				latestStepOf(d71.ids.verification).stepState !== 'RUNNING',
+				listByType(getEngine(), 'EXECUTION_PLAN').filter((p) => p.state.workUnitId === d71.ids.verification).length,
+				listByType(getEngine(), 'DECISION').length
+			],
+			'D71’s re-run escaped, left a step RUNNING, did not answer with the reason, made a plan, or recorded a Decision'
+		).toEqual(['', true, true, d71PlansBefore, decisionsBefore]);
+	});
+
+	it('⛔ RED FIRST — the step’s attempt that cannot be read after its start fails the step once with the reason, and the page answers with it; no producer opened (the lead’s §18.2 (2))', async () => {
+		const { u, spec } = await aSpecification();
+		const [opens, trace] = [seam.opens, seam.trace.length];
+		seam.attemptKeyThrows = { value: new Error('the events could not be read') };
+
+		const said = await answered(press(u, 'beginExecute', { pwuId: spec }));
+
+		seam.attemptKeyThrows = undefined;
+		expect(
+			[said.thrown, said.error.includes('the events could not be read'), latestStepOf(spec)],
+			'the attempt’s failure escaped, or the step was left RUNNING, or failed with no reason'
+		).toEqual(['', true, { stepState: 'FAILED', failed: [expect.stringContaining('the events could not be read')] }]);
+		expect([seam.trace.slice(trace), seam.opens - opens], 'the step’s failure was not asked for once, or a producer opened').toEqual([['fail-request'], 0]);
+	});
+
+	// ⭐ L17b3 — the lead's ruling 1 of §23 (the re-check's L17R-01; the lead's O-1) — THE TWO CATCHES BEFORE THE TRY LOOP DESCRIBE WHAT THEY CAUGHT BY
+	// THE ONE DESCRIBER (`describedThrow`): a value that cannot be described — `Object.create(null)`, a revoked `Proxy`, an `Error` whose `message`
+	// getter throws — thrown by the policy's resolution or by the producer's opening is said to be one; nothing escapes, the step is FAILED once.
+	it('⛔ RED FIRST — a value that cannot be described, thrown by the policy’s resolution or the producer’s opening before the try loop: nothing escapes, the step is FAILED once with the describer’s words, and the page answers with them (the lead’s ruling 1 of §23)', async () => {
+		/** The three values, made fresh for each case. */
+		const indescribable = (): readonly (readonly [string, unknown])[] => {
+			const revocable = Proxy.revocable({}, {});
+			revocable.revoke();
+			const unreadable = new Error('arrangement: its message cannot be read');
+			Object.defineProperty(unreadable, 'message', {
+				get() {
+					throw new Error('the message cannot be read');
+				}
+			});
+			return [
+				['Object.create(null)', Object.create(null) as unknown],
+				['a revoked Proxy', revocable.proxy],
+				['an Error whose message getter throws', unreadable]
+			];
+		};
+		const seen: unknown[] = [];
+		for (const where of ['policy', 'opening'] as const)
+			for (const [label, value] of indescribable()) {
+				const { u, spec } = await aSpecification();
+				const [opens, trace] = [seam.opens, seam.trace.length];
+				if (where === 'policy') seam.policyThrows = { value };
+				else seam.openThrows = { value };
+				const said = await answered(press(u, 'beginExecute', { pwuId: spec }));
+				seam.policyThrows = undefined;
+				seam.openThrows = undefined;
+				const step = latestStepOf(spec);
+				seen.push([where, label, said.thrown, said.error, step.stepState, step.failed, seam.trace.slice(trace), seam.opens - opens]);
+			}
+
+		const WORDS = 'a thrown value that cannot be described';
+		expect(
+			seen,
+			'a value that cannot be described escaped a catch before the try loop, left the step RUNNING, or was not said by the one describer'
+		).toEqual(
+			(['policy', 'opening'] as const).flatMap((where) =>
+				['Object.create(null)', 'a revoked Proxy', 'an Error whose message getter throws'].map((label) => [
+					where,
+					label,
+					'',
+					`The model invocation did not run: ${WORDS}`,
+					'FAILED',
+					[WORDS],
+					['fail-request'],
+					0
+				])
+			)
+		);
+	});
+
+	it('⛔ RED FIRST — a step refused before its try loop — its policy unresolved, or its producer not opened — says a failure the store refused or threw on recording beside the refusal, in D90’s form, and nothing escapes (the lead’s §18.2 (3))', async () => {
+		const seen: { readonly error: string; readonly thrown: string }[] = [];
+		for (const [where, recording] of [
+			['policy', 'refused'],
+			['policy', 'throws'],
+			['opening', 'refused'],
+			['opening', 'throws']
+		] as const) {
+			const { u, spec } = await aSpecification();
+			if (where === 'policy') seam.policyThrows = { value: new Error('the context policy could not be resolved') };
+			else seam.listThrows = 'the workspace could not be listed';
+			if (recording === 'refused') seam.refuseBatch = (commands) => (failing(commands) ? 'the store refused the failure' : undefined);
+			else seam.throwBatch = { when: failing, error: new Error('the store could not be written') };
+
+			seen.push(await answered(press(u, 'beginExecute', { pwuId: spec })));
+
+			seam.policyThrows = undefined;
+			seam.listThrows = undefined;
+			seam.refuseBatch = undefined;
+			seam.throwBatch = undefined;
+			expect(latestStepOf(spec).stepState, `arrangement: nothing could record the ${where} refusal’s failure`).toBe('RUNNING');
+		}
+
+		expect(seen.map((s) => s.thrown), 'a failure the store threw on escaped in the refusal’s place').toEqual(['', '', '', '']);
+		// ⭑ Each answer: the refusal with its own reason first, then the recording's failure beside it — the page's `batchError` form (`<command>:
+		// <message>`) for one the store refused, the one describer's for one it threw.
+		const [refusal, recordingFailure] = [(s: { readonly error: string }) => s.error.split(' — and the failure could not be recorded: ')[0] ?? '', (s: { readonly error: string }) => s.error.split(' — and the failure could not be recorded: ')[1]];
+		expect(
+			seen.map((s) => [refusal(s).startsWith('The model invocation did not run: '), refusal(s).includes(s === seen[0] || s === seen[1] ? 'the context policy could not be resolved' : 'the workspace could not be listed')]),
+			'the refusal with its own reason is not the answer'
+		).toEqual([
+			[true, true],
+			[true, true],
+			[true, true],
+			[true, true]
+		]);
+		expect(seen.map(recordingFailure), 'the failure’s recording is not said beside the refusal, in D90’s form').toEqual([
+			'FailExecutionStep: the store refused the failure',
+			'the store could not be written',
+			'FailExecutionStep: the store refused the failure',
+			'the store could not be written'
+		]);
+	});
+});
+
 beforeEach(() => {
 	resetEngine('reference');
 	seam.prompts.length = 0;
@@ -2172,6 +3671,24 @@ beforeEach(() => {
 	seam.disposes = 0;
 	seam.disposeThrows = undefined;
 	seam.throwBatch = undefined;
+	// ⭐ L17b3 — the three seams this package adds, reset. ⭐ And the six the review's findings add (L17-05, L17-08, L17-10, L17-14).
+	seam.contexts.length = 0;
+	seam.gatheredFrom = undefined;
+	seam.unreadable = undefined;
+	seam.tampered = undefined;
+	seam.answerShape = undefined;
+	seam.runs = undefined;
+	seam.documentOf = undefined;
+	seam.throwAfterCommit = undefined;
+	seam.trace.length = 0;
+	seam.refuseStepOf = undefined;
+	// ⭐ L17b3 — the lead's ruling 5 and §18.2: the four reads' seams, reset.
+	seam.conversationThrows = undefined;
+	seam.criteriaThrows = undefined;
+	seam.attemptKeyThrows = undefined;
+	seam.policyThrows = undefined;
+	// ⭐ L17b3 — the lead's ruling 1 of §23: the opening's seam, reset.
+	seam.openThrows = undefined;
 	seam.answer = (policyId) => answerOf(policyId);
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);

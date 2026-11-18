@@ -39,6 +39,10 @@ import {
 	floorValidatorResult,
 	seedPolicy as seedFloorPolicyFixture
 } from './__tests__/floor-fixtures.js';
+// ⭐ RESTATED IN FORM 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173` (2)): every `RequestRuntimeBinding` here names its
+// step's context policy, a field the command now requires, and the test's store holds that policy (`holdDefaultContextPolicy`), as the handler
+// refuses one it does not hold. Arrangement only: what each test checks is unchanged.
+import { HELD_CONTEXT_POLICY_ID, holdDefaultContextPolicy } from './__tests__/context-policy-fixture.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
@@ -890,6 +894,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			newEventId: () => `e${++seq}`
 		});
 		engine = sessionFor(actor);
+		holdDefaultContextPolicy(engine, TS);
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
@@ -1147,7 +1152,8 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 								runtimeBindingId: bindFor(n),
 								executionStepId: sid(n),
 								roleId: 'role-architect',
-								requestedCapabilities: [{ capability: 'file-system' }]
+								requestedCapabilities: [{ capability: 'file-system' }],
+								contextAssemblyPolicyId: HELD_CONTEXT_POLICY_ID
 							},
 							bindFor(n),
 							'RUNTIME_BINDING'

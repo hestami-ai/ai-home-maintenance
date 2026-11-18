@@ -21,6 +21,10 @@ import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+// ⭐ RESTATED IN FORM 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173` (2)): every `RequestRuntimeBinding` here names its
+// step's context policy, a field the command now requires, and the test's store holds that policy (`holdDefaultContextPolicy`), as the handler
+// refuses one it does not hold. Arrangement only: what each test checks is unchanged.
+import { HELD_CONTEXT_POLICY_ID, holdDefaultContextPolicy } from './__tests__/context-policy-fixture.js';
 
 const TS = '2026-07-26T00:00:00.000Z';
 const BINDING = 'bind_01ARZ3NDEKTSV4RRFFQ69GW1B0';
@@ -53,7 +57,8 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 			runtimeBindingId: BINDING,
 			executionStepId: STEP,
 			roleId: 'role_engineer',
-			requestedCapabilities: capabilities.map((capability) => ({ capability }))
+			requestedCapabilities: capabilities.map((capability) => ({ capability })),
+			contextAssemblyPolicyId: HELD_CONTEXT_POLICY_ID
 		});
 
 	/** Create the binding in REQUESTED asking for exactly `capabilities`. */
@@ -62,7 +67,8 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 			runtimeBindingId: BINDING,
 			executionStepId: STEP,
 			roleId: 'role_engineer',
-			requestedCapabilities: capabilities.map((capability) => ({ capability }))
+			requestedCapabilities: capabilities.map((capability) => ({ capability })),
+			contextAssemblyPolicyId: HELD_CONTEXT_POLICY_ID
 		});
 		expect(r.status, `arrange: request ${JSON.stringify(capabilities)}: ${r.error?.message}`).toBe(
 			'ACCEPTED'
@@ -83,6 +89,7 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		holdDefaultContextPolicy(engine, TS);
 	});
 
 	it('THE KILL TEST: a FIRST authorization granting an unrequested capability is REFUSED', () => {
@@ -193,7 +200,8 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 				runtimeBindingId: OTHER,
 				executionStepId: STEP,
 				roleId: 'role_engineer',
-				requestedCapabilities: [{ capability: 'file-system' }, { capability: 'network' }]
+				requestedCapabilities: [{ capability: 'file-system' }, { capability: 'network' }],
+				contextAssemblyPolicyId: HELD_CONTEXT_POLICY_ID
 			}
 		});
 		expect(created.status, created.error?.message).toBe('ACCEPTED');

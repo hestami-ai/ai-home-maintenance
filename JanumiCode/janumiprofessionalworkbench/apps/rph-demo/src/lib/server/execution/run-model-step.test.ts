@@ -4,7 +4,10 @@
 // generated enum with an `EXECUTION` member; every record in the system carries `ASSURANCE` or `AUTHORING`.
 // This suite is the first thing that puts a record on it.
 import { describe, expect, it } from 'vitest';
-import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createInMemoryArtifactStore, createInMemoryWorkspace, createRefusingProcessRunner } from '@janumipwb/rph-ports';
 import type { PromptTemplate, RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import {
 	assembledSources,
@@ -19,8 +22,31 @@ import {
 	LOOP_CONTEXT_ASSEMBLY_POLICY,
 	type ContextAssemblyPolicyContent
 } from '@janumipwb/rph-application';
-import { IN_MEMORY_SESSION, oneShotSession, type SessionFileHoldings } from './producer-session.js';
+import { IN_MEMORY_SESSION, oneShotSession, type ExecutorSessionPlace, type SessionFileHoldings } from './producer-session.js';
 import { stepBindingFor } from './step-binding.js';
+// ⭐ L17b3 — the lead's rulings 4 and 12: a reopened file's line, read through the session reader; a recorded replacement step replayed.
+import { executorSessionPlaceOf } from './executor-session.js';
+import { sessionFolderOf } from './workspace-host.js';
+import { createFilesystemWorkspace } from './filesystem-workspace.js';
+import { READ_EARLIER_ATTEMPT_TOOL, type EarlierAttemptPort, type UnitConversation } from './earlier-attempt-record.js';
+import { mintExecutionTools } from '../tools/execution-tool-surface.js';
+import { createProcessRunObserver } from '../tools/process-run-observer.js';
+import { toolResultAsSent, toPiToolResult } from '../agent/pi-tool-result.js';
+import {
+	instructionsSha256,
+	RECORDING_FORMAT,
+	SCRUB_TOKENS,
+	scrubPairs,
+	scrubText,
+	sha256Hex,
+	toolDefinitionsSha256,
+	type ExecutorTry,
+	type Recording
+} from '../replay/recording.js';
+import { createReplayRun, forgetReplayRuns } from '../replay/replay-run.js';
+import { executorKeyOf, openReplayExecutionSession } from '../replay/replay-executor.js';
+import { createReplayedProcessRunner } from '../replay/replayed-runner.js';
+import { FIXTURE_PWA_OBJECTS, fixtureManifest } from '../replay/replay-fixture.testing.js';
 
 /**
  * ⭐ R11 — the adapter observation every `ToolInvocationResult` now owes.
@@ -424,6 +450,7 @@ describe('JAN-EXECSESS — a repair is a TURN on a HELD session, not a re-render
 			turns,
 			session: {
 				retainsHistory: true,
+				mintedToolNames: [], // ⭐ L17b3 (D89) — arrangement: the session says the tools it minted (none), as every `ProducerSession` now does.
 				dispose: () => undefined,
 				// ⭐ PHASE 5 — this fake ran no commands, and for a fake that is a MEASUREMENT rather than
 				// a refusal to answer: no `ProcessRunner` was ever handed to anything here.
@@ -545,6 +572,7 @@ describe('⭐ P7-6R RD8 — a re-run’s first turn is the instruction AND the c
 			turns,
 			session: {
 				retainsHistory: true,
+				mintedToolNames: [], // ⭐ L17b3 (D89) — arrangement: the session says the tools it minted (none), as every `ProducerSession` now does.
 				dispose: () => undefined,
 				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32, writes: [] }),
 				lastTurnObservation: () => UNOBSERVED,
@@ -677,7 +705,9 @@ describe('EG-03 — the binding must still authorize the invocation', () => {
 	// suite invented — so a needs table that drifted from the one production uses would still be green.
 	// ⛔ `!` IS SAFE AND IS THE POINT: a MODEL_INVOCATION on a MODEL type is exactly the case that IS bound, and
 	// `step-binding.test.ts` is where the `undefined` arms are driven.
-	const BINDING = stepBindingFor('MODEL_INVOCATION', 'MODEL', 'bind_1', 'step_1')!;
+	// ⭐ RESTATED IN FORM 2026-11-17 (package L17b3, D89): ~~`stepBindingFor('MODEL_INVOCATION', 'MODEL', 'bind_1', 'step_1')!`~~ — the request names its
+	// step's context policy and whether it is a replacement's; this is a step outside the loop, bound to `ctx-default`.
+	const BINDING = stepBindingFor('MODEL_INVOCATION', 'MODEL', 'bind_1', 'step_1', { contextAssemblyPolicyId: 'ctx-default', replacement: false })!;
 
 	it('⭑⭑ REFUSES when the stored grant no longer covers what the step needs — BEFORE any model call', async () => {
 		// ⚠ THE ASSERTION THAT MATTERS IS `calls === 0`. A refusal that fires after the model has answered has
@@ -1186,6 +1216,7 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		const { input, dispatched } = harness({
 			session: {
 				retainsHistory: true,
+				mintedToolNames: [], // ⭐ L17b3 (D89) — arrangement: the session says the tools it minted (none), as every `ProducerSession` now does.
 				dispose: () => undefined,
 				// ⭑ THE MEASUREMENT WAS ALREADY TAKEN WHEN THE FAILURE ARRIVED — one call watched start and end,
 				// on a surface this adapter minted and can name.
@@ -1228,6 +1259,7 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		const { input, dispatched } = harness({
 			session: {
 				retainsHistory: true,
+				mintedToolNames: [], // ⭐ L17b3 (D89) — arrangement: the session says the tools it minted (none), as every `ProducerSession` now does.
 				dispose: () => undefined,
 				// ⭐ PHASE 5 — this fake ran no commands, and for a fake that is a MEASUREMENT rather than
 				// a refusal to answer: no `ProcessRunner` was ever handed to anything here.
@@ -1432,16 +1464,26 @@ describe('⭐⭐ L16 (D70) — the step hands the criteria its declared reviews 
 // ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-169`, the sponsor's ruling: a unit's later step continues its saved conversation;
 // `REG-D-170`) — A FIRST TURN ON A SESSION THAT ALREADY HOLDS WORK: the instruction, then — in place of RD8's "This is a fresh session" — what the
 // session holds, then what to do; D77's feedback after it. And each declares what it holds: the unit's own earlier work at THIS_WORK_UNIT, as a repair
-// turn on a remembering session does; a predecessor's at THIS_UNDERTAKING, which only the defect loop's policy permits. ⭑ On a session that holds
+// turn on a remembering session does; a predecessor's at THIS_UNDERTAKING, which only the defect loop's policy permits (⭐ since package L17b3, D89,
+// the record's, which a replacement's tool reads: no session holds another unit's conversation). ⭑ On a session that holds
 // nothing — every session held in memory, a unit's first step — RD8's turn byte for byte.
 describe('⭐⭐ L17b1 (D85; REG-D-169) — the first turn on a session that already holds work', () => {
 	/** RD8's line before a re-run's findings, restated (`firstTurn`; `executor-session.ts`, `CARRIED_FINDINGS_LINE`). */
 	const CARRIED_FINDINGS_LINE = 'An independent assurance review of an earlier attempt at this work found the following:';
 	const FINDINGS = [{ code: 'C1', statement: 'Requirement 3 has no acceptance criterion.' }];
 	// ⭐ RESTATED for the review's defect 8: a predecessor whose conversation returned a work product, said so (`returnedAnswer`).
-	const PREDECESSOR: SessionHolds = { kind: 'PREDECESSOR', title: 'Source', unitId: 'pwu_old', heldFindings: false, returnedAnswer: true };
+	// ⭐⭐ STRUCK 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173`): ~~`const PREDECESSOR: SessionHolds = { kind: 'PREDECESSOR',
+	// title: 'Source', unitId: 'pwu_old', heldFindings: false, returnedAnswer: true };`~~ — no session holds another unit's conversation since D89: a
+	// replacement starts a new session, the record of the units it replaces in reach through a read-only tool (`RECORD_OF_AN_ANSWER` below).
 	/** ⭐ The review's defects 1 and 8 — the unit's own reopened session, its earlier try having returned a work product, holding nothing else. */
 	const THIS_UNIT_ANSWERED: SessionHolds = { kind: 'THIS_UNIT', returnedAnswer: true, ownFindings: false, crossUnitFeedback: false };
+	/** ⭐ L17b3 (D89) — the line's sentence, a line of one unit with a record, a faulty unit's successor's: D89's two drafts, joined. */
+	const SENTENCE =
+		'The unit this one replaces, "Source" (pwu_old), was worked on before, and its conversation is on the record. You can read it with the read_earlier_attempt tool. ' +
+		'The feedback above says what that work got wrong; read the record only if you need more detail than the feedback gives — it shows what was tried and failed, ' +
+		'so that you do not try it again, unless something material has changed that would let it succeed now.';
+	/** ⭐ L17b3 (D89) — what the page hands a replacement's first step: the sentence, the tool minted, and a record holding an earlier unit's answer. */
+	const RECORD_OF_AN_ANSWER = { sentence: SENTENCE, toolMinted: true, holds: { answer: true, findings: false } } as const;
 	/** The turn sent, and the step's outcome, for `over`. */
 	async function sent(over: Partial<Parameters<typeof runModelInvocationStep>[0]> = {}) {
 		let seen = '';
@@ -1508,19 +1550,20 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — the first turn on a session that alr
 		);
 	});
 
-	it('⛔ RED FIRST — a forked session: the instruction, then that it holds the conversation of the unit it replaces, named, then the ask', async () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173`): ~~'⛔ RED FIRST — a forked session: the instruction, then
+	// that it holds the conversation of the unit it replaces, named, then the ask'~~, ~~`sent({ sessionHolds: PREDECESSOR, contextPolicy:
+	// LOOP_CONTEXT_ASSEMBLY_POLICY })`~~, ~~'the turn does not name the predecessor whose conversation it holds'~~, ~~`'This session holds the conversation
+	// of the unit this one replaces, "Source" (pwu_old): the turns above are its work, with the work product it returned, its rationale and any review
+	// findings it was given. That work was superseded, and this unit takes its place.'`~~, ~~`'Produce this unit’s work product for the instruction
+	// above; files that work wrote may still be in the workspace.'`~~ — nothing forks since D89: a replacement's first turn is a new unit's — the
+	// instruction, D77's feedback — then the record's sentence. The promise kept: the replacement's first turn names the unit it replaces.
+	it('⛔ RED FIRST — a replacement’s first turn: the instruction, D77’s feedback, then the record’s sentence, naming the unit it replaces (D89)', async () => {
 		const plain = await sent();
-		const { seen, out } = await sent({ sessionHolds: PREDECESSOR, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY });
+		const feedback = { text: 'Holistic feedback — the round’s failed criteria.', crossUnit: true };
+		const { seen, out } = await sent({ feedback, earlierAttempt: RECORD_OF_AN_ANSWER, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never);
 
 		expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
-		expect(seen, 'the turn does not name the predecessor whose conversation it holds').toBe(
-			[
-				plain.seen,
-				'',
-				'This session holds the conversation of the unit this one replaces, "Source" (pwu_old): the turns above are its work, with the work product it returned, its rationale and any review findings it was given. That work was superseded, and this unit takes its place.',
-				'Produce this unit’s work product for the instruction above; files that work wrote may still be in the workspace.'
-			].join('\n')
-		);
+		expect(seen, 'the turn does not end with the record’s sentence').toBe(`${plain.seen}\n\n${feedback.text}\n\n${SENTENCE}`);
 	});
 
 	it('⛔ RED FIRST — D77’s feedback follows the turn, after a blank line, on the first turn alone', async () => {
@@ -1533,17 +1576,26 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — the first turn on a session that alr
 		expect(repair.seen, 'a repair turn carried the feedback').not.toContain(feedback.text);
 	});
 
-	it('⛔ RED FIRST — each declares what it holds: its own unit’s work at THIS_WORK_UNIT; a predecessor’s, and feedback from another unit, at THIS_UNDERTAKING', () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-170`): ~~'… a predecessor’s, and feedback from another unit, at
+	// THIS_UNDERTAKING'~~, the fork's cases ~~`firstTurnSources(PREDECESSOR, [], undefined)`~~ and ~~`firstTurnSources({ ...PREDECESSOR, heldFindings:
+	// true }, [], undefined)`~~ with their declarations ~~`[PRIOR_WORK_PRODUCT, PRIOR_RATIONALE] at THIS_UNDERTAKING`~~ and ~~`[… , PRIOR_REVIEW_FINDING]
+	// at THIS_UNDERTAKING`~~ — since D89 a replacement's turns declare what the record its tool reads holds, read or not: an earlier unit's answer, its
+	// work product and rationale; findings or the loop's feedback it was given; and nothing where no tool was minted. The promise kept: what another unit
+	// left is declared at THIS_UNDERTAKING, and the unit's own at THIS_WORK_UNIT.
+	it('⛔ RED FIRST — each declares what it holds: its own unit’s work at THIS_WORK_UNIT; ~~a predecessor’s~~ ⭐ what the record a replacement’s tool reads holds, and feedback from another unit, at THIS_UNDERTAKING (D89)', () => {
+		const record = (answer: boolean, findings: boolean, toolMinted = true) => ({ toolMinted, holds: { answer, findings } });
 		expect(
 			[
 				firstTurnSources(THIS_UNIT_ANSWERED, [], undefined),
 				firstTurnSources(THIS_UNIT_ANSWERED, FINDINGS, undefined),
-				firstTurnSources(PREDECESSOR, [], undefined),
-				firstTurnSources({ ...PREDECESSOR, heldFindings: true }, [], undefined),
+				firstTurnSources({ kind: 'NOTHING' }, [], undefined, record(true, false)),
+				firstTurnSources({ kind: 'NOTHING' }, [], undefined, record(true, true)),
+				firstTurnSources({ kind: 'NOTHING' }, [], undefined, record(false, true)),
+				firstTurnSources({ kind: 'NOTHING' }, [], undefined, record(true, true, false)),
 				firstTurnSources({ kind: 'NOTHING' }, [], { text: 'f', crossUnit: true }),
 				firstTurnSources({ kind: 'NOTHING' }, [], { text: 'f', crossUnit: false })
 			],
-			'a first turn does not declare what its session holds and its feedback carries'
+			'a first turn does not declare what its session holds, what its record holds and what its feedback carries'
 		).toEqual([
 			[
 				{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
@@ -1564,65 +1616,74 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — the first turn on a session that alr
 				{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }
 			],
 			[{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }],
+			// ⭑ No tool minted: nothing in reach, nothing declared.
+			[],
+			[{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }],
 			[]
 		]);
 		expect(crossUnitSources(THIS_UNIT_ANSWERED, undefined), 'the unit’s own session declared another unit’s material').toEqual([]);
 	});
 
-	it('⛔ RED FIRST — ctx-default refuses a forked successor’s first turn before its instruction is rendered; ctx-default-loop runs it', async () => {
-		const refused = await sent({ sessionHolds: PREDECESSOR, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
-		expect(refused.out.ran, 'ctx-default ran a forked successor’s turn').toBe(false);
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'⛔ RED FIRST — ctx-default refuses a forked successor’s first turn before
+	// its instruction is rendered; ctx-default-loop runs it'~~, ~~`sent({ sessionHolds: PREDECESSOR, contextPolicy: … })`~~, ~~'ctx-default ran a forked
+	// successor’s turn'~~ — the replacement's first turn holds the record's tool in place of a fork. The promise kept: ctx-default refuses it before its
+	// instruction is rendered, naming the pair, and ctx-default-loop runs it.
+	it('⛔ RED FIRST — ctx-default refuses a replacement’s first turn, its record holding an earlier unit’s answer, before its instruction is rendered; ctx-default-loop runs it (D89)', async () => {
+		const refused = await sent({ earlierAttempt: RECORD_OF_AN_ANSWER, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY } as never);
+		expect(refused.out.ran, 'ctx-default ran a replacement’s turn').toBe(false);
 		expect(refused.out.ran ? '' : refused.out.refusedBecause, 'the refusal does not name the pair').toContain('PRIOR_RATIONALE at THIS_UNDERTAKING');
 		expect(refused.seen, 'the model was sent the refused turn').toBe('');
-		const loop = await sent({ sessionHolds: PREDECESSOR, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY });
+		const loop = await sent({ earlierAttempt: RECORD_OF_AN_ANSWER, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never);
 		expect(loop.out.ran, loop.out.ran ? '' : loop.out.refusedBecause).toBe(true);
 	});
 
-	it('⛔ RED FIRST — what a session holds is read from where it is kept: nothing in memory or in a new file; the unit’s own in its reopened file; its predecessor’s in a fork', () => {
-		const titleOf = (id: string) => (id === 'pwu_old' ? 'Source' : id);
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'… ; its predecessor’s in a fork'~~, its fork cases ~~`forked(true,
+	// false)`~~, ~~`forked(false, true)`~~, ~~`reopened({ ...held, forkedFrom })`~~, ~~`reopened({ ...heldOther, forkedFrom: forkedFromOther })`~~ and the
+	// noted new place ~~`{ kind: 'NEW', predecessorWithoutSession: 'pwu_old' }`~~, with their holdings ~~`{ kind: 'PREDECESSOR', title: 'Source', unitId:
+	// 'pwu_old', … }`~~ and ~~`{ kind: 'THIS_UNIT', …, predecessor: { … } }`~~, and the title reader ~~`titleOf`~~, which only a fork needed — no place
+	// forks since D89. The promise kept: what a session holds is read from where it is kept; and a reopened file carries the record's line where it
+	// holds it.
+	it('⛔ RED FIRST — what a session holds is read from where it is kept: nothing in memory or in a new file; the unit’s own in its reopened file, ~~its predecessor’s in a fork~~ ⭐ the record’s line among it where the file holds it (D89)', () => {
 		const folder = 'C:/run/demo.sqlite.sessions/executor/pwu_new';
-		// ⭐ RESTATED for the review's defects 1 and 8: a reopened place carries what its file was read to hold (`held`), and a fork whether its
-		// conversation returned a work product; a reopened fork holds its predecessor's conversation still.
+		// ⭐ RESTATED for the review's defects 1 and 8: a reopened place carries what its file was read to hold (`held`)~~, and a fork whether its
+		// conversation returned a work product; a reopened fork holds its predecessor's conversation still~~.
 		// ⭑ Each field takes both its values across the cases.
 		const held = { returnedAnswer: false, ownFindings: true, crossUnitFeedback: true };
 		const heldOther = { returnedAnswer: true, ownFindings: false, crossUnitFeedback: false };
-		const forkedFrom = { predecessorId: 'pwu_old', heldFindings: true, returnedAnswer: false };
-		const forkedFromOther = { predecessorId: 'pwu_old', heldFindings: false, returnedAnswer: true };
-		const reopened = (h: SessionFileHoldings) =>
-			sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'REOPEN', file: `${folder}/a.jsonl`, held: h } }, titleOf);
-		const forked = (heldFindings: boolean, returnedAnswer: boolean) =>
-			sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'FORK', from: 'x.jsonl', predecessorId: 'pwu_old', heldFindings, returnedAnswer } }, titleOf);
+		const reopened = (h: SessionFileHoldings) => sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'REOPEN', file: `${folder}/a.jsonl`, held: h } });
 		expect(
 			[
-				sessionHoldsOf(IN_MEMORY_SESSION, titleOf),
-				sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'NEW' } }, titleOf),
-				sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'NEW', predecessorWithoutSession: 'pwu_old' } }, titleOf),
+				sessionHoldsOf(IN_MEMORY_SESSION),
+				sessionHoldsOf({ kind: 'DURABLE', folder, opening: { kind: 'NEW' } }),
 				reopened(held),
 				reopened(heldOther),
-				forked(true, false),
-				forked(false, true),
-				reopened({ ...held, forkedFrom }),
-				reopened({ ...heldOther, forkedFrom: forkedFromOther })
+				reopened({ ...heldOther, heldLine: true } as SessionFileHoldings)
 			],
 			'what each place holds'
 		).toEqual([
 			{ kind: 'NOTHING' },
 			{ kind: 'NOTHING' },
-			{ kind: 'NOTHING' },
 			{ kind: 'THIS_UNIT', ...held },
 			{ kind: 'THIS_UNIT', ...heldOther },
-			{ kind: 'PREDECESSOR', title: 'Source', unitId: 'pwu_old', heldFindings: true, returnedAnswer: false },
-			{ kind: 'PREDECESSOR', title: 'Source', unitId: 'pwu_old', heldFindings: false, returnedAnswer: true },
-			{ kind: 'THIS_UNIT', ...held, predecessor: { title: 'Source', unitId: 'pwu_old', heldFindings: true, returnedAnswer: false } },
-			{ kind: 'THIS_UNIT', ...heldOther, predecessor: { title: 'Source', unitId: 'pwu_old', heldFindings: false, returnedAnswer: true } }
+			{ kind: 'THIS_UNIT', ...heldOther, heldLine: true }
 		]);
 	});
 
-	it('⛔ RED FIRST — a later try keeps declaring what its session still holds: a forked successor’s repair, one after a cross-unit first turn, and a reopened fork declare the cross-unit pairs, which ctx-default refuses (the review’s defect 1)', async () => {
-		const forked = await sentRetaining({ priorFindings: FINDINGS, stillHeld: { holds: PREDECESSOR }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
-		expect(forked.out.ran ? 'ran' : forked.out.refusedBecause, 'a repair try on a forked session declared only its own unit’s material').toContain(
-			'PRIOR_RATIONALE at THIS_UNDERTAKING'
-		);
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'⛔ RED FIRST — a later try keeps declaring what its session still holds:
+	// a forked successor’s repair, one after a cross-unit first turn, and a reopened fork declare the cross-unit pairs, which ctx-default refuses (the
+	// review’s defect 1)'~~, its fork limbs ~~`sentRetaining({ priorFindings: FINDINGS, stillHeld: { holds: PREDECESSOR }, … })`~~ (~~'a repair try on a
+	// forked session declared only its own unit’s material'~~) and ~~`sent({ sessionHolds: { ...THIS_UNIT_ANSWERED, predecessor: { title: 'Source',
+	// unitId: 'pwu_old', heldFindings: false, returnedAnswer: true } }, … })`~~ (~~'a later step on a reopened fork declared only its own unit’s
+	// material'~~), and its loop and one-shot limbs over ~~`stillHeld: { holds: PREDECESSOR }`~~ — a replacement's session holds the record's tool in
+	// place of a fork, and every turn of it declares what the record holds. The promise kept: a later try declares what its session still holds, which
+	// ctx-default refuses.
+	it('⛔ RED FIRST — a later try keeps declaring what its session still holds: ~~a forked successor’s repair~~ ⭐ a replacement’s repair, its session holding the record’s tool, and one after a cross-unit first turn ~~, and a reopened fork~~ declare the cross-unit pairs, which ctx-default refuses (the review’s defect 1; D89)', async () => {
+		const LATER = { toolMinted: true, holds: { answer: true, findings: false } };
+		const replacement = await sentRetaining({ priorFindings: FINDINGS, earlierAttempt: LATER, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY } as never);
+		expect(
+			replacement.out.ran ? 'ran' : replacement.out.refusedBecause,
+			'a repair try on a session holding the record’s tool declared only its own unit’s material'
+		).toContain('PRIOR_RATIONALE at THIS_UNDERTAKING');
 		const fed = await sentRetaining({
 			priorFindings: FINDINGS,
 			stillHeld: { holds: { kind: 'NOTHING' }, feedback: { text: 'Holistic feedback — the round’s failed criteria.', crossUnit: true } },
@@ -1631,13 +1692,16 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — the first turn on a session that alr
 		expect(fed.out.ran ? 'ran' : fed.out.refusedBecause, 'a repair try after a cross-unit first turn declared none of it').toContain(
 			'PRIOR_REVIEW_FINDING at THIS_UNDERTAKING'
 		);
-		const reopenedFork = await sent({
-			sessionHolds: { ...THIS_UNIT_ANSWERED, predecessor: { title: 'Source', unitId: 'pwu_old', heldFindings: false, returnedAnswer: true } },
+		// ⭐ L17b3 (D89) — a later step on a replacement's reopened file, its session holding the tool again: what the record holds, declared again.
+		const reopenedReplacement = await sent({
+			sessionHolds: { ...THIS_UNIT_ANSWERED, heldLine: true },
+			earlierAttempt: LATER,
 			contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY
-		});
-		expect(reopenedFork.out.ran ? 'ran' : reopenedFork.out.refusedBecause, 'a later step on a reopened fork declared only its own unit’s material').toContain(
-			'PRIOR_RATIONALE at THIS_UNDERTAKING'
-		);
+		} as never);
+		expect(
+			reopenedReplacement.out.ran ? 'ran' : reopenedReplacement.out.refusedBecause,
+			'a later step on a replacement’s reopened file declared only its own unit’s material'
+		).toContain('PRIOR_RATIONALE at THIS_UNDERTAKING');
 		const reopenedFed = await sent({ sessionHolds: { ...THIS_UNIT_ANSWERED, crossUnitFeedback: true }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
 		expect(reopenedFed.out.ran ? 'ran' : reopenedFed.out.refusedBecause, 'a later step on a file that carried cross-unit feedback declared none of it').toContain(
 			'PRIOR_REVIEW_FINDING at THIS_UNDERTAKING'
@@ -1658,14 +1722,26 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — the first turn on a session that alr
 			{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
 			{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
 		]);
-		const loop =await sentRetaining({ priorFindings: FINDINGS, stillHeld: { holds: PREDECESSOR }, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY });
+		const loop = await sentRetaining({ priorFindings: FINDINGS, earlierAttempt: LATER, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never);
 		expect(loop.out.ran, loop.out.ran ? '' : loop.out.refusedBecause).toBe(true);
-		// ⭑ A session that keeps no history holds none of it: its repair is declared as before.
-		const oneShot = await sent({ priorFindings: FINDINGS, stillHeld: { holds: PREDECESSOR }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
-		expect(oneShot.out.ran, 'a session that keeps no history was held to hold the fork').toBe(true);
+		// ⭑ A session that keeps no history holds none of it: its repair is declared as before. ⭐ L17b3 (D89) — ~~`stillHeld: { holds: PREDECESSOR }`~~,
+		// ~~'a session that keeps no history was held to hold the fork'~~: a reopened file's cross-unit feedback in its place; and one that mints no tool —
+		// a one-shot session mints none — puts no record in reach (`toolMinted: false`).
+		const oneShot = await sent({
+			priorFindings: FINDINGS,
+			stillHeld: { holds: { ...THIS_UNIT_ANSWERED, crossUnitFeedback: true } },
+			earlierAttempt: { toolMinted: false, holds: { answer: true, findings: true } },
+			contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY
+		} as never);
+		expect(oneShot.out.ran, 'a session that keeps no history and mints no tool was held to hold another unit’s material').toBe(true);
 	});
 
-	it('⛔ RED FIRST — a session whose earlier try returned no work product is said to hold none, and declares none: its own, and a fork’s (the review’s defect 8)', async () => {
+	// ⭐⭐ RESTATED 2026-11-17 (`JAN-EXEC` Phase 7, package L17b3 — design D89): ~~'… its own, and a fork’s (the review’s defect 8)'~~, its fork limb
+	// ~~`sent({ sessionHolds: { ...PREDECESSOR, returnedAnswer: false }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY })`~~, ~~'a fork of a stopped try
+	// is said, or declared, to hold its work product'~~, ~~`'the turns above are its work, which stopped before it returned a work product, with any
+	// review findings it was given. That work was superseded'`~~ — no session holds a fork since D89; a record of units that left no answer and no
+	// findings declares nothing of another unit's in its place. The promise kept: no work product is said, or declared, where none was returned.
+	it('⛔ RED FIRST — a session whose earlier try returned no work product is said to hold none, and declares none: its own, ~~and a fork’s~~ ⭐ and a record of units that returned none (the review’s defect 8; D89)', async () => {
 		const plain = await sent();
 		const ownStopped: SessionHolds = { kind: 'THIS_UNIT', returnedAnswer: false, ownFindings: false, crossUnitFeedback: false };
 		const own = await sent({ sessionHolds: ownStopped });
@@ -1677,16 +1753,11 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — the first turn on a session that alr
 				'Produce the work product for the instruction above; files your earlier attempt wrote may still be in the workspace.'
 			].join('\n')
 		);
-		const theirs = await sent({ sessionHolds: { ...PREDECESSOR, returnedAnswer: false }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
-		expect(
-			[
-				theirs.out.ran,
-				theirs.seen.includes(
-					'the turns above are its work, which stopped before it returned a work product, with any review findings it was given. That work was superseded'
-				)
-			],
-			'a fork of a stopped try is said, or declared, to hold its work product'
-		).toEqual([true, true]);
+		const theirs = await sent({
+			earlierAttempt: { sentence: SENTENCE, toolMinted: true, holds: { answer: false, findings: false } },
+			contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY
+		} as never);
+		expect(theirs.out.ran, 'a record of units that returned no work product and were given no findings was declared to hold another unit’s material').toBe(true);
 		expect(firstTurnSources(ownStopped, [], undefined), 'a stopped try’s session declared a work product and a rationale').toEqual([]);
 		const ownCarried = await sent({ sessionHolds: ownStopped, carriedFindings: FINDINGS });
 		expect(ownCarried.seen, 'a stopped try carrying a re-run’s findings is said to have returned a work product').toContain(
@@ -1711,5 +1782,410 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — the first turn on a session that alr
 				'restate them back; if you believe a finding is mistaken, say so in your rationale.'
 			].join('\n')
 		);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (§12.43; `REG-D-173`) — THE RECORD'S SENTENCE AND ITS TOOL: the sentence said on a first turn on a
+	// session that does not already hold it, and only where the tool is minted (or no unit left a record, said so); a session that mints no tool — a
+	// one-shot call — says so; and a step outside the loop as before.
+	describe('⭐⭐ L17b3 (D89) — the record’s sentence and its tool', () => {
+		it('⛔ RED FIRST — a one-shot session says it minted no tool, so no record is put in reach of it', () => {
+			expect(oneShotSession(async () => ANSWER).mintedToolNames, 'a one-shot session does not say it minted no tool').toEqual([]);
+		});
+
+		it('⛔ RED FIRST — the record’s sentence ends a first turn on a session that does not hold it, and no other turn: not a repair, not a turn on a session that holds the line (D89)', async () => {
+			const first = await sent({ earlierAttempt: RECORD_OF_AN_ANSWER, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never);
+			expect(first.seen.endsWith(`\n\n${SENTENCE}`), 'a replacement’s first turn does not end with the record’s sentence').toBe(true);
+			const repair = await sentRetaining({ earlierAttempt: RECORD_OF_AN_ANSWER, priorFindings: FINDINGS, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never);
+			const holdingTheLine = await sent({
+				earlierAttempt: RECORD_OF_AN_ANSWER,
+				sessionHolds: { ...THIS_UNIT_ANSWERED, heldLine: true },
+				contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY
+			} as never);
+			expect(
+				[repair.out.ran, repair.seen.includes(SENTENCE), holdingTheLine.out.ran, holdingTheLine.seen.includes(SENTENCE)],
+				'a repair turn, or a first turn on a session that holds the line, said the sentence again'
+			).toEqual([true, false, true, false]);
+		});
+
+		// ⭐⭐ The independent review's L17-01 — AT THE STEP, A LINE WITH NO RECORD AT ALL: the page hands its replacement the no-record sentence and no tool;
+		// its first turn ends with that sentence exactly, after D77's feedback, and declares no pair of the record — held by a policy that permits the
+		// feedback and no such pair, under which a line with a record and its tool is refused.
+		it('⛔ RED FIRST — a replacement whose line left no record: its first turn ends with the no-record sentence exactly, after D77’s feedback, with no tool, and it declares no pair of the record (D89; the review’s L17-01)', async () => {
+			const plain = await sent();
+			const feedback = { text: 'Holistic feedback — the round’s failed criteria.', crossUnit: true };
+			const NO_RECORD = 'The unit this one replaces left no recorded conversation.';
+			const FEEDBACK_ONLY: ContextAssemblyPolicyContent = {
+				policyId: 'ctx-feedback-only',
+				permittedSources: [
+					{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' },
+					{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_UNDERTAKING' }
+				]
+			};
+			const { seen, out } = await sent({
+				feedback,
+				earlierAttempt: { sentence: NO_RECORD, toolMinted: false, holds: { answer: false, findings: false } },
+				contextPolicy: FEEDBACK_ONLY
+			} as never);
+			expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
+			expect(seen, 'the turn does not end with the no-record sentence exactly').toBe(`${plain.seen}\n\n${feedback.text}\n\n${NO_RECORD}`);
+			const withRecord = await sent({ feedback, earlierAttempt: RECORD_OF_AN_ANSWER, contextPolicy: FEEDBACK_ONLY } as never);
+			expect(withRecord.out.ran ? 'ran' : withRecord.out.refusedBecause, 'arrangement: the policy refuses a line with a record and its tool').toContain(
+				'PRIOR_WORK_PRODUCT at THIS_UNDERTAKING'
+			);
+		});
+
+		it('⭑ CONTROL — a record whose tool was not minted — a narrower grant, or an executor that mints none — puts nothing in reach: no sentence, no pair, the turn as today (D89)', async () => {
+			const plain = await sent();
+			const noTool = await sent({ earlierAttempt: { toolMinted: false, holds: { answer: true, findings: true } }, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY } as never);
+			expect([noTool.out.ran, noTool.seen], 'a record with no tool changed the turn or what it declares').toEqual([true, plain.seen]);
+			// ⭑ Stage 3 (P6X-L17B3-M4 SURVIVED the case above): the page hands a first try the record's sentence whether or not the tool was minted
+			// (`reachOnTry`), so the case is held with the sentence offered too.
+			const offered = await sent({
+				earlierAttempt: { sentence: SENTENCE, toolMinted: false, holds: { answer: true, findings: true } },
+				contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY
+			} as never);
+			expect([offered.out.ran, offered.seen], 'the record’s sentence was said, or a pair declared, with no tool minted').toEqual([true, plain.seen]);
+		});
+
+		it('⭑ CONTROL — a step of a unit that is not a replacement, bound to ctx-default: its first turn the instruction exactly, its repair as before, each declared as before package L17b1 (D89)', async () => {
+			const first = await sent({ contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
+			expect([first.out.ran, first.out.ran && first.seen === first.out.prompt], 'a first turn outside the loop moved').toEqual([true, true]);
+			const repair = await sentRetaining({ priorFindings: FINDINGS, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
+			expect([repair.out.ran, repair.seen], 'a repair turn outside the loop moved').toEqual([
+				true,
+				[
+					'An independent assurance review of the work product you just produced found the following:',
+					'- C1: Requirement 3 has no acceptance criterion.',
+					'',
+					'Produce the work product again, addressing these findings. Do not argue with them and do not',
+					'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+				].join('\n')
+			]);
+			expect(firstTurnSources({ kind: 'NOTHING' }, [], undefined), 'a first turn outside the loop declared something').toEqual([]);
+		});
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D91 (§12.45; `REG-F-649`) — A TURN THAT CARRIES FINDINGS ABOUT WORK ITS SESSION DOES NOT HOLD SENDS THAT
+	// WORK AGAIN, AS THE RECORD HOLDS IT, WITH THE FINDINGS, AND SAYS WHY; THE TURN THEN DECLARES WHAT IT SENDS. The page decides whether the session holds
+	// the reviewed answer and reads the work back (`resend`); the step places it — first in a repair turn; after the instruction in a one-shot session's
+	// repair; after the instruction and before the findings in a first turn on a reopened file — and declares it. The words are the builder's (§4.2).
+	describe('⭐⭐ L17b3 (D91) — the work a turn’s session does not hold, sent again', () => {
+		const WORK = '{"document":"The reader reads a pipe as a file."}';
+		const RATIONALE = 'The reader treats every input as a file; a pipe is one.';
+		const INTRO = 'The work product the review judged is below. This conversation does not hold it, so it is given again here:';
+		const RATIONALE_LINE = 'Its rationale, as you gave it with that work product:';
+		/** The work sent again: its introduction, the work product, and its rationale where one went. */
+		const block = (rationale?: string) => [INTRO, '', WORK, ...(rationale === undefined ? [] : ['', RATIONALE_LINE, '', rationale])].join('\n');
+		/** Today's repair turn, for the one finding. */
+		const REPAIR = [
+			'An independent assurance review of the work product you just produced found the following:',
+			'- C1: Requirement 3 has no acceptance criterion.',
+			'',
+			'Produce the work product again, addressing these findings. Do not argue with them and do not',
+			'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+		].join('\n');
+		/** A policy permitting the instruction, the findings and the work product at THIS_WORK_UNIT, and no rationale. */
+		const NO_RATIONALE: ContextAssemblyPolicyContent = {
+			policyId: 'ctx-no-rationale',
+			permittedSources: [
+				{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' },
+				{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+				{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' }
+			]
+		};
+
+		it('⛔ RED FIRST — a repair after an answer its session does not hold sends the reviewed work first, then the findings and the request; it declares the work, not a rationale it did not send', async () => {
+			const { seen, out } = await sentRetaining({
+				priorFindings: FINDINGS,
+				resend: { workProduct: WORK, sessionHoldsAnEarlierAnswer: false },
+				contextPolicy: NO_RATIONALE
+			} as never);
+			expect(seen, 'the repair did not send the reviewed work first').toBe(`${block()}\n\n${REPAIR}`);
+			expect(out.ran, out.ran ? '' : out.refusedBecause).toBe(true);
+		});
+
+		it('⛔ RED FIRST — its rationale goes beside it where one went with that work product, and is declared', async () => {
+			const withRationale = { priorFindings: FINDINGS, resend: { workProduct: WORK, rationale: RATIONALE, sessionHoldsAnEarlierAnswer: false } };
+			const { seen } = await sentRetaining({ ...withRationale, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never);
+			expect(seen, 'the repair did not send the rationale beside the work').toBe(`${block(RATIONALE)}\n\n${REPAIR}`);
+			const refused = await sentRetaining({ ...withRationale, contextPolicy: NO_RATIONALE } as never);
+			expect(refused.out.ran ? 'ran' : refused.out.refusedBecause, 'the rationale it sent is not declared').toContain('PRIOR_RATIONALE at THIS_WORK_UNIT');
+		});
+
+		it('⛔ RED FIRST — what it sends, it declares: the work product and the findings; the rationale only where it went beside, or the session holds an earlier answer', () => {
+			expect(
+				assembledSources(FINDINGS, true, { workProduct: WORK, sessionHoldsAnEarlierAnswer: false } as never),
+				'the turn declares a rationale it did not send'
+			).toEqual([
+				{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+				{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' }
+			]);
+			const ALL = [
+				{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+				{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+				{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+			];
+			expect(
+				[
+					assembledSources(FINDINGS, true, { workProduct: WORK, rationale: RATIONALE, sessionHoldsAnEarlierAnswer: false } as never),
+					assembledSources(FINDINGS, true, { workProduct: WORK, sessionHoldsAnEarlierAnswer: true } as never),
+					assembledSources(FINDINGS, false, { workProduct: WORK, sessionHoldsAnEarlierAnswer: false } as never)
+				],
+				'a rationale sent, or held from an earlier answer, is not declared; or one is declared on a session that keeps none'
+			).toEqual([ALL, ALL, ALL.slice(0, 2)]);
+		});
+
+		it('⛔ RED FIRST — a one-shot session’s repair, which holds neither the work nor the instruction, sends the instruction too, then the work and the findings', async () => {
+			const plain = await sent();
+			const { seen } = await sent({ priorFindings: FINDINGS, resend: { workProduct: WORK, sessionHoldsAnEarlierAnswer: false }, contextPolicy: NO_RATIONALE } as never);
+			expect(seen, 'the one-shot repair did not send the instruction, then the work, then the findings').toBe(`${plain.seen}\n\n${block()}\n\n${REPAIR}`);
+		});
+
+		it('⛔ RED FIRST — a first turn carrying a re-run’s findings on a reopened file whose reviewed answer Pi does not replay sends it after the instruction and before the findings, and says the reviewed work is the one given above', async () => {
+			const plain = await sent();
+			const stopped: SessionHolds = { kind: 'THIS_UNIT', returnedAnswer: false, ownFindings: false, crossUnitFeedback: false };
+			const { seen } = await sent({
+				sessionHolds: stopped,
+				carriedFindings: FINDINGS,
+				resend: { workProduct: WORK, sessionHoldsAnEarlierAnswer: false },
+				contextPolicy: NO_RATIONALE
+			} as never);
+			expect(seen, 'the reopened first turn did not send the reviewed work after the instruction').toBe(
+				[
+					plain.seen,
+					'',
+					block(),
+					'',
+					CARRIED_FINDINGS_LINE,
+					'- C1: Requirement 3 has no acceptance criterion.',
+					'',
+					'This session holds that attempt: the turns above are your earlier work on this unit; the work product the review judged is the one given above, which the conversation does not hold.',
+					'Produce the work product again, addressing these findings. Do not argue with them and do not',
+					'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+				].join('\n')
+			);
+		});
+
+		it('⭑ CONTROL — a repair after an answer its session holds — one Pi replays — is byte for byte today’s, declared as today', async () => {
+			const { seen, out } = await sentRetaining({ priorFindings: FINDINGS, contextPolicy: DEFAULT_CONTEXT_ASSEMBLY_POLICY });
+			expect([out.ran, seen], 'a repair after a replayed answer moved').toEqual([true, REPAIR]);
+			expect(assembledSources(FINDINGS, true), 'its declarations moved').toEqual([
+				{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' },
+				{ source: 'PRIOR_WORK_PRODUCT', scope: 'THIS_WORK_UNIT' },
+				{ source: 'PRIOR_RATIONALE', scope: 'THIS_WORK_UNIT' }
+			]);
+		});
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — the lead's rulings 4 and 12 (§16; the independent review's L17C-04 and question 4, L17C-12).
+// RULING 4 — WHAT COUNTS AS THE LINE ALREADY SAID: a session holds the record's line only where one of its user turns ENDS with the exact sentence
+// the step would say (after the blank line it puts before it), or with the no-record sentence as its whole last paragraph — never a phrase found
+// anywhere in a turn. So a replacement's first step under a narrower grant (no tool, no sentence) whose instruction only mentions the tool leaves a
+// file that holds no line, and a later step reopening it with the tool minted says the sentence; a file whose first turn said it is not told again.
+// RULING 12 — A RECORDED REPLACEMENT STEP REPLAYS. The replay mints real tools for the step's grant, and so it mints the record's tool as the live
+// step does — from the context's record (`earlierAttempt`), under the grant — and its `mintedToolNames` lists what it minted, as the field says: so
+// the page says the record's sentence on the replayed first turn, as the live step did, and the tools are keyed as the live step offered them.
+// ⭑ The recording is made by this code's own live path, never written by hand: the first turn the step sends on a session that minted the record's
+// tool (`liveTurn`); the tools the live surface mints for the grant with the record (`executorKeyOf`, as a recording keys them); and the record
+// tool's own answer to the recorded call, rendered as Pi sends it (`toolResultAsSent`). Two limbs, each on its own recording, since a refusal
+// poisons the run it is met in: through the step, the sentence chosen from the replay's own minted tools, as the page chooses it; and the recorded
+// turn sent as recorded.
+describe('⭐⭐ L17b3 (D89; the lead’s rulings 4 and 12) — the record’s line on a reopened file, and a recorded replacement step replayed', () => {
+	/** The record's sentence and what the record holds, as the page hands a replacement's first try them (`reachOnTry`), the tool minted. */
+	const RECORD = {
+		sentence:
+			'The unit this one replaces, "Source" (pwu_old), was worked on before, and its conversation is on the record. You can read it with the read_earlier_attempt tool.',
+		toolMinted: true,
+		holds: { answer: true, findings: false }
+	} as const;
+	/** The first turn the step sends over `over`, on a stand-in that keeps what it was sent — one that keeps its history, as Pi's does, where asked. */
+	async function liveTurn(over: Partial<Parameters<typeof runModelInvocationStep>[0]>, retaining = false) {
+		let seen = '';
+		const session = oneShotSession(async (p: string) => {
+			seen = p;
+			return ANSWER;
+		});
+		await runModelInvocationStep(harness({ session: retaining ? { ...session, retainsHistory: true } : session, ...over }).input);
+		return seen;
+	}
+	/** A Pi session file in `folder`, as Pi writes one: its header, the first step's turn as its user entry, and its answer. */
+	function sessionFileOf(folder: string, turn: string): string {
+		mkdirSync(folder, { recursive: true });
+		const file = join(folder, '2026-11-18T00-00-00-000Z_s.jsonl');
+		const lines = [
+			{ type: 'session', version: 3, id: 's', timestamp: '2026-11-18T00:00:00.000Z', cwd: folder },
+			{ type: 'message', id: 'u1', parentId: null, timestamp: '2026-11-18T00:00:01.000Z', message: { role: 'user', content: [{ type: 'text', text: turn }], timestamp: 1 } },
+			{
+				type: 'message',
+				id: 'a1',
+				parentId: 'u1',
+				timestamp: '2026-11-18T00:00:02.000Z',
+				message: { role: 'assistant', content: [{ type: 'text', text: ANSWER }], stopReason: 'stop', timestamp: 2 }
+			}
+		];
+		writeFileSync(file, `${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
+		return file;
+	}
+
+	it('⛔ RED FIRST — a replacement’s first step under a narrower grant, its instruction mentioning the read_earlier_attempt tool, says no sentence; a later step reopening its file with the tool minted says it; a file whose first turn said it is not told again (the lead’s ruling 4)', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'jpwb-held-line-'));
+		try {
+			const MENTIONS: PromptTemplate = { ...ACTIVE, templateText: 'Assess {subject}. Deliver {purpose}. Document how to work with the read_earlier_attempt tool.' };
+			const narrower = await liveTurn({ template: MENTIONS, earlierAttempt: { ...RECORD, toolMinted: false }, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never);
+			const minted = await liveTurn({ template: MENTIONS, earlierAttempt: RECORD, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never);
+			expect(
+				[narrower.includes(RECORD.sentence), minted.endsWith(`\n\n${RECORD.sentence}`)],
+				'arrangement: the narrower grant’s first turn said no sentence, and the minted one’s ended with it'
+			).toEqual([false, true]);
+			/** The later step on `unitId`'s reopened file, whose first turn was `first`: its turn, the record's tool minted. */
+			const later = async (unitId: string, first: string): Promise<string> => {
+				sessionFileOf(sessionFolderOf(root, 'executor', unitId), first);
+				const place = executorSessionPlaceOf(root, unitId, RECORD.sentence);
+				expect('refusedBecause' in place ? place.refusedBecause : place.kind === 'DURABLE' && place.opening.kind, 'arrangement: the later step reopens its file').toBe('REOPEN');
+				return liveTurn(
+					{ template: MENTIONS, sessionHolds: sessionHoldsOf(place as ExecutorSessionPlace), earlierAttempt: RECORD, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never,
+					true
+				);
+			};
+			const afterNarrower = await later('pwu_narrower', narrower);
+			const afterSaid = await later('pwu_said', minted);
+			expect(
+				[afterNarrower.endsWith(`\n\n${RECORD.sentence}`), afterSaid.includes(RECORD.sentence)],
+				'a later step whose file was never told the line did not say it, or one whose file was told it said it again'
+			).toEqual([true, false]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	const GRANT = ['file-system', 'process-execution', 'earlier-attempt-record'];
+	const PRODUCER = { agentId: 'execution.model-invocation', modelId: 'fixture-executor-model', providerId: 'fixture-provider' };
+	const CONVERSATION: UnitConversation = {
+		unitId: 'pwu_old',
+		title: 'Source',
+		exchanges: [
+			{
+				exchangeId: 'mex_old',
+				step: { ordinal: 1, stepId: 'step_old' },
+				try: 1,
+				request: { kind: 'TURN_TEXT', text: 'Write the source.' },
+				answer: { kind: 'RAW_OUTPUT', text: 'The source, as written.' },
+				droppedReplies: []
+			}
+		]
+	};
+	/** The record's port the page hands the replacement's session: the one unit it replaces, which left a conversation; each read recorded. */
+	const portOver = (): EarlierAttemptPort => ({
+		readerUnitId: SUBJECT.id,
+		attemptKey: 'step_1#1',
+		currentTry: () => 1,
+		units: [{ unitId: 'pwu_old', title: 'Source', state: 'REJECTED', hasRecord: true }],
+		conversationOf: async () => CONVERSATION,
+		record: async () => ({ recorded: true as const, storageKey: 'reads/1' })
+	});
+	/** A replay sandbox as the replay host builds one: two FILESYSTEM workspaces, removed after. */
+	function sandbox() {
+		const root = mkdtempSync(join(tmpdir(), 'jpwb-replay-replacement-'));
+		const workspaceDir = join(root, 'und_replay-0123456789abcdef');
+		const outputDir = `${workspaceDir}.process-output`;
+		mkdirSync(workspaceDir);
+		mkdirSync(outputDir);
+		const at = (directoryPath: string, purgeability: 'RETAINED_BY_PARTICIPATION' | 'PURGEABLE_AT_EXPIRY') =>
+			createFilesystemWorkspace({ ownerKind: 'UNDERTAKING', ownerId: 'und_replay', purgeability, directoryPath });
+		const scrub = (text: string) => scrubText(text, scrubPairs({ WORKSPACE: workspaceDir, PROCESS_OUTPUT: outputDir, HOME: homedir() }));
+		return { root, workspaceDir, outputDir, workspace: at(workspaceDir, 'RETAINED_BY_PARTICIPATION'), output: at(outputDir, 'PURGEABLE_AT_EXPIRY'), scrub };
+	}
+	/** The live replacement step, recorded: its first turn, the key of the tools it was offered, and its one call to the record's tool. */
+	async function recordedLive(box: ReturnType<typeof sandbox>): Promise<{ readonly turn: string; readonly recording: Recording }> {
+		const turn = await liveTurn({ earlierAttempt: RECORD, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never);
+		const tools = mintExecutionTools({
+			ports: {
+				workspace: createInMemoryWorkspace({ ownerKind: 'UNDERTAKING', ownerId: 'und_live', purgeability: 'RETAINED_BY_PARTICIPATION' }),
+				runner: createRefusingProcessRunner(),
+				processRuns: createProcessRunObserver(),
+				earlierAttempt: portOver()
+			},
+			grantedCapabilities: GRANT,
+			bindingAuthorizationStatus: AUTHORIZED
+		});
+		const key = executorKeyOf(tools);
+		const read = tools.find((t) => t.name === READ_EARLIER_ATTEMPT_TOOL);
+		expect(read, 'arrangement: the live step did not mint the record’s tool').toBeDefined();
+		const resultSha256 = sha256Hex(box.scrub(toolResultAsSent(toPiToolResult(await read!.run({})))));
+		const tried: ExecutorTry = {
+			unit: SUBJECT.id,
+			turnSha256: sha256Hex(box.scrub(turn)),
+			instructionsSha256: instructionsSha256(key.instructions, box.scrub),
+			toolsSha256: toolDefinitionsSha256(key.tools, box.scrub),
+			toolCalls: [{ name: READ_EARLIER_ATTEMPT_TOOL, arguments: {}, outcome: 'COMPLETED', resultSha256 }],
+			answer: { arrived: true, text: ANSWER },
+			producer: PRODUCER
+		};
+		const recording = {
+			manifest: {
+				format: RECORDING_FORMAT,
+				commit: 'fixture-commit',
+				reviewerFingerprint: 'fixture-fingerprint',
+				...fixtureManifest(),
+				models: { executor: PRODUCER, reviewer: { agentId: 'devin', modelId: 'r', providerId: 'devin', callBoundMs: 240_000 } },
+				scrub: { tokens: [...SCRUB_TOKENS] },
+				expectedMatrix: []
+			},
+			executor: [tried],
+			commands: [],
+			reviewer: [],
+			indications: []
+		} as unknown as Recording;
+		return { turn, recording };
+	}
+	/** The replay's session over `recording`, its published PWA held to it, opened with the record's port as the page opens a replacement's. */
+	async function replayOf(box: ReturnType<typeof sandbox>, recording: Recording) {
+		const run = createReplayRun(recording, () => box.root);
+		run.checkPublishedPwa(FIXTURE_PWA_OBJECTS);
+		run.useSandbox({ workspace: box.workspaceDir, processOutput: box.outputDir });
+		const session = await openReplayExecutionSession(
+			{
+				workspace: box.workspace,
+				runner: createReplayedProcessRunner({ deliverableWorkspace: box.workspace, outputWorkspace: box.output, commands: run }),
+				grantedCapabilities: GRANT,
+				bindingAuthorizationStatus: AUTHORIZED,
+				earlierAttempt: portOver()
+			},
+			run
+		);
+		return { run, session };
+	}
+
+	// ⭐⭐ RESTATED 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — the lead's ruling 3 of §23; the re-check's L17R-03 and L17R-04, FILED by the lead
+	// as `REG-F-653`): ~~'⛔ RED FIRST — a recorded replacement step that called read_earlier_attempt replays without going stale: the replay mints the
+	// record’s tool from the context’s record and says the tools it minted (the lead’s ruling 12)'~~ — its fixture hands the live step and the replay
+	// the SAME hand-built record, so it proves the keys and the served result over that record, not a replay of a recorded run's own record. What a
+	// replay does not yet reproduce of the record's tool — the predecessor's provider payload, and Pi's conversion of a call's arguments — is
+	// REG-F-653's. Its assertions are byte for byte.
+	it('⛔ RED FIRST — a recorded replacement step’s turn and tools are keyed as the live step’s, and its read of the same record serves the recorded result: the replay mints the record’s tool from the context’s record and says the tools it minted (the lead’s ruling 12)', async () => {
+		const box = sandbox();
+		try {
+			const { turn, recording } = await recordedLive(box);
+			// ⭑ Through the step: the page's choice of the sentence, from the session's minted tools (`toolMinted`), as `runModelUnit` makes it.
+			const through = await replayOf(box, recording);
+			const toolMinted = through.session.mintedToolNames.includes(READ_EARLIER_ATTEMPT_TOOL);
+			const out = await runModelInvocationStep(
+				harness({ session: through.session, earlierAttempt: { ...RECORD, toolMinted }, contextPolicy: LOOP_CONTEXT_ASSEMBLY_POLICY } as never).input
+			);
+			const staleThrough = through.run.poisonedBy()?.message;
+			// ⭑ The recorded turn sent as recorded: what the tools alone are keyed as.
+			const sentAsRecorded = await replayOf(box, recording);
+			await sentAsRecorded.session.turn(turn).catch(() => undefined);
+			const staleAsRecorded = sentAsRecorded.run.poisonedBy()?.message;
+
+			expect.soft(through.session.mintedToolNames, 'the replay does not say the tools it minted, the record’s among them').toEqual(['write_file', 'run_command', READ_EARLIER_ATTEMPT_TOOL]);
+			expect.soft(staleThrough, `through the step, the replay went stale: ${staleThrough}`).toBeUndefined();
+			expect.soft(staleAsRecorded, `the recorded turn, sent as recorded, went stale: ${staleAsRecorded}`).toBeUndefined();
+			expect.soft([out.ran, through.run.consumed().executor, sentAsRecorded.run.consumed().executor], 'the recorded try was not served, each time').toEqual([true, 1, 1]);
+		} finally {
+			forgetReplayRuns();
+			rmSync(box.root, { recursive: true, force: true });
+		}
 	});
 });

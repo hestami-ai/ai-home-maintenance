@@ -15,7 +15,7 @@ import {
 } from '@janumipwb/rph-domain';
 import { advanceStatus, createObject, newEnvelope, reject, type CommandHandler } from './kit.js';
 import { fromStates } from './command-precondition.js';
-import { LOOP_CONTEXT_ASSEMBLY_POLICY_ID } from '../context-assembly.js';
+import { resolveContextAssemblyPolicy } from '../context-assembly.js';
 
 const BINDING = 'RUNTIME_BINDING';
 const MACHINE = 'RuntimeBinding.authorizationStatus';
@@ -53,6 +53,24 @@ export const requestRuntimeBinding: CommandHandler = (ctx, command, payload) => 
 			`RequestRuntimeBinding blocked: the request names no capability. A RuntimeBinding exists to convey runtime capability to a step, and an empty request authorizes nothing while still reaching AUTHORIZED — a state no later command can repair, because a binding may not be re-authorized once AUTHORIZED. Request the capability the step needs (N-20).`,
 			[p.runtimeBindingId]
 		);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173` (2); the lead's ruling 4 on Stage 1's writing) — THE POLICY THE REQUEST NAMES,
+	// RESOLVED AS THE TURN RESOLVES IT: by the turn's own resolver (`resolveContextAssemblyPolicy`), its finder by the stored object's `policyId`
+	// (`context-policy.ts`'s predicate), so the binding refuses exactly what the turn would — a policy the store does not hold, and an object by that
+	// policy id that is not a policy — naming the policy and carrying the resolver's reason. ⭑ The store is read first, outside the refusal: a store
+	// that cannot be read fails the handler as any read does, never reported as a policy it does not hold; the resolver over the value read throws
+	// only its own two refusals, each an `Error`.
+	const named = contextPolicyNamed(ctx, p.contextAssemblyPolicyId);
+	try {
+		resolveContextAssemblyPolicy(() => named, p.contextAssemblyPolicyId);
+	} catch (e) {
+		const reason = (e as Error).message;
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`RequestRuntimeBinding blocked: the binding would name the context assembly policy '${p.contextAssemblyPolicyId}', which this store does not hold as a policy, so it could not govern its step: ${reason}${reason.endsWith('.') ? '' : '.'} Create the policy, or name one this store holds (design D89).`,
+			[p.runtimeBindingId]
+		);
+	}
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, BINDING, p.runtimeBindingId, {
 			lifecycleStatus: 'REQUESTED',
@@ -67,7 +85,9 @@ export const requestRuntimeBinding: CommandHandler = (ctx, command, payload) => 
 		sandboxPolicy: {},
 		// ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — `REG-D-170` — ~~`'ctx-default'`~~: every new binding names the policy that carries the defect loop's
 		// two pairs (`context-assembly.ts`); a binding minted before names `ctx-default`, which stays seeded, unchanged.
-		contextAssemblyPolicyId: LOOP_CONTEXT_ASSEMBLY_POLICY_ID,
+		// ⭐⭐ Package L17b3 — design D89 (`REG-D-173` (2)) — ~~`LOOP_CONTEXT_ASSEMBLY_POLICY_ID`~~, the constant: the policy the request names, the
+		// domain model's §22 field — `ctx-default-loop` for a step the loop's material reaches, `ctx-default` for every other (the page decides).
+		contextAssemblyPolicyId: p.contextAssemblyPolicyId,
 		observabilityPolicyId: 'obs-default',
 		authorizationStatus: 'REQUESTED'
 	};
@@ -98,10 +118,26 @@ export const requestRuntimeBinding: CommandHandler = (ctx, command, payload) => 
 			modelSelectionPolicy: state.modelSelectionPolicy,
 			requestedCapabilities: state.requestedCapabilities,
 			sandboxPolicy: state.sandboxPolicy,
-			authorizationStatus: state.authorizationStatus
+			authorizationStatus: state.authorizationStatus,
+			// ⭐ Package L17b3 (D89) — the policy the binding names, on every new event (optional in the event's schema, so every older one replays).
+			contextAssemblyPolicyId: state.contextAssemblyPolicyId
 		}
 	});
 };
+
+/**
+ * ⭐ Package L17b3 (D89) — the stored context assembly policy whose content names `policyId`, as the turn finds it (`resolveContextPolicyFrom`, by
+ * the stored object's `policyId`): the handler's store keys its objects by their own minted id (`ctxpol_…`), never the policy id a binding names,
+ * so each policy the log created is read and matched on its content. `undefined` where none is held.
+ */
+function contextPolicyNamed(ctx: Parameters<CommandHandler>[0], policyId: string): unknown {
+	for (const e of ctx.store.readAllEvents()) {
+		if (e.eventType !== 'ContextAssemblyPolicyCreated') continue;
+		const state = ctx.store.loadObject(e.aggregateId)?.state as Record<string, unknown> | undefined;
+		if (state?.policyId === policyId) return state;
+	}
+	return undefined;
+}
 
 /**
  * AuthorizeRuntimeBinding — REQUESTED|PARTIALLY_AUTHORIZED -> AUTHORIZED **or** PARTIALLY_AUTHORIZED, according to

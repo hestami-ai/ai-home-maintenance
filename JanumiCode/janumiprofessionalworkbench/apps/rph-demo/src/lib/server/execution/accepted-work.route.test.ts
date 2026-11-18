@@ -117,21 +117,37 @@ vi.mock('./model.js', async (importOriginal) => {
 			seam.opens += 1;
 			await seam.onOpen?.(context.workspace);
 			return {
+				// ⭐ Package L17b3 (design D91; the lead's ruling 2 on Stage 1's writing) — arrangement only: this producer keeps its history, so it answers
+				// as Pi's adapter does after D92's gathering — a result carrying the stops of the messages its answer was gathered from (`stop`, an
+				// ordinary reply) — so a repair on a session that holds the reviewed answer sends the findings alone, as before. ~~A bare string~~.
 				turn: async (text: string) => {
-					seam.turns.push(text);
-					for (const w of seam.writes(text)) {
-						const out = await context.workspace.writeFile(w.path, w.contents);
-						if (out.written) observer.wrote({ path: out.path });
-					}
-					return JSON.stringify({
-						workProduct: { document: `THE WORK: ${text.split('\n')[0]}` },
-						rationale: { rationale: 'An account.', assumptions: [], limitations: [], residualUncertainty: [] }
-					});
+					const scripted = await (async () => {
+						seam.turns.push(text);
+						for (const w of seam.writes(text)) {
+							const out = await context.workspace.writeFile(w.path, w.contents);
+							if (out.written) observer.wrote({ path: out.path });
+						}
+						return JSON.stringify({
+							workProduct: { document: `THE WORK: ${text.split('\n')[0]}` },
+							rationale: { rationale: 'An account.', assumptions: [], limitations: [], residualUncertainty: [] }
+						});
+					})();
+					return {
+						answer: { arrived: true as const, text: scripted },
+						rawOutput: scripted,
+						producer: { agentId: 'execution.model-invocation', modelId: 'faux/model', providerId: 'faux' },
+						identityEvidence: 'PROVIDER_REPORTED' as const,
+						observedToolCalls: { canObserve: false as const, reason: 'a scripted fixture observes no tool calls' },
+						gatheredFrom: [{ stopReason: 'stop' }]
+					};
 				},
 				lastTurnObservation: () => ({ canObserve: false, reason: 'a scripted fixture observes no tool calls' }),
 				processRuns: () => observer.observed(),
 				dispose: () => undefined,
-				retainsHistory: true
+				retainsHistory: true,
+				// ⭐ Package L17b3 (design D89) — arrangement only: a session says the tools it minted, as every `ProducerSession` now must; this one mints
+				// none, so no record is put within the model's reach.
+				mintedToolNames: []
 			};
 		})
 	};

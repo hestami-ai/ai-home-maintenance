@@ -35,6 +35,8 @@ export function hypothesizerPrompt(h: {
 	readonly failedCriteria: readonly { readonly code: string; readonly statement: string }[];
 	readonly candidates: readonly HypothesizerCandidate[];
 	readonly narrative: readonly { readonly id: string; readonly failing: boolean; readonly statements: readonly ChapterStatement[] }[];
+	/** ⭐⭐ Package L17b3 — design D89 (`REG-D-173` (5)) — the recorded conversations written into the helper's copy, each named here. */
+	readonly recordFiles: readonly { readonly unitId: string; readonly title: string; readonly file: string }[];
 }): string {
 	const narrative = h.narrative.flatMap((c) =>
 		c.failing
@@ -58,6 +60,9 @@ export function hypothesizerPrompt(h: {
 				`- ${c.id} "${c.title}": purpose: ${c.purpose}; completion rule: ${c.completionRule}; ` +
 				`accepted work: ${c.acceptedWorkFile ?? 'not accepted'}; files its recorded work changed: ${c.changedFiles.join(', ') || 'none recorded'}`
 		),
+		'',
+		'The recorded conversations of these units’ work, as the Governed Stream recorded them, each a file in your copy of the workspace:',
+		...(h.recordFiles.length > 0 ? h.recordFiles.map((r) => `- ${r.unitId} "${r.title}": ${r.file}`) : ['- (none recorded)']),
 		'',
 		'The narrative memory of the Undertaking so far, this round’s chapter included:',
 		...(narrative.length > 0 ? narrative : ['- (none written)']),

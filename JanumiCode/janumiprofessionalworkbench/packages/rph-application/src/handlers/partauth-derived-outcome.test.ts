@@ -20,6 +20,10 @@ import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+// ⭐ RESTATED IN FORM 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173` (2)): every `RequestRuntimeBinding` here names its
+// step's context policy, a field the command now requires, and the test's store holds that policy (`holdDefaultContextPolicy`), as the handler
+// refuses one it does not hold. Arrangement only: what each test checks is unchanged.
+import { HELD_CONTEXT_POLICY_ID, holdDefaultContextPolicy } from './__tests__/context-policy-fixture.js';
 
 const TS = '2026-07-26T00:00:00Z';
 const BINDING = 'bind_01ARZ3NDEKTSV4RRFFQ69HB400';
@@ -63,7 +67,8 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 			runtimeBindingId: BINDING,
 			executionStepId: STEP,
 			roleId: 'role-architect',
-			requestedCapabilities: capabilities.map(cap)
+			requestedCapabilities: capabilities.map(cap),
+			contextAssemblyPolicyId: HELD_CONTEXT_POLICY_ID
 		});
 
 	const authorize = (...capabilities: string[]) =>
@@ -73,6 +78,7 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `e${++seq}` }).as(TEST_CRED.human);
+		holdDefaultContextPolicy(engine, TS);
 	});
 
 	describe('the two outcomes, both driven through the bus', () => {
@@ -328,6 +334,7 @@ describe('N-18 — a binding that confers nothing does not authorize a start', (
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ authenticate: testAuthenticator(), store, now: () => TS, newEventId: () => `n18e${++seq}` }).as(TEST_CRED.human);
+		holdDefaultContextPolicy(engine, TS);
 		send('CaptureIntent', { intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' }, INTENT, 'INTENT');
 		send('ProposePwu', {
 			pwuId: PWU, pwuKind: 'ARCHITECTURE', title: 'Arch', description: 'd', intentId: INTENT,
@@ -337,7 +344,8 @@ describe('N-18 — a binding that confers nothing does not authorize a start', (
 		}, PWU, 'PROFESSIONAL_WORK_UNIT');
 		accept(send('RequestRuntimeBinding', {
 			runtimeBindingId: BIND, executionStepId: STEP1, roleId: 'role-architect',
-			requestedCapabilities: caps.map(cap)
+			requestedCapabilities: caps.map(cap),
+			contextAssemblyPolicyId: HELD_CONTEXT_POLICY_ID
 		}, BIND, 'RUNTIME_BINDING'), 'request');
 		accept(send('AuthorizeRuntimeBinding', { grantedCapabilities: granted.map(cap) }, BIND, 'RUNTIME_BINDING'), 'authorize');
 		accept(send('ProposeExecutionPlan', {

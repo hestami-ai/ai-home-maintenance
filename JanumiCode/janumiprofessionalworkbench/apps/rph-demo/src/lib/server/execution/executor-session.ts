@@ -10,12 +10,12 @@
 // ⭑ PI-FREE, as `pi-executor-resources.ts` is: the folder is read with `node:fs`, and the session file's lines are Pi's JSON entries, read as data; only
 // `pi-executor.ts` opens Pi's `SessionManager` on what this decides (`executorSessionManager`).
 import { readdirSync, readFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
-import type { ArtifactStore } from '@janumipwb/rph-ports';
+import { join } from 'node:path';
 import { answerFromTurnEnd } from '../tools/backing-tool.js';
 // ⭐ The lead's ruling (k) on the review's fifth re-check — the one describer of a thrown value, and the one reader of its code, neither able to throw: the
 // two refusals below describe through them, so a refusal is said, whatever value the read threw.
 import { describedThrow, thrownCode } from '../described-throw.js';
+import { NO_RECORD_SENTENCE } from './earlier-attempt-record.js';
 import type { ExecutorSessionPlace, SessionFileHoldings } from './producer-session.js';
 import { sessionFolderOf } from './workspace-host.js';
 
@@ -75,76 +75,35 @@ export function twoSessionFilesRefusal(folder: string, count: number): string {
 
 /**
  * ⭐ D85 — THE PLACE A UNIT'S STEP OPENS ITS EXECUTOR SESSION IN, read from its folder: none on a store with no durable path (held in memory, as
- * before); its one file reopened when it has one (the unit's earlier steps, `REG-D-169`); else, for a replacement, its predecessor's one file forked;
- * else a new file. ⛔ Two files in either folder refuse, naming it. ⭑ A predecessor with no session file is said (`predecessorWithoutSession`), so the
- * run report can say the successor started as a new unit does (D85). ⭐ The independent review's defects 1 and 8 — and what each file holds is read
- * here, before anything is dispatched: a reopened file's own answer, findings and feedback and the conversation it was forked from
- * (`sessionFileHoldings`), and whether a predecessor's conversation returned a work product (`historyAnswered`). ⛔ The lead's ruling (e) on the review's
- * third re-check — a file it would reopen or fork that cannot be read refuses the step, naming it and why (`sessionEntriesOf`).
+ * before); its one file reopened when it has one (the unit's earlier steps, `REG-D-169`); else a new file. ⛔ Two files refuse, naming the folder.
+ * ⭐ The independent review's defects 1 and 8 — and what the file holds is read here, before anything is dispatched (`sessionFileHoldings`); ⛔ the
+ * lead's ruling (e) on the review's third re-check — a file it would reopen that cannot be read refuses the step, naming it and why.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173`) — ~~`predecessorId`; for a replacement, its predecessor's one file forked; a
+ * predecessor with no session file said (`predecessorWithoutSession`)~~: NOTHING FORKS. A replacement is a unit of its own: its first step opens a
+ * new file in its own folder, its later steps reopen it, and its predecessor's file is left byte for byte; the record of the units it replaces is in
+ * reach through its tool (`earlier-attempt-record.ts`). A file whose header names a parent — which only package L17b1's fork wrote — is refused at
+ * its reopening (`sessionFileHoldings`, `parentedSessionFileRefusal`). ⭐ The lead's ruling 4 (§16) — `lineSentence`, the record's sentence the
+ * unit's step would say, where it replaces any: what a reopened file is read against to hold the line (`sessionFileHoldings`).
  */
 export function executorSessionPlaceOf(
 	root: string | undefined,
 	unitId: string,
-	predecessorId: string | undefined
+	lineSentence?: string
 ): ExecutorSessionPlace | { readonly refusedBecause: string } {
 	if (root === undefined) return { kind: 'IN_MEMORY' };
 	const folder = sessionFolderOf(root, 'executor', unitId);
 	const own = sessionFilesIn(folder);
 	if (own.length > 1) return { refusedBecause: twoSessionFilesRefusal(folder, own.length) };
-	if (own.length === 1) return { kind: 'DURABLE', folder, opening: { kind: 'REOPEN', file: own[0]!, held: sessionFileHoldings(own[0]!) } };
-	if (predecessorId === undefined) return { kind: 'DURABLE', folder, opening: { kind: 'NEW' } };
-	const theirs = sessionFolderOf(root, 'executor', predecessorId);
-	const files = sessionFilesIn(theirs);
-	if (files.length > 1) return { refusedBecause: twoSessionFilesRefusal(theirs, files.length) };
-	if (files.length === 0) return { kind: 'DURABLE', folder, opening: { kind: 'NEW', predecessorWithoutSession: predecessorId } };
-	return {
-		kind: 'DURABLE',
-		folder,
-		opening: {
-			kind: 'FORK',
-			from: files[0]!,
-			predecessorId,
-			heldFindings: forkedHistoryHeldFindings(files[0]!),
-			returnedAnswer: historyAnswered(files[0]!)
-		}
-	};
-}
-
-/** ⭐ D85 — the schema of the note a successor records when its predecessor left no session (`recordPredecessorWithoutSession`). */
-export const PREDECESSOR_WITHOUT_SESSION_SCHEMA = 'jpwb.executor-session.predecessor-without-session/1';
-
-/** ⭐ D85 — the name that note is bound to on the content plane: its unit's, under the host's tenant prefix (§31.2). */
-export function predecessorWithoutSessionNameOf(tenantPrefix: string, unitId: string): string {
-	return `${tenantPrefix}/executor-session/${unitId}/predecessor-without-session`;
+	if (own.length === 1) return { kind: 'DURABLE', folder, opening: { kind: 'REOPEN', file: own[0]!, held: sessionFileHoldings(own[0]!, lineSentence) } };
+	return { kind: 'DURABLE', folder, opening: { kind: 'NEW' } };
 }
 
 /**
- * ⭐⭐ D85 — A REPLACEMENT WHOSE PREDECESSOR LEFT NO SESSION FILE STARTS AS A NEW UNIT DOES, AND THAT IS RECORDED FOR THE RUN REPORT: a note on the content
- * plane (`application/json`, `RETAINED_BY_PARTICIPATION`), bound to its unit's name (`predecessorWithoutSessionNameOf`), so a reader that knows only the
- * unit reaches it. ⭑ Its bytes are its facts alone, so a later step of the same unit binding it again names the same entry, which `bindName` admits.
- * ⛔ A binding the store refuses throws: the caller fails the step, as it does for the unit's baseline (`deliverable-view.ts`, `unitBaselineOf`).
+ * ⭐⭐ Package L17b3 — design D89 — why a session file whose header names a parent is refused: a fork of another unit's session, which no step makes
+ * since D89 — never read as the unit's own (the builder's words, §4.2).
  */
-export async function recordPredecessorWithoutSession(
-	store: Pick<ArtifactStore, 'put' | 'bindName'>,
-	tenantPrefix: string,
-	note: { readonly unitId: string; readonly predecessorId: string }
-): Promise<void> {
-	const ref = await store.put({
-		tenantPrefix,
-		bytes: JSON.stringify({
-			schema: PREDECESSOR_WITHOUT_SESSION_SCHEMA,
-			unitId: note.unitId,
-			predecessorId: note.predecessorId,
-			statement:
-				`The unit this one replaces, ${note.predecessorId}, left no session file, so this unit's session began as a new unit's does, ` +
-				'holding nothing of its predecessor’s conversation (design D85).'
-		}),
-		mediaType: 'application/json',
-		purgeability: 'RETAINED_BY_PARTICIPATION'
-	});
-	const named = await store.bindName(predecessorWithoutSessionNameOf(tenantPrefix, note.unitId), ref.storageKey);
-	if (!named.bound)
-		throw new Error(`the note that work unit ${note.unitId}'s predecessor left no session could not be named: ${named.refusedBecause}`);
+export function parentedSessionFileRefusal(file: string, parent: string): string {
+	return `the session file ${file} names a parent session (${parent}): a fork of another unit's session, which no step makes since design D89 — refused rather than read as this unit's own (design D89).`;
 }
 
 /**
@@ -160,17 +119,6 @@ function userText(message: unknown): string {
 	if (typeof content === 'string') return content;
 	if (!Array.isArray(content)) return '';
 	return content.map((b) => (typeof (b as { text?: unknown }).text === 'string' ? (b as { text: string }).text : '')).join('');
-}
-
-/**
- * ⭐⭐ `REG-D-170` — WHETHER A PREDECESSOR'S SESSION HELD REVIEW FINDINGS, so its successor's first turn declares PRIOR_REVIEW_FINDING at
- * THIS_UNDERTAKING with its history, and only then: a second user turn (a repair turn's findings, or a later step's), or a first turn that carried
- * findings (RD8's line, or D77's feedback). ⛔ The lead's ruling (e) on the review's third re-check — a file that cannot be read refuses the step, naming
- * it and why (`sessionEntriesOf`): never read as holding no findings, since our read and Pi's are two reads, and a file locked for a moment can fail ours
- * and pass Pi's, the fork then going on with findings in its history undeclared.
- */
-export function forkedHistoryHeldFindings(file: string): boolean {
-	return turnsHeldFindings(userTurnsOf(sessionEntriesOf(file)));
 }
 
 /** One entry of a Pi session file, as far as this module reads it: its kind, its id, a header's parent, a message's role, stop and content. */
@@ -210,12 +158,6 @@ function userTurnsOf(entries: readonly SessionEntry[]): string[] {
 	return entries.filter((e) => e.type === 'message' && e.message?.role === 'user').map((e) => userText(e.message));
 }
 
-/** Whether user turns held review findings: a second turn (a repair turn's findings, or a later step's), or a turn carrying RD8's or D77's. */
-function turnsHeldFindings(users: readonly string[]): boolean {
-	if (users.length > 1) return true;
-	return users.some((t) => t.includes(CARRIED_FINDINGS_LINE) || t.includes(FEEDBACK_HEADING));
-}
-
 /**
  * ⭐ The independent review's defect 8 — whether entries hold a returned answer. ⭐ The review's re-check (A), and the lead's ruling on it — WHAT A SESSION
  * HOLDS IS WHAT PI WILL SEND, read here, the one predicate: an assistant message holds an answer where the adapter reads one at a turn's end
@@ -242,60 +184,68 @@ function replayedByPi(stopReason: unknown): boolean {
 }
 
 /**
- * ⭐ The independent review's defect 8 — whether a session file's conversation returned an answer. ⛔ The lead's ruling (e) on the review's third
- * re-check — one that cannot be read refuses the step, naming it and why (`sessionEntriesOf`).
+ * ⭐ What a conversation's own entries hold: an answer, findings carried (a second turn, RD8's), and D77's feedback. ⭐⭐ Package L17b3 — design D89 —
+ * and whether a first turn on it told it of the record's line (the record's sentence, or that no unit in the line left a record), so a later step on
+ * the file does not say it again (`heldLine`, absent where it was told nothing). ⭐ The lead's ruling 4 (§16; the independent review's L17C-04) —
+ * ~~a turn that holds the phrase `with the read_earlier_attempt tool`, or the no-record sentence, anywhere~~: the line is held only where a user turn
+ * ENDS with the exact sentence the step would say (`lineSentence`), after the blank line the step puts before it, or with the no-record sentence as
+ * its whole last paragraph — never a phrase found anywhere in a turn.
  */
-export function historyAnswered(file: string): boolean {
-	return entriesAnswered(sessionEntriesOf(file));
-}
-
-/** ⭐ What a conversation's own entries hold: an answer, findings carried (a second turn, RD8's), and D77's feedback. */
-function ownHoldingsOf(own: readonly SessionEntry[]): Omit<SessionFileHoldings, 'forkedFrom'> {
+function ownHoldingsOf(own: readonly SessionEntry[], lineSentence?: string): SessionFileHoldings {
 	const users = userTurnsOf(own);
 	return {
 		returnedAnswer: entriesAnswered(own),
 		ownFindings: users.length > 1 || users.some((t) => t.includes(CARRIED_FINDINGS_LINE)),
-		crossUnitFeedback: users.some((t) => t.includes(FEEDBACK_HEADING))
+		crossUnitFeedback: users.some((t) => t.includes(FEEDBACK_HEADING)),
+		...(users.some((t) => lineSaidBy(t, lineSentence)) ? { heldLine: true as const } : {})
 	};
+}
+
+/** ⭐ The lead's ruling 4 — whether a user turn ends with the line's sentence, after a blank line, or with the no-record sentence as its last paragraph. */
+function lineSaidBy(turn: string, lineSentence: string | undefined): boolean {
+	if (lineSentence !== undefined && turn.endsWith(`\n\n${lineSentence}`)) return true;
+	const at = turn.lastIndexOf('\n\n');
+	return (at < 0 ? turn : turn.slice(at + 2)) === NO_RECORD_SENTENCE;
 }
 
 /**
  * ⭐⭐ The independent review's defects 1 and 8 — WHAT A SESSION FILE HOLDS, READ FROM IT before a step reopens it: whether its own turns returned an
- * answer, carried findings or carried D77's feedback; and, where it began as a fork — its header names its parent (`parentSession`, Pi's `forkFrom`) —
- * what the conversation it was forked from holds. Pi copies a parent's entries whole, their ids kept, so the entries that are not the parent's are the
- * unit's own. ⛔ The lead's ruling (e) on the review's third re-check — the file itself, read to be reopened, refuses the step where it cannot be read,
- * naming it and why (`sessionEntriesOf`). ⭑ The conversation it was forked from, where its parent's file cannot be read, is held, as before, to hold
- * everything its parent could — declared, never said short (`parentEntriesOf`).
+ * answer, carried findings or carried D77's feedback, and (package L17b3, D89) whether it holds the record's line. ⛔ The lead's ruling (e) on the
+ * review's third re-check — the file, read to be reopened, refuses the step where it cannot be read, naming it and why (`sessionEntriesOf`).
+ * ⭐⭐ Package L17b3 — design D89 — ~~and, where it began as a fork, what the conversation it was forked from holds~~: a file whose header names a
+ * parent (`parentSession`, Pi's `forkFrom`) is refused, naming it and its parent — no step forks since D89, and a fork's copied history is another
+ * unit's conversation, never this unit's own. ⭐ The lead's ruling 4 (§16) — `lineSentence`, the record's sentence the step would say, what the line
+ * held is read against (`ownHoldingsOf`); none given, only the no-record sentence holds it.
  */
-export function sessionFileHoldings(file: string): SessionFileHoldings {
+export function sessionFileHoldings(file: string, lineSentence?: string): SessionFileHoldings {
 	const entries = sessionEntriesOf(file);
 	const header = entries.find((e) => e.type === 'session');
 	const parent = typeof header?.parentSession === 'string' && header.parentSession !== '' ? header.parentSession : undefined;
-	const body = entries.filter((e) => e.type !== 'session');
-	if (parent === undefined) return ownHoldingsOf(body);
-	const theirs = parentEntriesOf(parent);
-	const theirIds = new Set((theirs ?? []).flatMap((e) => (typeof e.id === 'string' ? [e.id] : [])));
-	return {
-		...ownHoldingsOf(body.filter((e) => !(typeof e.id === 'string' && theirIds.has(e.id)))),
-		forkedFrom: {
-			predecessorId: basename(dirname(parent)),
-			heldFindings: theirs === undefined ? true : turnsHeldFindings(userTurnsOf(theirs)),
-			returnedAnswer: theirs === undefined ? true : entriesAnswered(theirs)
-		}
-	};
+	if (parent !== undefined) throw new Error(parentedSessionFileRefusal(file, parent));
+	return ownHoldingsOf(
+		entries.filter((e) => e.type !== 'session'),
+		lineSentence
+	);
 }
 
 /**
- * ⭐ The lead's ruling (e) on the review's third re-check — THE CONVERSATION A REOPENED FORK WAS FORKED FROM, read from its parent's file: `undefined`
- * where that file cannot be read, never a refusal — the fork's own file holds the entries Pi copied, so Pi does not need the parent — and the fork is then
- * held to hold everything its parent could (`sessionFileHoldings`).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D91 (`REG-F-649`; the lead's ruling 10 on Stage 0) — D91'S CHECK ON A REOPENED FILE: whether it
+ * holds the reviewed try's answer as Pi replays it. The reviewed try is found by its turn's text — the ONE user entry equal to it; its messages are
+ * the assistant's after it, up to the next user entry. `HELD` where every one of those that carried text is of a kind Pi replays (D85's predicate,
+ * `replayedByPi`); `NOT_HELD` where any is not; `NOT_SHOWN` where no single entry is the turn — and the work is then sent again. ⛔ A file that
+ * cannot be read refuses, naming it and why (`sessionEntriesOf`).
  */
-function parentEntriesOf(parent: string): SessionEntry[] | undefined {
-	try {
-		return sessionEntriesOf(parent);
-	} catch {
-		return undefined;
-	}
+export function reviewedTryHeld(file: string, turnText: string): 'HELD' | 'NOT_HELD' | 'NOT_SHOWN' {
+	const entries = sessionEntriesOf(file).filter((e) => e.type === 'message');
+	const matches = entries.flatMap((e, i) => (e.message?.role === 'user' && userText(e.message) === turnText ? [i] : []));
+	if (matches.length !== 1) return 'NOT_SHOWN';
+	const after = entries.slice(matches[0]! + 1);
+	const next = after.findIndex((e) => e.message?.role === 'user');
+	const replies = (next < 0 ? after : after.slice(0, next)).filter((e) => e.message?.role === 'assistant' && userText(e.message) !== '');
+	// ⭐ The lead's ruling 2 (§16; the independent review's L17C-02) — no message that carried text after the reviewed turn — its user entry alone, or an
+	// answer whose line the reader skips — shows nothing the session holds of the reviewed answer: NOT_SHOWN, never HELD.
+	if (replies.length === 0) return 'NOT_SHOWN';
+	return replies.every((e) => replayedByPi(e.message?.stopReason)) ? 'HELD' : 'NOT_HELD';
 }
 
 /**

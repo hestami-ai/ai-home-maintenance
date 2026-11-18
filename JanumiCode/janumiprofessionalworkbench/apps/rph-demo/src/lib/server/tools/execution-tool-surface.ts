@@ -114,6 +114,12 @@ import { RecordPlaneNameSchema } from '@janumipwb/rph-contracts';
 import { canReuseBindingForNewAttempt, capabilityAuthorized } from '@janumipwb/rph-domain';
 import { planProcessRun, type ProcessRunner, type Workspace } from '@janumipwb/rph-ports';
 import type { ParamSpec, ToolRunResult } from '../agent/types.js';
+import {
+	EARLIER_ATTEMPT_CAPABILITY,
+	readEarlierAttempt,
+	READ_EARLIER_ATTEMPT_TOOL,
+	type EarlierAttemptPort
+} from '../execution/earlier-attempt-record.js';
 import type { ProcessRunObserver } from './process-run-observer.js';
 
 /**
@@ -152,6 +158,12 @@ export interface ExecutionToolPorts {
 	 * tool and supplies no observer produces no process evidence, rather than empty evidence.
 	 */
 	readonly processRuns?: ProcessRunObserver;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (`REG-D-173` (4)) — THE RECORD A REPLACEMENT'S TOOL READS: the line of units it replaces,
+	 * their conversations and the writer of each read's record. ⚠ OPTIONAL, AND ITS ABSENCE MEANS NO TOOL: `read_earlier_attempt` is minted only
+	 * where the grant names its capability AND a record to read is handed in — a step that is not a replacement's is handed none.
+	 */
+	readonly earlierAttempt?: EarlierAttemptPort;
 }
 
 /**
@@ -178,6 +190,11 @@ export interface ExecutionToolTemplate {
 	readonly description: string;
 	readonly parameters: ParamSpec;
 	mint(ports: ExecutionToolPorts): (args: Record<string, unknown>) => Promise<ToolRunResult>;
+	/**
+	 * ⭐ Package L17b3 (D89) — whether the ports hold what the tool works over; absent, always. ⛔ NOT A WIDENING of the grant: a tool is minted
+	 * only where its capability is granted, and then only where this holds — the record's tool where a record to read is handed in.
+	 */
+	readonly availableWith?: (ports: ExecutionToolPorts) => boolean;
 }
 
 /**
@@ -376,6 +393,34 @@ const RUN_COMMAND: ExecutionToolTemplate = {
 };
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b3 — design D89 (§12.43, "The tool", "What it returns", "Each read recorded"; `REG-D-173` (3), (4)) — THE
+ * RECORD'S READ-ONLY TOOL, AND ITS HANDLER (`readEarlierAttempt`, `earlier-attempt-record.ts`). It takes `{ unit?, part? }` — a unit its first turn
+ * names as read by the tool, the nearest such by default; a part counted from 1 — and returns that part of the unit's recorded conversation, its
+ * read recorded first; a unit or a part outside them is answered with what may be asked for, and recorded too; a read the store refuses to record
+ * is not served. Minted only under its grant and where a record to read is handed in (`availableWith`), each call numbered in its session's tool.
+ */
+const READ_EARLIER_ATTEMPT: ExecutionToolTemplate = {
+	name: READ_EARLIER_ATTEMPT_TOOL,
+	capability: EARLIER_ATTEMPT_CAPABILITY,
+	description:
+		'Read the recorded conversation of a unit this one replaces, as the Governed Stream recorded it, in parts. Read-only; every read is recorded.',
+	parameters: {
+		unit: { type: 'string', description: 'The id of a unit your first turn names as one this tool reads; the nearest by default.', required: false },
+		part: { type: 'integer', description: 'The part to read, counted from 1; the first by default.', required: false }
+	},
+	availableWith: (ports) => ports.earlierAttempt !== undefined,
+	mint: (ports) => {
+		let reads = 0;
+		return async (args) => {
+			const port = ports.earlierAttempt;
+			if (port === undefined) return { ok: false, summary: 'No record of an earlier unit is held for this step.' };
+			reads += 1;
+			return readEarlierAttempt(port, reads, args);
+		};
+	}
+};
+
+/**
  * Every tool this host knows how to mint, and the one capability each requires.
  *
  * ⛔ ONE CAPABILITY PER TOOL, NOT A LIST. A tool authorised by *any one of* several capabilities would make the
@@ -384,7 +429,8 @@ const RUN_COMMAND: ExecutionToolTemplate = {
  */
 export const EXECUTION_TOOL_CATALOG: readonly ExecutionToolTemplate[] = Object.freeze([
 	WRITE_FILE,
-	RUN_COMMAND
+	RUN_COMMAND,
+	READ_EARLIER_ATTEMPT
 ]);
 
 /**
@@ -450,7 +496,7 @@ export function mintExecutionTools(
 				capabilityAuthorized({
 					grantedCapabilities: input.grantedCapabilities,
 					requiredCapability: template.capability
-				}).ok
+				}).ok && (template.availableWith?.(input.ports) ?? true)
 		)
 		.map((template) => ({
 			name: template.name,

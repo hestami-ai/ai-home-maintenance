@@ -47,6 +47,10 @@ import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+// ⭐ RESTATED IN FORM 2026-11-18 (`JAN-EXEC` Phase 7, package L17b3 — design D89, `REG-D-173` (2)): every `RequestRuntimeBinding` here names its
+// step's context policy, a field the command now requires, and the test's store holds that policy (`holdDefaultContextPolicy`), as the handler
+// refuses one it does not hold. Arrangement only: what each test checks is unchanged.
+import { HELD_CONTEXT_POLICY_ID, holdDefaultContextPolicy } from './__tests__/context-policy-fixture.js';
 
 const TS = '2026-09-12T00:00:00Z';
 const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
@@ -205,6 +209,7 @@ describe('execution.ts — a command whose subject is absent must say so, and re
 			now: () => TS,
 			newEventId: () => `e${++seq}`
 		}).as(TEST_CRED.human);
+		holdDefaultContextPolicy(engine, TS);
 		ok(
 			dispatch(
 				'CaptureIntent',
@@ -281,7 +286,8 @@ describe('execution.ts — a command whose subject is absent must say so, and re
 					runtimeBindingId: BINDING,
 					executionStepId: '', // the binding names no step at all
 					roleId: 'role-architect',
-					requestedCapabilities: [{ capability: 'file-system' }]
+					requestedCapabilities: [{ capability: 'file-system' }],
+					contextAssemblyPolicyId: HELD_CONTEXT_POLICY_ID
 				},
 				BINDING,
 				'RUNTIME_BINDING'

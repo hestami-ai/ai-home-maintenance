@@ -41,9 +41,9 @@
 		".tsx"
 	],
 	"counts": {
-		"files": 490,
+		"files": 493,
 		"byRoot": {
-			"apps": 201,
+			"apps": 204,
 			"packages": 141,
 			"scripts": 118,
 			"verif": 30
@@ -52,12 +52,12 @@
 			".cjs": 2,
 			".js": 17,
 			".mjs": 2,
-			".ts": 469
+			".ts": 472
 		},
 		"leftOut": {
 			".svelte (no analyzer)": 11,
-			"excluded by **/*.test.ts": 566,
-			"excluded by **/__tests__/**": 4
+			"excluded by **/*.test.ts": 570,
+			"excluded by **/__tests__/**": 5
 		}
 	},
 	"tsconfigs": [
@@ -208,6 +208,8 @@
 		"apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
 		"apps/rph-demo/src/lib/server/execution/context-policy.ts",
 		"apps/rph-demo/src/lib/server/execution/deliverable-view.ts",
+		"apps/rph-demo/src/lib/server/execution/dropped-replies.ts",
+		"apps/rph-demo/src/lib/server/execution/earlier-attempt-record.ts",
 		"apps/rph-demo/src/lib/server/execution/evidence-join.ts",
 		"apps/rph-demo/src/lib/server/execution/execution-contract.ts",
 		"apps/rph-demo/src/lib/server/execution/executor-selection.ts",
@@ -226,6 +228,7 @@
 		"apps/rph-demo/src/lib/server/execution/step-binding.ts",
 		"apps/rph-demo/src/lib/server/execution/stopped-unit-recovery.ts",
 		"apps/rph-demo/src/lib/server/execution/successor-feedback.ts",
+		"apps/rph-demo/src/lib/server/execution/verified-bytes.ts",
 		"apps/rph-demo/src/lib/server/execution/work-product-floor.ts",
 		"apps/rph-demo/src/lib/server/execution/workspace-host.ts",
 		"apps/rph-demo/src/lib/server/floor.ts",
