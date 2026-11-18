@@ -204,7 +204,7 @@ These inform the design and bind nothing:
   16) is part of the reference tree whose digest `verif/phase7-rerun-commands.test.ts:175-176` pins ("An edit to any
   file of the reference changes this digest"); cycle 6 restored its decomposition because "four of its tests then
   found changed" (`a318be36` message). The Sonar scope includes it (`sonar-project.properties:18`, `:21`).
-- Today's procedure tells authors to keep the plain form: `docs/operations/sonarqube.md:100-103`, "as an inline
+- Today's procedure tells authors to keep the plain form: `docs/operations/sonarqube.md:100-103` (as they read until package S5 replaced them with the marker and the register), "as an inline
   justification comment naming the rule ID (S####) at the site — the repository carries many; follow their form."
 
 **F-6. The in-build route exists, covers part of Sonar way, and today's lint would run it half-blind.**
@@ -487,7 +487,7 @@ takes about 23 minutes, and a diff is empty once work is committed (F-11). (e) A
   (J4). ESLint fails on its own only on an empty population (F-7); losing part of it passes.
 - **Pins.** eslint, @eslint/js, typescript-eslint and the three plugins are pinned exactly, because the lint baseline
   pins their output, as `JAN-TOOLCUR`'s D8 pins vitest and @vitest/coverage-v8 for the coverage floor; they join the
-  matrix's lint group (G3). Today the first three are caret ranges (`package.json:47`, `:52`, `:57`; ~~`:45`, `:50`, `:55`~~ until package T0, `8cc18d7e`, added lines above them). unicorn 65.0.1,
+  matrix's lint group (G3). Today the first three are caret ranges (`package.json:51`, `:56`, `:61`; ~~`:47`, `:52`, `:57`~~ until packages S1, `1b6cc06b`, and S5 added four scripts above them; ~~`:45`, `:50`, `:55`~~ until package T0, `8cc18d7e`, added lines above them). unicorn 65.0.1,
   which SonarJS 14.4 bundles, declares ESLint ">=9.38.0", so it admits ESLint 10 too (whether it runs there is
   unmeasured); 79.0.0 needs ">=10.4" (web-sonar option B). Parity with the engine argues for 65.0.1 on either major.
 

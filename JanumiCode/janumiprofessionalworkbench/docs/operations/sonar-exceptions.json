@@ -1,0 +1,492 @@
+{
+	"schema": "jpwb-sonar-exceptions/1",
+	"$comment": "JAN-SONARCM D-5's exceptions register (roadmap S5). A Sonar finding left in place on purpose is an entry here, with JAN-ENGC-001 §7.4's fields, approved by a register ruling that names it; its site carries the marker \"// eslint-disable-next-line <rule> -- EXC-nnn <reason>\". docs/operations/sonarqube.md §8 is the procedure. `bun run sonar:exceptions` writes docs/operations/sonar-exceptions.md from this file; verif/sonar-exceptions.test.ts checks the register, its join with the markers in the Sonar scope, the NOSONAR census and the page.",
+	"exceptions": [],
+	"pinnedFolders": [
+		{
+			"folder": "verif/fixtures/phase7/reference/",
+			"pinnedBy": "verif/phase7-rerun-commands.test.ts",
+			"pin": "An edit to any file of the reference changes this digest"
+		}
+	],
+	"sharedNames": {
+		"$comment": "The rule names eslint-plugin-sonarjs shares with ESLint core or typescript-eslint, derived from the packages' own metadata: each plugin rule folder's eslintId and sonarKey, against ESLint's built-in rules and typescript-eslint's plugin rules. The engine matches a marker by its rule name's last segment, so a marker naming the shared rule may also silence the Sonar rule (DESIGN-sonar-configuration-management.md F-5, D-5).",
+		"derivedFrom": {
+			"eslint-plugin-sonarjs": "4.2.2",
+			"eslint": "9.39.5",
+			"@typescript-eslint/eslint-plugin": "8.63.0"
+		},
+		"names": [
+			{
+				"pluginRule": "block-scoped-var",
+				"sonarKey": "S2392",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"block-scoped-var"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "max-lines",
+				"sonarKey": "S104",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"max-lines"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "max-lines-per-function",
+				"sonarKey": "S138",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"max-lines-per-function"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-array-delete",
+				"sonarKey": "S2870",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "typescript-eslint",
+				"collidingRules": [
+					"@typescript-eslint/no-array-delete"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-control-regex",
+				"sonarKey": "S6324",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"no-control-regex"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-delete-var",
+				"sonarKey": "S3001",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"no-delete-var"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-empty-character-class",
+				"sonarKey": "S2639",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"no-empty-character-class"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-fallthrough",
+				"sonarKey": "S128",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"no-fallthrough"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-invalid-regexp",
+				"sonarKey": "S5856",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"no-invalid-regexp"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-labels",
+				"sonarKey": "S1119",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"no-labels"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-misleading-character-class",
+				"sonarKey": "S5868",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"no-misleading-character-class"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-regex-spaces",
+				"sonarKey": "S6326",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"no-regex-spaces"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "no-unused-vars",
+				"sonarKey": "S1481",
+				"languages": [
+					"js"
+				],
+				"sharedWith": "both",
+				"collidingRules": [
+					"no-unused-vars",
+					"@typescript-eslint/no-unused-vars"
+				],
+				"measured": true,
+				"effect": "Measured (V-9, S1, 2026-11-17): a marker naming ESLint core's no-unused-vars silenced the engine's javascript:S1481 on a JavaScript seed, while lint's sonarjs/no-unused-vars on a TypeScript seed was not silenced. The engine has no typescript:S1481."
+			},
+			{
+				"pluginRule": "no-useless-catch",
+				"sonarKey": "S2737",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "eslint-core",
+				"collidingRules": [
+					"no-useless-catch"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			},
+			{
+				"pluginRule": "prefer-regexp-exec",
+				"sonarKey": "S6594",
+				"languages": [
+					"js",
+					"ts"
+				],
+				"sharedWith": "typescript-eslint",
+				"collidingRules": [
+					"@typescript-eslint/prefer-regexp-exec"
+				],
+				"measured": false,
+				"effect": "Not measured. Inferred from the engine's last-segment matching and the measured S1481 case: a marker naming the shared rule would also silence this Sonar rule in the engine."
+			}
+		]
+	},
+	"markerProof": {
+		"$comment": "V-9 (DESIGN-sonar-configuration-management.md V-9): one directive serves both channels. S1 ran it with the bare directive (2026-11-17); S5 completed it with the full marker form for each family of rule name the 23 refusal sites use, and measured V-10's NOSONAR rule (2026-11-18). Each case's messages are the channels' own, copied from the runs' outputs; the seeds and outputs stay outside the repository, as S1's one-off proofs did.",
+		"runs": [
+			{
+				"id": "S1-engine-ts",
+				"date": "2026-11-17",
+				"package": "S1",
+				"channel": "engine",
+				"tree": "ab504c960e651ac1bfd76359284eb7800a941db1, with 9 uncommitted paths (the seeds and the census)",
+				"engine": {
+					"extension": "6.3.0",
+					"languageServer": "6.3.0.79979",
+					"sonarjs": "14.4.0.46458",
+					"jre": "21.0.12.1"
+				},
+				"node": "24.22.3",
+				"ruleSetSha256": "652fd49176b6705da4c4c82809e2d4967fe91502eebb6283d456f6a92660f020",
+				"censusSha256": "623980359916604a0b827fecea8517c81aa337f93b9cfc3870024d2388711965",
+				"files": 7
+			},
+			{
+				"id": "S1-engine-js",
+				"date": "2026-11-17",
+				"package": "S1",
+				"channel": "engine",
+				"tree": "ab504c960e651ac1bfd76359284eb7800a941db1, with 11 uncommitted paths (the seeds and the census)",
+				"engine": {
+					"extension": "6.3.0",
+					"languageServer": "6.3.0.79979",
+					"sonarjs": "14.4.0.46458",
+					"jre": "21.0.12.1"
+				},
+				"node": "24.22.3",
+				"ruleSetSha256": "652fd49176b6705da4c4c82809e2d4967fe91502eebb6283d456f6a92660f020",
+				"censusSha256": "5c69230fed8161da1fb7d6c149a4e36f16e566f7f8c70937c536a28ea60547dd",
+				"files": 2
+			},
+			{
+				"id": "S1-engine-e2e",
+				"date": "2026-11-17",
+				"package": "S1",
+				"channel": "engine",
+				"tree": "ab504c960e651ac1bfd76359284eb7800a941db1, with 8 uncommitted paths (the seeds and the census)",
+				"engine": {
+					"extension": "6.3.0",
+					"languageServer": "6.3.0.79979",
+					"sonarjs": "14.4.0.46458",
+					"jre": "21.0.12.1"
+				},
+				"node": "24.22.3",
+				"ruleSetSha256": "652fd49176b6705da4c4c82809e2d4967fe91502eebb6283d456f6a92660f020",
+				"censusSha256": "8b41c900561780557a907dc517a22e6d445a83a0fc0f6e17f927bcac84ba64a1",
+				"files": 2
+			},
+			{
+				"id": "S1-lint",
+				"date": "2026-11-17",
+				"package": "S1",
+				"channel": "lint",
+				"versions": {
+					"eslint": "9.39.5",
+					"@eslint/js": "9.39.5",
+					"eslint-plugin-sonarjs": "4.2.2",
+					"typescript-eslint": "8.63.0",
+					"typescript": "5.9.3"
+				},
+				"config": "eslint-plugin-sonarjs's recommended set, typed through typescript-eslint's projectService, with unused directives reported as warnings",
+				"files": 7
+			},
+			{
+				"id": "S5-engine",
+				"date": "2026-11-18",
+				"package": "S5",
+				"channel": "engine",
+				"tree": "44b8482edac53ef0b3e76663bf7ee288b796a519, with 12 uncommitted paths (the seeds and the census)",
+				"engine": {
+					"extension": "6.3.0",
+					"languageServer": "6.3.0.79979",
+					"sonarjs": "14.4.0.46458",
+					"jre": "21.0.12.1"
+				},
+				"node": "24.22.3",
+				"ruleSetSha256": "652fd49176b6705da4c4c82809e2d4967fe91502eebb6283d456f6a92660f020",
+				"censusSha256": "308f31272e80ec9054bdd832146b224b35244b62d58ba33f292d73c3f866035c",
+				"files": 11
+			},
+			{
+				"id": "S5-lint",
+				"date": "2026-11-18",
+				"package": "S5",
+				"channel": "lint",
+				"versions": {
+					"eslint": "9.39.5",
+					"@eslint/js": "9.39.5",
+					"eslint-plugin-sonarjs": "4.2.2",
+					"typescript-eslint": "8.63.0",
+					"typescript": "5.9.3"
+				},
+				"config": "S1-lint's, with @typescript-eslint/prefer-optional-chain and prefer-regex-literals on as errors",
+				"files": 11
+			}
+		],
+		"cases": [
+			{
+				"id": "no-marker",
+				"what": "No marker, on a function of cognitive complexity 16",
+				"marker": "",
+				"engine": "typescript:S3776 reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"lint": "sonarjs/cognitive-complexity reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"runs": [
+					"S1-engine-ts",
+					"S1-lint",
+					"S5-engine",
+					"S5-lint"
+				]
+			},
+			{
+				"id": "bare-marker",
+				"what": "A marker naming the rule, with no reason",
+				"marker": "// eslint-disable-next-line sonarjs/cognitive-complexity",
+				"engine": "Nothing reported.",
+				"lint": "Nothing reported.",
+				"runs": [
+					"S1-engine-ts",
+					"S1-lint"
+				]
+			},
+			{
+				"id": "full-marker-plugin",
+				"what": "The full marker form, naming the plugin's rule",
+				"marker": "// eslint-disable-next-line sonarjs/cognitive-complexity -- EXC-001 V-9 completion: the full marker form",
+				"engine": "Nothing reported.",
+				"lint": "Nothing reported.",
+				"runs": [
+					"S5-engine",
+					"S5-lint"
+				]
+			},
+			{
+				"id": "another-rule",
+				"what": "A marker naming another rule",
+				"marker": "// eslint-disable-next-line sonarjs/no-identical-functions",
+				"engine": "typescript:S3776 reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"lint": "\"Unused eslint-disable directive (no problems were reported from 'sonarjs/no-identical-functions').\" (a warning) sonarjs/cognitive-complexity reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"runs": [
+					"S1-engine-ts",
+					"S1-lint"
+				]
+			},
+			{
+				"id": "rule-lint-does-not-load",
+				"what": "A marker naming a rule lint does not load",
+				"marker": "// eslint-disable-next-line unicorn/no-array-for-each",
+				"engine": "typescript:S3776 reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"lint": "unicorn/no-array-for-each reported: \"Definition for rule 'unicorn/no-array-for-each' was not found.\" sonarjs/cognitive-complexity reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"runs": [
+					"S1-engine-ts",
+					"S1-lint"
+				]
+			},
+			{
+				"id": "full-marker-typescript-eslint",
+				"what": "The full marker form, naming typescript-eslint's rule for S6582, which Sonar modified",
+				"marker": "// eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- EXC-002 V-9 completion: a typescript-eslint name",
+				"engine": "Nothing reported. Unmarked: typescript:S6582 reported: \"Prefer using an optional chain expression instead, as it's more concise and easier to read.\"",
+				"lint": "Nothing reported. Unmarked: @typescript-eslint/prefer-optional-chain reported: \"Prefer using an optional chain expression instead, as it's more concise and easier to read.\"",
+				"runs": [
+					"S5-engine",
+					"S5-lint"
+				]
+			},
+			{
+				"id": "full-marker-unicorn",
+				"what": "The full marker form, naming unicorn's rule for S7758",
+				"marker": "// eslint-disable-next-line unicorn/prefer-code-point -- EXC-003 V-9 completion: a unicorn name",
+				"engine": "Nothing reported. Unmarked: typescript:S7758 reported: \"Prefer `String#codePointAt()` over `String#charCodeAt()`.\"",
+				"lint": "unicorn/prefer-code-point reported: \"Definition for rule 'unicorn/prefer-code-point' was not found.\" Unmarked: Nothing reported. Lint does not load unicorn.",
+				"runs": [
+					"S5-engine",
+					"S5-lint"
+				]
+			},
+			{
+				"id": "full-marker-eslint-core",
+				"what": "The full marker form, naming ESLint core's rule for S6325",
+				"marker": "// eslint-disable-next-line prefer-regex-literals -- EXC-004 V-9 completion: an ESLint core name",
+				"engine": "Nothing reported. Unmarked: typescript:S6325 reported: \"Use a regular expression literal instead of the 'RegExp' constructor.\"",
+				"lint": "Nothing reported. Unmarked: prefer-regex-literals reported: \"Use a regular expression literal instead of the 'RegExp' constructor.\"",
+				"runs": [
+					"S5-engine",
+					"S5-lint"
+				]
+			},
+			{
+				"id": "shared-name-eslint-core",
+				"what": "A marker naming ESLint core's no-unused-vars, a name the plugin shares (S1481): the engine on a JavaScript seed, lint on a TypeScript one",
+				"marker": "// eslint-disable-next-line no-unused-vars",
+				"engine": "javascript:S1854 reported: \"The value assigned to \"spare\" is never read. Use it or remove this assignment.\" Unmarked: javascript:S1481 reported: \"Remove the declaration of the unused 'spare' variable.\" javascript:S1854 reported: \"The value assigned to \"spare\" is never read. Use it or remove this assignment.\"",
+				"lint": "\"Unused eslint-disable directive (no problems were reported from 'no-unused-vars').\" (a warning) sonarjs/no-unused-vars reported: \"Remove the declaration of the unused 'spare' variable.\" sonarjs/no-dead-store reported: \"Remove this useless assignment to variable \"spare\".\" Unmarked: sonarjs/no-unused-vars reported: \"Remove the declaration of the unused 'spare' variable.\" sonarjs/no-dead-store reported: \"Remove this useless assignment to variable \"spare\".\"",
+				"runs": [
+					"S1-engine-js",
+					"S1-lint"
+				]
+			},
+			{
+				"id": "shared-name-typescript-eslint",
+				"what": "A marker naming typescript-eslint's no-unused-vars on a TypeScript seed; the engine has no typescript:S1481",
+				"marker": "// eslint-disable-next-line @typescript-eslint/no-unused-vars",
+				"engine": "typescript:S1854 reported: \"The value assigned to \"spare\" is never read. Use it or remove this assignment.\" Unmarked: typescript:S1854 reported: \"The value assigned to \"spare\" is never read. Use it or remove this assignment.\"",
+				"lint": "@typescript-eslint/no-unused-vars reported: \"Definition for rule '@typescript-eslint/no-unused-vars' was not found.\" sonarjs/no-unused-vars reported: \"Remove the declaration of the unused 'spare' variable.\" sonarjs/no-dead-store reported: \"Remove this useless assignment to variable \"spare\".\" S1-lint did not load typescript-eslint's plugin.",
+				"runs": [
+					"S1-engine-ts",
+					"S1-lint"
+				]
+			},
+			{
+				"id": "test-pattern-s2925",
+				"what": "S2925 in apps/rph-demo/e2e/, with the properties' test inclusions passed as the test pattern",
+				"marker": "",
+				"engine": "typescript:S2925 reported 6 times, at the 6 places cycle 6 met it in phase7-half-b.e2e.ts and pwa-designer-gallery.e2e.ts, though neither file matches the test pattern: \"Replace this fixed wait with a synchronization on an observable condition.\"",
+				"lint": "Not run.",
+				"runs": [
+					"S1-engine-e2e"
+				]
+			},
+			{
+				"id": "nosonar",
+				"what": "NOSONAR at the start of a comment on the reported line",
+				"marker": "// NOSONAR",
+				"engine": "Nothing reported.",
+				"lint": "sonarjs/cognitive-complexity reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"runs": [
+					"S5-engine",
+					"S5-lint"
+				]
+			},
+			{
+				"id": "nosonar-lower-case",
+				"what": "The same in lower case",
+				"marker": "// nosonar",
+				"engine": "Nothing reported.",
+				"lint": "sonarjs/cognitive-complexity reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"runs": [
+					"S5-engine",
+					"S5-lint"
+				]
+			},
+			{
+				"id": "nosonar-later",
+				"what": "A comment on the reported line that mentions NOSONAR later in its text",
+				"marker": "// a comment that mentions NOSONAR later",
+				"engine": "typescript:S3776 reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"lint": "sonarjs/cognitive-complexity reported: \"Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed.\"",
+				"runs": [
+					"S5-engine",
+					"S5-lint"
+				]
+			}
+		]
+	}
+}

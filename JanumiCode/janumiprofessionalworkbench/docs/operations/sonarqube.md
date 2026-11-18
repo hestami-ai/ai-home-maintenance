@@ -98,9 +98,9 @@ REG-E-018's earlier reconciliation — explicit recorded exception, never silenc
 as register precedent. In practice:
 
 - A finding deferred rather than fixed is **ruled**, with its verification rather than its
-  argument, either in the register (pattern: `cd0bad4d`, which settled two deferred regex findings
-  under delegated authority) or as an inline justification comment naming the rule ID (S####) at
-  the site — the repository carries many; follow their form.
+  argument, by a register ruling (pattern: `cd0bad4d`, which settled two deferred regex findings
+  under delegated authority) that names its entry in the exceptions register, and its site carries
+  the marker `// eslint-disable-next-line <rule> -- EXC-nnn <reason>`; never `NOSONAR` (§8).
 - A principled won't-fix records its rationale where the next scan will meet it. Silence is not a
   disposition.
 - Standing refusal families a future sweep must not re-open: **S2871 sort comparators are
@@ -181,3 +181,53 @@ detecting drift is not permission to adopt a new engine. The rule set is a revie
 removed is a class of finding no longer looked for, never a way to silence one finding (that is an
 exception, §5). The scope is `sonar-project.properties`, then the census; narrowing it needs a register
 entry (§1).
+
+## 8. Exceptions: the register and the marker (JAN-SONARCM S5)
+
+**When.** A finding the engine reports stays only under JAN-ENGC-001 §7.4: a false positive, generated or
+vendor-controlled code, or a demonstrated conflict with a higher-order requirement; never convenience or
+silence (§5). Fix it when a safe, coherent fix exists.
+
+**The register entry.** In `docs/operations/sonar-exceptions.json`, under the next free id (`EXC-` and three
+digits), with §7.4's fields: `tool` (`SonarJS`); `rule`, the engine's key (`typescript:S3776`, which the
+committed rule set must hold) and `eslintName`, the name the marker uses; `finding`, the engine's message;
+`locations`, each file and how many markers cite the entry there; `why`, `risk` and `controls`; `approval`;
+`owner`; and `term`: `temporary`, and when it is true a `removal` condition, a `review` date or an `expiry`
+date (`YYYY-MM-DD`). Each text is one line.
+
+**The approval.** A ruling in the decision register (`docs/canon/JPWB-REG-005 Decision and Divergence
+Register.md`), named in `approval.ruling`, whose text names the entry's id: a `SPONSOR RULING`
+(`"kind": "sponsor"`), or a `DELEGATED` ruling under a delegation that is itself a sponsor ruling
+(`"kind": "delegated"`). Never the author's own decision: "An AI agent or the author of a deviation SHALL
+NOT self-approve it" (JAN-ENGC-001 §10.1).
+
+**The marker.** On the line above the finding: `// eslint-disable-next-line <rule> -- EXC-nnn <reason>`.
+One rule, named as ESLint knows it: the plugin's rules as `sonarjs/<name>`, a borrowed rule by its
+upstream name (`@typescript-eslint/<name>`, `unicorn/<name>`, or ESLint core's bare name). Lint must load
+that rule for the file, or it fails ("Definition for rule ... was not found."), so a `sonarjs/` marker
+cannot land until JAN-SONARCM S2 loads the plugin. V-9 measured the form in both channels; its record is
+on `docs/operations/sonar-exceptions.md`.
+
+**What the Sonar scope does not admit.** No other ESLint directive that can turn a rule off: no block
+`eslint-disable` or `eslint-enable`, no `eslint-disable-line`, no inline `/* eslint <rule>: off */`, and no
+`eslint-disable-next-line` without an exception. The engine matches a directive by its rule name's last
+segment, so any directive can silence a Sonar rule. And no `NOSONAR`: the engine honours a comment that
+starts with it, in any case, and silences every rule on its line, while the committed rule set does not
+hold S1291, the rule that would report it, so only this check sees one.
+
+**Files whose bytes a test pins.** A finding there takes no marker. Its entry gives `pinned` (the file and
+its number of findings) instead of `locations`, and the file lies under a folder the register's
+`pinnedFolders` declares, with the test that pins it and the pin's words, which the check finds in that
+test. The engine baseline holds the count (JAN-SONARCM D-4).
+
+**Commands**, from the JPWB root:
+- `bun run sonar:exceptions` writes `docs/operations/sonar-exceptions.md` from the register, and writes
+  nothing from a register whose form fails.
+- `bun run sonar:exceptions --check` runs every check: the register, the rulings, the declared pins, the
+  scan of the Sonar scope and its join with the register, NOSONAR, and the page. It also lists each review
+  date and expiry that has passed; the monthly sweep (JAN-SONARCM S4) judges expiry, and the gate judges
+  no date.
+
+`verif/sonar-exceptions.test.ts` runs the same checks in `gate:fast`. The 23 refusal comments cycle 6 left
+(`docs/_working/DESIGN-sonar-configuration-management.md`, Appendix C) are records awaiting JAN-SONARCM
+X1, which converts them into markers with entries; they are not a form to copy.

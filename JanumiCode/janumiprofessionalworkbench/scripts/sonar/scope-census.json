@@ -41,22 +41,22 @@
 		".tsx"
 	],
 	"counts": {
-		"files": 493,
+		"files": 494,
 		"byRoot": {
 			"apps": 204,
 			"packages": 141,
-			"scripts": 118,
+			"scripts": 119,
 			"verif": 30
 		},
 		"bySuffix": {
 			".cjs": 2,
 			".js": 17,
 			".mjs": 2,
-			".ts": 472
+			".ts": 473
 		},
 		"leftOut": {
 			".svelte (no analyzer)": 11,
-			"excluded by **/*.test.ts": 570,
+			"excluded by **/*.test.ts": 571,
 			"excluded by **/__tests__/**": 5
 		}
 	},
@@ -519,6 +519,7 @@
 		"scripts/sonar/batch-runner.cjs",
 		"scripts/sonar/census.ts",
 		"scripts/sonar/compare.ts",
+		"scripts/sonar/exceptions.ts",
 		"scripts/sonar/runner-core.cjs",
 		"scripts/sonar/scope.ts",
 		"scripts/spec-obligations.ts",
