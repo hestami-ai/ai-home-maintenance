@@ -403,6 +403,16 @@ The split keeps the newest entries, and every new one, in `ledger.ts`; older ent
   - The page: a hand-edited copy fails, naming the command; the page written into a `mkdtempSync` folder equals the committed bytes.
   - The live lint cases above, each alone.
   - The CONTROL first: the real tree passes every check.
+- **Built (2026-11-18).** As planned above, with three additions, each named here:
+  - *The comment reader's own defect, found by its planned reds.* On the first run, the 16 reds whose fault was a line added at the end of a fixture file stayed green. TypeScript hangs a documentation block at the end of a file on the end-of-file token as JSDoc; the walk counted that JSDoc as the token's child, so it never reached the token or the comments before it. The walk now leaves JSDoc children out, and a reader case holds it: a documentation block at the end of a file, with two comments after it.
+  - *V-9's record tied to the engine.* A test fails when an engine run in the register's `markerProof` ran under another engine or Node than the matrix pins, with its own control. The marker form is the engine's behaviour, so an engine change proves it again.
+  - *The design's F-5* quotes the procedure's words at `docs/operations/sonarqube.md:100-103`, which S5 replaced; that citation is dated in place.
+
+  What was measured:
+  - *Committed*, in `verif/sonar-exceptions.test.ts`, 86 tests: the CONTROLs on the real tree and on the fixture; V-8's four limbs; each other field of §7.4; the approval's faults; the join's; eleven directive forms; V-10 in four spellings and the engine's rule; the pins; the comment reader; the page; the dates; V-9's lint channel, live; and the record. Each red asserts its one message.
+  - *S5's own mutants* (in scratch, since the ledger does not reach `scripts/sonar/`): 33 mutants, each breaking one guard of `scripts/sonar/exceptions.ts` alone on a disposable worktree. All 33 were killed, each by the test named for it.
+  - *The real tree*: 491 files in the scope, with no directive, no NOSONAR and no exception. `bun run sonar:exceptions --check` holds in about three seconds.
+  - *The Sonar scan* of `scripts/sonar/exceptions.ts` with S1's runner: no finding.
 
 ### S4 · The first recorded sweep and the engine baseline
 

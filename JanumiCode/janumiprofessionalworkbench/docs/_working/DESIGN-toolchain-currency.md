@@ -144,7 +144,7 @@ and the order of the first upgrades, as a preview for the roadmap.
 
 ### F-2. The stated pins are enforced by nothing, and the Node floor is too low
 
-- Bun: `package.json:60-65` (~~`:58-63`~~ until package T0, `8cc18d7e`, added lines above it) `"devEngines": { "packageManager": { "name": "bun", "version": "1.3.14" } }`. Bun reads
+- Bun: `package.json:64-69` (~~`:60-65`~~ until packages S1, `1b6cc06b`, and S5 added four scripts above it; ~~`:58-63`~~ until package T0, `8cc18d7e`, added lines above it) `"devEngines": { "packageManager": { "name": "bun", "version": "1.3.14" } }`. Bun reads
   none of `packageManager`, `engines` or `devEngines`. Bun PR #46656 (open) says *"Bun never reads either field, so
   `bun install` and `bun run check` on bun 1.4.3 print nothing."* (https://api.github.com/repos/oven-sh/bun/pulls/46656);
   `devEngines` support is open issue #26512 (critic C5, F2).

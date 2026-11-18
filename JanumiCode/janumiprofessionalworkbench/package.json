@@ -44,7 +44,8 @@
 		"toolchain:review": "bun run scripts/toolchain/review.ts",
 		"sonar:census": "bun run scripts/sonar/census.ts",
 		"sonar:scan": "node scripts/sonar/batch-runner.cjs",
-		"sonar:compare": "bun run scripts/sonar/compare.ts"
+		"sonar:compare": "bun run scripts/sonar/compare.ts",
+		"sonar:exceptions": "bun run scripts/sonar/exceptions.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.37.0",
