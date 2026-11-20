@@ -25,7 +25,12 @@
 // the time they take at 16.3 s a request (the later check's median on Ollama 0.40.15).
 //
 // usage: bun --conditions=source scripts/reviewer-qual/decision-model-records.ts --server <address> --model <name>
-//          --digest <12 or more hexadecimal characters> [--set v13|probes|both]
+//          --digest <12 or more hexadecimal characters> [--set v13|probes|both|probes-0.40.16]
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — §20 (the sponsor's choice, *"Record on 0.40.16, labelled"*) — `--set probes-0.40.16`, THE
+// RECORDS' SECOND FILE (`makeLabelledRecords`): only the probe questions no committed file holds BY BODY are asked, through the product's
+// client unchanged (D63), into `probes-0.40.16.ndjson`, its identity the records' model and digest on server version 0.40.16; it prints
+// its plan before the first request, and stops on any served digest but the records' or any server version but its own file's, read at
+// the start, before each entry it asks and after the last.
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -42,7 +47,15 @@ import {
 	type IndicationRequest,
 	type IndicationsResult
 } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
-import { MALFORMED_REFUSED_REQUEST, refusedRequestOf, type RecordedRefusal } from './recorded-indications.js';
+import { decisionModelBody } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
+import {
+	LABELLED_RECORDS_FILE,
+	labelledRecordsIdentity,
+	MALFORMED_REFUSED_REQUEST,
+	RECORDS_FILES,
+	refusedRequestOf,
+	type RecordedRefusal
+} from './recorded-indications.js';
 
 /** One review whose questions are asked: a case of the set, or a probe of the fingerprint. */
 export interface RecordsEntry {
@@ -297,6 +310,169 @@ export async function makeRecords(run: RecordsRun): Promise<{ readonly made: num
 	}
 }
 
+/** ⭐⭐ §20 — a run of the records' second file's set: a records run, and the committed files whose bodies it does not ask again. */
+export interface LabelledRecordsRun extends RecordsRun {
+	readonly committed: readonly string[];
+}
+
+/** The second file's set, by name. */
+export const LABELLED_SET = 'probes-0.40.16';
+
+/** ⭐ §20 — a review's requests and its material, asked of no model, with each request's body hash: none where it makes no request. */
+async function questionsOf(
+	input: ReasoningReviewInput,
+	model: string
+): Promise<{ readonly requests: readonly IndicationRequest[]; readonly material: string; readonly bodies: readonly string[] }> {
+	let out: { requests: readonly IndicationRequest[]; material: string; bodies: readonly string[] } = { requests: [], material: '', bodies: [] };
+	try {
+		await reviewPrompt(input, async (requests, material) => {
+			out = { requests, material, bodies: requests.map((r) => sha256(decisionModelBody(model, material, r))) };
+			return { scores: Object.fromEntries(requests.map((r) => [r.key, 0])) };
+		});
+	} catch {
+		// Refused before any request, its requests none; or after its requests were made, which stand.
+	}
+	return out;
+}
+
+/**
+ * ⭐ §20 — every body a records file holds, scored or refused, and the ids of its entries — or, where `own` is given and the file's
+ * identity line is another, the stop. A refused request out of its form stops the run, as the original set's resume does.
+ */
+function heldBy(file: string, own?: RecordsIdentity): { readonly bodies: readonly string[]; readonly ids: readonly string[] } {
+	const lines = readFileSync(file, 'utf8').split('\n').filter((l) => l.trim() !== '');
+	const head = JSON.parse(lines[0] ?? '{}') as Partial<RecordsIdentity> & { kind?: string };
+	if (own !== undefined && (head.kind !== 'IDENTITY' || head.model !== own.model || head.digest !== own.digest || head.serverVersion !== own.serverVersion))
+		throw new Stopped(
+			`STOPPED: ${file} was made on ${head.model} ${String(head.digest).slice(0, 12)} on Ollama ${head.serverVersion}, not its set's ` +
+				`${own.model} ${own.digest.slice(0, 12)} on Ollama ${own.serverVersion} (REG-F-608)`
+		);
+	const bodies: string[] = [];
+	const ids: string[] = [];
+	for (const [k, text] of lines.slice(1).entries()) {
+		const line = JSON.parse(text) as { kind?: string; id?: string; questions?: readonly RecordedQuestion[]; refusedRequest?: unknown };
+		const refusal = refusedRequestOf(line);
+		if (refusal === null) throw new Stopped(`STOPPED: ${file} line ${k + 2} ${MALFORMED_REFUSED_REQUEST}`);
+		bodies.push(...(line.questions ?? []).map((q) => q.bodySha256), ...(refusal ? [refusal.bodySha256] : []));
+		if (typeof line.id === 'string') ids.push(line.id);
+	}
+	return { bodies, ids };
+}
+
+/** ⭐ §20 — the questions `toAsk` of one review asked through the product's client, held to the file's identity alone: its record. */
+async function askUnheld(
+	run: LabelledRecordsRun,
+	own: RecordsIdentity,
+	id: string,
+	toAsk: readonly IndicationRequest[],
+	material: string
+): Promise<{ readonly questions: readonly RecordedQuestion[]; readonly refusedRequest?: RecordedRefusal }> {
+	const client = createDecisionModelClient({
+		server: run.server,
+		model: run.model,
+		// ⭐⭐ D63 (`REG-D-152`): the version its file is made on, and none beside it.
+		identity: { digest: own.digest, serverVersion: own.serverVersion, alsoAccepted: [] },
+		...(run.bounds ? { bounds: run.bounds } : {})
+	});
+	const kinds = new Map(toAsk.map((r) => [r.key, r.kind]));
+	const result = await client(toAsk, material);
+	const exchanged = (result.exchanges ?? []) as readonly IndicationExchange[];
+	const loaded = exchanged.find((x) => x.otherModels.length > 0);
+	if (loaded) throw new Stopped(`STOPPED: ${id}: another model was loaded when ${loaded.key} was sent (${loaded.otherModels.join(', ')})`);
+	const questions = exchanged.flatMap((x): RecordedQuestion[] =>
+		x.outcome.kind === 'SCORED' ? [{ key: x.key, kind: kinds.get(x.key)!, bodySha256: sha256(x.body), score: x.outcome.score }] : []
+	);
+	if (!('refusal' in result)) return { questions };
+	const at413 = refusedAt413(result);
+	if (at413 === undefined) throw new Stopped(`STOPPED: ${id}: the client refused its review: ${result.refusal}`);
+	return {
+		questions,
+		refusedRequest: { key: at413.key, kind: kinds.get(at413.key)!, bodySha256: sha256(at413.body), status: 413, response: at413.response }
+	};
+}
+
+/**
+ * ⭐⭐ §20 — MAKE THE RECORDS' SECOND FILE: each entry's questions that no committed file — nor the file itself — holds by body, asked in
+ * order, a body asked once; an entry the file holds by id, or with nothing unheld, asks nothing. Stops — writing nothing for the entry it
+ * stopped at — on another model loaded, a served model or digest other than the records', a server version other than its file's, a
+ * refusal but a 413. Its identity: `labelledRecordsIdentity()`, the records' model and digest on the label's version.
+ */
+export async function makeLabelledRecords(run: LabelledRecordsRun): Promise<{ readonly made: number; readonly requests: number; readonly stopped?: string }> {
+	let made = 0;
+	let requests = 0;
+	const own = labelledRecordsIdentity();
+	try {
+		if (run.model !== own.model) throw new Stopped(`STOPPED: ${run.set} is made of the records’ model ${own.model}, not ${run.model} (D54; §20)`);
+		if (!/^[0-9a-f]{12,64}$/.test(run.digest) || !own.digest.startsWith(run.digest))
+			throw new Stopped(`STOPPED: ${JSON.stringify(run.digest)} is not the records’ digest ${own.digest} (D54; §20)`);
+		const served = await identityOf(run.server, run.model);
+		if (served.digest !== own.digest) throw new Stopped(`STOPPED: ${run.model} is served with digest ${served.digest}, not the records’ ${own.digest} (D54; REG-F-608)`);
+		if (served.serverVersion !== own.serverVersion)
+			throw new Stopped(`STOPPED: at the start, the server is Ollama ${served.serverVersion}, not its file’s ${own.serverVersion} (REG-F-608; §20)`);
+		const others = await othersLoaded(run.server, run.model);
+		if (others.length > 0) throw new Stopped(`STOPPED: another model is loaded (${others.join(', ')}): the records are made with none`);
+		// ⭑ What is held already: every body the committed files hold, and the file's own bodies and entries.
+		const held = new Set<string>();
+		for (const f of run.committed) for (const b of heldBy(f).bodies) held.add(b);
+		const own0 = existsSync(run.file) ? heldBy(run.file, own) : { bodies: [], ids: [] };
+		for (const b of own0.bodies) held.add(b);
+		const done = new Set(own0.ids);
+		// ⭑ The plan, before the first request: each entry's unheld questions, in order, a body planned once.
+		const planned = new Set(held);
+		const plan: { readonly entry: RecordsEntry; readonly toAsk: readonly IndicationRequest[]; readonly material: string }[] = [];
+		for (const e of run.entries) {
+			if (done.has(e.id)) continue;
+			const q = await questionsOf(e.input, run.model);
+			const toAsk = q.requests.filter((_, i) => {
+				const unheld = !planned.has(q.bodies[i]!);
+				planned.add(q.bodies[i]!);
+				return unheld;
+			});
+			if (toAsk.length > 0) plan.push({ entry: e, toAsk, material: q.material });
+		}
+		const count = plan.reduce((sum, p) => sum + p.toAsk.length, 0);
+		run.log(
+			`${run.set}: ${run.model} ${own.digest.slice(0, 12)} on Ollama ${own.serverVersion}; ${run.entries.length} entries, ${held.size} bodies held by ` +
+				`the committed files and this one; ${count} requests to make, about ${((count * SECONDS_A_REQUEST) / 3600).toFixed(1)} h at ${SECONDS_A_REQUEST} s a request`
+		);
+		if (!existsSync(run.file)) {
+			mkdirSync(dirname(run.file), { recursive: true });
+			writeFileSync(
+				run.file,
+				`${JSON.stringify({ kind: 'IDENTITY', set: run.set, ...own, cold: 'one question a request; before each, /api/ps read until the model is absent; keep_alive 0 (D51)' })}\n`,
+				'utf8'
+			);
+		}
+		const sameAsOwn = async (when: string) => {
+			const now = await identityOf(run.server, run.model);
+			if (now.digest !== own.digest || now.serverVersion !== own.serverVersion)
+				throw new Stopped(
+					`STOPPED: ${when}, the server serves ${now.model} ${now.digest.slice(0, 12)} on Ollama ${now.serverVersion}, not the file's ` +
+						`${own.digest.slice(0, 12)} on Ollama ${own.serverVersion} (REG-F-608)`
+				);
+		};
+		for (const p of plan) {
+			await sameAsOwn(`before ${p.entry.id}`);
+			const asked = await askUnheld(run, own, p.entry.id, p.toAsk, p.material);
+			const line = { kind: p.entry.kind, id: p.entry.id, questions: asked.questions, ...(asked.refusedRequest ? { refusedRequest: asked.refusedRequest } : {}) };
+			appendFileSync(run.file, `${JSON.stringify(line)}\n`, 'utf8');
+			made += 1;
+			requests += asked.questions.length + Number(asked.refusedRequest !== undefined);
+			run.log(
+				`${p.entry.kind} ${p.entry.id}: ${asked.questions.length} question(s)` +
+					(asked.refusedRequest ? `, then request ${asked.refusedRequest.key} refused by the server: HTTP ${asked.refusedRequest.status}` : '')
+			);
+		}
+		await sameAsOwn('after the last entry');
+		run.log(`${run.set}: done — ${made} entries made, ${requests} requests`);
+		return { made, requests };
+	} catch (e) {
+		if (!(e instanceof Stopped)) throw e;
+		run.log(e.message);
+		return { made, requests, stopped: e.message };
+	}
+}
+
 /** `--name value` arguments, by name. */
 function argsOf(argv: readonly string[]): Map<string, string> {
 	const out = new Map<string, string>();
@@ -319,8 +495,10 @@ export async function main(argv: readonly string[]): Promise<number> {
 	const model = a.get('model');
 	const digest = a.get('digest');
 	const set = a.get('set') ?? 'both';
-	if (!server || !model || !digest || !['v13', 'probes', 'both'].includes(set)) {
-		console.error('usage: decision-model-records.ts --server <address> --model <name> --digest <hex> [--set v13|probes|both] (no default model: REG-D-052)');
+	if (!server || !model || !digest || !['v13', 'probes', 'both', LABELLED_SET].includes(set)) {
+		console.error(
+			`usage: decision-model-records.ts --server <address> --model <name> --digest <hex> [--set v13|probes|both|${LABELLED_SET}] (no default model: REG-D-052)`
+		);
 		return 2;
 	}
 	const root = new URL('../../', import.meta.url);
@@ -328,6 +506,25 @@ export async function main(argv: readonly string[]): Promise<number> {
 	const { caseReviewInput } = await import('./materialize.js');
 	const { FINGERPRINT_PROBES } = await import('./probes.js');
 	const folder = new URL('docs/tracking/reviewer-qualification/decision-model/', root);
+	// ⭐⭐ §20 — the second file's set alone: the probes, each question no committed file holds by body, into its own file.
+	if (set === LABELLED_SET) {
+		const out = await makeLabelledRecords({
+			server,
+			model,
+			digest,
+			set,
+			file: fileURLToPath(new URL(LABELLED_RECORDS_FILE, folder)),
+			entries: FINGERPRINT_PROBES.map((p) => ({
+				kind: 'PROBE' as const,
+				id: p.id,
+				input: p.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult, PRODUCT_SEAMS.declaredPolicies)
+			})),
+			controls: [],
+			log: (line) => console.log(line),
+			committed: RECORDS_FILES.map((f) => fileURLToPath(new URL(f, folder)))
+		});
+		return out.stopped ? 1 : 0;
+	}
 	const caseSet = committedCaseSet(root);
 	const sets: RecordsRun[] = [];
 	if (set !== 'probes')

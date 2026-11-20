@@ -120,6 +120,32 @@ const seam = vi.hoisted(() => ({
 	policyThrows: undefined as undefined | { readonly value: unknown },
 	/** ⭐ L17b3 (the lead's ruling 1 of §23) — set, opening the producer throws this value, before anything of its session is made. */
 	openThrows: undefined as undefined | { readonly value: unknown },
+	/**
+	 * ⭐ L17b2 (D73, D86) — what devin answers as the Historian, given its prompt: its answer's text, the session export it writes, or a failure of the
+	 * call; undefined, a clean answer — every criterion met, nothing recurring, nothing recommended — and an export with no step.
+	 */
+	historian: undefined as
+		| undefined
+		| ((call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string }),
+	/** ⭐ L17b2 (D86) — each call devin was given as the Historian: its argv, its working folder and its bound, and what its folder and its user configuration held at the call. */
+	historianCalls: [] as {
+		readonly args: readonly string[];
+		readonly cwd: string;
+		readonly timeout: number;
+		readonly files: Readonly<Record<string, string>>;
+		readonly userConfig: string;
+	}[],
+	/** ⭐ L17b2 (ruling 2 (A)) — what `devin --version` answers the Historian's check: the version whose tools were measured, unless a case says another. */
+	historianVersion: 'devin 3000.11.234 (92c83011d113)',
+	/** ⭐ L17b2 (ruling 6) — set, the Historian's call is given the seams the stage handed it (`historianExec`), not this file's program. */
+	historianPassThrough: false,
+	/** ⭐ L17b2 addendum (the lead's §27, item 7) — set, the records the Historian part's clash check is given, from those the part hands it: the REAL
+	 *  check (`recordNameClash`) runs on what this returns. */
+	historianRecordsChecked: undefined as undefined | ((records: readonly { readonly file: string; readonly what: string; readonly text: string }[]) => readonly { readonly file: string; readonly what: string; readonly text: string }[]),
+	/** ⭐ L17b2 — set, the page's shared workspace is a FILESYSTEM one in a fresh folder, as a durable store's is: the Historian has a directory to copy. */
+	sharedOnDisk: false,
+	/** ⭐ L17b2 — the folders those shared workspaces were made in, removed after the file. */
+	sharedDirs: [] as string[],
 	/** What the declared reviewer answers a policy's review: set in `beforeEach`, every criterion MET. */
 	answer: (() => {
 		throw new Error('arrangement: no declared answer set');
@@ -129,6 +155,18 @@ const seam = vi.hoisted(() => ({
 vi.mock('./workspace-host.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./workspace-host.js')>();
 	const { createInMemoryWorkspace, createRefusingProcessRunner } = await import('@janumipwb/rph-ports');
+	// ⭐ L17b2 — a shared workspace on disk, where a case asks for one: `<a fresh folder>/demo.sqlite.workspaces/und-<id>`, as a durable store lays it out.
+	const { createFilesystemWorkspace } = await import('./filesystem-workspace.js');
+	const { mkdirSync: made, mkdtempSync: fresh } = await import('node:fs');
+	const { tmpdir: temp } = await import('node:os');
+	const { join: joined } = await import('node:path');
+	const sharedDirFor = (undertakingId: string): string => {
+		const root = fresh(joined(temp(), 'jpwb-l17b2-shared-'));
+		seam.sharedDirs.push(root);
+		const dir = joined(root, 'demo.sqlite.workspaces', `und-${undertakingId}`);
+		made(dir, { recursive: true });
+		return dir;
+	};
 	return {
 		...actual,
 		// ⭐ L17b1 — the sessions root a serving store would give, where a case sets one; else the product's own answer.
@@ -139,11 +177,20 @@ vi.mock('./workspace-host.js', async (importOriginal) => {
 		}),
 		resolveUndertakingSandbox: vi.fn((undertakingId: string) => {
 			if (!seam.workspaces.has(undertakingId)) {
-				const workspace = createInMemoryWorkspace({
-					ownerKind: 'UNDERTAKING',
-					ownerId: undertakingId,
-					purgeability: 'RETAINED_BY_PARTICIPATION'
-				});
+				// ⭐ L17b2 — ~~`const workspace = createInMemoryWorkspace({ … })`~~: where a case asks (`seam.sharedOnDisk`), the shared workspace on disk, as a
+				// durable store's is, so the Historian has a directory to copy (D86); else in memory, as before.
+				const workspace = seam.sharedOnDisk
+					? createFilesystemWorkspace({
+							ownerKind: 'UNDERTAKING',
+							ownerId: undertakingId,
+							purgeability: 'RETAINED_BY_PARTICIPATION',
+							directoryPath: sharedDirFor(undertakingId)
+						})
+					: createInMemoryWorkspace({
+							ownerKind: 'UNDERTAKING',
+							ownerId: undertakingId,
+							purgeability: 'RETAINED_BY_PARTICIPATION'
+						});
 				seam.workspaces.set(undertakingId, {
 					workspace: {
 						...workspace,
@@ -441,6 +488,68 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 	};
 });
 
+// ⭐⭐ L17b2 (D86; the lead's rulings 2, 6, 8 and 16) — THE HISTORIAN'S REAL CALL, ITS PROGRAM REPLACED AT THE SEAM, as the floor's devin is above:
+// `devin --version` answered by the case (`seam.historianVersion`), and the session by the case's answer (`seam.historian`), its export written where
+// the argv names it; what the folder and the user configuration held at the call kept (`seam.historianCalls`). Where a case hands the stage a seam of
+// its own (`historianExec`, ruling 6), the call is given that seam (`seam.historianPassThrough`). ⚠ The module is package L17b2's: until it exists
+// nothing imports it, so this factory never runs (vitest gives a mock of an absent module its unresolved id).
+vi.mock('../tools/devin-historian.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../tools/devin-historian.js')>();
+	const fs = await import('node:fs');
+	const path = await import('node:path');
+	/** Every file under `root`, by its path relative to it, `/`-separated, with its text. */
+	const tree = (root: string): Record<string, string> => {
+		const out: Record<string, string> = {};
+		const walk = (dir: string): void => {
+			for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+				const at = path.join(dir, e.name);
+				if (e.isDirectory()) walk(at);
+				else out[path.relative(root, at).split(path.sep).join('/')] = fs.readFileSync(at, 'utf8');
+			}
+		};
+		walk(root);
+		return out;
+	};
+	/** A clean answer over the policy's rubric: each of HC-01 to HC-05 met, nothing recurring, nothing recommended. */
+	const clean = JSON.stringify({
+		findings: ['HC-01', 'HC-02', 'HC-03', 'HC-04', 'HC-05'].map((id) => ({ criterionId: id, failed: false, statement: 'met' })),
+		recommendation: 'SATISFIED',
+		residualUncertainty: [],
+		recurrence: null,
+		recommendedControlAction: null
+	});
+	return {
+		...actual,
+		// ⭐ L17b2 addendum (the lead's §27, item 7) — the clash check the Historian part asks of its records: the real one, on the records the case
+		// hands it where it hands any (`seam.historianRecordsChecked`).
+		recordNameClash: vi.fn((records: Parameters<typeof actual.recordNameClash>[0]) =>
+			actual.recordNameClash(seam.historianRecordsChecked?.(records) ?? records)
+		),
+		devinHistorianCall: vi.fn(
+			(call: Parameters<typeof actual.devinHistorianCall>[0], given: Parameters<typeof actual.devinHistorianCall>[1]) =>
+				seam.historianPassThrough
+					? actual.devinHistorianCall(call, given)
+					: actual.devinHistorianCall(call, {
+							versionOf: async () => seam.historianVersion,
+							exec: async (_file: string, args: readonly string[], options: { readonly cwd: string; readonly timeout: number }) => {
+								const after = (flag: string): string => args[args.indexOf(flag) + 1] ?? '';
+								seam.historianCalls.push({
+									args: [...args],
+									cwd: options.cwd,
+									timeout: options.timeout,
+									files: tree(options.cwd),
+									userConfig: fs.existsSync(after('--config')) ? fs.readFileSync(after('--config'), 'utf8') : ''
+								});
+								const answered = seam.historian?.({ prompt: fs.readFileSync(after('--prompt-file'), 'utf8') }) ?? {};
+								if (answered.fails !== undefined) throw new Error(answered.fails);
+								fs.writeFileSync(after('--export'), answered.export ?? JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [] }));
+								return { stdout: answered.stdout ?? clean };
+							}
+						})
+		)
+	};
+});
+
 // ⭑ THE DECLARED POLICIES' REVIEWER, STOOD IN FOR AT ITS SEAM: what it was shown is kept, and its answer is the case's (`seam.answer`), so a
 // criterion can be recorded with any of the five outcomes — a reviewer's own reply reaches three (MET, NOT_MET, UNABLE_TO_DETERMINE).
 vi.mock('../assurance/index.js', async (importOriginal) => {
@@ -473,16 +582,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import { getObject, listByType, listPwus } from '@janumipwb/rph-engine';
-import type { Workspace } from '@janumipwb/rph-ports';
+import { createInMemoryWorkspace, type Workspace } from '@janumipwb/rph-ports';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { actions as undertakings } from '../../../routes/undertakings/+page.server.js';
 import { actions as unitPage, load as unitLoad } from '../../../routes/undertakings/[id]/+page.server.js';
 import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
 import { dispatch, dispatchBatch, getArtifactStore, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import { resolveUndertakingSandbox, sessionFolderOf } from './workspace-host.js';
-import { runAssuranceStage } from '../assurance/assurance-stage.js';
+import { rerunHistorian, runAssuranceStage } from '../assurance/assurance-stage.js';
 import { chapterRecordsOf } from '../assurance/narrative-chapter.js';
-import { HELPER_INVOKER, NARRATIVE_WRITER_INVOKER } from '../assurance/assurance-stage-roles.js';
+import { HELPER_INVOKER, isAssuranceStageExchange, NARRATIVE_WRITER_INVOKER } from '../assurance/assurance-stage-roles.js';
 // ⭐ L17b3 (the review's L17-04) — the page's own demo policy, for an assessment of two units a recurrence can be recorded on.
 import { DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD, DEMO_POLICY_VERSION } from '../assurance/demo-policy.js';
 import { createProcessRunObserver } from '../tools/process-run-observer.js';
@@ -491,7 +600,16 @@ import { admittedViewRef, readDeliverableView } from './deliverable-view.js';
 import { CARRIED_FINDINGS_LINE, FEEDBACK_HEADING } from './executor-session.js';
 import { createFilesystemWorkspace } from './filesystem-workspace.js';
 import type { ProducerSession, ProducerSessionContext } from './producer-session.js';
-import { successorRoundOf, tacticRecordNotice, tacticRecordPath, tacticRecordRequest, takeTacticRecord } from './successor-feedback.js';
+import {
+	feedbackForRerun,
+	feedbackForSuccessor,
+	stagePartsForTurn,
+	successorRoundOf,
+	tacticRecordNotice,
+	tacticRecordPath,
+	tacticRecordRequest,
+	takeTacticRecord
+} from './successor-feedback.js';
 
 const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -735,7 +853,16 @@ const TYPES = (specPolicies: readonly string[] = [], buildPolicies: readonly str
 
 type Fixture = Awaited<ReturnType<typeof instantiated>>;
 // ⭐ L17b3 (the review's L17-06, L17-09) — and RD8's re-run of a stopped unit (`rerunWork`), the binding's third minting site.
-type Action = 'beginExecute' | 'recordAssurance' | 'markSatisfied' | 'rerunRejectedWork' | 'sendWorkBack' | 'runAssuranceStage' | 'rerunWork';
+// ⭐ L17b2 (ruling 7) — and "Ask the Historian again" (`rerunHistorian`).
+type Action =
+	| 'beginExecute'
+	| 'recordAssurance'
+	| 'markSatisfied'
+	| 'rerunRejectedWork'
+	| 'sendWorkBack'
+	| 'runAssuranceStage'
+	| 'rerunWork'
+	| 'rerunHistorian';
 
 /** The unit titled `title` that is CURRENT — after a replacement, one title names an old unit and its successor. */
 const currentOf = (u: Fixture, title: string) => {
@@ -972,6 +1099,11 @@ describe('⭐⭐ L17b1 (D74 to D76; the lead’s ruling (B)) — the page offers
 
 	it('⛔ RED FIRST — not offered once the unit is re-run in place: its state is no longer the rejected one, though its last verdict still is', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~D71’s re-run pressed straight after the rejection~~: the way back is offered only once the round’s stage has
+		// run and its Historian concluded, so the stage runs first (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is not
+		// about the narrative. ⭑ The round’s stage having run, the offer below is absent on the round’s rule too; the refusal’s words after it are what
+		// tell the state’s rule, which `assuranceStageOffer` reads first.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it with the findings.' })).error, 'arrangement: the re-run').toBeUndefined();
 		expect(axesOf(r.ids.verification), 'arrangement: the re-run left the rejected state').not.toEqual(['UNDER_ASSURANCE', 'SUCCEEDED', 'REJECTED']);
 
@@ -994,13 +1126,24 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 		const pressed = await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification });
 
 		expect([pressed.advanced, pressed.error], 'the stage did not run').toEqual(['assurance-stage', undefined]);
-		expect(pressed.stage?.map((p) => [p.part, p.status]), 'the parts are not the chapter, then the Hypothesizer, then the Unsticking Agent').toEqual([
+		// ⭐ L17b2 (D73; the lead's ruling 5) — RESTATED: ~~`expect(` … `'…then the Hypothesizer, then the Unsticking Agent').toEqual([['narrative-chapter',
+		// 'recorded'], ['fault-diagnosis', 'not-run'], ['step-back', 'not-run']])`~~ the Historian third, before the Unsticking Agent — not run here, its
+		// time bound unset (ruling 16); soft, so that the control after it is observed (§5, ruling 4).
+		expect.soft(pressed.stage?.map((p) => [p.part, p.status]), 'the parts are not the chapter, then the Hypothesizer, then the Historian, then the Unsticking Agent').toEqual([
+			['narrative-chapter', 'recorded'],
+			['fault-diagnosis', 'not-run'],
+			['historical-assessment', 'not-run'],
+			['step-back', 'not-run']
+		]);
+		// ⭑ CONTROL — L17b1's promise kept: its three parts, the Historian's taken out, in their order and as they were.
+		expect(pressed.stage?.filter((p) => p.part !== 'historical-assessment').map((p) => [p.part, p.status]), 'L17b1’s three parts are not as they were').toEqual([
 			['narrative-chapter', 'recorded'],
 			['fault-diagnosis', 'not-run'],
 			['step-back', 'not-run']
 		]);
 		expect(pressed.stage?.[1]?.why ?? '', 'the Hypothesizer’s not running is not said').toContain("the hypothesizer runs on Pi's harness alone");
-		expect(pressed.stage?.[2]?.why, 'the Unsticking Agent’s not running is not said').toBe('the round has no open KNOWN_FAILURE_RECURRENCE observation (design D75)');
+		// ⭐ L17b2 — RESTATED: ~~`pressed.stage?.[2]?.why`~~ the Unsticking Agent read by its part, the Historian now third.
+		expect(pressed.stage?.find((p) => p.part === 'step-back')?.why, 'the Unsticking Agent’s not running is not said').toBe('the round has no open KNOWN_FAILURE_RECURRENCE observation (design D75)');
 
 		const written = seam.prompts.slice(prompts).filter((p) => p.includes(WRITER_PROMPT));
 		expect(written.length, 'the writer was not called once').toBe(1);
@@ -1036,7 +1179,16 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 
 		const pressed = await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification });
 
-		expect(pressed.stage?.map((p) => [p.part, p.status]), 'the failing chapter is not recorded as failing, the stage going on').toEqual([
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `[['narrative-chapter', 'failing'], ['fault-diagnosis', 'not-run'], ['step-back', 'not-run']]`~~
+		// the Historian third, not run here (its time bound unset); soft, the control after it.
+		expect.soft(pressed.stage?.map((p) => [p.part, p.status]), 'the failing chapter is not recorded as failing, the stage going on').toEqual([
+			['narrative-chapter', 'failing'],
+			['fault-diagnosis', 'not-run'],
+			['historical-assessment', 'not-run'],
+			['step-back', 'not-run']
+		]);
+		// ⭑ CONTROL — L17b1's promise kept: its three parts, the Historian's taken out, as they were.
+		expect(pressed.stage?.filter((p) => p.part !== 'historical-assessment').map((p) => [p.part, p.status]), 'L17b1’s three parts are not as they were').toEqual([
 			['narrative-chapter', 'failing'],
 			['fault-diagnosis', 'not-run'],
 			['step-back', 'not-run']
@@ -1052,7 +1204,16 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 
 		const done = await runAssuranceStage(r.ids.verification, pi.deps);
 
-		expect('parts' in done && done.parts.map((p) => [p.part, p.status]), 'the Hypothesizer’s diagnosis is not recorded').toEqual([
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `[['narrative-chapter', 'recorded'], ['fault-diagnosis', 'recorded'], ['step-back', 'not-run']]`~~
+		// the Historian third, not run here (its time bound unset); soft, the control after it.
+		expect.soft('parts' in done && done.parts.map((p) => [p.part, p.status]), 'the Hypothesizer’s diagnosis is not recorded').toEqual([
+			['narrative-chapter', 'recorded'],
+			['fault-diagnosis', 'recorded'],
+			['historical-assessment', 'not-run'],
+			['step-back', 'not-run']
+		]);
+		// ⭑ CONTROL — L17b1's promise kept: its three parts, the Historian's taken out, as they were.
+		expect('parts' in done && done.parts.filter((p) => p.part !== 'historical-assessment').map((p) => [p.part, p.status]), 'L17b1’s three parts are not as they were').toEqual([
 			['narrative-chapter', 'recorded'],
 			['fault-diagnosis', 'recorded'],
 			['step-back', 'not-run']
@@ -1108,7 +1269,17 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 
 		const done = await runAssuranceStage(r.ids.verification, pi.deps);
 
-		expect('parts' in done && done.parts.map((p) => [p.part, p.status]), 'the step-back is not recorded after the diagnosis').toEqual([
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `[['narrative-chapter', 'recorded'], ['fault-diagnosis', 'recorded'], ['step-back', 'recorded']]`~~
+		// the Historian third, not run here (its time bound unset), and the Unsticking Agent still brought by the open recurrence the case records
+		// (`openRecurrencesOf`, as built); soft, the control after it.
+		expect.soft('parts' in done && done.parts.map((p) => [p.part, p.status]), 'the step-back is not recorded after the diagnosis').toEqual([
+			['narrative-chapter', 'recorded'],
+			['fault-diagnosis', 'recorded'],
+			['historical-assessment', 'not-run'],
+			['step-back', 'recorded']
+		]);
+		// ⭑ CONTROL — L17b1's promise kept: its three parts, the Historian's taken out, as they were.
+		expect('parts' in done && done.parts.filter((p) => p.part !== 'historical-assessment').map((p) => [p.part, p.status]), 'L17b1’s three parts are not as they were').toEqual([
 			['narrative-chapter', 'recorded'],
 			['fault-diagnosis', 'recorded'],
 			['step-back', 'recorded']
@@ -1137,8 +1308,26 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 		});
 		expect(recurrence.status, `arrangement: the recurrence — ${recurrence.error?.message ?? ''}`).toBe('ACCEPTED');
 		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+		// ⭐ L17b2 (ruling 3; D73, D86) — the Historian’s time bound set, so the stage’s third part concludes and the send-back is offered after it; the
+		// writer runs (`chapterAnswering`): this promise is the stage’s records reaching the turn.
+		historianBoundSet();
 		const done = await runAssuranceStage(r.ids.verification, pi.deps);
-		expect('parts' in done && done.parts.map((p) => p.status), 'arrangement: the stage recorded its three parts').toEqual(['recorded', 'recorded', 'recorded']);
+		// ⭐ L17b2 (D73; ruling 5) — ~~`done.parts.map((p) => p.status)`, 'arrangement: the stage recorded its three parts', `.toEqual(['recorded', 'recorded',
+		// 'recorded'])`~~: the Historian third, recorded, the Unsticking Agent after it — soft (§5, ruling 4), its message restated, which no ledger entry
+		// quotes; and its old promise kept beside it, hard: the parts but the Historian’s are L17b1’s, value for value.
+		expect
+			.soft('parts' in done && done.parts.map((p) => [p.part, p.status]), 'arrangement: the stage recorded its four parts, the Historian’s third')
+			.toEqual([
+				['narrative-chapter', 'recorded'],
+				['fault-diagnosis', 'recorded'],
+				[HISTORIAN_PART, 'recorded'],
+				['step-back', 'recorded']
+			]);
+		expect('parts' in done && done.parts.filter((p) => p.part !== HISTORIAN_PART).map((p) => p.status), 'arrangement: the stage recorded its three parts, as before').toEqual([
+			'recorded',
+			'recorded',
+			'recorded'
+		]);
 		expect(pi.asked[0]?.prompt, 'the Hypothesizer was not shown the round’s chapter').toContain(`- The record ${roundId} stands as it was given. [${roundId}]`);
 		const [diagnosisId, stepBackId] = ['fault-diagnosis', 'step-back'].map((part) =>
 			String((stageEvidenceOf(part)[0]!.state.contentReference as { artifactId: string }).artifactId)
@@ -1155,7 +1344,10 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 			`It names ${r.ids.source} as the unit whose work most likely holds the fault.`,
 			'Its guidance on how you might proceed — advice only, which changes nothing of this unit’s definition, its outputs or its criteria:\nBuild the reader in parts and check each against a pipe before the whole.',
 			`The step-back (${stepBackId}) — questions and facts to help you reconsider, never what to do:`,
-			'- Fact: The reader calls fstat before it reads. (source: src/reader.ts)'
+			'- Fact: The reader calls fstat before it reads. (source: src/reader.ts)',
+			// ⭐ L17b2 (D87, D77; ruling 19; §7 Q2) — and the Historian’s judgment, after the step-back and just before the request (§8.3’s words): last, so
+			// every part before it is observed at HEAD, where no Historian runs.
+			`- Fact: The reader calls fstat before it reads. (source: src/reader.ts)\n\n${cleanJudgmentOf(r.ids.verification)}\n\n${tacticRecordRequest(tacticRecordPath('Source', currentOf(r.u, 'Source').id))}`
 		])
 			expect(turn, `the faulty successor’s turn does not carry: ${part}`).toContain(part);
 	});
@@ -1221,7 +1413,16 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 		const second = await runAssuranceStage(r.ids.verification, pi.deps);
 
 		expect(first, 'arrangement: the first press threw').toBe('the batch could not be run');
-		expect('parts' in second ? second.parts.map((p) => p.part) : second.refusedBecause, 'the round was held after a press that threw').toEqual([
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `['narrative-chapter', 'fault-diagnosis', 'step-back']`~~ the Historian third; soft, the
+		// control after it.
+		expect.soft('parts' in second ? second.parts.map((p) => p.part) : second.refusedBecause, 'the round was held after a press that threw').toEqual([
+			'narrative-chapter',
+			'fault-diagnosis',
+			'historical-assessment',
+			'step-back'
+		]);
+		// ⭑ CONTROL — L17b1's promise kept: the press ran its three parts, the Historian's taken out, in their order.
+		expect('parts' in second ? second.parts.map((p) => p.part).filter((p) => p !== 'historical-assessment') : second.refusedBecause, 'L17b1’s three parts did not run').toEqual([
 			'narrative-chapter',
 			'fault-diagnosis',
 			'step-back'
@@ -1254,7 +1455,16 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 
 		const done = await runAssuranceStage(r.ids.verification, deps);
 
-		expect('parts' in done && done.parts.map((p) => [p.part, p.status]), 'the failed helper is not recorded as failing, the stage going on').toEqual([
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `[['narrative-chapter', 'recorded'], ['fault-diagnosis', 'failing'], ['step-back', 'recorded']]`~~
+		// the Historian third, not run here (its time bound unset); soft, the control after it.
+		expect.soft('parts' in done && done.parts.map((p) => [p.part, p.status]), 'the failed helper is not recorded as failing, the stage going on').toEqual([
+			['narrative-chapter', 'recorded'],
+			['fault-diagnosis', 'failing'],
+			['historical-assessment', 'not-run'],
+			['step-back', 'recorded']
+		]);
+		// ⭑ CONTROL — L17b1's promise kept: its three parts, the Historian's taken out, as they were.
+		expect('parts' in done && done.parts.filter((p) => p.part !== 'historical-assessment').map((p) => [p.part, p.status]), 'L17b1’s three parts are not as they were').toEqual([
 			['narrative-chapter', 'recorded'],
 			['fault-diagnosis', 'failing'],
 			['step-back', 'recorded']
@@ -1296,7 +1506,16 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 
 		const done = await runAssuranceStage(r.ids.verification, deps);
 
-		expect('parts' in done && done.parts.map((p) => [p.part, p.status]), 'a helper whose session could not be closed is not recorded as failing, the stage going on').toEqual([
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `[['narrative-chapter', 'recorded'], ['fault-diagnosis', 'failing'], ['step-back', 'recorded']]`~~
+		// the Historian third, not run here (its time bound unset); soft, the control after it.
+		expect.soft('parts' in done && done.parts.map((p) => [p.part, p.status]), 'a helper whose session could not be closed is not recorded as failing, the stage going on').toEqual([
+			['narrative-chapter', 'recorded'],
+			['fault-diagnosis', 'failing'],
+			['historical-assessment', 'not-run'],
+			['step-back', 'recorded']
+		]);
+		// ⭑ CONTROL — L17b1's promise kept: its three parts, the Historian's taken out, as they were.
+		expect('parts' in done && done.parts.filter((p) => p.part !== 'historical-assessment').map((p) => [p.part, p.status]), 'L17b1’s three parts are not as they were').toEqual([
 			['narrative-chapter', 'recorded'],
 			['fault-diagnosis', 'failing'],
 			['step-back', 'recorded']
@@ -1365,7 +1584,19 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 			});
 		}
 
-		expect(seen.map((s) => s.parts), 'a value that cannot be described threw the press, or its part was not recorded as its own, the stage going on').toEqual([
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `'narrative-chapter failing, fault-diagnosis recorded, step-back recorded', 'narrative-chapter
+		// recorded, fault-diagnosis not-run, step-back not-run', 'narrative-chapter recorded, fault-diagnosis failing, step-back recorded'`~~ the Historian
+		// third in each, not run (its time bound unset); soft, the control after it.
+		expect.soft(seen.map((s) => s.parts), 'a value that cannot be described threw the press, or its part was not recorded as its own, the stage going on').toEqual([
+			'narrative-chapter failing, fault-diagnosis recorded, historical-assessment not-run, step-back recorded',
+			'narrative-chapter recorded, fault-diagnosis not-run, historical-assessment not-run, step-back not-run',
+			'narrative-chapter recorded, fault-diagnosis failing, historical-assessment not-run, step-back recorded'
+		]);
+		// ⭑ CONTROL — L17b1's promise kept: each press's three parts, the Historian's taken out, as they were.
+		expect(
+			seen.map((s) => s.parts.split(', ').filter((p) => !p.startsWith('historical-assessment ')).join(', ')),
+			'L17b1’s three parts are not as they were'
+		).toEqual([
 			'narrative-chapter failing, fault-diagnosis recorded, step-back recorded',
 			'narrative-chapter recorded, fault-diagnosis not-run, step-back not-run',
 			'narrative-chapter recorded, fault-diagnosis failing, step-back recorded'
@@ -1394,7 +1625,11 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 		expect(recurrence.status, `arrangement: the recurrence — ${recurrence.error?.message ?? ''}`).toBe('ACCEPTED');
 		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
 		const done = await runAssuranceStage(r.ids.verification, pi.deps);
-		expect('parts' in done && done.parts.map((p) => p.status), 'arrangement: the stage recorded its three parts').toEqual(['recorded', 'recorded', 'recorded']);
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `['recorded', 'recorded', 'recorded']`~~ the Historian third, not run here (its time bound
+		// unset); soft, the control after it holding the arrangement as it was.
+		expect.soft('parts' in done && done.parts.map((p) => p.status), 'arrangement: the stage recorded its three parts').toEqual(['recorded', 'recorded', 'not-run', 'recorded']);
+		// ⭑ CONTROL — the arrangement as it was: L17b1's three parts recorded, the Historian's taken out.
+		expect('parts' in done && done.parts.filter((p) => p.part !== 'historical-assessment').map((p) => p.status), 'arrangement: L17b1’s three parts were recorded').toEqual(['recorded', 'recorded', 'recorded']);
 		const idOf = (part: string) => String((stageEvidenceOf(part)[0]!.state.contentReference as { artifactId: string }).artifactId);
 		const chapterAt = getEngine()
 			.readAllEvents()
@@ -1443,7 +1678,11 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 		const fenced = (json: string) => ['```json', json, '```'].join('\n');
 		const pi = onPi({ diagnosis: fenced(DIAGNOSIS.replaceAll('SOURCE', r.ids.source)), stepBack: fenced(STEP_BACK) });
 		const done = await runAssuranceStage(r.ids.verification, pi.deps);
-		expect('parts' in done && done.parts.map((p) => p.status), 'arrangement: the fenced answers were accepted').toEqual(['recorded', 'recorded', 'recorded']);
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `['recorded', 'recorded', 'recorded']`~~ the Historian third, not run here (its time bound
+		// unset); soft, the control after it holding the arrangement as it was.
+		expect.soft('parts' in done && done.parts.map((p) => p.status), 'arrangement: the fenced answers were accepted').toEqual(['recorded', 'recorded', 'not-run', 'recorded']);
+		// ⭑ CONTROL — the arrangement as it was: L17b1's three parts accepted, the Historian's taken out.
+		expect('parts' in done && done.parts.filter((p) => p.part !== 'historical-assessment').map((p) => p.status), 'arrangement: L17b1’s three fenced answers were accepted').toEqual(['recorded', 'recorded', 'recorded']);
 		// ⭑ And a tactic record a model wrote fenced, taken as the page takes one.
 		const workspace: Workspace = createFilesystemWorkspace({ ownerKind: 'UNDERTAKING', ownerId: 'und', purgeability: 'RETAINED_BY_PARTICIPATION', directoryPath: pi.dir });
 		const path = tacticRecordPath('Verification', r.ids.verification);
@@ -1483,8 +1722,17 @@ describe('⭐⭐ L17b1 (D76, D74, D75) — one press: the chapter first, then th
 		const r = await verificationRejected();
 		expect(Object.keys(stageOffers(r.u) ?? {}), 'a unit its reviews accepted is offered the stage').toEqual([r.ids.verification]);
 		seam.review = chapterAnswering;
+		// ⭐ L17b2 (ruling 3) — the Historian’s time bound set, so the round’s Historian concludes and D71’s re-run is offered after the stage; the writer runs:
+		// this CONTROL’s promise is that the stage’s records — the Historian’s judgment now among them — never reach a declared review (D73, D77), held
+		// whole by the digest below.
+		historianBoundSet();
 		await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification });
 		const declared = seam.declared.length;
+		// ⭐⭐ L17b2, Stage 3b (the lead's §33, item 4; brief-3b item 12) — THE ARRANGEMENT STRENGTHENED, no check touched: the re-run's producer writes the
+		// tactic record its turn asks for, as a model would (`writesItsTacticRecord`; the test after this one arranges it so). Without it nothing of the
+		// stage's loop was in the workspace when the re-run's view was taken, so no mutant of what a view lists could reach a declared review here: a view
+		// listing the files of `.jpwb/tactic/` — the notice in the record's place — SURVIVED this CONTROL. With it, the digest below holds that too.
+		seam.onTurn = writesItsTacticRecord(r.u);
 
 		expect((await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it with the findings.' })).error, 'arrangement: the re-run').toBeUndefined();
 		expect((await press(r.u, 'recordAssurance', { pwuId: r.ids.verification })).error, 'arrangement: the re-run’s sign-off').toBeUndefined();
@@ -1508,6 +1756,9 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 	it('⛔ RED FIRST — its first turn: the instruction, the findings, then the narrative, then the request for its tactic record; the record taken before the view and overwritten; no view and no review holds it', async () => {
 		const r = await verificationRejected();
 		seam.review = chapterAnswering;
+		// ⭐ L17b2 (ruling 3) — the Historian’s time bound set, so the round’s Historian concludes and D71’s re-run is offered; the writer runs: this promise
+		// is the turn’s parts, the narrative among them.
+		historianBoundSet();
 		expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, 'arrangement: the stage').toBeUndefined();
 		seam.onTurn = writesItsTacticRecord(r.u);
 		const turns = seam.turns.length;
@@ -1521,6 +1772,9 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 		const at = [CARRIED_FINDINGS_LINE, 'This is a fresh session', FEEDBACK_HEADING, 'The loop so far', tacticRecordRequest(path)].map((part) => turn.indexOf(part));
 		expect(at.every((i) => i >= 0) && at.every((i, k) => k === 0 || i > at[k - 1]!), `the turn’s parts are not in their order: ${JSON.stringify(at)}`).toBe(true);
 		expect(turn.endsWith(`\n\n${tacticRecordRequest(path)}`), 'the turn does not end with the request').toBe(true);
+		// ⭐ L17b2 (D87, D77; ruling 19; §7 Q2) — and, the round’s Historian concluded, its judgment after the narrative and just before the request (§8.3’s
+		// words; no step-back here, the Hypothesizer not run). Soft, so the checks after it are observed at HEAD, where no Historian runs.
+		expect.soft(turn.endsWith(`\n\n${cleanJudgmentOf(r.ids.verification)}\n\n${tacticRecordRequest(path)}`), 'the turn does not carry the Historian’s judgment just before the request').toBe(true);
 
 		const tactic = listByType(getEngine(), 'ARTIFACT').filter((a) => a.state.artifactType === 'tactic-record');
 		expect(tactic.length, 'the tactic record is not recorded').toBe(1);
@@ -1555,6 +1809,7 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 	it('⛔ RED FIRST — a notice that cannot be written is said on the page, and recorded as a finding beside the record (the review’s defect 7)', async () => {
 		const r = await verificationRejected();
 		seam.review = chapterAnswering;
+		historianBoundSet(); // ⭐ L17b2 (ruling 3) — the round’s Historian concludes, so D71’s re-run is offered after the stage.
 		expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, 'arrangement: the stage').toBeUndefined();
 		// ⭑ The model writes its record; then the file turns read-only, so the host's notice over it is refused, as the port refuses a write.
 		seam.onTurn = async (text) => {
@@ -1577,6 +1832,7 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 	it('⛔ RED FIRST — a take whose record the store refused is no take: the page takes it again at the step’s end, and says what was refused (the review’s defect 7)', async () => {
 		const r = await verificationRejected();
 		seam.review = chapterAnswering;
+		historianBoundSet(); // ⭐ L17b2 (ruling 3) — the round’s Historian concludes, so D71’s re-run is offered after the stage.
 		expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, 'arrangement: the stage').toBeUndefined();
 		seam.onTurn = writesItsTacticRecord(r.u);
 		// ⭑ The try's take is refused as a store refuses a batch; the take at the step's end runs as the product's.
@@ -1592,6 +1848,9 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 
 	it('⛔ RED FIRST — a record never written by the step’s end is said on the page beside the step’s outcome, never discarded (the review’s defect 7)', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is the tactic record’s note, not the narrative.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 
 		const begun = await press(r.u, 'beginExecute', { pwuId: currentOf(r.u, 'Source').id });
@@ -1606,6 +1865,9 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 
 	it('⛔ RED FIRST — a step refused at its end says its tactic record’s note beside the refusal (the review’s defect 7)', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset until the floor’s refusal below): this promise is the note beside a refusal.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		// ⭑ The floor refuses every try’s work product with a finding, so the step ends refused (package N’s arrangement).
 		seam.review = (prompt) => {
@@ -1633,6 +1895,7 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 		for (const refuse of ['first-invocation', 'invocation', 'work-product', 'evidence'] as const) {
 			const r = await verificationRejected();
 			seam.review = chapterAnswering;
+			historianBoundSet(); // ⭐ L17b2 (ruling 3) — the round’s Historian concludes, so D71’s re-run is offered after the stage.
 			expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, `arrangement: the stage (${refuse})`).toBeUndefined();
 			const takes = seam.takes.length;
 			const records = tacticRecords();
@@ -1695,7 +1958,10 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 			[seen[0]!.note.includes('no tactic record was written at'), seen[1]!.note.includes(REFUSED_TAKE), seen[3]!.note.includes(REFUSED_TAKE)],
 			'the notes a step gathered before its refusal, or its last take’s finding, are not said beside it'
 		).toEqual([true, true, true]);
-	});
+	// ⭐ L17b2 (§11, ruling 9) — its own bound: 4 cases, each an Undertaking rejected and a stage press with the Historian third (L17b2), then
+	// D71's re-run — past the file's 60 s on a loaded machine (L17b2 facts §26.5: 12.1 s at B0, 41.4 s at part 4), its length, never its
+	// assertions (REG-F-642’s class).
+	}, 240_000);
 
 	it('⛔ RED FIRST — a step that fails before its try’s review, or whose try an exception escapes, still ends: its last take runs, its notes beside the failure, and an exception goes on as it was, the end’s own failure named on it (the review’s second re-check, D)', async () => {
 		const tacticRecords = () => listByType(getEngine(), 'ARTIFACT').filter((a) => a.state.artifactType === 'tactic-record').length;
@@ -1706,6 +1972,7 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 		for (const ending of ['manifest', 'view', 'escaping', 'escaping-and-its-end', 'manifest-and-its-end'] as const) {
 			const r = await verificationRejected();
 			seam.review = chapterAnswering;
+			historianBoundSet(); // ⭐ L17b2 (ruling 3) — the round’s Historian concludes, so D71’s re-run is offered after the stage.
 			expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, `arrangement: the stage (${ending})`).toBeUndefined();
 			const takes = seam.takes.length;
 			const records = tacticRecords();
@@ -1775,7 +2042,10 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 			{ stepState: 'FAILED', failed: ["the host could not read the unit's workspace after try 1: a file was removed between the walk and its stat"] },
 			true
 		]);
-	});
+	// ⭐ L17b2 (§11, ruling 9) — its own bound: 5 cases, each an Undertaking rejected and a stage press with the Historian third (L17b2), then
+	// D71's re-run — past the file's 60 s on a loaded machine (L17b2 facts §26.5: 20.9 s at B0, 58.7 s at part 4), its length, never its
+	// assertions (REG-F-642’s class).
+	}, 240_000);
 
 	it('⛔ RED FIRST — the step’s end cannot throw: a take that throws at the step’s end is the take’s failure, said among the end’s notes, and the step goes on — a refusal in a try returns its refusal, and the ordinary way out reaches its completion (the lead’s ruling (a) on the review’s third re-check)', async () => {
 		const REFUSED_TAKE = 'its record was refused: REJECTED: the store refused the batch';
@@ -1784,6 +2054,7 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 		for (const ending of ['refused', 'ordinary'] as const) {
 			const r = await verificationRejected();
 			seam.review = chapterAnswering;
+			historianBoundSet(); // ⭐ L17b2 (ruling 3) — the round’s Historian concludes, so D71’s re-run is offered after the stage.
 			expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, `arrangement: the stage (${ending})`).toBeUndefined();
 			seam.onTurn = writesItsTacticRecord(r.u);
 			// ⭑ The try's take is refused, as a store refuses a batch; the step's end takes it again, and that take throws, as a store that cannot be
@@ -1823,6 +2094,7 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 		for (const ending of ['ordinary', 'refused', 'failed', 'escaping', 'closed'] as const) {
 			const r = await verificationRejected();
 			seam.review = chapterAnswering;
+			historianBoundSet(); // ⭐ L17b2 (ruling 3) — the round’s Historian concludes, so D71’s re-run is offered after the stage.
 			expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, `arrangement: the stage (${ending})`).toBeUndefined();
 			const takes = seam.takes.length;
 			const records = tacticRecords();
@@ -1878,7 +2150,10 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 		).toEqual([true, true, true, true, false]);
 		const page = readFileSync(new URL('../../../routes/undertakings/[id]/+page.svelte', import.meta.url), 'utf8');
 		expect(page, 'the page does not render the close’s note').toContain('data-testid="session-close-note">{form.sessionCloseNote}</p>');
-	});
+	// ⭐ L17b2 (§11, ruling 9) — its own bound: 5 cases, each an Undertaking rejected and a stage press with the Historian third (L17b2), then
+	// D71's re-run — past the file's 60 s on a loaded machine (L17b2 facts §26.5: 18.1 s at B0, 47.9 s at part 4), its length, never its
+	// assertions (REG-F-642’s class).
+	}, 240_000);
 
 	it('⛔ RED FIRST — an exception that escapes a try goes on as the very value thrown: an Error whose message can be written carries the step’s end’s notes after its own message; any other value, and an Error whose message cannot be written, go on unchanged; a handled failure that then throws is given the end that already ran (the lead’s ruling (c) on the review’s third re-check)', async () => {
 		const REFUSED_TAKE = 'its record was refused: REJECTED: the store refused the batch';
@@ -1902,16 +2177,18 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 		for (const [kind, value] of cases) {
 			const r = await verificationRejected();
 			seam.review = chapterAnswering;
-			// ⭑ The stage runs, so the re-run takes a tactic record, its try's take refused: a note for the end to name. The control whose end has nothing to
-			// say runs none, so its re-run is asked for no tactic record.
-			if (kind !== 'noNotes') {
-				expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, `arrangement: the stage (${kind})`).toBeUndefined();
-				seam.onTurn = async (text) => {
-					await writesItsTacticRecord(r.u)(text);
-					if (kind === 'afterItsEnd') seam.listThrows = 'a file was removed between the walk and its stat';
-				};
-				seam.takeAnswer = (stepEnded) => (stepEnded ? undefined : { part: 'tactic-record', recorded: false, failure: REFUSED_TAKE });
-			}
+			// ⭑ The stage runs, so the re-run takes a tactic record, its try's take refused: a note for the end to name. ~~The control whose end has nothing to
+			// say runs none, so its re-run is asked for no tactic record.~~ ⭐ L17b2 (ruling 3; D72’s “When”) — the way back is offered only once the round’s
+			// stage has run and its Historian concluded, so every case runs it, ~~`if (kind !== 'noNotes') { … }`~~ the control too, its re-run then asked for
+			// its tactic record. The control’s end still has nothing to say: its model writes the record and its try takes it, whole — the take comes before
+			// the process runs are read, where the exception escapes — so the end has nothing left to take, and its close succeeds.
+			historianBoundSet();
+			expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, `arrangement: the stage (${kind})`).toBeUndefined();
+			seam.onTurn = async (text) => {
+				await writesItsTacticRecord(r.u)(text);
+				if (kind === 'afterItsEnd') seam.listThrows = 'a file was removed between the walk and its stat';
+			};
+			if (kind !== 'noNotes') seam.takeAnswer = (stepEnded) => (stepEnded ? undefined : { part: 'tactic-record', recorded: false, failure: REFUSED_TAKE });
 			// ⭑ An exception escapes the try where its process runs are read; or, the try's workspace unread, the failure's own record throws after the end ran.
 			if (kind === 'afterItsEnd') seam.throwBatch = { when: (commands) => commands.some((c) => c.commandType === 'FailExecutionStep'), error: value };
 			else seam.processRunsThrows = { value };
@@ -1953,13 +2230,19 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 			[false, true],
 			[false, true]
 		]);
-	});
+		// ⭐ L17b2 — the control’s premise, held: its try took its record, so its end had none to take.
+		expect(takes[4], 'arrangement: the control’s try did not take its record, so its end had a take to make').toEqual([false]);
+	// ⭐ L17b2 (§11, ruling 9) — its own bound: 6 cases, each an Undertaking rejected and a stage press with the Historian third (L17b2), then
+	// D71's re-run — past the file's 60 s on a loaded machine (L17b2 facts §26.5: 27.5 s at B0, 61.3 s at part 4), its length, never its
+	// assertions (REG-F-642’s class).
+	}, 240_000);
 
 	it('⛔ RED FIRST — the try’s own take cannot throw: a take that throws in a try is the take’s failure, said among the notes, and the try goes on to its view — a content store that fails at the take and at the view is met where package N meets it, the step FAILED with the view’s own reason; the take, not on the record, is taken again at the step’s end (the lead’s ruling (g) on the review’s fourth re-check)', async () => {
 		const tacticRecords = () => listByType(getEngine(), 'ARTIFACT').filter((a) => a.state.artifactType === 'tactic-record').length;
 		const STORE = 'the content store is read-only';
 		const r = await verificationRejected();
 		seam.review = chapterAnswering;
+		historianBoundSet(); // ⭐ L17b2 (ruling 3) — the round’s Historian concludes, so D71’s re-run is offered after the stage.
 		expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, 'arrangement: the stage').toBeUndefined();
 		const takes = seam.takes.length;
 		const records = tacticRecords();
@@ -2006,6 +2289,7 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 		for (const ending of ['close-backstop', 'close-in-the-end', 'take-in-the-end', 'take-in-the-try', 'revoked-proxy'] as const) {
 			const r = await verificationRejected();
 			seam.review = chapterAnswering;
+			historianBoundSet(); // ⭐ L17b2 (ruling 3) — the round’s Historian concludes, so D71’s re-run is offered after the stage.
 			expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, `arrangement: the stage (${ending})`).toBeUndefined();
 			const takes = seam.takes.length;
 			const records = tacticRecords();
@@ -2069,13 +2353,20 @@ describe('⭐⭐ L17b1 (D77) — D71’s re-run in place after the stage: the sa
 			`${REFUSED_TAKE} its take at the step's end failed: ${UNDESCRIBED} | `,
 			`its take after try 1 failed: ${UNDESCRIBED} | `
 		]);
-	});
+	// ⭐ L17b2 (§11, ruling 9) — its own bound: 5 cases, each an Undertaking rejected and a stage press with the Historian third (L17b2), then
+	// D71's re-run — past the file's 60 s on a loaded machine (L17b2 facts §26.5: 16.5 s at B0, 48.6 s at part 4), its length, never its
+	// assertions (REG-F-642’s class).
+	}, 240_000);
 
 	it('⛔ RED FIRST — package N’s two failures before a try’s review describe whatever value is thrown, through the one describer: a workspace whose listing, or a view whose record, throws a value that cannot be described FAILS THE STEP with its reason, never an escape (the lead’s ruling (k) on the review’s fifth re-check)', async () => {
 		const UNDESCRIBED = 'a thrown value that cannot be described';
 		const seen: { thrown: string; error: string; step: ReturnType<typeof latestStepOf> }[] = [];
 		for (const failing of ['listing', 'view'] as const) {
 			const r = await verificationRejected();
+			// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~D71’s re-run pressed straight after the rejection~~: after the round’s stage, its Historian concluding
+			// (`stageFirst`), its writer failing its check (`seam.review` unset). Its re-run is then asked for its tactic record and writes none, so the step’s
+			// end says so beside the failure (`tacticRecordNote`), never in the reason this test pins.
+			await stageFirst(r.u, r.ids.verification);
 			// ⭑ Once the turn is done the listing throws `Object.create(null)`, or the try's view's record does, where package N's check makes each throw an Error.
 			seam.onTurn = async () => {
 				if (failing === 'listing') seam.listThrows = { value: Object.create(null) };
@@ -2112,6 +2403,9 @@ describe('⭐⭐ L17b1 (D77, reading 16) — each successor’s first turn, and 
 	it('⛔ RED FIRST — the faulty unit’s successor: the instruction, then the narrative, the round’s failed criteria and the request for its tactic record; each other successor: the narrative and the line naming the replaced unit and the Decision', async () => {
 		const r = await verificationRejected();
 		seam.review = chapterAnswering;
+		// ⭐ L17b2 (ruling 3) — the Historian’s time bound set, so the round’s Historian concludes and the send-back is offered after the stage; the writer
+		// runs: this promise is each successor’s turn, the narrative in it.
+		historianBoundSet();
 		expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, 'arrangement: the stage').toBeUndefined();
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const decisionId = listByType(getEngine(), 'DECISION').find((d) => d.state.selectedOption === 'REPLACE_REACHED_WORK')!.id;
@@ -2134,6 +2428,9 @@ describe('⭐⭐ L17b1 (D77, reading 16) — each successor’s first turn, and 
 		expect(at.every((i) => i >= 0) && at.every((i, k) => k === 0 || i > at[k - 1]!), `the faulty successor’s parts are not in their order: ${JSON.stringify(at)}`).toBe(true);
 		expect(faulty.indexOf(FEEDBACK_HEADING) > faulty.indexOf('Write the'), 'the feedback does not follow the instruction').toBe(true);
 		expect(listByType(getEngine(), 'ARTIFACT').filter((a) => a.state.artifactType === 'tactic-record').length, 'the faulty successor’s record is not taken').toBe(1);
+		// ⭐ L17b2 (D87, D77; ruling 19; §7 Q2) — and, the round’s Historian concluded, its judgment after the round’s failed criteria and just before the
+		// request (§8.3’s words; no diagnosis and no step-back here, the Hypothesizer not run). Soft, so the checks after it are observed at HEAD.
+		expect.soft(faulty.includes(`\n\n${cleanJudgmentOf(r.ids.verification)}\n\n${tacticRecordRequest(path)}`), 'the faulty successor’s turn does not carry the Historian’s judgment just before the request').toBe(true);
 
 		for (const action of ['recordAssurance', 'markSatisfied'] as const)
 			expect((await press(r.u, action, { pwuId: source2 })).error, `arrangement: ${action} on the new Source`).toBeUndefined();
@@ -2146,22 +2443,44 @@ describe('⭐⭐ L17b1 (D77, reading 16) — each successor’s first turn, and 
 			`This unit is redone because a unit its work used was replaced: "Source" (${r.ids.source}), under the person’s Decision ${decisionId}.`
 		);
 		expect(other, 'another successor was asked for a tactic record').not.toContain('Your tactic record');
+		// ⭐ L17b2 (D87; ruling 19) — and is given no Historian’s judgment: the faulty unit’s successor alone carries it (group B’s third test, on this turn).
+		expect.soft(other.includes(JUDGMENT_HEADING), 'another successor was given the Historian’s judgment').toBe(false);
 	});
 
-	it('⛔ RED FIRST — with no stage run, the faulty unit’s successor still carries the round’s failed criteria and the request, and no narrative', async () => {
+	it('⛔ RED FIRST — ~~with no stage run~~ ⭐ after a stage whose chapter failed its check, the faulty unit’s successor still carries the round’s failed criteria and the request, and ~~no narrative~~ ⭐ no narrative but the line naming that chapter', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back with no stage run~~: the way back is offered only once the round’s stage has run and its
+		// Historian concluded, so "no stage run" is no path the product takes now; this title, which the ledger quotes (M81, M95), ~~is kept as it was and its
+		// premise struck here~~ ⭐ is restated in place at Stage 3, with the two entries' predictions (the lead's §11 (3)). The nearest path that is: the stage run
+		// with its writer failing its check (`seam.review` unset), so it leaves no narrative
+		// statement — the chapter named as failing, its statements left out — and, the Hypothesizer not run, no diagnosis and no step-back.
+		const chapter = (await stageFirst(r.u, r.ids.verification)).find((p) => p.part === 'narrative-chapter');
+		expect(chapter?.status, 'arrangement: the stage ran, its chapter failing its check').toBe('failing');
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const turns = seam.turns.length;
 
 		expect((await press(r.u, 'beginExecute', { pwuId: currentOf(r.u, 'Source').id })).error, 'the new Source did not run').toBeUndefined();
 
 		const turn = seam.turns[turns] ?? '';
+		// ⭐ L17b2 (ruling 3) — ~~`false`~~ for 'The loop so far': the stage ran, its chapter failing, and a turn names a chapter that failed its check under
+		// the narrative’s heading (`successorFeedback`) — so the heading is there, and the narrative is that one line, nothing more (the check after this one).
 		expect([turn.includes(FEEDBACK_HEADING), turn.includes('The standard-input mode exits 1'), turn.includes('Your tactic record'), turn.includes('The loop so far')], 'the parts recorded are not the ones carried').toEqual([
 			true,
 			true,
 			true,
-			false
+			true
 		]);
+		// ⭐ L17b2 — the old promise’s "no narrative", as it holds now: the narrative holds only what the record holds — the failing chapter named, its
+		// statements left out — and the round’s failed criteria follow it.
+		expect
+			.soft(turn, 'the narrative holds more than the record: the chapter that failed its check is not named alone, its statements left out')
+			.toContain(
+				`The loop so far — the narrative memory of this Undertaking, chapter by chapter, each statement with the records it rests on:\nChapter ${chapter?.artifactId ?? '(none)'} failed its check, so its statements are left out: judge from the records.\n\nThe criteria the review that rejected the work found not met, each with its rationale:`
+			);
+		// ⭐ L17b2 (D87, D77; ruling 19; §7 Q2) — and, the round’s Historian concluded, its judgment just before the request (§8.3’s words).
+		expect
+			.soft(turn, 'the faulty successor’s turn does not carry the Historian’s judgment just before the request')
+			.toContain(`\n\n${cleanJudgmentOf(r.ids.verification)}\n\n${tacticRecordRequest(tacticRecordPath('Source', currentOf(r.u, 'Source').id))}`);
 		// ⭑ The model wrote no record: at the step's end that is a finding, recorded, and the step went on.
 		const findings = listByType(getEngine(), 'ARTIFACT').filter((a) => a.state.artifactType === 'tactic-record-finding');
 		expect(findings.length, 'a record never written is not a finding, recorded').toBe(1);
@@ -2178,6 +2497,9 @@ describe('⭐⭐ L17b1 (D77, reading 16) — each successor’s first turn, and 
 
 	it('⛔ RED FIRST — the derivation names the unit the act was pressed for: a target that is a reached composite’s child, at the head of a chain of producers (Source)', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is the derivation, read from the act’s Decision alone.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const decisionId = listByType(getEngine(), 'DECISION').find((d) => d.state.selectedOption === 'REPLACE_REACHED_WORK')!.id;
 		const source2 = currentOf(r.u, 'Source').id;
@@ -2193,6 +2515,9 @@ describe('⭐⭐ L17b1 (D77, reading 16) — each successor’s first turn, and 
 
 	it('⛔ RED FIRST — the derivation names the unit the act was pressed for: a composite target (Build)', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is the derivation, read from the act’s Decision alone.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await press(r.u, 'sendWorkBack', { pwuId: r.ids.verification, targetId: r.ids.build, rationale: TYPED })).error, 'arrangement: the act').toBeUndefined();
 		const build2 = currentOf(r.u, 'Build').id;
 
@@ -2243,6 +2568,11 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 			folder: sessionFolderOf(root, 'executor', spec),
 			opening: { kind: 'NEW' }
 		});
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~D71’s re-run pressed straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is the session’s place, not the narrative. On Pi, over the page’s
+		// in-memory shared workspace, the Hypothesizer is not run, so the stage opens no producer and sends no turn: the places and turns below are the
+		// re-run’s own. Its feedback comes after its findings, so the sentences this test pins do not move.
+		await stageFirst(r.u, r.ids.verification);
 		const folder = sessionFolderOf(root, 'executor', r.ids.verification);
 		// ⭐ RESTATED IN FORM AT STAGE 2 (package L17b3, design D91): ~~`sessionFileIn(folder)`~~, a file whose one turn is `'Write the work.'` — under D91 a
 		// reopened file whose user entries hold no turn equal to the reviewed try's cannot show that it holds the reviewed answer, so the work is sent
@@ -2284,6 +2614,10 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 		const r = await verificationRejected();
 		const from = sessionFileIn(sessionFolderOf(root, 'executor', r.ids.source));
 		const before = readFileSync(from, 'utf8');
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check: this promise is the replacement’s session, not the narrative. On Pi, over the page’s in-memory shared
+		// workspace, the stage opens no producer, so the places below are the steps’ own.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const source2 = currentOf(r.u, 'Source').id;
 		let places = seam.places.length;
@@ -2341,6 +2675,9 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 		const root = durableOnPi();
 		const r = await verificationRejected();
 		sessionFileIn(sessionFolderOf(root, 'executor', r.ids.source));
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset until the floor’s refusal below): this promise is what a later try is handed.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		// ⭑ The floor refuses the first try's work product with a finding, so the producer is asked again (package N's arrangement).
 		let refusedOnce = false;
@@ -2384,6 +2721,9 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 	it('⛔ RED FIRST — the session place’s refusal describes whatever value is thrown, through the one describer: a sessions root that throws a value that cannot be described refuses the re-run, said, never an escape (the lead’s ruling (k) on the review’s fifth re-check)', async () => {
 		durableOnPi();
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~D71’s re-run pressed straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check — pressed BEFORE the sessions root is made to throw, since the stage’s press asks for it too.
+		await stageFirst(r.u, r.ids.verification);
 		seam.sessionsRootThrows = { value: Object.create(null) };
 
 		const out = await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it.' }).then(
@@ -2401,6 +2741,9 @@ describe('⭐⭐ L17b1 (D85; REG-D-169) — through the page: with a durable sto
 	it('⭑ CONTROL — with no durable store, or an executor that is not Pi, every step is held in memory, as before', async () => {
 		const r = await verificationRejected();
 		expect(seam.places.length > 0 && seam.places.every((p) => JSON.stringify(p) === JSON.stringify({ kind: 'IN_MEMORY' })), 'a step with no durable store was not held in memory').toBe(true);
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~D71’s re-run pressed straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check. The stand-in’s stage opens no producer, so the places below are the re-run’s own.
+		await stageFirst(r.u, r.ids.verification);
 		seam.sessionsRoot = join(TMP, `sessions-${++tmpCase}`, 'demo.sqlite.sessions');
 		const places = seam.places.length;
 		expect((await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it.' })).error, 'arrangement: the re-run').toBeUndefined();
@@ -2419,20 +2762,34 @@ const bindingPoliciesOf = (pwuId: string): string[] =>
 		.map((id) => String(getObject(getEngine(), id)?.contextAssemblyPolicyId ?? ''));
 
 describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s policy, the record’s sentence, and the record the roles are given', () => {
-	it('⛔ RED FIRST — the page names each step’s context policy: ctx-default for a step outside the loop; ctx-default-loop for a replacement’s, and for D71’s re-run in place where the round’s stage ran; ctx-default for that re-run where it did not (REG-D-173 (2))', async () => {
+	// ⭐ L17b2 (ruling 3) — the title’s last clause, ~~"where the round’s stage ran; ctx-default for that re-run where it did not"~~, struck in place (no ledger
+	// entry quotes the title): D71’s re-run follows the round’s stage now, always, and so always carries the loop’s feedback.
+	it('⛔ RED FIRST — the page names each step’s context policy: ctx-default for a step outside the loop; ctx-default-loop for a replacement’s, and for D71’s re-run in place, which follows the round’s stage ~~where the round’s stage ran; ctx-default for that re-run where it did not~~ (REG-D-173 (2))', async () => {
 		const sent = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): the binding’s rule, not the narrative, is this promise. A stage makes no plan, so
+		// each unit’s bindings below are its steps’ own.
+		await stageFirst(sent.u, sent.ids.verification);
 		expect((await sendBackToSource(sent)).error, 'arrangement: the act').toBeUndefined();
 		const source2 = currentOf(sent.u, 'Source').id;
 		expect((await press(sent.u, 'beginExecute', { pwuId: source2 })).error, 'arrangement: the new Source ran').toBeUndefined();
 		const staged = await verificationRejected();
 		seam.review = chapterAnswering;
+		historianBoundSet(); // ⭐ L17b2 (ruling 3) — the round’s Historian concludes, so D71’s re-run is offered after the stage.
 		expect((await press(staged.u, 'runAssuranceStage', { pwuId: staged.ids.verification })).error, 'arrangement: the stage').toBeUndefined();
 		seam.onTurn = writesItsTacticRecord(staged.u);
 		expect((await press(staged.u, 'rerunRejectedWork', { pwuId: staged.ids.verification, rationale: 'Re-run it.' })).error, 'arrangement: the re-run after the stage').toBeUndefined();
 		seam.onTurn = undefined;
 		const plain = await verificationRejected();
-		expect((await press(plain.u, 'rerunRejectedWork', { pwuId: plain.ids.verification, rationale: 'Re-run it.' })).error, 'arrangement: the re-run with no stage').toBeUndefined();
+		// ⭐ L17b2 — ~~D71’s re-run with no stage, bound to ctx-default~~ (~~'arrangement: the re-run with no stage'~~, a message no ledger entry quotes): no
+		// such re-run is offered now, and none can carry no feedback, since every stage records its chapter and a re-run after one carries it
+		// (`feedbackForRerun`). The nearest case that is: the stage that records the least — its writer failing its check, the Hypothesizer not run — whose
+		// re-run carries the failing chapter’s line alone (and, after L17b2, the Historian’s judgment), and is bound to the loop’s policy all the same.
+		seam.review = undefined;
+		await stageFirst(plain.u, plain.ids.verification);
+		expect((await press(plain.u, 'rerunRejectedWork', { pwuId: plain.ids.verification, rationale: 'Re-run it.' })).error, 'arrangement: the re-run after a stage whose writer failed').toBeUndefined();
 
+		// ⭐ L17b2 — ~~`['ctx-default', 'ctx-default']`~~ for `plain`, last: its re-run, after the stage, carries the loop’s feedback.
 		expect(
 			[
 				bindingPoliciesOf(sent.ids.spec),
@@ -2442,11 +2799,15 @@ describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s po
 				bindingPoliciesOf(plain.ids.verification)
 			],
 			'a step is bound to a policy its kind does not call for'
-		).toEqual([['ctx-default'], ['ctx-default'], ['ctx-default-loop'], ['ctx-default', 'ctx-default-loop'], ['ctx-default', 'ctx-default']]);
+		).toEqual([['ctx-default'], ['ctx-default'], ['ctx-default-loop'], ['ctx-default', 'ctx-default-loop'], ['ctx-default', 'ctx-default-loop']]);
 	});
 
 	it('⛔ RED FIRST — a replacement’s first turn ends with the record’s sentence, naming the unit it replaces, its step granted the record’s capability and handed the record; a unit that is not a replacement is given neither (D89)', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is the record’s sentence and grant. The stand-in’s stage opens no
+		// producer, so the first context below is still the Specification’s first step’s, and the feedback sits before the sentence, which still ends the turn.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const source2 = currentOf(r.u, 'Source').id;
 		const contexts = seam.contexts.length;
@@ -2491,6 +2852,9 @@ describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s po
 		await press(u, 'recordAssurance', { pwuId: verification });
 		seam.answer = (policyId) => answerOf(policyId);
 		expect(axesOf(verification)[2], 'arrangement: Verification rejected').toBe('REJECTED');
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is the no-record sentence, which still ends the new Docs’ turn.
+		await stageFirst(u, verification);
 		const sent = await press(u, 'sendWorkBack', { pwuId: verification, targetId: u.unitOf('Specification').id, rationale: TYPED });
 		expect(sent.error, 'arrangement: the work sent back to the Specification').toBeUndefined();
 		const docs2 = currentOf(u, 'Docs').id;
@@ -2528,6 +2892,9 @@ describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s po
 		const before = tryIds();
 		expect(before.length, 'arrangement: executor tries on the record').toBeGreaterThan(0);
 
+		// ⭐ L17b2 (ruling 3) — the Historian’s time bound set, so each round’s Historian concludes and D71’s re-run is offered after the first stage; the
+		// writer runs: this promise is what it is given. The Historian’s call is no executor try and no floor prompt, so neither set below moves.
+		historianBoundSet();
 		expect((await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification })).error, 'arrangement: the first round’s stage').toBeUndefined();
 
 		// ⭑ A later try: D71's re-run in place, which runs two commands, one failing, and answers past the bound; its sign-off rejected again — a second round.
@@ -2580,7 +2947,13 @@ describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s po
 	it('⛔ RED FIRST — on Pi, the Hypothesizer is given the recorded conversations of the rejected unit and of each candidate, and the Unsticking Agent, on a recurrence, those of the rejected unit and of each unit the recurrence names — exactly those, each file the unit’s rendering from the record, named in its prompt, the copies removed after; none reaches the shared workspace (D89; REG-D-173 (5); the review’s L17-04)', async () => {
 		const r = await verificationRejected();
 		seam.review = chapterAnswering;
-		// ⭑ The recurrence's assessment under the page's own demo policy, as its evidence journey opens one (`openAssessmentFor`) — never under one of
+		// ⭐ L17b2 (ruling 10) — RESTATED: ~~the recurrence recorded on an assessment of Verification and Docs, and the Unsticking Agent given the records of
+		// the units that observation's subjects name~~ the units a recurrence names are read from the records it cites — its `evidenceIds` — by their
+		// structure: a cited assessment's subjects, a cited stage record's unit, a cited unit; never from the observation's own subjects, which the kernel
+		// copies from the assessment it is recorded on (the Historian's, the rejected unit alone: L17b2 facts §2.5). So the recurrence is recorded on the
+		// round's opening verdict, its subjects Verification alone, and cites three records — an assessment of Verification and Docs, the tactic record of
+		// Tests, and Lint itself — each naming its units as the reading must.
+		// ⭑ The cited assessment under the page's own demo policy, as its evidence journey opens one (`openAssessmentFor`) — never under one of
 		// Verification's declared policies, where a further request would unseat its REJECTED verdict (`declared-assurance.ts`, its header's item 1).
 		if (getObject(getEngine(), DEMO_POLICY_ID) === undefined)
 			for (const [commandType, payload] of [
@@ -2599,19 +2972,52 @@ describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s po
 			claimIds: []
 		});
 		expect(requested.status, `arrangement: an assessment of Verification and Docs — ${requested.error?.message ?? ''}`).toBe('ACCEPTED');
+		// ⭐ L17b2 (ruling 10) — a tactic record Tests's model wrote, taken as the page takes one, in a workspace of its own: a stage record of Tests.
+		const tacticDir = join(TMP, `tactic-${++tmpCase}`, 'demo.sqlite.workspaces', 'und-tactic');
+		mkdirSync(tacticDir, { recursive: true });
+		const tacticAt: Workspace = createFilesystemWorkspace({ ownerKind: 'UNDERTAKING', ownerId: 'und', purgeability: 'RETAINED_BY_PARTICIPATION', directoryPath: tacticDir });
+		const tacticPath = tacticRecordPath('Tests', r.ids.tests);
+		await tacticAt.writeFile(tacticPath, RECORD);
+		const took = await takeTacticRecord(
+			{ store: getArtifactStore(), tenantPrefix: 'tnt-local', newId: mintUiId, now: () => '2026-11-16T12:00:00.000Z', runSteps: runStepsHere },
+			{
+				workspace: tacticAt,
+				path: tacticPath,
+				unitId: r.ids.tests,
+				undertakingId: r.u.undertakingId,
+				roundId: r.verdicts[0]!.assessmentId,
+				attemptKey: 'step_tests#1',
+				producerModelId: 'faux/model',
+				atStart: undefined,
+				stepEnded: false
+			}
+		);
+		expect([took?.part, took?.recorded], 'arrangement: Tests’s tactic record was taken').toEqual(['tactic-record', true]);
+		const tacticId = String((stageEvidenceOf('tactic-record')[0]!.state.contentReference as { artifactId: string }).artifactId);
+		// ⭐ L17b2 (ruling 10) — ~~`assessmentId,`~~ recorded on the round's opening verdict, and ~~no `evidenceIds`~~ citing the three records.
 		const recurrence = dispatch('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', mintUiId('obs'), {
-			assessmentId,
+			assessmentId: r.verdicts[0]!.assessmentId,
 			observationType: 'FINDING',
 			findingCode: 'KNOWN_FAILURE_RECURRENCE',
 			severity: 'INFORMATIONAL',
-			statement: 'The standard-input mode fails again, and the documented usage with it.'
+			statement: 'The standard-input mode fails again, and the documented usage with it.',
+			evidenceIds: [assessmentId, tacticId, r.ids.lint]
 		});
 		expect(recurrence.status, `arrangement: the recurrence — ${recurrence.error?.message ?? ''}`).toBe('ACCEPTED');
 		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
 
 		const done = await runAssuranceStage(r.ids.verification, pi.deps);
 
-		expect('parts' in done && done.parts.map((p) => [p.part, p.status]), 'arrangement: both helpers ran').toEqual([
+		// ⭐ L17b2 (D73; ruling 5) — RESTATED: ~~`expect(` … `[['narrative-chapter', 'recorded'], ['fault-diagnosis', 'recorded'], ['step-back', 'recorded']]`~~
+		// the Historian third, not run here (its time bound unset); soft, the control after it holding the arrangement as it was.
+		expect.soft('parts' in done && done.parts.map((p) => [p.part, p.status]), 'arrangement: both helpers ran').toEqual([
+			['narrative-chapter', 'recorded'],
+			['fault-diagnosis', 'recorded'],
+			['historical-assessment', 'not-run'],
+			['step-back', 'recorded']
+		]);
+		// ⭑ CONTROL — the arrangement as it was: L17b1's three parts recorded, the Historian's taken out.
+		expect('parts' in done && done.parts.filter((p) => p.part !== 'historical-assessment').map((p) => [p.part, p.status]), 'arrangement: both helpers ran, as before').toEqual([
 			['narrative-chapter', 'recorded'],
 			['fault-diagnosis', 'recorded'],
 			['step-back', 'recorded']
@@ -2625,9 +3031,13 @@ describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s po
 			['Tests', r.ids.tests],
 			['Lint', r.ids.lint]
 		] as const;
+		// ⭐ L17b2 (ruling 10) — ~~`[['Verification', r.ids.verification], ['Docs', r.ids.docs]]`~~ the rejected unit, and the units the cited records name:
+		// Verification and Docs (the assessment's subjects), Tests (the tactic record's unit) and Lint (a cited unit) — exactly those, as before.
 		const unsticking = [
 			['Verification', r.ids.verification],
-			['Docs', r.ids.docs]
+			['Docs', r.ids.docs],
+			['Tests', r.ids.tests],
+			['Lint', r.ids.lint]
 		] as const;
 		expect(
 			[pi.asked[0]?.recordFiles, pi.asked[1]?.recordFiles],
@@ -2676,6 +3086,10 @@ describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s po
 		const { u, spec } = await aSpecification();
 		expect((await stoppedThenRerun(u, spec)).advanced, 'arrangement: the Specification’s work re-run').toBe('work-rerun');
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer answered by the seam the first re-run left (`transportDownWhile`, which answers it as `chapterAnswering`): the chapter
+		// recorded. This promise is the binding’s rule; a stage makes no plan, so the bindings below are the steps’ own.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const source2 = currentOf(r.u, 'Source').id;
 		expect((await stoppedThenRerun(r.u, source2)).advanced, 'arrangement: the new Source’s work re-run').toBe('work-rerun');
@@ -2686,13 +3100,17 @@ describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s po
 		]);
 	});
 
-	it('⛔ RED FIRST — a step on a reopened file that holds D77’s feedback is bound to ctx-default-loop: at D71’s re-run with no stage run, and at RD8’s re-run of a unit outside the loop (the review’s L17-06; D89)', async () => {
+	it('⛔ RED FIRST — a step on a reopened file that holds D77’s feedback is bound to ctx-default-loop: at D71’s re-run ~~with no stage run~~ ⭐ after the round’s stage, and at RD8’s re-run of a unit outside the loop (the review’s L17-06; D89)', async () => {
 		const root = durableHere();
 		const holdingFeedback = (pwuId: string) =>
 			sessionFileWith(sessionFolderOf(root, 'executor', pwuId), [
 				{ user: `Write the work.\n\n${FEEDBACK_HEADING}\n- The round’s failed criterion.`, assistant: 'The work.', stopReason: 'stop' }
 			]);
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~D71’s re-run with no stage run~~: no such re-run is offered now. After the round’s stage (`stageFirst`, its
+		// writer failing its check) the re-run’s own turn carries the loop’s feedback too, so its limb no longer tells the held feedback from the carried:
+		// RD8’s limb — a unit outside the loop, no stage — is the one that does now (`P6X-L17B3-M50`, whose check this is, still reddens there).
+		await stageFirst(r.u, r.ids.verification);
 		holdingFeedback(r.ids.verification);
 		expect((await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it.' })).error, 'arrangement: the re-run').toBeUndefined();
 		const { u, spec } = await aSpecification();
@@ -2716,6 +3134,10 @@ describe('⭐⭐ L17b3 (D89; REG-D-173) — through the page: the binding’s po
 		/** A replacement's first step, stopped at its review's transport; its file as Pi leaves one, its first turn as sent or without the sentence; then RD8's re-run's first turn. */
 		const laterTurn = async (toldInFile: boolean) => {
 			const r = await verificationRejected();
+			// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+			// (`stageFirst`), its writer failing its check in both calls (`seam.review` cleared: the first call’s re-run leaves its own seam behind).
+			seam.review = undefined;
+			await stageFirst(r.u, r.ids.verification);
 			expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 			const source2 = currentOf(r.u, 'Source').id;
 			const sentence =
@@ -3328,7 +3750,12 @@ describe('⭐⭐ L17b3 (D91; REG-F-649) — through the page: a repair after an 
 		return { root, r, reviewedTurn, work, folder: sessionFolderOf(root, 'executor', r.ids.verification) };
 	}
 	/** D71's re-run of Verification: its first turn, and the input the page handed its step. */
+	// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the re-run pressed straight after the rejection~~: after the round’s stage, its Historian concluding
+	// (`stageFirst`; its writer failing its check, `seam.review` unset: these promises are D91’s, not the narrative’s). On Pi, over the page’s in-memory
+	// shared workspace, the Hypothesizer is not run, so no producer is opened and no turn sent: the turn and the input below are the re-run’s own. Its
+	// feedback comes after the findings, so the opening each test pins — the instruction, then the work sent again — does not move.
 	async function rerunInPlace(r: Awaited<ReturnType<typeof verificationRejected>>) {
+		await stageFirst(r.u, r.ids.verification);
 		const [turns, inputs] = [seam.turns.length, seam.stepInputs.length];
 		expect((await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it with the findings.' })).error, 'arrangement: the re-run').toBeUndefined();
 		return { turn: seam.turns[turns] ?? '', input: seam.stepInputs[inputs] };
@@ -3449,6 +3876,10 @@ describe('⭐⭐ L17b3 (D90; the lead’s ruling 5 and §18.2) — the reads bef
 
 	it('⛔ RED FIRST — a replacement’s record that cannot be read after its step started fails the step once with the reason, and the page answers with it; no producer opened (the lead’s ruling 5)', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset). The stage opens no producer and asks for no step’s failure, so the opens and the
+		// trace counted below are the new Source’s step’s own.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const source2 = currentOf(r.u, 'Source').id;
 		const [opens, trace] = [seam.opens, seam.trace.length];
@@ -3514,6 +3945,10 @@ describe('⭐⭐ L17b3 (D90; the lead’s ruling 5 and §18.2) — the reads bef
 		// ⭐ The lead's ruling 4 of §23 — D71's re-run: a unit its declared reviews rejected, the criteria's read failing as the person re-runs it — that
 		// read alone (`onlyWithin`), so the offer, which reads the same policies first, reads them whole.
 		const d71 = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~D71’s re-run pressed straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`; its writer answered by the RD8 limb’s seam above, as `chapterAnswering`), before the counts: a stage makes no plan and records no
+		// Decision, so the counts below are the re-run’s own.
+		await stageFirst(d71.u, d71.ids.verification);
 		const [d71PlansBefore, decisionsBefore] = [
 			listByType(getEngine(), 'EXECUTION_PLAN').filter((p) => p.state.workUnitId === d71.ids.verification).length,
 			listByType(getEngine(), 'DECISION').length
@@ -3647,6 +4082,845 @@ describe('⭐⭐ L17b3 (D90; the lead’s ruling 5 and §18.2) — the reads bef
 	});
 });
 
+// ── ⭐⭐ L17b2 — design D73 with D86, D87 and D72 (`REG-D-166` (2), (3), (6); `REG-D-167` (1) to (3); the lead's rulings 2 to 11, 14, 16, 17, 19 and 22
+// on L17b2's Stage 0) — THE HISTORIAN, THIRD IN THE STAGE, AND THE WAY BACK ITS RECORD OFFERS ──────────────────────────────────────────────────────
+//
+// ⭑ WHAT MUST HOLD: at a rejected sign-off the stage runs the Historian third, after the chapter and the Hypothesizer — a devin session over copies of
+// the round's records and of the shared workspace (D86) — and records its assessment of the rejected unit under `pol_historical_consistency` beside the
+// declared reviews, never folded into them: its rows, its verdict computed from them, its own validator id, its recommended action held by Gate B, and
+// its recurrence citing the earlier records it names; the Unsticking Agent runs after it on an open recurrence. The page's way back then follows from
+// those records alone (`wayBackOffer`): none before the stage; by the diagnosis after it; the Historian asked once more where it did not conclude; and
+// none where it recommends the sponsor's decision or did not conclude twice, the page saying the sponsor decides. ⛔ No model and no devin: the
+// Historian's program is the case's (`seam.historian`), behind the real call (`devinHistorianCall`), as the floor's devin is.
+
+/** ⭐ L17b2 — the Historian's part, as its record names it, and its exchange's role (ruling 11). */
+const HISTORIAN_PART = 'historical-assessment';
+const HISTORIAN_ROLE = 'assurance-stage.historian';
+afterAll(() => {
+	for (const d of seam.sharedDirs) rmSync(d, { recursive: true, force: true });
+});
+/** ⭐ L17b2 — the Historian's time bound, set: required, with no default (ruling 16); design D84 fixes its value. */
+const historianBoundSet = (): void => {
+	vi.stubEnv('JPWB_HISTORIAN_CALL_MS', '600000');
+};
+/** ⭐ L17b2 — the Historian's answer (ruling 19): the declared answer over HC-01 to HC-05, each met but those `failed` names, and its two fields. */
+function historianAnswer(
+	o: {
+		readonly failed?: readonly string[];
+		readonly findings?: readonly unknown[];
+		readonly recommendation?: string;
+		readonly recurrence?: unknown;
+		readonly recommendedControlAction?: unknown;
+	} = {}
+): string {
+	const failed = new Set(o.failed ?? []);
+	return JSON.stringify({
+		findings:
+			o.findings ??
+			['HC-01', 'HC-02', 'HC-03', 'HC-04', 'HC-05'].map((id) => ({
+				criterionId: id,
+				failed: failed.has(id),
+				statement: failed.has(id) ? 'The standard-input failure of the round before comes back.' : 'met'
+			})),
+		recommendation: o.recommendation ?? 'SATISFIED',
+		residualUncertainty: [],
+		recurrence: o.recurrence ?? null,
+		recommendedControlAction: o.recommendedControlAction ?? null
+	});
+}
+/** ⭐ L17b2 — the assessments of a unit under the Historian's policy, in the order recorded. */
+const historianAssessmentsOf = (pwuId: string) =>
+	listByType(getEngine(), 'ASSURANCE_ASSESSMENT').filter(
+		(a) => a.state.assurancePolicyId === 'pol_historical_consistency' && ((a.state.subjectObjectIds as string[] | undefined) ?? []).includes(pwuId)
+	);
+/** ⭐ L17b2 — the Historian's exchanges, by their role. */
+const historianExchanges = () => listByType(getEngine(), 'MODEL_EXCHANGE').filter((x) => x.state.invokerId === HISTORIAN_ROLE);
+/** ⭐ L17b2 — one part of a direct press, by its name. */
+const partOf = (done: Awaited<ReturnType<typeof runAssuranceStage>>, part: string): { readonly status?: string; readonly why?: string } | undefined =>
+	'parts' in done ? done.parts.find((p) => p.part === part) : undefined;
+/**
+ * ⭐ L17b2 — what the page offers a unit for its way back, read as the page loads: the stage, D71's re-run, D72's send-back, the Historian asked
+ * again (`historianAgainByPwu`), and the sponsor's decision where no way back is offered (`sponsorDecidesByPwu`).
+ */
+function wayBackOffersOf(u: Fixture, pwuId: string) {
+	const page = unitLoad({ params: { id: u.undertakingId } } as never) as unknown as Record<string, Record<string, unknown> | undefined>;
+	return {
+		stage: page.assuranceStageByPwu?.[pwuId],
+		rerun: page.rejectedRerunByPwu?.[pwuId],
+		sendBack: page.sendBackByPwu?.[pwuId] as { readonly candidates: readonly { readonly id: string; readonly title: string }[] } | undefined,
+		historianAgain: page.historianAgainByPwu?.[pwuId],
+		sponsorDecides: page.sponsorDecidesByPwu?.[pwuId] as { readonly because?: unknown; readonly said?: unknown } | undefined
+	};
+}
+/** ⭐ L17b2 — a diagnosis that names no candidate. */
+const DIAGNOSIS_NONE = JSON.stringify({ hypotheses: [], named: null, confidence: 'cannot tell', guidance: '' });
+/** ⭐ L17b2 — a direct press on Pi, the Historian's time bound set and its answer the case's; the Hypothesizer naming `named` (a unit's id, or none). */
+async function pressWithHistorian(
+	r: Awaited<ReturnType<typeof verificationRejected>>,
+	named: string | null,
+	historian?: (call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string },
+	/** ⭐ L17b2 (item 4) — a diagnosis of the case's own, in place of the one naming `named`. */
+	diagnosis?: string
+) {
+	historianBoundSet();
+	seam.review = chapterAnswering;
+	seam.historian = historian;
+	const pi = onPi({ diagnosis: diagnosis ?? (named === null ? DIAGNOSIS_NONE : DIAGNOSIS.replaceAll('SOURCE', named)), stepBack: STEP_BACK });
+	const done = await runAssuranceStage(r.ids.verification, pi.deps);
+	return { done, pi };
+}
+
+describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — the Historian, third in the stage: its call over copies, its assessment beside the declared reviews, and what it records', () => {
+	it('⛔ RED FIRST — one press, on Pi: the chapter, the Hypothesizer, then the Historian — its assessment of the rejected unit under pol_historical_consistency, its rows, its verdict computed from them and never the reviewer’s recommendation, its completion under its own validator id, its recommended action, and its recurrence citing the earlier record it names — beside the declared reviews, never folded into them; then the Unsticking Agent, brought by that recurrence', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		const decisions = listByType(getEngine(), 'DECISION').length;
+		const reason = 'Build the reader in parts, each checked against a pipe.';
+		const statement = 'The standard-input failure of the round comes back.';
+		const { done, pi } = await pressWithHistorian(r, r.ids.source, () => ({
+			stdout: historianAnswer({
+				failed: ['HC-02'],
+				recommendation: 'REJECTED',
+				recurrence: { recurs: true, statement, earlierRecords: [roundId] },
+				recommendedControlAction: { action: 'RESHAPE_PWU', reason }
+			})
+		}));
+
+		expect.soft('parts' in done && done.parts.map((p) => [p.part, p.status]), 'the Historian is not the stage’s third part, the Unsticking Agent after it').toEqual([
+			['narrative-chapter', 'recorded'],
+			['fault-diagnosis', 'recorded'],
+			[HISTORIAN_PART, 'recorded'],
+			['step-back', 'recorded']
+		]);
+		const made = historianAssessmentsOf(r.ids.verification);
+		expect(made.length, 'the Historian made no assessment of the rejected unit').toBe(1);
+		const historian = made[0]!;
+		const events = getEngine()
+			.readAllEvents()
+			.filter((e) => e.aggregateId === historian.id);
+		expect.soft(historian.state.subjectObjectIds, 'its subject is not the rejected unit alone').toEqual([r.ids.verification]);
+		expect.soft(historian.state.assessmentState, 'its verdict is not the one its rows compute (a MATERIAL criterion not met), or is the reviewer’s recommendation').toBe(
+			'CONDITIONALLY_SATISFIED'
+		);
+		expect.soft(
+			events
+				.filter((e) => e.eventType === 'AssuranceCriterionEvaluated')
+				.map((e) => [(e.payload as { criterionId?: unknown }).criterionId, (e.payload as { result?: unknown }).result]),
+			'its criteria are not each recorded with its result'
+		).toEqual([
+			['HC-01', 'MET'],
+			['HC-02', 'NOT_MET'],
+			['HC-03', 'MET'],
+			['HC-04', 'MET'],
+			['HC-05', 'MET']
+		]);
+		expect.soft(
+			events.filter((e) => e.eventType === 'AssuranceAssessmentCompleted').map((e) => (e.payload as { validatorId?: unknown }).validatorId),
+			'it is not completed under its own validator id'
+		).toEqual(['historian.historical-consistency']);
+		// ⭐⭐ L17b2, Stage 3b (the lead's §33, item 4; brief-3b item 1) — STRENGTHENED (a test gap the mutant found: the producer dropped from the Historian's
+		// completion SURVIVED every test) — ITS INDEPENDENCE FROM THE REJECTED UNIT'S EXECUTOR IS CHECKED (D73): its completion is handed the producer the
+		// round's opening verdict names, so its policy's DIFFERENT_AGENT is verified against that producer, and its assessment keeps it.
+		const roundProducer = listByType(getEngine(), 'ASSURANCE_ASSESSMENT').find((a) => a.id === roundId)?.state.producer;
+		expect.soft(roundProducer, 'arrangement: the round’s opening verdict names the rejected unit’s executor as its producer').toBeDefined();
+		expect.soft(
+			[
+				events.filter((e) => e.eventType === 'AssuranceAssessmentCompleted').map((e) => (e.payload as { independenceResult?: unknown }).independenceResult),
+				historian.state.producer
+			],
+			'its independence from the rejected unit’s executor was not checked: its completion was not handed that executor as the producer'
+		).toEqual([['VERIFIED'], roundProducer]);
+		// ⭐ L17b2 (the lead's ruling on STOP 2 (A), §27) — RESTATED: ~~`historian.state.recommendedControlActions`~~, the assessment OBJECT's
+		// field, which the kernel reports [] by construction ("silence, not a finding of 'none'", `assurance.ts`); read where the record keeps
+		// it, the Historian's completion EVENT's `recommendedControlActions`, as the projection and the rule (`historianAsksOf`) read it. Its
+		// promise and its message kept.
+		expect.soft(
+			events
+				.filter((e) => e.eventType === 'AssuranceAssessmentCompleted')
+				.map((e) => (e.payload as { recommendedControlActions?: unknown }).recommendedControlActions),
+			'its recommended action is not recorded, with its reason'
+		).toEqual([[{ action: 'RESHAPE_PWU', reason }]]);
+		const recurrences = listByType(getEngine(), 'ASSURANCE_OBSERVATION').filter(
+			(o) => o.state.assessmentId === historian.id && o.state.findingCode === 'KNOWN_FAILURE_RECURRENCE'
+		);
+		expect.soft(
+			recurrences.map((o) => [o.state.disposition, o.state.subjectObjectIds, o.state.evidenceIds, o.state.statement]),
+			'its recurrence is not recorded open on its assessment, citing the earlier record it names'
+		).toEqual([['OPEN', [r.ids.verification], [roundId], statement]]);
+		expect.soft(axesOf(r.ids.verification), 'the Historian’s assessment was folded into the unit’s own assurance').toEqual(['UNDER_ASSURANCE', 'SUCCEEDED', 'REJECTED']);
+		expect.soft(verdictsOf(r.ids.verification, [COVERAGE, INTENT]), 'a declared verdict moved').toEqual(r.verdicts);
+		expect.soft(listByType(getEngine(), 'DECISION').length, 'the stage recorded a Decision').toBe(decisions);
+		expect.soft(pi.asked[1]?.prompt ?? '', 'the Unsticking Agent was not shown the Historian’s recurrence').toContain(`- [${recurrences[0]?.id ?? '(none)'}] ${statement}`);
+	});
+
+	it('⛔ RED FIRST — its call: devin in a fresh folder of copies — the prompt (the rubric in the policy’s words, this sign-off’s failed criteria, the narrative so far, the folder’s layout, its index first), its project configuration, `records/` named by their ids with `INDEX.md` (each rejecting verdict, the chapter, the diagnosis, each candidate, and the recorded conversations — the Hypothesizer’s very bytes), and `workspace/`, a copy of the shared workspace; its user configuration beside it, outside what it may read; the selected reviewer’s model, the time bound set; both folders removed after the call', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		const { pi } = await pressWithHistorian(r, r.ids.source);
+		expect(seam.historianCalls.length, 'the Historian was not called, once').toBe(1);
+		const call = seam.historianCalls[0]!;
+		const prompt = call.files['prompt.txt'] ?? '';
+		for (const c of policyOf('pol_historical_consistency').criteria)
+			expect.soft(prompt, `its prompt does not hold ${c.id} in the policy’s words`).toContain(`- ${c.id}: ${c.description}`);
+		expect.soft(prompt, 'its prompt does not hold this sign-off’s failed criteria').toContain('The standard-input mode exits 1: the reader Source wrote cannot read a pipe.');
+		expect.soft(prompt, 'its prompt does not hold the narrative so far').toContain(`The record ${roundId} stands as it was given.`);
+		expect.soft(prompt, 'its prompt does not name its records’ index').toContain('records/INDEX.md');
+		expect.soft(prompt, 'its prompt does not ask it to check its claims against the copies').toContain('Check each claim you make against these copies, and cite the file it rests on.');
+		const idOf = (part: string) => String((stageEvidenceOf(part)[0]?.state.contentReference as { artifactId?: string } | undefined)?.artifactId ?? '');
+		const records = Object.keys(call.files)
+			.filter((f) => f.startsWith('records/'))
+			.map((f) => f.slice('records/'.length));
+		const conversations = pi.asked[0]?.recordFiles ?? [];
+		expect.soft(conversations.length, 'arrangement: the Hypothesizer was given recorded conversations').toBeGreaterThan(0);
+		expect.soft(records, 'its records are not each named by its id, with their index').toEqual(
+			expect.arrayContaining([
+				'INDEX.md',
+				`${roundId}.json`,
+				`${r.verdicts[1]!.assessmentId}.json`,
+				`${idOf('narrative-chapter')}.json`,
+				`${idOf('fault-diagnosis')}.json`,
+				...[r.ids.verification, r.ids.spec, r.ids.build, r.ids.source, r.ids.tests, r.ids.lint].map((id) => `${id}.json`),
+				...conversations
+			])
+		);
+		for (const f of conversations) expect.soft(call.files[`records/${f}`], `${f} is not the Hypothesizer’s very bytes`).toBe(pi.asked[0]?.recordTexts[f]);
+		for (const f of records.filter((x) => x !== 'INDEX.md')) expect.soft(call.files['records/INDEX.md'] ?? '', `its index does not name ${f}`).toContain(`${f} — `);
+		expect.soft(call.files['workspace/src/reader.ts'], 'its workspace is not a copy of the shared workspace').toBe('export const read = () => "";\n');
+		const tool = await import('../tools/devin-historian.js');
+		expect.soft(call.files['.devin/config.json'], 'its project configuration is not its own').toBe(tool.HISTORIAN_PROJECT_CONFIG);
+		expect.soft(call.userConfig, 'its user configuration is not its own').toBe(tool.HISTORIAN_USER_CONFIG);
+		const configPath = call.args[call.args.indexOf('--config') + 1] ?? '';
+		expect.soft(configPath !== '' && !configPath.startsWith(`${call.cwd}/`) && !configPath.startsWith(`${call.cwd}\\`), 'its user configuration is inside what it may read').toBe(true);
+		expect.soft(call.args[call.args.indexOf('--model') + 1], 'it is not called with the selected reviewer’s model').toBe('fixture-assurance-model');
+		expect.soft(call.timeout, 'it is not called with the time bound set').toBe(600_000);
+		expect.soft([existsSync(call.cwd), existsSync(configPath)], 'its folder, or its host folder, was kept after the call').toEqual([false, false]);
+	});
+
+	it('⛔ RED FIRST — its exchange: its role’s own, on the ASSURANCE plane under pol_historical_consistency over the round, one the recording leaves out as the stage’s; its tool observation says it could not watch the session and points at where its tool calls and its export are kept; and its stage record holds its answer, its tool calls with their paths, its exchange and its assessment (ruling 11)', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		const answer = historianAnswer();
+		const exported = JSON.stringify({
+			schema_version: 'ATIF-v1.7',
+			steps: [{ step_id: 1, source: 'agent', tool_calls: [{ tool_call_id: 'call_0', function_name: 'read', arguments: { file_path: 'records/INDEX.md' } }] }]
+		});
+		await pressWithHistorian(r, r.ids.source, () => ({ stdout: answer, export: exported }));
+		const exchanges = historianExchanges();
+		expect(exchanges.length, 'the Historian’s exchange is not recorded under its role').toBe(1);
+		const x = exchanges[0]!;
+		expect.soft(
+			[x.state.plane, x.state.assurancePolicyId, x.state.subjectObjectId, x.state.subjectObjectType],
+			'its exchange is not on the ASSURANCE plane under its policy, over the round'
+		).toEqual(['ASSURANCE', 'pol_historical_consistency', roundId, 'ASSURANCE_ASSESSMENT']);
+		expect.soft(isAssuranceStageExchange(x.state), 'the recording would not leave its exchange out as the stage’s').toBe(true);
+		const reason = String((x.state.observedToolCalls as { reason?: unknown } | undefined)?.reason ?? '');
+		expect.soft(reason, 'its tool observation does not say where its tool calls are kept').toContain(`${HISTORIAN_PART} record of the round`);
+		expect.soft(reason, 'its tool observation does not point at its export').toContain("The backing tool's own export of this session");
+		const rec = stageEvidenceOf(HISTORIAN_PART);
+		expect.soft(rec.length, 'its stage record is not recorded once').toBe(1);
+		const artifact = getObject(getEngine(), String((rec[0]?.state.contentReference as { artifactId?: string } | undefined)?.artifactId ?? '')) ?? {};
+		const held = JSON.parse((await getArtifactStore().get(String(artifact.storageKey ?? ''))) ?? '{}') as Record<string, unknown>;
+		expect.soft(held.answer, 'its stage record does not hold its answer').toBe(answer);
+		expect.soft(held.toolCalls, 'its stage record does not hold its tool calls with their paths').toEqual([
+			{ name: 'read', paths: ['records/INDEX.md'], inside: true, allowed: true }
+		]);
+		expect.soft([held.exchangeId, held.assessmentId], 'its stage record does not name its exchange and its assessment').toEqual([
+			x.id,
+			historianAssessmentsOf(r.ids.verification)[0]?.id
+		]);
+	});
+
+	it('⛔ RED FIRST — a read outside its folder, and a tool not allowed, are each a MATERIAL finding on its assessment, naming the path or the tool, and lower its verdict; an export whose calls cannot be read is a finding too, never a clean bill (rulings 2 (B), 17)', async () => {
+		const seen: { codes: unknown[]; statements: string; verdict: unknown }[] = [];
+		for (const exported of [
+			JSON.stringify({
+				schema_version: 'ATIF-v1.7',
+				steps: [
+					{
+						step_id: 1,
+						source: 'agent',
+						tool_calls: [
+							{ tool_call_id: 'c0', function_name: 'read', arguments: { file_path: 'records/INDEX.md' } },
+							{ tool_call_id: 'c1', function_name: 'read', arguments: { file_path: '../outside.txt' } },
+							{ tool_call_id: 'c2', function_name: 'exec', arguments: { command: 'ls' } }
+						]
+					}
+				]
+			}),
+			'not json'
+		]) {
+			const r = await verificationRejected();
+			await pressWithHistorian(r, r.ids.source, () => ({ stdout: historianAnswer(), export: exported }));
+			const made = historianAssessmentsOf(r.ids.verification)[0];
+			const findings = listByType(getEngine(), 'ASSURANCE_OBSERVATION').filter((o) => made !== undefined && o.state.assessmentId === made.id);
+			seen.push({
+				codes: findings.map((o) => [o.state.findingCode, o.state.severity]),
+				statements: findings.map((o) => String(o.state.statement)).join(' | '),
+				verdict: made?.state.assessmentState
+			});
+		}
+		expect.soft(
+			seen.map((s) => s.codes),
+			'a read outside its folder, a tool not allowed, or an unreadable export is not a MATERIAL finding on its assessment'
+		).toEqual([
+			[
+				['HISTORIAN_READ_OUTSIDE_FOLDER', 'MATERIAL'],
+				['HISTORIAN_TOOL_NOT_ALLOWED', 'MATERIAL']
+			],
+			[['HISTORIAN_TOOL_CALLS_UNREADABLE', 'MATERIAL']]
+		]);
+		expect.soft(seen[0]?.statements ?? '', 'the read outside its folder does not name its path').toContain('../outside.txt');
+		expect.soft(seen[0]?.statements ?? '', 'the tool not allowed is not named').toContain('exec');
+		expect.soft(seen[1]?.statements ?? '', 'an unreadable export is not said').toContain('its tool calls could not be read from its export');
+		expect.soft(seen.map((s) => s.verdict), 'a finding did not lower its verdict, every criterion met').toEqual(['CONDITIONALLY_SATISFIED', 'CONDITIONALLY_SATISFIED']);
+	});
+
+	it('⛔ RED FIRST — Gate B: a recommended action the policy does not permit, or one that is not a string, refuses the completion — the Historian’s part recorded failing in Gate B’s words, nothing of its assessment left (one batch), and the rule reading it as not concluded (rulings 5, 22)', async () => {
+		const seen: { status: unknown; why: string; left: readonly number[]; offers: readonly boolean[] }[] = [];
+		for (const action of ['CHANGE_MODEL', 42] as const) {
+			const r = await verificationRejected();
+			const observations = listByType(getEngine(), 'ASSURANCE_OBSERVATION').length;
+			const { done } = await pressWithHistorian(r, r.ids.source, () => ({
+				stdout: historianAnswer({
+					failed: ['HC-02'],
+					recurrence: { recurs: true, statement: 'It comes back.', earlierRecords: [r.verdicts[0]!.assessmentId] },
+					recommendedControlAction: { action, reason: 'Try another model.' }
+				})
+			}));
+			const part = partOf(done, HISTORIAN_PART);
+			const offers = wayBackOffersOf(r.u, r.ids.verification);
+			seen.push({
+				status: part?.status,
+				why: part?.why ?? '',
+				left: [historianAssessmentsOf(r.ids.verification).length, listByType(getEngine(), 'ASSURANCE_OBSERVATION').length - observations],
+				offers: [offers.historianAgain !== undefined, offers.rerun !== undefined, offers.sendBack !== undefined]
+			});
+		}
+		expect.soft(seen.map((s) => s.status), 'an action outside the policy’s list did not make the Historian’s part fail').toEqual(['failing', 'failing']);
+		expect.soft(seen[0]?.why ?? '', 'Gate B’s words are not recorded').toContain('the validator recommended control action(s) [CHANGE_MODEL] that this policy does not permit (§11)');
+		expect.soft(seen[1]?.why ?? '', 'an action that is not a string is not named as the others are').toContain('[42] that this policy does not permit (§11)');
+		expect.soft(seen.map((s) => s.left), 'a refused completion left its assessment or its observations').toEqual([
+			[0, 0],
+			[0, 0]
+		]);
+		expect.soft(seen.map((s) => s.offers), 'a refused completion is not read as not concluded: the Historian asked again, and no way back').toEqual([
+			[true, false, false],
+			[true, false, false]
+		]);
+	});
+
+	// ⭐ L17b2 addendum (the lead's §27, item 7) — two of the Historian's record files of one name: its folder is not written, and it is recorded not
+	// run, saying why and naming the name. No record names collide as the stage names them (each by its own id), so the case hands the real check its
+	// records with the first one twice, at the seam (`seam.historianRecordsChecked`).
+	it('⛔ RED FIRST — two record files of one name: the Historian is recorded not run, with why naming the name — its folder never written, devin never called, nothing recorded of it', async () => {
+		const r = await verificationRejected();
+		historianBoundSet();
+		seam.review = chapterAnswering;
+		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+		let doubled = '';
+		seam.historianRecordsChecked = (records) => {
+			doubled = records[0]?.file ?? '';
+			return [...records, ...records.slice(0, 1)];
+		};
+		const calls = seam.historianCalls.length;
+		const exchanges = historianExchanges().length;
+		const done = await runAssuranceStage(r.ids.verification, { ...pi.deps, writerPrint: async (prompt: string) => chapterAnswering(prompt) ?? '' });
+		const part = partOf(done, HISTORIAN_PART);
+		expect
+			.soft([part?.status, doubled !== '' && (part?.why ?? '').includes(`records/${doubled}`)], 'two record files of one name: the Historian is not recorded not run, naming the name')
+			.toEqual(['not-run', true]);
+		expect
+			.soft(
+				[seam.historianCalls.length - calls, historianExchanges().length - exchanges, historianAssessmentsOf(r.ids.verification).length],
+				'its folder was written and devin called, or something of it recorded'
+			)
+			.toEqual([0, 0, 0]);
+	});
+
+	// ⭐ §7 (Q1) — RESTATED, its title with it: ~~"a shared workspace with no directory to copy"~~ not run → a shared workspace in memory is copied
+	// through the port, file by file, and the Historian runs; and the two ways a copy would be partial are each not run (no partial copy).
+	it('⛔ RED FIRST — where the Historian cannot run, it is recorded not run, saying why, and nothing of it is called or recorded: the selected reviewer agy; the stand-in with no Historian given; a refused selection; a replay; its time bound unset; devin’s version not the one measured; a file the shared workspace lists but cannot read, or a listing that fails (no partial copy) — while the stand-in with a Historian given runs it, and so does a shared workspace in memory, copied file by file (rulings 2 (A), 6, 16; §7, Q1)', async () => {
+		const defaults = (): void => {
+			vi.unstubAllEnvs();
+			vi.stubEnv('PATH', noProgramsDirectory());
+			for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
+			vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+			vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-assurance-model');
+			historianBoundSet();
+		};
+		const historianExec = async (_file: string, args: readonly string[]) => {
+			writeFileSync(args[args.indexOf('--export') + 1] ?? join(TMP, 'stray-export.json'), JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [] }));
+			return { stdout: historianAnswer() };
+		};
+		const GIVEN = 'the stand-in, a Historian given';
+		// ⭐ §7 (Q1) — the shared workspace in memory, holding two files, for the three cases that read one: whole; a file it lists but cannot read; a
+		// listing that fails.
+		const IN_MEMORY = 'a shared workspace in memory';
+		const IN_MEMORY_FILES: Readonly<Record<string, string>> = { 'src/reader.ts': 'export const read = () => "";\n', 'notes/plan.md': '# The plan\n' };
+		const sharedInMemoryFor = async (name: string, undertakingId: string): Promise<Workspace | undefined> => {
+			if (![IN_MEMORY, 'a file listed but not read', 'a listing that fails'].includes(name)) return undefined;
+			const ws = createInMemoryWorkspace({ ownerKind: 'UNDERTAKING', ownerId: undertakingId, purgeability: 'RETAINED_BY_PARTICIPATION' });
+			for (const [path, text] of Object.entries(IN_MEMORY_FILES)) await ws.writeFile(path, text);
+			if (name === 'a file listed but not read') return { ...ws, readFile: async (path: string) => (path === 'src/reader.ts' ? undefined : ws.readFile(path)) };
+			if (name === 'a listing that fails')
+				return {
+					...ws,
+					list: async () => {
+						throw new Error('the listing failed: EIO');
+					}
+				};
+			return ws;
+		};
+		const cases: readonly (readonly [string, Readonly<Record<string, string | undefined>>, string])[] = [
+			['agy', { JPWB_ASSURANCE_TOOL: 'agy', JPWB_JUDGE_MODEL: 'fixture-judge-model' }, 'the selected reviewer is agy'],
+			['the stand-in, no Historian given', { JPWB_ASSURANCE_TOOL: undefined, JPWB_ASSURANCE_MODEL: undefined }, 'the selected reviewer is the stand-in'],
+			['a refused selection', { JPWB_ASSURANCE_MODEL: undefined }, 'none can run'],
+			['a replay', { JPWB_ASSURANCE_TOOL: undefined, JPWB_ASSURANCE_MODEL: undefined, JPWB_REPLAY: join(TMP, 'a-recording') }, 'a replay does not replay the assurance stage'],
+			['its time bound unset', { JPWB_HISTORIAN_CALL_MS: undefined }, 'its time bound is not set: design D84 measures it'],
+			['another devin version', {}, '3000.11.300'],
+			// ⭐ §7 (Q1) — ~~`['no directory to copy', {}, 'no directory on disk to copy']`~~: a shared workspace in memory is copied through the port, file by
+			// file, and the Historian runs; a file it lists but cannot read, or a listing that fails, leaves it not run, naming the file or why.
+			[IN_MEMORY, {}, ''],
+			['a file listed but not read', {}, 'src/reader.ts'],
+			['a listing that fails', {}, 'the listing failed: EIO'],
+			[GIVEN, { JPWB_ASSURANCE_TOOL: undefined, JPWB_ASSURANCE_MODEL: undefined }, '']
+		];
+		const seen: (readonly [string, unknown, boolean])[] = [];
+		// ⭐ §7 (Q1) — what the Historian's `workspace/` held at its call, in the case whose shared workspace is in memory.
+		let inMemoryCopy: Record<string, string> = {};
+		const quiet: (readonly [string, number, number])[] = [];
+		for (const [name, env, why] of cases) {
+			defaults();
+			const r = await verificationRejected();
+			for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);
+			seam.historianVersion = name === 'another devin version' ? 'devin 3000.11.300 (abc)' : 'devin 3000.11.234 (92c83011d113)';
+			seam.historianPassThrough = name === GIVEN;
+			seam.review = chapterAnswering;
+			const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+			const calls = seam.historianCalls.length;
+			const inMemory = await sharedInMemoryFor(name, r.u.undertakingId);
+			const exchanges = historianExchanges().length;
+			const done = await runAssuranceStage(r.ids.verification, {
+				...pi.deps,
+				writerPrint: async (prompt: string) => chapterAnswering(prompt) ?? '',
+				// ⭐ §7 (Q1) — ~~`name === 'no directory to copy' ? { sandboxOf: () => ({ workspace: createInMemoryWorkspace(…) }) } : {}`~~ the case's shared
+				// workspace in memory, where it reads one.
+				...(inMemory === undefined ? {} : { sandboxOf: () => ({ workspace: inMemory }) as never }),
+				...(name === GIVEN ? { historianExec, historianVersionOf: async () => 'devin 3000.11.234 (92c83011d113)' } : {})
+			});
+			const part = partOf(done, HISTORIAN_PART);
+			seen.push([name, part?.status, why === '' || (part?.why ?? '').includes(why)]);
+			if (name === IN_MEMORY && seam.historianCalls.length > calls)
+				inMemoryCopy = Object.fromEntries(Object.entries(seam.historianCalls.at(-1)?.files ?? {}).filter(([p]) => p.startsWith('workspace/')));
+			if (why !== '')
+				quiet.push([name, seam.historianCalls.length - calls + (historianExchanges().length - exchanges), historianAssessmentsOf(r.ids.verification).length]);
+		}
+		expect.soft(seen, 'a case is not recorded not run, saying why — or the stand-in with a Historian given does not run it').toEqual(
+			cases.map(([name, , why]) => [name, why === '' ? 'recorded' : 'not-run', true])
+		);
+		expect.soft(quiet, 'a Historian that could not run was called, or recorded something').toEqual(
+			cases.filter(([, , why]) => why !== '').map(([name]) => [name, 0, 0])
+		);
+		// ⭐ §7 (Q1) — and the shared workspace in memory reached the Historian's `workspace/` whole, each file at its path.
+		expect.soft(inMemoryCopy, 'a shared workspace in memory was not copied, file by file, into the Historian’s workspace/').toEqual(
+			Object.fromEntries(Object.entries(IN_MEMORY_FILES).map(([path, text]) => [`workspace/${path}`, text]))
+		);
+	// ⭐ Its own bound: ten Undertakings rejected, one per case, about five seconds each — past the file's 60 s under a loaded machine (L17b2
+	// facts §8.4: 51.9 s, then 61.0 s and timed out).
+	}, 240_000);
+
+	it('⛔ RED FIRST — the Historian’s recurrence cites the records it rests on: one it was not given is left out of the observation’s `evidenceIds` and named in a MATERIAL finding on its assessment; and the units the cited records name, by their structure, reach the Unsticking Agent (ruling 10)', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		const { pi } = await pressWithHistorian(r, r.ids.source, () => ({
+			stdout: historianAnswer({
+				recurrence: { recurs: true, statement: 'Lint’s reading of the input comes back.', earlierRecords: [roundId, r.ids.lint, 'asm_never_given'] }
+			})
+		}));
+		const made = historianAssessmentsOf(r.ids.verification);
+		expect(made.length, 'the Historian made no assessment of the rejected unit').toBe(1);
+		const on = listByType(getEngine(), 'ASSURANCE_OBSERVATION').filter((o) => o.state.assessmentId === made[0]!.id);
+		expect.soft(
+			on.filter((o) => o.state.findingCode === 'KNOWN_FAILURE_RECURRENCE').map((o) => o.state.evidenceIds),
+			'its recurrence does not cite exactly the records it was given'
+		).toEqual([[roundId, r.ids.lint]]);
+		expect.soft(
+			on.filter((o) => o.state.findingCode === 'HISTORIAN_RECORD_NOT_GIVEN').map((o) => [o.state.severity, o.state.statement]),
+			'the record it was not given is not named in a finding on its assessment'
+		).toEqual([['MATERIAL', 'the recurrence cites asm_never_given, which is not among the records the Historian was given, so it is left out (design D73)']]);
+		const fileOf = (title: string, id: string) => `${title.toLowerCase()}--${id}.md`;
+		expect.soft(pi.asked[1]?.recordFiles, 'the Unsticking Agent is not given the records of the units the cited records name').toEqual(
+			[fileOf('Verification', r.ids.verification), fileOf('Lint', r.ids.lint)].sort()
+		);
+	});
+
+	it('⭑ CONTROL — a sign-off that accepts its unit runs no Historian: no stage is offered it, and nothing of a Historian is called or recorded (D73)', async () => {
+		historianBoundSet();
+		const u = await instantiated(TYPES());
+		await acceptAll(u, ['Specification', 'Source', 'Tests', 'Lint', 'Build', 'Docs', 'Verification']);
+		const verification = u.unitOf('Verification').id;
+		expect(stageOffers(u)?.[verification], 'a unit its reviews accepted is offered the stage').toBeUndefined();
+		expect(
+			[seam.historianCalls.length, historianAssessmentsOf(verification).length, historianExchanges().length],
+			'a Historian ran at a sign-off that accepted its unit'
+		).toEqual([0, 0, 0]);
+	});
+});
+
+describe('⭐⭐ L17b2 (D72’s “When”, D73, D87; rulings 3, 4, 14) — the page’s way back follows the round’s records alone', () => {
+	it('⛔ RED FIRST — before the stage has run: the stage alone — neither D71’s re-run nor the send-back is offered, and neither act is accepted', async () => {
+		const r = await verificationRejected();
+		const before = wayBackOffersOf(r.u, r.ids.verification);
+		expect.soft(before.stage, 'the stage is not offered').toEqual({ roundId: r.verdicts[0]!.assessmentId });
+		expect.soft(before.rerun !== undefined, 'D71’s re-run is offered before the stage has run').toBe(false);
+		expect.soft(before.sendBack !== undefined, 'the send-back is offered before the stage has run').toBe(false);
+		expect.soft(
+			(await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it with the findings.' })).error ?? '',
+			'D71’s re-run was accepted before the stage ran'
+		).toContain('Re-running the work its declared reviews rejected refused');
+		const s = await verificationRejected();
+		expect.soft((await sendBackToSource(s)).error ?? '', 'the work was sent back before the stage ran').toContain('Sending the work back refused');
+		expect.soft(getObject(getEngine(), s.ids.source)?.workLifecycleState, 'a unit was superseded before the stage ran').toBe('SATISFIED');
+	});
+
+	it('⛔ RED FIRST — after the stage, the diagnosis naming an earlier unit: the work sent back to that unit alone — no re-run in place, no other candidate — and the acts follow the offer', async () => {
+		const r = await verificationRejected();
+		await pressWithHistorian(r, r.ids.source);
+		const after = wayBackOffersOf(r.u, r.ids.verification);
+		expect.soft(after.sendBack?.candidates.map((c) => c.title), 'the send-back does not offer the unit the diagnosis names, alone').toEqual(['Source']);
+		expect.soft(after.rerun !== undefined, 'D71’s re-run is offered where the diagnosis names an earlier unit').toBe(false);
+		expect.soft([after.historianAgain, after.sponsorDecides], 'the Historian is offered again, or the sponsor’s decision, after a concluded assessment').toEqual([undefined, undefined]);
+		const tests = await press(r.u, 'sendWorkBack', { pwuId: r.ids.verification, targetId: r.ids.tests, rationale: TYPED });
+		expect.soft(tests.error ?? '', 'the work was sent back to a unit the diagnosis does not name').toContain('Sending the work back refused');
+		expect.soft(getObject(getEngine(), r.ids.tests)?.workLifecycleState, 'a unit the diagnosis does not name was superseded').not.toBe('SUPERSEDED');
+		expect.soft(
+			(await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: 'Re-run it with the findings.' })).error ?? '',
+			'D71’s re-run was accepted where the diagnosis names an earlier unit'
+		).toContain('Re-running the work its declared reviews rejected refused');
+		expect.soft((await sendBackToSource(r)).advanced, 'the work was not sent back to the unit the diagnosis names').toBe('work-sent-back');
+	});
+
+	it('⛔ RED FIRST — after the stage, the diagnosis naming the rejected unit: its own work re-run in place alone; naming none: the person’s choice, the re-run beside every candidate, as before', async () => {
+		const r = await verificationRejected();
+		await pressWithHistorian(r, r.ids.verification);
+		const own = wayBackOffersOf(r.u, r.ids.verification);
+		expect.soft(own.rerun !== undefined, 'D71’s re-run is not offered where the diagnosis names the rejected unit').toBe(true);
+		expect.soft(own.sendBack !== undefined, 'the send-back is offered where the diagnosis names the rejected unit').toBe(false);
+		expect.soft((await sendBackToSource(r)).error ?? '', 'the work was sent back where the diagnosis names the rejected unit').toContain('Sending the work back refused');
+		const n = await verificationRejected();
+		await pressWithHistorian(n, null);
+		const none = wayBackOffersOf(n.u, n.ids.verification);
+		expect.soft(
+			[none.rerun !== undefined, none.sendBack?.candidates.map((c) => c.title).sort()],
+			'the person’s choice is not the re-run beside every candidate'
+		).toEqual([true, ['Build', 'Lint', 'Source', 'Specification', 'Tests']]);
+	});
+
+	it('⛔ RED FIRST — the Historian recommending REQUEST_HUMAN_DECISION: no way back, the page saying the sponsor decides; recommending RESHAPE_PWU: the way back as when nothing is recommended (D87)', async () => {
+		const r = await verificationRejected();
+		await pressWithHistorian(r, r.ids.source, () => ({
+			stdout: historianAnswer({ recommendedControlAction: { action: 'REQUEST_HUMAN_DECISION', reason: 'The loop is stuck: the same failure, round on round.' } })
+		}));
+		const paused = wayBackOffersOf(r.u, r.ids.verification);
+		expect.soft([paused.rerun !== undefined, paused.sendBack !== undefined], 'a way back is offered where the Historian recommends the sponsor’s decision').toEqual([false, false]);
+		expect.soft(paused.sponsorDecides?.because, 'the page does not say why no way back is offered').toBe('REQUEST_HUMAN_DECISION');
+		expect.soft(String(paused.sponsorDecides?.said ?? ''), 'the page does not say the sponsor decides').toContain('the sponsor decides');
+		const s = await verificationRejected();
+		await pressWithHistorian(s, s.ids.source, () => ({
+			stdout: historianAnswer({ recommendedControlAction: { action: 'RESHAPE_PWU', reason: 'Build the reader in parts, each checked against a pipe.' } })
+		}));
+		const reshape = wayBackOffersOf(s.u, s.ids.verification);
+		expect.soft(
+			[reshape.sendBack?.candidates.map((c) => c.title), reshape.rerun !== undefined, reshape.sponsorDecides],
+			'RESHAPE_PWU does not offer the way back as when nothing is recommended'
+		).toEqual([['Source'], false, undefined]);
+	});
+});
+
+describe('⭐⭐ L17b2 (ruling 7) — “Ask the Historian again” (`rerunHistorian`), through the page', () => {
+	it('⛔ RED FIRST — offered once per round where its Historian did not conclude, with no way back beside it; pressed, the Historian is asked once more; inconclusive again, no way back, the page saying the sponsor decides, and the act refused', async () => {
+		const page = readFileSync(new URL('../../../routes/undertakings/[id]/+page.svelte', import.meta.url), 'utf8');
+		expect.soft(page, 'the page renders no form for asking the Historian again').toContain('action="?/rerunHistorian"');
+		expect.soft(page, 'the page renders no button for asking the Historian again').toContain('data-testid="ask-historian-again"');
+		expect.soft(page, 'the page does not say where the sponsor decides').toContain('data-testid="sponsor-decides"');
+		seam.sharedOnDisk = true;
+		const r = await verificationRejected();
+		historianBoundSet();
+		seam.review = chapterAnswering;
+		seam.historian = () => ({ stdout: historianAnswer({ findings: [], recommendation: 'INCONCLUSIVE' }) });
+		const pressed = await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification });
+		expect(pressed.stage?.find((p) => p.part === HISTORIAN_PART)?.status, 'the Historian did not answer, through the page').toBe('recorded');
+		expect.soft(historianAssessmentsOf(r.ids.verification).map((a) => a.state.assessmentState), 'its assessment is not inconclusive').toEqual(['INCONCLUSIVE']);
+		const once = wayBackOffersOf(r.u, r.ids.verification);
+		expect.soft([once.historianAgain, once.rerun !== undefined, once.sendBack !== undefined], 'not concluded once: the Historian is not offered again, alone').toEqual([
+			{ roundId: r.verdicts[0]!.assessmentId },
+			false,
+			false
+		]);
+		const again = await press(r.u, 'rerunHistorian', { pwuId: r.ids.verification });
+		expect.soft(again.advanced, `the Historian was not asked again: ${again.error ?? ''}`).toBe('historian-asked-again');
+		expect.soft(historianAssessmentsOf(r.ids.verification).length, 'the Historian was not asked a second time').toBe(2);
+		const twice = wayBackOffersOf(r.u, r.ids.verification);
+		expect.soft([twice.historianAgain, twice.rerun !== undefined, twice.sendBack !== undefined], 'not concluded twice: a way back, or a third ask, is offered').toEqual([
+			undefined,
+			false,
+			false
+		]);
+		expect.soft(twice.sponsorDecides?.because, 'the page does not say why no way back is offered').toBe('NOT_CONCLUDED_TWICE');
+		expect.soft(String(twice.sponsorDecides?.said ?? ''), 'the page does not say the sponsor decides').toContain('the sponsor decides');
+		expect.soft((await press(r.u, 'rerunHistorian', { pwuId: r.ids.verification })).error ?? '', 'a third ask was not refused').toContain('Asking the Historian again refused');
+	});
+
+	it('⛔ RED FIRST — asked again and concluded: the way back by the diagnosis, as at a first answer — here the Hypothesizer not run, so the person’s choice', async () => {
+		seam.sharedOnDisk = true;
+		const r = await verificationRejected();
+		historianBoundSet();
+		seam.review = chapterAnswering;
+		let asked = 0;
+		seam.historian = () => {
+			asked += 1;
+			return { stdout: asked === 1 ? historianAnswer({ findings: [], recommendation: 'INCONCLUSIVE' }) : historianAnswer() };
+		};
+		await press(r.u, 'runAssuranceStage', { pwuId: r.ids.verification });
+		const again = await press(r.u, 'rerunHistorian', { pwuId: r.ids.verification });
+		expect(again.advanced, `the Historian was not asked again: ${again.error ?? ''}`).toBe('historian-asked-again');
+		const after = wayBackOffersOf(r.u, r.ids.verification);
+		expect.soft(
+			[after.rerun !== undefined, after.sendBack?.candidates.map((c) => c.title).sort(), after.historianAgain, after.sponsorDecides],
+			'asked again and concluded, the way back is not the person’s choice'
+		).toEqual([true, ['Build', 'Lint', 'Source', 'Specification', 'Tests'], undefined, undefined]);
+	});
+
+	// ⭐⭐ L17b2, Stage 3b (the lead's §33, item 4; brief-3b items 4 and 5) — TESTS THE MUTANTS OWED, each driven as a mutant first and each SURVIVING the
+	// two tests above, the only ones that press the act: every re-ask they script answers INCONCLUSIVE or clean, so none records a recurrence; and the
+	// one refusal they read is read for the page's prefix alone.
+	it('⛔ RED FIRST — asked again, on Pi, its answer recording a recurrence, the round with no step-back record yet: the Unsticking Agent after it, shown that recurrence, its step-back recorded (§27, reading 5); ⭑ CONTROL: where the round already has a step-back record, it is not brought again', async () => {
+		const inconclusive = () => ({ stdout: historianAnswer({ findings: [], recommendation: 'INCONCLUSIVE' }) });
+		const recurring = (roundId: string) => () => ({
+			stdout: historianAnswer({ failed: ['HC-02'], recurrence: { recurs: true, statement: RECURRING, earlierRecords: [roundId] } })
+		});
+		// The stage's Historian did not conclude, and nothing recurs yet: no Unsticking Agent — the stage says its part not run, and records nothing of it.
+		const r = await verificationRejected();
+		const first = await pressWithHistorian(r, null, inconclusive);
+		expect('parts' in first.done && first.done.parts.map((p) => [p.part, p.status]), 'arrangement: the stage brought no Unsticking Agent').toEqual([
+			['narrative-chapter', 'recorded'],
+			['fault-diagnosis', 'recorded'],
+			[HISTORIAN_PART, 'recorded'],
+			['step-back', 'not-run']
+		]);
+		seam.historian = recurring(r.verdicts[0]!.assessmentId);
+		const again = await rerunHistorian(r.ids.verification, first.pi.deps);
+		expect.soft('parts' in again ? again.parts.map((p) => [p.part, p.status]) : again.refusedBecause, 'the re-ask’s recurrence did not bring the Unsticking Agent').toEqual([
+			[HISTORIAN_PART, 'recorded'],
+			['step-back', 'recorded']
+		]);
+		expect.soft(first.pi.asked.at(-1)?.prompt ?? '', 'the Unsticking Agent was not shown the re-ask’s recurrence').toContain(RECURRING);
+		// ⭑ CONTROL — a recurrence open on the round before its stage (L17b1's arrangement): the stage's own Unsticking Agent ran, so the round has its
+		// step-back record; asked again, the Historian recording a recurrence too, the Unsticking Agent is not brought a second time.
+		const s = await verificationRejected();
+		const open = dispatch('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', mintUiId('obs'), {
+			assessmentId: s.verdicts[0]!.assessmentId,
+			observationType: 'FINDING',
+			findingCode: 'KNOWN_FAILURE_RECURRENCE',
+			severity: 'INFORMATIONAL',
+			statement: 'The standard-input mode fails again, as it did in the round before.'
+		});
+		expect(open.status, `arrangement: the recurrence — ${open.error?.message ?? ''}`).toBe('ACCEPTED');
+		const staged = await pressWithHistorian(s, null, inconclusive);
+		expect('parts' in staged.done && staged.done.parts.find((p) => p.part === 'step-back')?.status, 'arrangement: the stage’s own Unsticking Agent ran').toBe('recorded');
+		const asked = staged.pi.asked.length;
+		seam.historian = recurring(s.verdicts[0]!.assessmentId);
+		const second = await rerunHistorian(s.ids.verification, staged.pi.deps);
+		expect.soft(
+			'parts' in second ? second.parts.map((p) => [p.part, p.status]) : second.refusedBecause,
+			'⭑ CONTROL — the Unsticking Agent was brought again though the round already has a step-back record'
+		).toEqual([[HISTORIAN_PART, 'recorded']]);
+		expect.soft(staged.pi.asked.length, '⭑ CONTROL — a helper was asked again').toBe(asked);
+	});
+
+	it('⛔ RED FIRST — “Ask the Historian again” is refused, with why, wherever it is not offered, and nothing of a Historian is called: on a unit with no round, in the stage’s offer’s own words; before the round’s stage, after a Historian that concluded, after one that asks for the sponsor’s decision, and after two that did not conclude — each in the rule’s own words', async () => {
+		const REFUSED = 'Asking the Historian again refused: ';
+		/** The act pressed on `pwuId`: what the page said, and how many times the Historian's program was called by it. */
+		const refusal = async (u: Fixture, pwuId: string) => {
+			const calls = seam.historianCalls.length;
+			const pressed = await press(u, 'rerunHistorian', { pwuId });
+			return [pressed.error ?? `not refused: ${pressed.advanced ?? ''}`, seam.historianCalls.length - calls] as const;
+		};
+		seam.sharedOnDisk = true;
+		seam.review = chapterAnswering;
+		const r = await verificationRejected();
+		const round = r.verdicts[0]!.assessmentId;
+		const noRound = await refusal(r.u, r.ids.source);
+		expect.soft(
+			[
+				noRound[0].startsWith(`${REFUSED}the unit is `),
+				noRound[0].endsWith(
+					'; the assurance stage runs on a unit its declared reviews rejected at its sign-off (UNDER_ASSURANCE, SUCCEEDED, REJECTED) (REG-D-166 (3); design D74 to D76)'
+				),
+				noRound[1]
+			],
+			`on a unit with no round: the act is not refused in the stage’s offer’s own words, or a Historian was called — ${noRound[0]}`
+		).toEqual([true, true, 0]);
+		expect.soft(await refusal(r.u, r.ids.verification), 'before the round’s stage: the act is not refused in the rule’s own words, or a Historian was called').toEqual([
+			`${REFUSED}the assurance stage of this round (${round}) has not run: the Historian is asked again only where the stage's own ask did not conclude (design D73; L17b2 ruling 7)`,
+			0
+		]);
+		await stageFirst(r.u, r.ids.verification);
+		expect.soft(await refusal(r.u, r.ids.verification), 'after a Historian that concluded: the act is not refused in the rule’s own words, or a Historian was called').toEqual([
+			`${REFUSED}the Historian of this round (${round}) concluded: it is asked again only where it did not (design D73; L17b2 ruling 7)`,
+			0
+		]);
+		const s = await verificationRejected();
+		seam.historian = () => ({
+			stdout: historianAnswer({ recommendedControlAction: { action: 'REQUEST_HUMAN_DECISION', reason: 'The loop is stuck: the same failure, round on round.' } })
+		});
+		await stageFirst(s.u, s.ids.verification);
+		expect.soft(
+			await refusal(s.u, s.ids.verification),
+			'after one that asks for the sponsor’s decision: the act is not refused in the rule’s own words, or a Historian was called'
+		).toEqual([
+			`${REFUSED}the Historian of this round (${s.verdicts[0]!.assessmentId}) asks for the sponsor's decision: it is not asked again, and the sponsor decides (design D73, D87)`,
+			0
+		]);
+		const t = await verificationRejected();
+		seam.historian = () => ({ stdout: historianAnswer({ findings: [], recommendation: 'INCONCLUSIVE' }) });
+		await stageFirst(t.u, t.ids.verification);
+		expect((await press(t.u, 'rerunHistorian', { pwuId: t.ids.verification })).advanced, 'arrangement: asked once more, and not concluded again').toBe('historian-asked-again');
+		expect.soft(await refusal(t.u, t.ids.verification), 'after two that did not conclude: the act is not refused in the rule’s own words, or a Historian was called').toEqual([
+			`${REFUSED}the Historian of this round (${t.verdicts[0]!.assessmentId}) was asked twice and did not conclude: it is not asked a third time, and the sponsor decides (design D73; L17b2 rulings 7, 14)`,
+			0
+		]);
+	});
+});
+
+// ── ⭐⭐ L17b2 — design D87 with D77 (`REG-D-167` (1), (2); the lead's ruling 19, and §7's Q2) — THE HISTORIAN'S JUDGMENT, AND A RESHAPE_PWU REASON,
+// READ FROM THE RECORD AND CARRIED TO THE NEXT WORKER ─────────────────────────────────────────────────────────────────────────────────────────
+//
+// ⭑ `stagePartsForTurn` reads, beside the chapters, the diagnosis and the step-back, the round's concluded Historian: its judgment — its verdict,
+// each criterion with its result and rationale, and, where it recorded one, its recurrence with the earlier records it names — and, where it
+// recommends RESHAPE_PWU, its reason. D71's re-run in place and the faulty unit's successor carry both in D77's two slots (after the step-back,
+// before the tactic request); every other successor neither. ⭑ THE WORDS (ruling 19's content; the words mine, fixed here for item 3's turn pins,
+// §7 Q2): the heading `The Historian’s judgment of the loop:` and the reason's heading are L17b1's (`successorFeedback`); the judgment's lines are
+// `judgmentOf`'s below.
+
+/** ⭐ L17b2 (ruling 19) — the Historian's judgment as a turn shows it: its verdict, each criterion with its result and rationale, and its recurrence. */
+const judgmentOf = (
+	assessmentId: string,
+	verdict: string,
+	rows: readonly (readonly [string, string, string])[],
+	recurrence?: { readonly statement: string; readonly earlierRecords: readonly string[] }
+): string =>
+	[
+		`Its verdict on the loop (assessment ${assessmentId}): ${verdict}.`,
+		...rows.map(([id, result, rationale]) => `- ${id} ${result}: ${rationale}`),
+		...(recurrence === undefined
+			? []
+			: [`It finds this round’s failure an earlier one’s coming back: ${recurrence.statement} (the earlier records it names: ${recurrence.earlierRecords.join(', ')})`])
+	].join('\n');
+const JUDGMENT_HEADING = 'The Historian’s judgment of the loop:';
+const RESHAPE_HEADING = 'Why the Historian recommends reshaping how this unit’s work is done — feedback only; the unit’s definition does not change:';
+const RESHAPE_REASON = 'Build the reader in parts, each checked against a pipe.';
+const RECURRING = 'The standard-input failure of the round comes back.';
+/** ⭐ L17b2 — the rows `historianAnswer({ failed: ['HC-02'] })` records: each criterion's result and its rationale, the answer's statement. */
+const ROWS_HC02_NOT_MET = [
+	['HC-01', 'MET', 'met'],
+	['HC-02', 'NOT_MET', 'The standard-input failure of the round before comes back.'],
+	['HC-03', 'MET', 'met'],
+	['HC-04', 'MET', 'met'],
+	['HC-05', 'MET', 'met']
+] as const;
+/** ⭐ L17b2 — a Historian that finds HC-02 not met, the round's failure coming back (citing the round's opening verdict), and recommends RESHAPE_PWU. */
+const reshapingHistorian = (roundId: string) => () => ({
+	stdout: historianAnswer({
+		failed: ['HC-02'],
+		recurrence: { recurs: true, statement: RECURRING, earlierRecords: [roundId] },
+		recommendedControlAction: { action: 'RESHAPE_PWU', reason: RESHAPE_REASON }
+	})
+});
+// ── ⭐⭐ L17b2 — §4.13's item 3 (ruling 3; §7 Q2; §9): THE ROUND'S STAGE FIRST, ITS HISTORIAN CONCLUDING, BEFORE EITHER WAY BACK ──────────────────────
+//
+// ⭑ After L17b2 neither D71's re-run nor D72's send-back is offered until the round's Historian assessment is recorded (ruling 3; D72's "When"), so each
+// test of this file that presses either act straight after a rejection runs the round's stage first, through the page (`stageFirst`) or directly, its
+// Historian's time bound set (ruling 16) so that it concludes — the seam's clean answer (`seam.historian` unset): every criterion met, nothing recurring,
+// nothing recommended. The page's executor is the stand-in, or Pi over the page's in-memory shared workspace, so the Hypothesizer is not run
+// (`stage-helper-run.ts`: "runs on Pi's harness alone", "no directory on disk to copy") and the way back is the person's choice: both acts offered, as
+// before L17b2. ⭑ Every stage records its chapter part, recorded, failing or not run, and a turn names a chapter not recorded as failing, its statements
+// left out (`successorFeedback`): so a turn after a stage whose writer failed carries the narrative's heading and that one line. ⭑ D71's re-run and the
+// faulty unit's successor then carry the Historian's judgment, after the step-back's place and before the tactic request (ruling 19; §8.3's words).
+/** ⭐ L17b2 — the rows a clean Historian records: HC-01 to HC-05, each met, its rationale the answer's statement, 'met'. */
+const ROWS_ALL_MET = ['HC-01', 'HC-02', 'HC-03', 'HC-04', 'HC-05'].map((id) => [id, 'MET', 'met'] as const);
+/** ⭐ L17b2 — a clean Historian's judgment of `pwuId`'s round as a turn shows it, its heading first; its assessment's id read from the record ('(none)' where none is). */
+const cleanJudgmentOf = (pwuId: string): string =>
+	`${JUDGMENT_HEADING}\n${judgmentOf(historianAssessmentsOf(pwuId)[0]?.id ?? '(none)', 'SATISFIED', ROWS_ALL_MET)}`;
+/** ⭐ L17b2 — the round's stage pressed through the page, its Historian's time bound set so that it concludes; the parts the page returned. */
+async function stageFirst(u: Fixture, pwuId: string): Promise<readonly StagePartSeen[]> {
+	historianBoundSet();
+	const pressed = await press(u, 'runAssuranceStage', { pwuId });
+	expect(pressed.advanced, `arrangement: the round’s stage, first — ${pressed.error ?? ''}`).toBe('assurance-stage');
+	return pressed.stage ?? [];
+}
+
+describe('⭐⭐ L17b2 (D87, D77; ruling 19; §7 Q2) — the Historian’s judgment, and a RESHAPE_PWU reason, read from the record and carried to the next worker', () => {
+	it('⛔ RED FIRST — the round’s parts as a turn shows them hold the Historian’s judgment — its verdict, each criterion with its result and rationale, its recurrence with the earlier records it names — and, where it recommends RESHAPE_PWU, its reason (stagePartsForTurn)', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		await pressWithHistorian(r, r.ids.source, reshapingHistorian(roundId));
+		const historianId = historianAssessmentsOf(r.ids.verification)[0]?.id ?? '(none)';
+		const parts = await stagePartsForTurn(getEngine(), getArtifactStore(), r.u.undertakingId, roundId);
+		expect((parts as { historian?: unknown }).historian, 'the round’s parts do not hold the Historian’s judgment and its reason').toEqual({
+			assessmentId: historianId,
+			judgment: judgmentOf(historianId, 'CONDITIONALLY_SATISFIED', ROWS_HC02_NOT_MET, { statement: RECURRING, earlierRecords: [roundId] }),
+			reshapeReason: RESHAPE_REASON
+		});
+	});
+
+	it('⛔ RED FIRST — D71’s re-run in place carries them, after the step-back and before the request for its tactic record (feedbackForRerun)', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		await pressWithHistorian(r, r.ids.verification, reshapingHistorian(roundId));
+		const historianId = historianAssessmentsOf(r.ids.verification)[0]?.id ?? '(none)';
+		const text = (await feedbackForRerun(getEngine(), getArtifactStore(), r.ids.verification, roundId))?.feedback.text ?? '';
+		const stepBackAt = text.indexOf('The step-back (');
+		const judgmentAt = text.indexOf(
+			`${JUDGMENT_HEADING}\n${judgmentOf(historianId, 'CONDITIONALLY_SATISFIED', ROWS_HC02_NOT_MET, { statement: RECURRING, earlierRecords: [roundId] })}`
+		);
+		const reasonAt = text.indexOf(`${RESHAPE_HEADING}\n${RESHAPE_REASON}`);
+		const requestAt = text.indexOf('Your tactic record:');
+		expect.soft(stepBackAt, 'arrangement: the step-back, brought by the Historian’s recurrence, is in the turn').toBeGreaterThan(-1);
+		expect.soft(judgmentAt, 'D71’s re-run does not carry the Historian’s judgment after the step-back').toBeGreaterThan(stepBackAt);
+		expect.soft(reasonAt, 'D71’s re-run does not carry the RESHAPE_PWU reason after the judgment').toBeGreaterThan(judgmentAt);
+		expect.soft(requestAt, 'the request for its tactic record is not after them').toBeGreaterThan(reasonAt);
+	});
+
+	it('⛔ RED FIRST — the faulty unit’s successor carries them too; every other successor neither (feedbackForSuccessor)', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		await pressWithHistorian(r, r.ids.source, reshapingHistorian(roundId));
+		const historianId = historianAssessmentsOf(r.ids.verification)[0]?.id ?? '(none)';
+		expect((await sendBackToSource(r)).error, 'arrangement: the work sent back to Source').toBeUndefined();
+		const faulty = (await feedbackForSuccessor(getEngine(), getArtifactStore(), currentOf(r.u, 'Source').id))?.feedback?.text ?? '';
+		const other = (await feedbackForSuccessor(getEngine(), getArtifactStore(), currentOf(r.u, 'Tests').id))?.feedback?.text ?? '';
+		expect.soft(faulty, 'the faulty unit’s successor is not given the Historian’s judgment').toContain(
+			`${JUDGMENT_HEADING}\n${judgmentOf(historianId, 'CONDITIONALLY_SATISFIED', ROWS_HC02_NOT_MET, { statement: RECURRING, earlierRecords: [roundId] })}`
+		);
+		expect.soft(faulty, 'the faulty unit’s successor is not given the RESHAPE_PWU reason').toContain(`${RESHAPE_HEADING}\n${RESHAPE_REASON}`);
+		expect.soft(other !== '', 'arrangement: another successor is given its feedback').toBe(true);
+		expect.soft([other.includes(JUDGMENT_HEADING), other.includes(RESHAPE_HEADING)], 'another successor is given the Historian’s judgment or its reason').toEqual([false, false]);
+	});
+
+	it('⭑ CONTROL (D87) — a round whose Historian recommends nothing, and whose diagnosis gives no guidance: the turn carries neither a reason nor a guidance part', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		await pressWithHistorian(r, r.ids.verification, undefined, DIAGNOSIS.replaceAll('SOURCE', r.ids.verification).replace(/"guidance":"[^"]*"/, '"guidance":""'));
+		const text = (await feedbackForRerun(getEngine(), getArtifactStore(), r.ids.verification, roundId))?.feedback.text ?? '';
+		expect(text, 'arrangement: D71’s re-run is given its feedback').toContain('Your tactic record:');
+		expect([text.includes(RESHAPE_HEADING), text.includes('Its guidance on how you might proceed')], 'a reason or a guidance part is carried where none was given').toEqual([
+			false,
+			false
+		]);
+	});
+});
+
 beforeEach(() => {
 	resetEngine('reference');
 	seam.prompts.length = 0;
@@ -3689,6 +4963,13 @@ beforeEach(() => {
 	seam.policyThrows = undefined;
 	// ⭐ L17b3 — the lead's ruling 1 of §23: the opening's seam, reset.
 	seam.openThrows = undefined;
+	// ⭐ L17b2 — the Historian's seams, reset: a clean answer, the version measured, this file's program, the shared workspace in memory.
+	seam.historian = undefined;
+	seam.historianCalls.length = 0;
+	seam.historianVersion = 'devin 3000.11.234 (92c83011d113)';
+	seam.historianPassThrough = false;
+	seam.historianRecordsChecked = undefined;
+	seam.sharedOnDisk = false;
 	seam.answer = (policyId) => answerOf(policyId);
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);

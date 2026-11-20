@@ -23,7 +23,10 @@ import {
 } from '../apps/rph-demo/src/lib/server/assurance/decision-model-stub.testing.js';
 import { pwaTypeContentBudget } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { workProductReviewInput } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
-import { makeRecords, SECONDS_A_REQUEST, type RecordsEntry } from '../scripts/reviewer-qual/decision-model-records.js';
+import { makeRecords, plannedRequests, SECONDS_A_REQUEST, type RecordsEntry } from '../scripts/reviewer-qual/decision-model-records.js';
+// ⭐ §20 — read through the module, so that before the code lands only the tests that call the new set are red, never the file's load.
+import * as recordsScript from '../scripts/reviewer-qual/decision-model-records.js';
+import { DECISION_MODEL_RECORDS_IDENTITY } from '../apps/rph-demo/src/lib/server/assurance/decision-model-identity.js';
 
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 const DIR = mkdtempSync(join(tmpdir(), 'jpwb-dm-records-'));
@@ -254,5 +257,107 @@ describe('⭐⭐ L8 (D63; REG-D-152) — the records are made on one version: th
 		expect(out.stopped).toBe('STOPPED: A: the client refused its review: the server is Ollama 0.40.16, not 0.40.15 (D51; REG-F-608)');
 		expect(linesOf(r.file).map((l) => l.kind)).toEqual(['IDENTITY']);
 		expect(posts(s), 'no question asked').toEqual([]);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — §20 (the sponsor's choice, *"Record on 0.40.16, labelled"*) — THE RECORDS' SECOND FILE'S SET
+// (`--set probes-0.40.16`, `makeLabelledRecords`): it asks only the questions no committed file holds BY BODY, through the product's
+// client, unchanged (D63), into a file of its own made on the records' model and digest and on server version 0.40.16; it prints its
+// plan before the first request; and it stops on any served digest but the records', or any server version but its own file's, read at
+// the start, before each entry it asks and after the last — the same measured condition (`REG-F-608`), for its own file.
+describe('⭐⭐ L17b2 (§20) — the second file’s set asks only the bodies no committed file holds, on its own server version alone', () => {
+	const RECORDS = DECISION_MODEL_RECORDS_IDENTITY;
+	const C = answer('{"summary":"The log holds 2 records, both read."}');
+	const D = answer('{"summary":"The log holds 1 record, unread."}');
+	const committed = { file: '' };
+	/** A run of the second set against `server`, over `entries`, into a file of its own; the committed file beside it. */
+	function labelledRun(server: string, entries: readonly RecordsEntry[], file = join(DIR, `labelled-${(n += 1)}.ndjson`)) {
+		const log: string[] = [];
+		const make = (recordsScript as unknown as { makeLabelledRecords: (r: unknown) => Promise<{ made: number; requests: number; stopped?: string }> })
+			.makeLabelledRecords;
+		return {
+			file,
+			log,
+			go: () =>
+				make({
+					server,
+					model: STUB_MODEL,
+					digest: '733585a9ebb6',
+					file,
+					set: 'probes-0.40.16',
+					entries,
+					controls: [],
+					log: (line: string) => log.push(line),
+					bounds: { pollMs: 1 },
+					committed: [committed.file]
+				})
+		};
+	}
+	const probe = (id: string, input: ReasoningReviewInput): RecordsEntry => ({ kind: 'PROBE', id, input });
+
+	it('⭐ arrangement: a committed file on the product’s identity, holding A, made by the records script', async () => {
+		const s = await stub({ digest: RECORDS.digest });
+		const r = runOf(s.url, { entries: [ENTRIES[0]!], controls: [] });
+		const out = await r.go();
+		expect(out.stopped).toBeUndefined();
+		committed.file = r.file;
+		expect(linesOf(r.file)[0]).toMatchObject({ kind: 'IDENTITY', ...RECORDS });
+	});
+
+	it('⛔ RED FIRST — it asks only the bodies no committed file holds: A held, asked of none; C asked, each question; C under another id, held by its own file', async () => {
+		const s = await stub({ digest: RECORDS.digest, version: '0.40.16' });
+		const r = labelledRun(s.url, [probe('A', ENTRIES[0]!.input), probe('C', C), probe('C-again', C)]);
+		const out = await r.go();
+		const c = (await plannedRequests(C)).length;
+		expect.soft(out.stopped, 'stopped').toBeUndefined();
+		expect.soft(posts(s).length, 'the requests sent: C’s alone').toBe(c);
+		expect.soft([out.made, out.requests], 'entries made, requests counted').toEqual([1, c]);
+		const [head, ...rest] = existsSync(r.file) ? linesOf(r.file) : [];
+		expect.soft(head, 'its identity: the records’ model and digest, on 0.40.16').toMatchObject({
+			kind: 'IDENTITY',
+			set: 'probes-0.40.16',
+			model: RECORDS.model,
+			digest: RECORDS.digest,
+			serverVersion: '0.40.16'
+		});
+		expect.soft(rest.map((l) => [l.kind, l.id, (l.questions as unknown[]).length]), 'its lines').toEqual([['PROBE', 'C', c]]);
+		const held = new Set(linesOf(committed.file).slice(1).flatMap((l) => (l.questions as { bodySha256: string }[]).map((q) => q.bodySha256)));
+		const asked = ((rest[0]?.questions ?? []) as { bodySha256: string }[]).map((q) => q.bodySha256);
+		expect.soft(asked.filter((b) => held.has(b)), 'a body the committed file holds, asked again').toEqual([]);
+		expect.soft(r.log[0] ?? '', 'the plan, before the first request').toMatch(new RegExp(`^probes-0\\.40\\.16: .*; ${c} requests to make, about `));
+	});
+
+	it('⛔ RED FIRST — it stops on a server version but its own file’s: 0.40.15 at the start — no request, no file; 0.40.17 before its second entry — that entry unwritten', async () => {
+		const at15 = await stub({ digest: RECORDS.digest });
+		const r15 = labelledRun(at15.url, [probe('C', C)]);
+		const out15 = await r15.go();
+		expect.soft(out15.stopped ?? '', 'at the start').toMatch(/^STOPPED: at the start, the server is Ollama 0\.40\.15, not its file’s 0\.40\.16/);
+		expect.soft([posts(at15).length, existsSync(r15.file)], 'no request, no file').toEqual([0, false]);
+		let reads = 0;
+		const moving = await stub({ digest: RECORDS.digest, version: () => ((reads += 1) > 3 ? '0.40.17' : '0.40.16') });
+		const r = labelledRun(moving.url, [probe('C', C), probe('D', D)]);
+		const out = await r.go();
+		expect.soft(out.stopped ?? '', 'before D').toMatch(
+			/^STOPPED: before D, the server serves pplx-decider:27b-q4_K_M 733585a9ebb6 on Ollama 0\.40\.17, not the file's 733585a9ebb6 on Ollama 0\.40\.16 \(REG-F-608\)/
+		);
+		expect.soft(existsSync(r.file) ? linesOf(r.file).map((l) => l.id ?? l.kind) : [], 'D unwritten').toEqual(['IDENTITY', 'C']);
+	});
+
+	it('⛔ RED FIRST — it stops on a served digest but the records’, though its first twelve characters agree: no request, no file', async () => {
+		const s = await stub({ version: '0.40.16' });
+		const r = labelledRun(s.url, [probe('C', C)]);
+		const out = await r.go();
+		expect.soft(out.stopped ?? '').toBe(`STOPPED: ${STUB_MODEL} is served with digest ${STUB_DIGEST}, not the records’ ${RECORDS.digest} (D54; REG-F-608)`);
+		expect.soft([posts(s).length, existsSync(r.file)], 'no request, no file').toEqual([0, false]);
+	});
+
+	it('⛔ RED FIRST — it resumes: a second run asks nothing its own file holds', async () => {
+		const s = await stub({ digest: RECORDS.digest, version: '0.40.16' });
+		const file = join(DIR, `labelled-${(n += 1)}.ndjson`);
+		const first = await labelledRun(s.url, [probe('C', C)], file).go();
+		const before = posts(s).length;
+		const again = await labelledRun(s.url, [probe('C', C), probe('C-again', C)], file).go();
+		expect.soft([first.made, first.stopped], 'the first run').toEqual([1, undefined]);
+		expect.soft([again.made, posts(s).length - before, again.stopped], 'the second run').toEqual([0, 0, undefined]);
 	});
 });

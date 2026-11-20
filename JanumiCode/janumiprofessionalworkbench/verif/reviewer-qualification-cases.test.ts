@@ -3355,6 +3355,14 @@ function bridgeDifferences(a: GraphCase, b: GraphCase): string[] {
 	if (JSON.stringify(a.subject) !== JSON.stringify(b.subject)) out.push('subject');
 	return out;
 }
+/**
+ * ⭐ `JAN-EXEC` Phase 7, package L17b2 — design D78 (`REG-D-166` (3)): a library view as it stood before D78, when the case sets
+ * were made — the seeded Historian's kinds `['ARCHITECTURE_DECISION']`, every other value the view's own, in its keys' order. D78
+ * empties those kinds in the seed and moves no case: each case keeps the library it was made with.
+ */
+function asBeforeD78<T extends { readonly id: string }>(view: readonly T[]): T[] {
+	return view.map((p) => (p.id === 'pol_historical_consistency' ? { ...p, pwuKinds: ['ARCHITECTURE_DECISION'] } : p));
+}
 /** The view the authoring surface reads of an engine the workbench seeds (`seedPolicyLibrary`). */
 function seededLibraryView(): ReturnType<typeof assurancePolicyViews> {
 	let seq = 0;
@@ -3406,12 +3414,20 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 		expect(moved.map((c) => c.id), 'the 35 part prompts moved').toEqual(partsV9().map((c) => c.id));
 	}, 120_000);
 
-	it('⭐ THE SEEDED LIBRARY — every part case carries the library the workbench seeds, as the authoring surface’s view reads it over a seeded engine, value for value; the probes cut every part with the same', () => {
+	// ⭐ RESTATED (`JAN-EXEC` Phase 7, package L17b2 — design D78; `REG-D-166` (3)): the seeded Historian names no kind now. The cases
+	// keep the library they were made with — D78 moves no case prompt — which is the seeded view as it stood before D78, the
+	// Historian's kinds its one difference (`asBeforeD78`); the probes read the seed (`SEEDED_PROBE_LIBRARY`), so they cut every part
+	// with today's view. The old promise, every other value the seeded view's, value for value, is kept.
+	it('⭐ THE SEEDED LIBRARY — every part case carries the library the workbench seeds, as the authoring surface’s view reads it over a seeded engine, value for value ⭐ as it stood before D78 (L17b2); the probes cut every part with ~~the same~~ ⭐ today’s', () => {
 		const view = seededLibraryView();
 		expect(view.length, 'arrangement: the floor’s three and the catalog’s twelve').toBe(15);
-		expect(SEEDED_POLICY_LIBRARY, 'the cases’ library is the seeded view').toEqual(view);
-		expect(SEEDED_PROBE_LIBRARY, 'and the probes’').toEqual(view);
-		for (const c of partsV9()) expect(c.input.policyLibrary, c.id).toEqual(view);
+		expect(
+			(view.find((p) => p.id === 'pol_historical_consistency') as { pwuKinds?: unknown } | undefined)?.pwuKinds,
+			'today’s seeded view: the Historian names no kind (D78)'
+		).toBeUndefined();
+		expect(SEEDED_POLICY_LIBRARY, 'the cases’ library is the seeded view ⭐ as it stood before D78').toEqual(asBeforeD78(view));
+		expect(SEEDED_PROBE_LIBRARY, 'and the probes’ ⭐ is today’s').toEqual(view);
+		for (const c of partsV9()) expect(c.input.policyLibrary, c.id).toEqual(asBeforeD78(view));
 	});
 
 	it('⭐ RED FIRST — MATERIALIZE, THROUGH THE PRODUCT’S BUILDERS: a part case is its source graph’s export cut by pwaTypeParts with the library it carries, and handed to pwaTypeReviewInput, and nothing else', () => {
@@ -4201,7 +4217,13 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
 // component a witness of D64's branch rendered against its server held in memory, no new record — and no probe's own prompt and no
 // case prompt moves (every prompt within both bounds is sent as before). The record's RESCORED lines re-stamp D53's evaluations
 // under it and its ACKNOWLEDGED line names it, its reason quoting the ruling: such a prompt is unmeasured.
-const REVIEWER_FINGERPRINT_TODAY = 'aba310bd65d5f1263eacdf2c6fc0ac6938044e75525cf2fc1141ae187da6f1a9';
+// ⛔ MOVED 2026-11-19 (`JAN-EXEC` Phase 7, package L17b2 — D78; `REG-D-166` (3)) —
+// ~~'aba310bd65d5f1263eacdf2c6fc0ac6938044e75525cf2fc1141ae187da6f1a9'~~: the seeded pol_historical_consistency governs every kind of unit.
+// The probes component moves: each authoring part's list of the policies its kind may take gains the Historian, so fifteen part probes
+// ask new question bodies, scored from the records' second file (`probes-0.40.16.ndjson`, Ollama 0.40.16; §20, §24); no case prompt
+// moves. The record's RESCORED lines re-stamp D53's evaluations under it, its ACKNOWLEDGED line names it, the second file disclosed,
+// and two ESCALATION lines carry W12-RR-08 and P12-RR-09 (REG-F-555, REG-F-579).
+const REVIEWER_FINGERPRINT_TODAY = '797ccd576ef2e5cb81ae805fcad2597a88a3752667defd22d257140b375fc3f4';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
@@ -4332,9 +4354,19 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 			}))
 		);
 		expect(JSON.stringify(PRACTICE_POLICIES), 'the case set’s six are the engine’s, value for value and key for key').toBe(JSON.stringify(six));
-		expect(JSON.stringify(BRIDGE_POLICY_LIBRARY), 'the bridge library: the seeded 15, then the six').toBe(JSON.stringify(view));
+		// ⭐ RESTATED (`JAN-EXEC` Phase 7, package L17b2 — design D78; `REG-D-166` (3)): the cases keep the library they were made with,
+		// the seeded 15 as they stood before D78 (`asBeforeD78`: the Historian's kinds its one difference), then the six — key for key.
+		expect(
+			(seeded.find((p) => p.id === 'pol_historical_consistency') as { pwuKinds?: unknown } | undefined)?.pwuKinds,
+			'today’s seeded view: the Historian names no kind (D78)'
+		).toBeUndefined();
+		expect(JSON.stringify(BRIDGE_POLICY_LIBRARY), 'the bridge library: the seeded 15 ⭐ as before D78, then the six').toBe(
+			JSON.stringify(asBeforeD78(view))
+		);
 		for (const c of partsV10())
-			expect(c.input.policyLibrary, `${c.id}: the library it is cut with`).toEqual(BRIDGE_SOURCES_V10.includes(c.sourceCaseId) ? view : seeded);
+			expect(c.input.policyLibrary, `${c.id}: the library it is cut with`).toEqual(
+				asBeforeD78(BRIDGE_SOURCES_V10.includes(c.sourceCaseId) ? view : seeded)
+			);
 	});
 
 	it('⭑ CONTROL (REG-F-574) — a policy created through the authoring broker’s createPolicy, the agent tool’s path, carries no kinds in that view, so a part of every bridge kind lists it as one its kind may take: today’s create surface cannot scope a policy by kind', () => {

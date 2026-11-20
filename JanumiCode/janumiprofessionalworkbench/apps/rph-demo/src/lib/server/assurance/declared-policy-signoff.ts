@@ -71,6 +71,8 @@
 // ⚠ ON THE ASSURANCE PLANE ONLY (`REG-D-111` (4)): nothing here gates `CompleteExecutionStep` (`REG-F-406` item 2, `R20`).
 import { driveAssessmentToAssessing, listAssessments, selectGoverningPolicies } from '@janumipwb/rph-engine';
 import type { EngineHandle } from '@janumipwb/rph-engine';
+// ⭐ L17b2 addendum (§27 item 3) — the one validator id the Historian completes its assessments under (the kernel's own definition).
+import { HISTORIAN_VALIDATOR_ID } from '@janumipwb/rph-application';
 import type { ActorReference, AssessmentCriterion } from '@janumipwb/rph-contracts';
 import {
 	BLOCKING_SEVERITIES,
@@ -739,6 +741,12 @@ export interface LatestDeclaredVerdict {
  * ⭐ `E12F` F3 — THE LATEST ASSESSMENT PER GOVERNING DECLARED POLICY OVER `pwuId`: the floor gate's rule — by `updatedAt`, ties
  * to the last seen (`latestAssessmentByPolicy`, `assessment-index.ts`), which `RPH-PWU-007`'s fold reads too — so the page,
  * the re-run and the kernel's guard agree on which verdict speaks. A policy never assessed has no row.
+ * ⭐ L17b2 addendum (§27 item 3; ruling 18's general form, "never folded into the unit's own assurance") — and, as that index does, each
+ * assessment the Historian completed is left out: a unit whose type DECLARES `pol_historical_consistency` would otherwise have the
+ * Historian's later assessment read here as its declared verdict, by D71's offer and act, D72's, the declared re-run, the assurance
+ * stage's offer and the rule. Told apart as the index tells them (`isHistorianCompletion`, `assessment-index.ts`): by the completion
+ * EVENT's `validatorId`, the one constant — the assessment's state names no validator, and the Historian's is recorded in one batch, so
+ * none is stored in progress.
  */
 export function latestDeclaredVerdicts(
 	engine: EngineHandle,
@@ -746,8 +754,19 @@ export function latestDeclaredVerdicts(
 	policyIds: readonly string[]
 ): ReadonlyMap<string, LatestDeclaredVerdict> {
 	const wanted = new Set(policyIds);
+	const historians = new Set(
+		engine
+			.readAllEvents()
+			.filter(
+				(e) =>
+					e.eventType === 'AssuranceAssessmentCompleted' &&
+					(e.payload as { readonly validatorId?: unknown } | undefined)?.validatorId === HISTORIAN_VALIDATOR_ID
+			)
+			.map((e) => e.aggregateId)
+	);
 	const latest = new Map<string, LatestDeclaredVerdict & { readonly at: string }>();
 	for (const a of listAssessments(engine, { kind: 'WORKSPACE' })) {
+		if (historians.has(a.id)) continue;
 		const s = a.state as { assurancePolicyId?: unknown; subjectObjectIds?: unknown; updatedAt?: unknown; assessmentState?: unknown };
 		const policyId = typeof s.assurancePolicyId === 'string' ? s.assurancePolicyId : '';
 		const subjects = Array.isArray(s.subjectObjectIds) ? s.subjectObjectIds : [];

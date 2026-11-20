@@ -23,8 +23,24 @@
 // ⛔ `StorageAdapter` OFFERS NO LIST-BY-TYPE, which is why this walks the event log for the aggregate ids and
 // then loads each object. `handlers/assurance.ts` states the same constraint at its own SUPPORTS relation. The
 // walk is bounded by the assessment count, and both callers are on refusal paths that run once per command.
+//
+// ⭐ THE HISTORIAN'S ASSESSMENTS ARE LEFT OUT (`JAN-EXEC` Phase 7, package L17b2; the lead's ruling 18). At the sign-off of a unit its
+// declared reviews reject, the harness's Historian assesses the unit under `pol_historical_consistency` — "a separate assessment, never
+// folded into the unit's own assurance" (design D73). A unit whose type DECLARES that policy (ARCHITECTURE_DECISION's does; after
+// D78 any kind may take it) would otherwise have the Historian's later assessment read here as its declared verdict, by every reader
+// of this index: the satisfaction guard on both axes (RPH-PWU-007, RPH-ASR-012), D71's rework guard, the floor gate and the baseline
+// promotion. A completed assessment's STATE names no validator; its completion EVENT does (`AssuranceAssessmentCompleted.validatorId`,
+// measured: L17b2 facts §4.3), so the walk below, which already reads those events, tells the Historian's apart by it. ⚠ One the
+// Historian has begun and not completed names no validator yet, so it cannot be told apart here: the harness records the Historian's
+// assessment in ONE batch, from its request to its completion (ruling 5), so none is ever stored in progress.
 import type { HandlerContext } from './kit.js';
 import { withScanContext } from '@janumipwb/rph-ports';
+
+/**
+ * The validator id the harness's Historian completes its assessments under. ONE definition, shared by this index, which leaves those
+ * assessments out, and by the app's Historian, which records it (exported from the package for that reason).
+ */
+export const HISTORIAN_VALIDATOR_ID = 'historian.historical-consistency';
 
 /** One policy's most recent assessment over a subject, reduced to the four fields both gates read. */
 export interface SubjectAssessmentRecord {
@@ -51,8 +67,20 @@ interface StoredAssessmentState {
 	readonly subjectSemanticVersions?: Record<string, number>;
 }
 
+/** Whether `e` completed an assessment under the Historian's validator id. */
+function isHistorianCompletion(e: {
+	readonly eventType: string;
+	readonly payload: unknown;
+}): boolean {
+	if (e.eventType !== 'AssuranceAssessmentCompleted') return false;
+	return (
+		(e.payload as { readonly validatorId?: unknown } | undefined)?.validatorId ===
+		HISTORIAN_VALIDATOR_ID
+	);
+}
+
 /**
- * Index `subjectId`'s assessments by policy, keeping the LATEST per policy (see the ordering rule above).
+ * Index `subjectId`'s assessments by policy, keeping the LATEST per policy (see the ordering rule above), the Historian's left out.
  *
  * Pure with respect to the store: it reads events and objects and writes nothing.
  */
@@ -61,13 +89,19 @@ export function latestAssessmentByPolicy(
 	subjectId: string
 ): Map<string, SubjectAssessmentRecord> {
 	const ids = new Set<string>();
-	for (const e of ctx.store.readAllEvents())
-		if (e.aggregateType === 'ASSURANCE_ASSESSMENT') ids.add(e.aggregateId);
+	/** The assessments the Historian completed, read from the same walk (ruling 18). */
+	const historians = new Set<string>();
+	for (const e of ctx.store.readAllEvents()) {
+		if (e.aggregateType !== 'ASSURANCE_ASSESSMENT') continue;
+		ids.add(e.aggregateId);
+		if (isHistorianCompletion(e)) historians.add(e.aggregateId);
+	}
 	const latest = new Map<string, SubjectAssessmentRecord>();
 	// ⭑ AN ENUMERATION, NOT A BY-ID READ (`JAN-CRITREAD` `DD-6b`, `REG-D-070` §5.5): this walks the whole
 	// population of a type, so its loads are the scan's, not a caller's dependency.
 	withScanContext(() => {
 		for (const id of ids) {
+			if (historians.has(id)) continue;
 			const s = ctx.store.loadObject(id)?.state as StoredAssessmentState | undefined;
 			if (!s || !Array.isArray(s.subjectObjectIds) || !s.subjectObjectIds.includes(subjectId))
 				continue;

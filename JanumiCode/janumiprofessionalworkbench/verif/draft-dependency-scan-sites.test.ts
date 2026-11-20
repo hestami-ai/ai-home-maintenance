@@ -181,6 +181,19 @@ const DECLARED_SCAN_SITES: Record<
 		class: 'ADVISORY',
 		why: "No draft reads it. `latestDeclaredVerdicts` ranks a work unit's declared assessments, per policy, for the re-run of its declared reviews that did not conclude (`REG-D-112` (a)) — the Undertaking page's offer, and the server's re-check when the person presses it — on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is, and being out of date changes nothing a draft commits."
 	},
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D73 and D86: the Historian, the assurance stage's third part, whose records are read when a
+	// person presses the stage or asks the Historian again on the Undertaking page. No draft reads them. This census reddened on their
+	// arrival, which is its job.
+	'apps/rph-demo/src/lib/server/assurance/historian-part.ts :: listByType': {
+		calls: 3,
+		class: 'ADVISORY',
+		why: "No draft reads it. `historianRecordsOf` gives the Historian (design D73, D86) the Undertaking's records — its assessments (this round's rejecting verdicts, earlier rejecting ones, an earlier round's Historian), the findings they recorded, and the person's REPLAN Decisions — when a person presses the assurance stage or asks the Historian again on the Undertaking page: on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is."
+	},
+	'apps/rph-demo/src/lib/server/assurance/historian-part.ts :: listPwus': {
+		calls: 1,
+		class: 'ADVISORY',
+		why: "No draft reads it. `historianRecordsOf` names the Undertaking's units, so the Historian is shown each of them and the records over them — on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is."
+	},
 	'apps/rph-demo/src/lib/server/assurance/reviewer-answer.ts :: listByType': {
 		calls: 1,
 		class: 'DISPLAY',

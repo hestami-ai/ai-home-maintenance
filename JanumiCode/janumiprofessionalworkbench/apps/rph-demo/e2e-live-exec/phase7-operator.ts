@@ -82,10 +82,16 @@ import {
 	phase7Half,
 	phase7AuthoringAllowanceMs,
 	phase7AuthoringReviewAllowance,
+	// ⭐⭐ L17b2 (D82; ruling 20, as §16 restates it) — what the round's assurance stage and the Historian asked again count.
+	PHASE7_ASSURANCE_STAGE_REVIEWER_CALLS,
 	phase7HalfBAuthoringTimeoutMs,
 	phase7HalfBTestTimeoutMs,
 	PHASE7_CANDIDATE_POLL_MS,
 	PHASE7_DECLARED_POLICIES_PER_UNIT,
+	PHASE7_HISTORIAN_AGAIN_REVIEWER_CALLS,
+	// ⭐⭐ L17b2 (D82; §18) — the loop's press bounds, from the Historian's time bound the boot recorded.
+	phase7AssuranceStageMs,
+	phase7HistorianAgainMs,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_INTROSPECT_MS,
 	PHASE7_PAID_LIMIT,
@@ -97,18 +103,31 @@ import {
 	PHASE7_UNIT_ALLOWANCE_MS,
 	PHASE7_UNIT_REVIEWER_CALLS,
 	PHASE7_REVIEWED_COMMANDS,
+	// ⭐⭐ L17b2 (D82; ruling 15) — the run plan's workhorse, by this PWA's type.
+	PHASE7_WORKHORSE_TYPE,
 	phase7RereviewReviewerCalls,
 	REVIEWER_MODEL_VARIABLE,
 	wiredReviewer,
 	type Phase7Half
 } from './lane-config.js';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — the lead's ruling 6 (C), with rulings 2 (A) and 16 — THE HISTORIAN'S TWO RULES, BY THE PRODUCT'S OWN READERS: its
+// time bound's setting and reader, and devin's version's reader — so the paid boot never words either rule a second time, and the lane's press bounds read
+// the bound the boot recorded.
+import {
+	HISTORIAN_CALL_MS_VARIABLE,
+	historianCallBound,
+	historianVersionRefusal
+} from '../src/lib/server/tools/devin-historian.js';
 
 // ── THE BOUNDS THE LANE'S OWN ACTS WAIT ──────────────────────────────────────────────────────────────────────────────
-// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ ~~85~~ ~~103~~ ~~108.7~~ 116.6 hours (`lane-config.ts`). Each
+// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ ~~85~~ ~~103~~ ~~108.7~~ ~~116.6~~ ⭐ 424.2 hours
+// (`lane-config.ts`: 1,527,240 s — restated at L17b2, the lead's §33 (1): the figure here was three sums old). Each
 // act below that calls no model is bounded here, as an allowance, and Begin & Execute by `PHASE7_UNIT_ALLOWANCE_MS`.
 
 // ⭐ `P76F-C` C8 — the UI's bound and a sign-off act's are DEFINED in `lane-config.ts` now, so the spec's timeout counts every
-// ~~act~~ ⛔ `P76F-D` D4: every PHASE AND RECOVERY act by the bound it waits (`PHASE7_TEST_TIMEOUT_MS`) — the setup's acts only
+// ~~act~~ ⛔ `P76F-D` D4: ~~every PHASE AND RECOVERY act~~ ⭐ L17b2 (the lead's §31 (2), §33 (1)) — the root's run and each phase's, the limit's
+// reads, each phase's one recovery, the sign-offs and the final screenshot and read, each by the bound it waits (`PHASE7_TEST_TIMEOUT_MS`), and NO
+// round of D82's loop, nor any D71 re-run: the spend limit bounds those, by calls, not by time (`lane-config.ts` says so) — the setup's acts only
 // within an allowance their bounds pass (`PHASE7_SETUP_MS`); re-exported here, where each act names it.
 export { PHASE7_SIGN_OFF_MS, PHASE7_UI_MS };
 /** One readiness call (`devin --version`, `devin models list`). */
@@ -171,12 +190,17 @@ export function inheritedVariables(
  * config spreads over the server for a paid half-B run (`phase7AuthoringReviewAllowanceEnv`), in the config's own order, before
  * `PI_OFFLINE`: so the boot records what the server was handed, and refuses a paid half-B boot handed another than the
  * computed one (`bootOf`).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — the lead's ruling 6 (C), with ruling 16 (§15.3 (7)) — AND THE HISTORIAN'S TIME BOUND, which the config passes
+ * through from the operator's shell (`JPWB_HISTORIAN_CALL_MS`), in the config's own order, after `JPWB_DEMO_DB`: so the boot reads the bound as the server
+ * is handed it — refusing a paid run whose server could not run its Historian (`historianRefusals`) — and the lane computes the loop's press bounds from
+ * the bound the boot recorded.
  */
 export const OVERLAY_KEYS = [
 	'RPH_DEMO_MODE',
 	'JPWB_HARNESS',
 	'JPWB_SEED',
 	'JPWB_DEMO_DB',
+	HISTORIAN_CALL_MS_VARIABLE,
 	AUTHORING_REVIEW_ALLOWANCE_VARIABLE,
 	'PI_OFFLINE'
 ] as const;
@@ -388,6 +412,34 @@ function allowanceRefusal(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — the lead's ruling 6 (C), with rulings 2 (A) and 16 (§15.3 (7), accepted at §16; §18 (6)) — WHY A PAID RUN MAY
+ * NOT GO ON FOR ITS JUDGE: the Historian, which judges a unit its declared reviews reject (D73, D86), could not run in it — and a paid run that cannot run
+ * its judge must not find that out at its first rejection. Each refusal names what was found, in the product's own words, read by the product's own
+ * readers (`src/lib/server/tools/devin-historian.ts`), never a second wording of either rule:
+ *   · its time bound as the server was handed it (the overlay's `JPWB_HISTORIAN_CALL_MS`, required, with no default) not one the product takes
+ *     (`historianCallBound`: unset — `HISTORIAN_BOUND_UNSET`, "its time bound is not set: design D84 measures it" — not a positive whole number of
+ *     milliseconds, or above Node's largest timer);
+ *   · devin's version, as the readiness read it, not the one whose tools were measured (`historianVersionRefusal`, naming both) — read only where
+ *     `devin --version` exited 0: one that failed is refused once, by the readiness, naming that failure, never a second time (§18 (6)).
+ * ⚠ A reviewer that is not devin is refused at every boot already (`reviewerUnderTest`). A dry run is refused for none of these: it makes no paid call.
+ */
+function historianRefusals(paid: boolean, overlay: Overlay, readiness: Readiness | null): string[] {
+	if (!paid) return [];
+	const handed = overlay[HISTORIAN_CALL_MS_VARIABLE];
+	const bound = historianCallBound({ [HISTORIAN_CALL_MS_VARIABLE]: handed ?? undefined });
+	// ⛔ §18 (6) — read only where `devin --version` ran: one that failed is refused once, by the readiness, naming that failure — never a second time, for
+	// a version it never read.
+	const version =
+		readiness === null || readiness.devinVersion.exitCode !== 0 ? undefined : historianVersionRefusal(readiness.devinVersion.stdout);
+	const cannot = 'the Historian could not run in this paid run, so a unit its declared reviews reject could not be judged (L17b2 ruling 6 (C)): ';
+	const handedAs = handed === null ? `no ${HISTORIAN_CALL_MS_VARIABLE}` : `${HISTORIAN_CALL_MS_VARIABLE}=${JSON.stringify(handed)}`;
+	return [
+		...(bound.ok ? [] : [`${cannot}the server was handed ${handedAs} — ${bound.why}`]),
+		...(version === undefined ? [] : [`${cannot}${version}`])
+	];
+}
+
+/**
  * ⭐ D3 — THE BOOT: what the run starts from, and every reason it may not go on. ⛔ Each refusal is the run's, and
  * none is left to the run to find later: the lane's keys (`laneKeysRefusal`), the reviewer this spec readies, devin's
  * readiness, a paid run's prior calls (D8), a server whose store is not the run folder's, and a store the server did
@@ -412,6 +464,8 @@ export async function bootOf(b: {
 		...(keys === undefined ? [] : [keys]),
 		...('refusal' in reviewer ? [reviewer.refusal] : []),
 		...(readiness === null ? [] : readinessRefusals(readiness)),
+		// ⭐⭐ L17b2 — ruling 6 (C) — A PAID RUN WHOSE HISTORIAN COULD NOT RUN: refused here, before any paid call.
+		...historianRefusals(b.paid, overlay, readiness),
 		...(b.paid && typeof prior === 'string' ? [prior] : []),
 		// ⭐⭐ Package O — D26 — A PAID HALF-B SERVER HANDED ANOTHER AUTHORING-REVIEW ALLOWANCE THAN THE ONE THIS RUN COMPUTES.
 		...allowanceRefusal(b.paid, phase7Half(b.env), prior, overlay[AUTHORING_REVIEW_ALLOWANCE_VARIABLE]),
@@ -857,7 +911,19 @@ export const COUNTED_AHEAD = {
 	// ~~stagedInventory: 'the authoring floor’s worst case, for the types its turn staged'~~ ⛔ Package L2 — D20 (`REG-F-580`):
 	// Send counts the allowance it hands over, and no inventory is counted again; a record made before says them as it was made.
 	/** ⭐ D20 — Send: the allowance the lane hands the authoring review (`phase7AuthoringReviewAllowance`). */
-	authoringAllowance: 'the allowance the lane hands the authoring review, which no round of its floor may pass'
+	authoringAllowance: 'the allowance the lane hands the authoring review, which no round of its floor may pass',
+	/**
+	 * ⭐⭐ L17b2 — D82 (ruling 20, as the lead's §16 restates it) — the round's assurance stage: its reviewer calls (`PHASE7_ASSURANCE_STAGE_REVIEWER_CALLS`),
+	 * and, named, the helpers' turns the limit leaves out.
+	 */
+	assuranceStage:
+		`its ${PHASE7_ASSURANCE_STAGE_REVIEWER_CALLS} reviewer calls, the narrative writer’s one and the Historian’s one, neither repaired — the ` +
+		'Hypothesizer’s turn and, on an open recurrence, the Unsticking Agent’s are Pi executor turns, which the reviewer-call limit does not count, as it ' +
+		'counts no Begin & Execute’s',
+	/** ⭐⭐ L17b2 — the Historian asked again: its one call (`PHASE7_HISTORIAN_AGAIN_REVIEWER_CALLS`), and, named, the Unsticking Agent's turn it can bring. */
+	historianAgain:
+		`its ${PHASE7_HISTORIAN_AGAIN_REVIEWER_CALLS} reviewer call, the Historian’s, never repaired — the Unsticking Agent’s turn, which a re-ask that ` +
+		'records a recurrence brings, is a Pi executor turn the reviewer-call limit does not count'
 } as const;
 
 /**
@@ -1385,6 +1451,85 @@ export async function rerunRejectedWork(page: Page, row: Locator, decode: Decode
 	return pressFormAction(page, 'rerunRejectedWork', row.getByTestId('rerun-rejected-work'), PHASE7_UNIT_ALLOWANCE_MS, decode);
 }
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — design D82 with D72, D73 and D87 (`REG-D-166` (5), (6), (8); the lead's rulings 3, 7, 14 and §16, accepting
+// §15.3 (1)) — THE LOOP'S ACTS ON THE PAGE ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// Each offer is read off the unit's row by the page's own test id, the row waited for first, as D71's is; each act presses its own button. The page offers
+// exactly what the server accepts: the round's rule, read from the record (`wayBackOffer`, `src/lib/server/execution/loop-rule.ts`), filters its offers.
+
+/** ⭐⭐ L17b2 — whether the unit's row offers the round's assurance stage (`run-assurance-stage`), the row waited for first. */
+export async function stageOffered(row: Locator): Promise<boolean> {
+	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
+	return (await row.getByTestId('run-assurance-stage').count()) > 0;
+}
+
+/**
+ * ⭐⭐ L17b2 — THE ROUND'S ASSURANCE STAGE: its own button pressed — it records no Decision and moves no state, so it asks no rationale — waited for up to
+ * `timeoutMs`, the bound the lane computes from the boot's settings (`phase7AssuranceStageMs`). Its click bounded by `PHASE7_UI_MS`.
+ */
+export function runAssuranceStage(page: Page, row: Locator, decode: Decode, timeoutMs: number): Promise<ActionOutcome> {
+	return pressFormAction(page, 'runAssuranceStage', row.getByTestId('run-assurance-stage'), timeoutMs, decode);
+}
+
+/** ⭐⭐ L17b2 (ruling 7) — whether the unit's row offers asking the Historian again (`ask-historian-again`), the row waited for first. */
+export async function historianAgainOffered(row: Locator): Promise<boolean> {
+	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
+	return (await row.getByTestId('ask-historian-again').count()) > 0;
+}
+
+/**
+ * ⭐⭐ L17b2 (ruling 7) — THE HISTORIAN ASKED AGAIN: its own button pressed, no rationale asked, waited for up to `timeoutMs`, the bound the lane computes
+ * (`phase7HistorianAgainMs`). Its click bounded by `PHASE7_UI_MS`.
+ */
+export function rerunHistorian(page: Page, row: Locator, decode: Decode, timeoutMs: number): Promise<ActionOutcome> {
+	return pressFormAction(page, 'rerunHistorian', row.getByTestId('ask-historian-again'), timeoutMs, decode);
+}
+
+/**
+ * ⭐⭐ L17b2 (ruling 14; §7) — THE SPONSOR'S CASE, AS THE PAGE STATES IT: the `sponsor-decides` element's text, read whole once the row is waited for — the
+ * page's own words (`sponsorDecidesStatement`), which name the case and, for `REQUEST_HUMAN_DECISION`, the Historian's reason as it gave it — or null
+ * where the row says nothing. ⭑ Its text content, not its rendered text: the words as the page holds them.
+ */
+export async function sponsorDecides(row: Locator): Promise<string | null> {
+	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
+	const said = row.getByTestId('sponsor-decides');
+	if ((await said.count()) === 0) return null;
+	return (await said.textContent({ timeout: PHASE7_UI_MS })) ?? '';
+}
+
+/** ⭐⭐ L17b2 (D72) — one unit the row offers the work sent back to: its option's value, the unit's id, and its label, its title as the page shows it. */
+export interface SendBackOption {
+	readonly id: string;
+	readonly title: string;
+}
+
+/**
+ * ⭐⭐ L17b2 (D72; §18) — THE UNITS THE ROW OFFERS THE WORK SENT BACK TO: the `send-work-back-target` select's options, in their order, each its value and
+ * its label, once the row is waited for; none where the row offers no send-back. Each read bounded by `PHASE7_UI_MS`.
+ */
+export async function sendBackOffered(row: Locator): Promise<readonly SendBackOption[]> {
+	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
+	const select = row.getByTestId('send-work-back-target');
+	if ((await select.count()) === 0) return [];
+	return Promise.all(
+		(await select.locator('option').all()).map(async (option) => ({
+			id: (await option.getAttribute('value', { timeout: PHASE7_UI_MS })) ?? '',
+			title: (await option.textContent({ timeout: PHASE7_UI_MS })) ?? ''
+		}))
+	);
+}
+
+/**
+ * ⭐⭐ L17b2 (D72; §17.13 (2), accepted at §18) — THE WORK SENT BACK, BY REPLACEMENT, TO `targetId`: the row waited for; the target chosen in its own
+ * select; the rule's rationale typed into its own field (`SEND_BACK_RATIONALE`); its own button pressed — each bounded by `PHASE7_UI_MS` — and waited for
+ * as a sign-off act is (`PHASE7_SIGN_OFF_MS`): it calls no model, its one batch recording the person's Decision, the new units and the supersessions.
+ */
+export async function sendWorkBack(page: Page, row: Locator, targetId: string, decode: Decode): Promise<ActionOutcome> {
+	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
+	await row.getByTestId('send-work-back-target').selectOption(targetId, { timeout: PHASE7_UI_MS });
+	await row.getByTestId('send-work-back-rationale').fill(SEND_BACK_RATIONALE, { timeout: PHASE7_UI_MS });
+	return pressFormAction(page, 'sendWorkBack', row.getByTestId('send-work-back'), PHASE7_SIGN_OFF_MS, decode);
+}
+
 export async function markSatisfied(
 	page: Page,
 	row: Locator,
@@ -1628,20 +1773,54 @@ export interface SignOffRecord {
 	 * declared reviews never rejected is the one it was before, field for field.
 	 */
 	readonly rejectedRerunLimitCheck?: LimitCheck;
-	/** ⭐⭐ Package L16 — D71 — the rule's re-run of the work its declared reviews rejected, at most ONCE per unit; absent where none was pressed. */
+	/**
+	 * ⭐⭐ Package L16 — D71 — the rule's re-run of the work its declared reviews rejected, ~~at most ONCE per unit~~ ⭐⭐ (L17b2, D82: no count bounds the
+	 * way back) the way back of the round it is pressed in; absent where none was pressed.
+	 */
 	readonly rejectedRerun?: SignOffAct;
 	/**
-	 * ⭐⭐ Package L16 — D71 — the unit's sign-off after that re-run: its declared reviews asked again, of the new work, and that act never again
-	 * (a second rejection leaves the unit as found, and the run ends `withheld`, as today); absent where no re-run ran.
+	 * ⭐⭐ Package L16 — D71 — the unit's sign-off after that re-run: its declared reviews asked again, of the new work, ~~and that act never again
+	 * (a second rejection leaves the unit as found, and the run ends `withheld`, as today)~~ ⭐⭐ (L17b2, D82) under the same rule — a second rejection is
+	 * the next round, its stage and its way back, nested here again; absent where no re-run ran.
 	 */
 	readonly afterRerun?: SignOffRecord;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D82 (ruling 20, as §16 restates it) — the limit read before the round's assurance stage, its two reviewer
+	 * calls counted (`COUNTED_AHEAD.assuranceStage`). ⚠ ABSENT where none was read, as every field of the loop below: a record no loop touched is the one it
+	 * was before, field for field.
+	 */
+	readonly stageLimitCheck?: LimitCheck;
+	/** ⭐⭐ L17b2 — D82 — the round's assurance stage, pressed where the row offered it (`runAssuranceStage`). */
+	readonly stage?: SignOffAct;
+	/** ⭐⭐ L17b2 — D73 (ruling 7) — the limit read before the Historian asked again, its one call counted (`COUNTED_AHEAD.historianAgain`). */
+	readonly historianAgainLimitCheck?: LimitCheck;
+	/** ⭐⭐ L17b2 — D73 (ruling 7) — the Historian asked again, where the page offered it after the round's stage (`rerunHistorian`). */
+	readonly historianAgain?: SignOffAct;
+	/**
+	 * ⭐⭐ L17b2 — D72 — the work sent back, by replacement: its target as the page offered it, by id and by the title the page showed, and the act. The
+	 * faulty unit's successor is signed off under the same rule as its own unit of the run's list (`supersededBy` links them).
+	 */
+	readonly sendBack?: { readonly targetId: string; readonly targetTitle: string; readonly act: SignOffAct };
+	/**
+	 * ⭐⭐ L17b2 — ruling 14 — the page's statement that the sponsor decides, whole, as it showed it (`sponsorDecides`): the Historian recommends the
+	 * sponsor's decision, or did not conclude twice. Nothing is pressed after it, and the run ends `withheld`, the statement in its detail.
+	 */
+	readonly sponsorDecides?: string;
 	/**
 	 * ⭐ E12's re-review F4 — THE REFUSAL THAT STANDS: the last act pressed, when it was refused or got no answer — what left
 	 * the sign-off unfinished. null when none does: nothing was pressed, or the sign-off was accepted, a Record Assurance the
 	 * rule's accepted re-run stood in for included (its own reason stays on its act, `SignOffAct.refusal`).
 	 */
 	readonly refused: {
-		readonly act: 'Record Assurance' | 'Re-run the declared reviews' | 'Mark Satisfied' | typeof REJECTED_RERUN_ACT;
+		// ⭐⭐ L17b2 — and the loop's three acts, by the page's words for them.
+		readonly act:
+			| 'Record Assurance'
+			| 'Re-run the declared reviews'
+			| 'Mark Satisfied'
+			| typeof REJECTED_RERUN_ACT
+			| typeof STAGE_ACT
+			| typeof HISTORIAN_AGAIN_ACT
+			| typeof SEND_BACK_ACT;
 		readonly reason: string;
 	} | null;
 	/**
@@ -1691,15 +1870,54 @@ export const DECLARED_RERUN_RATIONALE =
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — WHAT THE RULE TYPES BEFORE IT RE-RUNS THE WORK A UNIT'S DECLARED REVIEWS
  * REJECTED: the run plan's rule, naming itself and the ruling that amends it (the live-run design's rule (2), as amended 2026-11-14).
+ * ⭐⭐ L17b2 — D82 (`REG-D-166` (8); the lead's §18 (3)) — ~~"… as REG-D-163 (2) amends it: a unit its declared reviews reject at its sign-off has its
+ * work re-run once, with their findings."~~: no count bounds the way back now, so the rationale says the rule as it stands — after the round's assurance
+ * stage, each time the round's records offer it. (The run plan's other "re-run once", `REG-D-105` (4)'s for a stopped unit's review, is not D82's.)
  */
 export const REJECTED_RERUN_RATIONALE =
-	'The run plan’s rule, REG-D-105 (4), as REG-D-163 (2) amends it: a unit its declared reviews reject at its sign-off has its work re-run once, with their findings.';
+	'The run plan’s rule, REG-D-105 (4), as REG-D-163 (2) and D82 amend it: a unit its declared reviews reject at its sign-off has its work re-run with their findings, after the round’s assurance stage, each time the round’s records offer it.';
+
+/**
+ * ⭐⭐ L17b2 — D82 with D72 (`REG-D-166` (1), (5), (8); the lead's §27 reading 13: its words are 2c's) — WHAT THE RULE TYPES BEFORE IT SENDS THE WORK BACK:
+ * the run plan's rule, naming itself, the rulings and its two cases — the unit the round's records name, or, the way back the person's choice, the
+ * workhorse by this PWA's type (`PHASE7_WORKHORSE_TYPE`). The page appends its citation of `REG-D-166` (1) to the Decision's rationale (D72).
+ */
+export const SEND_BACK_RATIONALE =
+	'The run plan’s rule, REG-D-105 (4), as D82 amends it (REG-D-166 (5), (8)): a unit its declared reviews reject at its sign-off has its work sent ' +
+	'back by replacement, after the round’s assurance stage, to the unit the round’s records name — or, where the way back is the person’s choice, to ' +
+	`the one candidate of this PWA’s workhorse type, ${PHASE7_WORKHORSE_TYPE}.`;
 
 /** ⭐⭐ Package L16 — D71 — the act's name, as the lane's record and the report name it. */
 export const REJECTED_RERUN_ACT = 'Re-run the work with the reviews’ findings';
 
 /** ⭐⭐ Package L16 — D71 — the suffix of the action files of the unit's sign-off after that re-run (`markSatisfiedAfterRerun`, …). */
 export const AFTER_RERUN = 'AfterRerun';
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D82 (§18 (5); §17.13 (5)) — WRITE-ONCE ACROSS ROUNDS: the suffix of the action files of a unit's sign-off after the
+ * n-th re-run of its work — none for its first (today's names), `AfterRerun` after the first re-run (D71's `AFTER_RERUN`, which the run report reads),
+ * and `AfterRerun<n>` after the n-th — so a later round's files never collide with an earlier one's (`writeOnce` refuses a file written before), and
+ * every act of every round is kept. ⚠ The run report's audit reads the first two (`AFTER_RERUN_SUFFIX`); a later round's are design D81's to read.
+ */
+export function roundSuffix(n: number): string {
+	if (n === 0) return '';
+	return n === 1 ? AFTER_RERUN : `${AFTER_RERUN}${n}`;
+}
+
+/** ⭐⭐ L17b2 — D82 — the loop's acts' names, as the page's buttons say them and as the lane's record names them (`SignOffRecord.refused`). */
+export const STAGE_ACT = 'Run the assurance stage';
+export const HISTORIAN_AGAIN_ACT = 'Ask the Historian again';
+export const SEND_BACK_ACT = 'Send the work back';
+
+/**
+ * ⭐⭐ L17b2 — D82 (ruling 15) — THE NAME OF A UNIT'S TYPE, AS THE STORE HOLDS IT: the unit's `pwuTypeId`, then that type's `name` — never the unit's
+ * title, nor the title the page shows; null where the store names no type for it, or holds no type of that id.
+ */
+export function typeNameOf(snap: EngineSnapshot, unitId: string): string | null {
+	const typeId = str(snap.pwus.find((p) => p.id === unitId)?.state.pwuTypeId);
+	if (typeId === '') return null;
+	return str(snap.pwuTypes.find((t) => t.id === typeId)?.state.name) || null;
+}
 
 /** `lane/actions/…`'s body: the unit, the action, and what came back, raw and decoded. */
 export const actionRecordOf = (unit: RunUnit, action: string, o: ActionOutcome) => ({
@@ -2507,6 +2725,18 @@ export interface LaneHands {
 	/** ⭐⭐ Package L16 — D71 — the row's offer of re-running the work its declared reviews rejected, and the act (`REG-D-163` (2)). */
 	readonly rejectedRerunOffered: (unit: RunUnit) => Promise<boolean>;
 	readonly rerunRejectedWork: (unit: RunUnit) => Promise<ActionOutcome>;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D82 (the lead's §15.3 (1), §16) — THE LOOP'S HANDS on the unit's row: the round's assurance stage and the
+	 * Historian asked again, each waited for up to `timeoutMs`, the bound the lane computes from the boot's settings (`phase7AssuranceStageMs`,
+	 * `phase7HistorianAgainMs`); the sponsor's case, the page's words or null; and D72's send-back, its candidates and the act to the one the lane chose.
+	 */
+	readonly stageOffered: (unit: RunUnit) => Promise<boolean>;
+	readonly runAssuranceStage: (unit: RunUnit, timeoutMs: number) => Promise<ActionOutcome>;
+	readonly historianAgainOffered: (unit: RunUnit) => Promise<boolean>;
+	readonly rerunHistorian: (unit: RunUnit, timeoutMs: number) => Promise<ActionOutcome>;
+	readonly sponsorDecides: (unit: RunUnit) => Promise<string | null>;
+	readonly sendBackOffered: (unit: RunUnit) => Promise<readonly SendBackOption[]>;
+	readonly sendWorkBack: (unit: RunUnit, targetId: string) => Promise<ActionOutcome>;
 	/** Mark Satisfied on the unit's row, once Record Assurance has left it (`markSatisfied`). */
 	readonly markSatisfied: (unit: RunUnit) => Promise<ActionOutcome>;
 	/** ⭐ P7-6R R-1f — what the unit's row offers after a stop (`recoveryOffers`). */
@@ -2572,7 +2802,12 @@ export interface LaneHands {
  *      conclude, has them re-run ONCE by the rule (`REG-D-105` (4), `REG-D-112` (a)), the limit read first; accepted, Mark
  *      Satisfied follows; refused, the unit is left as found. ⛔ E12's re-review F1 — A SIGN-OFF ACT WITH NO ANSWER ENDS THE
  *      RUN THERE, as a Begin & Execute with none does (`unansweredEnd`, D4): its unit's declared reviews may still be running,
- *      so nothing is pressed beside them, and the final archive is taken. ~~DRY, THE ROOT'S SIGN-OFF STOPS BEFORE THE
+ *      so nothing is pressed beside them, and the final archive is taken. ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D82, after D71 (`REG-D-166` (5),
+ *      (6), (8); `REG-D-163` (2)) — A RECORD ASSURANCE ITS DECLARED REVIEWS REJECT, whose row offers no declared re-run: THE ROUND'S LOOP
+ *      (`loopRound`) — the round's assurance stage, then the page read afresh: the sponsor's case, the Historian asked again, and the way back it offers
+ *      (D71's re-run, D72's send-back, or the workhorse by this PWA's type where the way back is the person's choice) — each press's worst case counted
+ *      first, with no count of the rounds; the sign-off again after every re-run; where it presses nothing more, the run ends `withheld`, the case
+ *      named. ~~DRY, THE ROOT'S SIGN-OFF STOPS BEFORE THE
  *      REVIEWER CALL (`REG-D-112` (b)) … the sign-off recorded `DRY_SIGN_OFF_NOT_REACHED`~~ ⛔ Package M (D7): a dry run
  *      presses no unit, so it reaches no sign-off;
  *   5. DRY, the model exchanges the store holds — read only now, AFTER the final archive, so that a model call anything
@@ -2614,8 +2849,22 @@ export async function runTheLane(r: {
 	const note = (problem: string | null): void => {
 		if (problem !== null) record.problems.push(problem);
 	};
-	/** The end a press with no answer reached, kept for a throw after it. */
+	/**
+	 * The end a press with no answer reached, kept for a throw after it. ⭐⭐ L17b2 (ruling 14) — or the end the loop reached where it presses nothing
+	 * more (`paused`): the sponsor decides, or the workhorse cannot be chosen — `withheld`, its case named; the run's loop then breaks, as for an act with
+	 * no answer, and the final archive is taken.
+	 */
 	const reached: { end: RunEnd | null } = { end: null };
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 (§18; the lead's §27 reading 5) — THE HISTORIAN'S TIME BOUND, AS THE BOOT RECORDED WHAT THE SERVER WAS HANDED (its
+	 * overlay), read by the product's own reader (`historianCallBound`): the loop's press bounds are computed from it (`phase7AssuranceStageMs`,
+	 * `phase7HistorianAgainMs`). ⚠ A server handed none, or one the product does not take, runs no Historian, so its term is none: a paid boot is refused
+	 * there (`historianRefusals`), and only a boot made by hand reaches the loop so.
+	 */
+	const historianBound = historianCallBound({
+		[HISTORIAN_CALL_MS_VARIABLE]: boot.record.overlay[HISTORIAN_CALL_MS_VARIABLE] ?? undefined
+	});
+	const historianCallMs = historianBound.ok ? historianBound.ms : 0;
 	writeOnce(lane.boot, boot.record);
 	if (boot.refusals.length > 0) return end('refused-at-boot', boot.refusals.join('\n'));
 
@@ -2897,16 +3146,17 @@ export async function runTheLane(r: {
 			notPressed: null
 		} as const;
 		/**
-		 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 — ONE ROUND OF A UNIT'S SIGN-OFF: the first, which may press the rule's re-run of work its
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 — ONE ROUND OF A UNIT'S SIGN-OFF: ~~the first, which may press the rule's re-run of work its
 		 * declared reviews rejected; or the one after that re-run, which never does (`rejectedRerun: false`), its action files suffixed
-		 * (`AFTER_RERUN`), its record kept inside the first's (`wrap`).
+		 * (`AFTER_RERUN`)~~ ⭐⭐ (L17b2, D82: `REG-D-166` (8) — no count bounds the way back) any round, its NUMBER `n` — 0 for the unit's first sign-off,
+		 * n after the n-th re-run of its work — its action files suffixed by it (`roundSuffix`), its record kept inside the round's before (`wrap`).
 		 */
 		interface SignOffRound {
-			readonly rejectedRerun: boolean;
+			readonly n: number;
 			readonly suffix: string;
 			readonly wrap: (r: SignOffRecord) => SignOffRecord;
 		}
-		const FIRST_SIGN_OFF: SignOffRound = { rejectedRerun: true, suffix: '', wrap: (r) => r };
+		const FIRST_SIGN_OFF: SignOffRound = { n: 0, suffix: roundSuffix(0), wrap: (r) => r };
 		/**
 		 * ⭐ `E12F` F2 — the limit, read from the store now, with `unit`'s sign-off worst case counted (D8). ⭐ The merge of E12
 		 * and E3 (J1) — in half B that worst case is the policies the PUBLISHED PWA's units declare, read from the same store
@@ -2955,7 +3205,8 @@ export async function runTheLane(r: {
 		 * (the loop below then stops the lane). ⭐ `E12F` F3 — a Record Assurance ANSWERED with a refusal whose row, read
 		 * afresh, offers re-running the declared reviews that did not conclude: re-run once by the rule, the limit read first;
 		 * accepted, Mark Satisfied; refused, left as found. ⛔ E12's re-review F1 — an act with NO ANSWER sets the run's end
-		 * (`reached`) before the store is read, and nothing more is pressed (the loop below then ends the run).
+		 * (`reached`) before the store is read, and nothing more is pressed (the loop below then ends the run). ⭐⭐ L17b2 — D82 — a refused Record
+		 * Assurance whose row offers no declared re-run: the round's loop (`loopRound`).
 		 */
 		const signOff = async (unit: RunUnit, round: SignOffRound = FIRST_SIGN_OFF): Promise<SignOffRecord> => {
 			const { check, pressMs } = await signOffLimit(unit);
@@ -2995,12 +3246,12 @@ export async function runTheLane(r: {
 			// a refusal leaves it stale. A row offering no declared re-run is left as found.
 			await hands.showOverview();
 			if (!(await hands.declaredRerunOffered(unit))) {
-				// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — A UNIT ITS DECLARED REVIEWS REJECTED: its work re-run ONCE by the
-				// rule, with their findings, the press's whole worst case counted first (`REG-D-135` (4)); then its sign-off again, which never
-				// presses this act again — a second rejection leaves it as found, and the run ends `withheld`, as today (P7-6's rule (3), which
-				// abandons, is not extended).
-				if (!round.rejectedRerun || !(await hands.rejectedRerunOffered(unit))) return asRefused;
-				return rerunRejected(unit, asRefused, round);
+				// ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2)) — A UNIT ITS DECLARED REVIEWS REJECTED: its work re-run ~~ONCE~~ by the
+				// rule, with their findings, the press's whole worst case counted first (`REG-D-135` (4)); then its sign-off again, ~~which never
+				// presses this act again — a second rejection leaves it as found, and the run ends `withheld`, as today~~ (P7-6's rule (3), which
+				// abandons, is not extended). ⭐⭐ L17b2 — D82 (`REG-D-166` (8)) — ~~`if (!round.rejectedRerun || !(await hands.rejectedRerunOffered(unit))) return
+				// asRefused;`~~: AND BEFORE ANY WAY BACK, THE ROUND'S ASSURANCE STAGE — the round's loop, with no count (`loopRound`).
+				return loopRound(unit, asRefused, round);
 			}
 			const rerun = await signOffLimit(unit);
 			const rerunCheck = rerun.check;
@@ -3029,12 +3280,157 @@ export async function runTheLane(r: {
 			};
 		};
 		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — the lead's ruling 14 (§17.13 (4), accepted at §18) — WHERE THE LOOP PRESSES NOTHING MORE: the sponsor
+		 * decides — the Historian recommends the sponsor's decision, or did not conclude twice — or the way back is the person's choice and the workhorse
+		 * cannot be chosen. The run ends `withheld`, its detail `<title>: <why>` (for the sponsor's case, the page's statement, whole), and is archived as at
+		 * every end: the end is set as an act with no answer sets it (`reached`), so the run's loop breaks, takes the final archive and ends there. ⛔ No new
+		 * end reason: `paused-for-person` is design D79's, package L17c's.
+		 */
+		const paused = (unit: RunUnit, rec: SignOffRecord, round: SignOffRound, detail: string): SignOffRecord => {
+			reached.end = { reason: 'withheld', detail };
+			unit.signOff = round.wrap(rec);
+			writeRunRecord(lane, record);
+			return rec;
+		};
+		/** One press of the round's loop that calls a model: its limit, its act, and what it writes (`loopPress`). */
+		interface LoopPress {
+			/** The form action, and its action file's stem. */
+			readonly action: 'runAssuranceStage' | 'rerunHistorian';
+			readonly act: typeof STAGE_ACT | typeof HISTORIAN_AGAIN_ACT;
+			readonly ahead: number;
+			readonly counted: string;
+			/** What the limit's note says it counted. */
+			readonly countedNote: string;
+			readonly press: () => Promise<ActionOutcome>;
+			/** The record's fields for it: its limit check, and its act where it was pressed. */
+			readonly fields: (check: LimitCheck, act?: SignOffAct) => Partial<SignOffRecord>;
+		}
+		/**
+		 * ⭐⭐ L17b2 — D82 (ruling 20; §18) — ONE PRESS OF THE ROUND'S LOOP THAT CALLS A MODEL — the stage, or the Historian asked again: the limit read
+		 * first, its worst case counted (refused: nothing pressed, its note recorded, and the run ends `paid-limit` by `limitStopped`); the press, waited for
+		 * the bound its caller computed; kept before the store is read (`actOf`), its action file the round's own (`<action><suffix>`). Answered with success,
+		 * the page is loaded afresh, as the rule's reads are; refused, or with no answer, the round stops there, the refusal standing (its act's name the
+		 * page's), and an act with no answer sets the run's end (D4).
+		 */
+		const loopPress = async (
+			unit: RunUnit,
+			before: SignOffRecord,
+			round: SignOffRound,
+			p: LoopPress
+		): Promise<{ readonly rec: SignOffRecord; readonly stopped: boolean }> => {
+			const { snapshot } = await hands.read();
+			const check = limitCheck(boot.prior as number, recordedReviewerCalls(snapshot), p.ahead, p.counted);
+			if (!check.allowed)
+				return {
+					stopped: true,
+					rec: { ...before, ...p.fields(check), notPressed: `the limit: ${check.total} of ${check.limit} reviewer calls, ${p.countedNote} counted (D8; REG-D-135 (4); D82)` }
+				};
+			const outcome = await p.press();
+			writeOnce(actionFile(lane, unit, `${p.action}${round.suffix}`), actionRecordOf(unit, `${p.action}${round.suffix}`, outcome));
+			const pressed = (act: SignOffAct): SignOffRecord => ({
+				...before,
+				...p.fields(check, act),
+				refused: outcome.envelopeType === 'success' ? before.refused : { act: p.act, reason: refusalOf(outcome) }
+			});
+			reached.end = unansweredEnd(unit.title, outcome, p.act);
+			const rec = pressed(await actOf(unit, outcome, (act) => round.wrap(pressed(act))));
+			if (outcome.envelopeType !== 'success' || reached.end !== null) return { rec, stopped: true };
+			await hands.showOverview();
+			return { rec, stopped: false };
+		};
+		/**
+		 * ⭐⭐ L17b2 — D82 with D72 (`REG-D-166` (1), (5); §15.3 (3)) — THE WORK SENT BACK, BY REPLACEMENT, TO `target`: pressed with the rule's rationale
+		 * (`SEND_BACK_RATIONALE`), waited for as a sign-off act; it calls no model, so no limit is read before it, as none is before an abandonment or Mark
+		 * Satisfied (§15.3 (3) counts it none). Kept before the store is read, its action file the round's own (`sendWorkBack<suffix>`), recorded with its
+		 * target as the page offered it (`sendBack`). Answered with success, the faulty unit is superseded, and the lane's discovery takes its replacement in
+		 * once the page offers no unit the run already holds (`follow`); refused, or with no answer, the round stops there, the refusal standing.
+		 */
+		const sendBack = async (unit: RunUnit, before: SignOffRecord, round: SignOffRound, target: SendBackOption): Promise<SignOffRecord> => {
+			const sent = await hands.sendWorkBack(unit, target.id);
+			writeOnce(actionFile(lane, unit, `sendWorkBack${round.suffix}`), actionRecordOf(unit, `sendWorkBack${round.suffix}`, sent));
+			const withSent = (act: SignOffAct): SignOffRecord => ({
+				...before,
+				sendBack: { targetId: target.id, targetTitle: target.title, act },
+				refused: sent.envelopeType === 'success' ? before.refused : { act: SEND_BACK_ACT, reason: refusalOf(sent) }
+			});
+			reached.end = unansweredEnd(unit.title, sent, SEND_BACK_ACT);
+			return withSent(await actOf(unit, sent, (act) => round.wrap(withSent(act))));
+		};
+		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — design D82 with D72, D73 and D87 (`REG-D-166` (5), (6), (8); `REG-D-148`; the lead's rulings 3, 14, 15 and 20,
+		 * §16 accepting §15.3 (2)) — THE ROUND'S LOOP, after a Record Assurance answered with a refusal whose row offers no declared re-run:
+		 *   1. the round's assurance stage, where the row offers it — its two reviewer calls counted first, waited for up to the bound the boot's settings
+		 *      give it (`phase7AssuranceStageMs`); refused, or with no answer, the round stops there;
+		 *   2. then the page, read afresh: the sponsor's case — nothing more is pressed, the run ends `withheld`, the page's statement named (`paused`); the
+		 *      Historian asked again where offered — its one call counted first, waited for `phase7HistorianAgainMs` — then the page read again; else the way
+		 *      back it offers: D71's re-run alone (`rerunRejected`); the send-back to the one unit offered, whatever its type (`sendBack`); or, the way back
+		 *      the person's choice, the one candidate whose TYPE is the workhorse's (`PHASE7_WORKHORSE_TYPE`, read from the store by `typeNameOf`), or D71's
+		 *      re-run where the rejected unit is itself of that type — none of that type, or more than one: nothing pressed, the run ends `withheld`, why named;
+		 *   3. the sign-off again after every re-run, under this same rule (`rerunRejected`'s next round); after a send-back, the replacement taken in by the
+		 *      lane's discovery (`follow`, L17a's) and pressed in the page's order, the faulty unit's successor signed off under this same rule.
+		 * No count bounds the rounds: the spend limit does, each press's worst case counted first (`REG-D-135` (4)). A row that offers nothing of it — no
+		 * stage, no statement, no re-ask and no way back — is left as found, as before.
+		 */
+		const loopRound = async (unit: RunUnit, asRefused: SignOffRecord, round: SignOffRound): Promise<SignOffRecord> => {
+			let rec = asRefused;
+			// ── 1. THE ROUND'S ASSURANCE STAGE, where the row offers it (D72's "When"; ruling 3: no way back is offered before it).
+			if (await hands.stageOffered(unit)) {
+				const staged = await loopPress(unit, rec, round, {
+					action: 'runAssuranceStage',
+					act: STAGE_ACT,
+					ahead: PHASE7_ASSURANCE_STAGE_REVIEWER_CALLS,
+					counted: COUNTED_AHEAD.assuranceStage,
+					countedNote: `the stage's ${PHASE7_ASSURANCE_STAGE_REVIEWER_CALLS} reviewer calls`,
+					press: () => hands.runAssuranceStage(unit, phase7AssuranceStageMs(historianCallMs)),
+					fields: (check, act) => ({ stageLimitCheck: check, ...(act === undefined ? {} : { stage: act }) })
+				});
+				if (staged.stopped) return staged.rec;
+				rec = staged.rec;
+			}
+			// ── 2. THE PAGE, READ AFRESH: the sponsor's case; the Historian asked again, then read again; then the way back it offers.
+			for (;;) {
+				const said = await hands.sponsorDecides(unit);
+				if (said !== null) return paused(unit, { ...rec, sponsorDecides: said }, round, `${unit.title}: ${said}`);
+				if (!(await hands.historianAgainOffered(unit))) break;
+				const asked = await loopPress(unit, rec, round, {
+					action: 'rerunHistorian',
+					act: HISTORIAN_AGAIN_ACT,
+					ahead: PHASE7_HISTORIAN_AGAIN_REVIEWER_CALLS,
+					counted: COUNTED_AHEAD.historianAgain,
+					countedNote: `the Historian's ${PHASE7_HISTORIAN_AGAIN_REVIEWER_CALLS} call`,
+					press: () => hands.rerunHistorian(unit, phase7HistorianAgainMs(historianCallMs)),
+					fields: (check, act) => ({ historianAgainLimitCheck: check, ...(act === undefined ? {} : { historianAgain: act }) })
+				});
+				if (asked.stopped) return asked.rec;
+				rec = asked.rec;
+			}
+			const rerunOffered = await hands.rejectedRerunOffered(unit);
+			const candidates = await hands.sendBackOffered(unit);
+			// D71's re-run alone: the round's records name this unit. The send-back to the one unit offered: they name that one. Nothing: left as found.
+			if (candidates.length === 0) return rerunOffered ? rerunRejected(unit, rec, round) : rec;
+			if (!rerunOffered && candidates.length === 1) return sendBack(unit, rec, round, candidates[0]!);
+			// ── THE PERSON'S CHOICE (ruling 15): the one candidate of the workhorse's TYPE, read from the store — the rejected unit itself, by D71's re-run, among
+			// them where the page offers that re-run.
+			const { snapshot } = await hands.read();
+			const ofType = [...(rerunOffered ? [{ id: unit.unitId!, title: unit.title }] : []), ...candidates].filter(
+				(c) => typeNameOf(snapshot, c.id) === PHASE7_WORKHORSE_TYPE
+			);
+			if (ofType.length !== 1) {
+				const found = ofType.length === 0 ? 'no candidate' : `${ofType.length} candidates`;
+				return paused(unit, rec, round, `${unit.title}: the way back is the person’s choice, and ${found} of the type ${PHASE7_WORKHORSE_TYPE}`);
+			}
+			const chosen = ofType[0]!;
+			return chosen.id === unit.unitId ? rerunRejected(unit, rec, round) : sendBack(unit, rec, round, chosen);
+		};
+		/**
 		 * ⭐⭐ `JAN-EXEC` Phase 7, package L16 — D71 (`REG-D-163` (2); the live-run design's rule (2), as amended 2026-11-14) — THE RULE'S RE-RUN
-		 * OF THE WORK A UNIT'S DECLARED REVIEWS REJECTED, ONCE: the limit read first, the re-run's WHOLE press counted (`REG-D-135` (4); it runs
-		 * the unit's work again, `PHASE7_UNIT_REVIEWER_CALLS`); the act pressed and kept; answered with success — the work ran again and its
-		 * step completed — the unit's sign-off again (`signOff`, its round `rejectedRerun: false`, so never this act again), the page loaded
-		 * afresh; answered otherwise, left as found (a re-run stopped at its floor included: no rule is extended to it — the builder's reading).
-		 * ⛔ A press with no answer sets the run's end (D4), and nothing more is pressed.
+		 * OF THE WORK A UNIT'S DECLARED REVIEWS REJECTED, ~~ONCE~~ ⭐⭐ (L17b2, D82) EACH TIME THE ROUND'S RECORDS OFFER IT: the limit read first, the re-run's
+		 * WHOLE press counted (`REG-D-135` (4); it runs the unit's work again, `PHASE7_UNIT_REVIEWER_CALLS`); the act pressed and kept, its action file the
+		 * round's own (`rerunRejectedWork<suffix>`); answered with success — the work ran again and its step completed — the unit's sign-off again
+		 * (`signOff`, ~~its round `rejectedRerun: false`, so never this act again~~ ⭐⭐ the next round, under the same rule), the page loaded afresh;
+		 * answered otherwise, left as found (a re-run stopped at its floor included: no rule is extended to it — the builder's reading).
+		 * ⛔ A press with no answer sets the run's end (D4), and nothing more is pressed. ⭐⭐ L17b2 — a re-run answered with success leaves the round's
+		 * refusal standing (~~`refused: null`~~): the round's sign-off is unfinished, and the round after it says what followed (`afterRerun`).
 		 */
 		const rerunRejected = async (unit: RunUnit, asRefused: SignOffRecord, round: SignOffRound): Promise<SignOffRecord> => {
 			const { snapshot } = await hands.read();
@@ -3051,31 +3447,41 @@ export async function runTheLane(r: {
 					notPressed: `the limit: ${check.total} of ${check.limit} reviewer calls, the re-run's whole press counted (D8; REG-D-135 (4); REG-D-163 (2))`
 				};
 			const again = await hands.rerunRejectedWork(unit);
-			writeOnce(actionFile(lane, unit, 'rerunRejectedWork'), actionRecordOf(unit, 'rerunRejectedWork', again));
+			writeOnce(
+				actionFile(lane, unit, `rerunRejectedWork${round.suffix}`),
+				actionRecordOf(unit, `rerunRejectedWork${round.suffix}`, again)
+			);
 			const pressedRecord = (act: SignOffAct): SignOffRecord => ({
 				...asRefused,
 				rejectedRerunLimitCheck: check,
 				rejectedRerun: act,
-				refused: again.envelopeType === 'success' ? null : { act: REJECTED_RERUN_ACT, reason: refusalOf(again) }
+				refused: again.envelopeType === 'success' ? asRefused.refused : { act: REJECTED_RERUN_ACT, reason: refusalOf(again) }
 			});
 			reached.end = unansweredEnd(unit.title, again, REJECTED_RERUN_ACT);
 			const againAct = await actOf(unit, again, (act) => round.wrap(pressedRecord(act)));
 			if (again.envelopeType !== 'success' || reached.end !== null) return pressedRecord(againAct);
-			// ⭐ ITS SIGN-OFF AGAIN — the declared reviews asked again, of the new work — and never this act again. ⚠ LOADED AFRESH.
+			// ⭐ ITS SIGN-OFF AGAIN — the declared reviews asked again, of the new work — ~~and never this act again~~ ⭐⭐ (L17b2, D82) the next round, under
+			// the same rule, its files its own (`roundSuffix`). ⚠ LOADED AFRESH.
 			await hands.showOverview();
+			const next = round.n + 1;
 			const after = await signOff(unit, {
-				rejectedRerun: false,
-				suffix: AFTER_RERUN,
+				n: next,
+				suffix: roundSuffix(next),
 				wrap: (r) => round.wrap({ ...pressedRecord(againAct), afterRerun: r })
 			});
 			return { ...pressedRecord(againAct), afterRerun: after };
 		};
-		/** ⭐⭐ Package L16 — D71 — whether a limit check refused a press of this sign-off, or of the one after its re-run (D8). */
+		/**
+		 * ⭐⭐ Package L16 — D71 — whether a limit check refused a press of this sign-off, or of the one after its re-run (D8). ⭐⭐ L17b2 — D82 — or the
+		 * round's stage, or the Historian asked again, in any round.
+		 */
 		const limitStopped = (r: SignOffRecord | undefined): boolean =>
 			r !== undefined &&
 			(r.limitCheck?.allowed === false ||
 				r.rerunLimitCheck?.allowed === false ||
 				r.rejectedRerunLimitCheck?.allowed === false ||
+				r.stageLimitCheck?.allowed === false ||
+				r.historianAgainLimitCheck?.allowed === false ||
 				limitStopped(r.afterRerun));
 		// ── 3. ⭐⭐ THE ORDER — ONLY WHAT THE PAGE OFFERS, ONE UNIT AT A TIME (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2); design
 		// D4-D7) ──────────────────────────────────────────────────────────────────────────────────────────────────────────

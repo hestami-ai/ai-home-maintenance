@@ -24,6 +24,8 @@ import {
 import { acceptedWorkFile } from '@janumipwb/rph-application';
 import { ProfessionalWorkUnitSchema, type ProposePwuPayload } from '@janumipwb/rph-contracts';
 import { governingDeclaredPolicies, latestDeclaredVerdicts, type LatestDeclaredVerdict } from '../assurance/declared-policy-signoff.js';
+// ⭐ L17b2 (D72; §16 (3)) — the round's stage records, which join the send-back's Decision's subjects.
+import { STAGE_PART, stageRecordsIn } from '../assurance/assurance-stage-records.js';
 
 /** ⭐ D72 — the option a person's sending of the work back selects, on its Decision: a free string, as `RERUN_REJECTED_WORK`. */
 export const REPLACE_REACHED_WORK = 'REPLACE_REACHED_WORK';
@@ -237,4 +239,23 @@ export function supersededWorkNotice(n: {
 		'The superseded work is no longer in this file; its bytes stay in the workbench’s content store.',
 		''
 	].join('\n');
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D72 (the lead's §16 (3)) — THE ROUND'S STAGE RECORDS, AS THE SEND-BACK'S DECISION NAMES THEM: each part the
+ * round's assurance stage recorded — the chapter, the diagnosis, the Historian's record (each ask's), and the step-back where one ran — in the stage's
+ * order (the event log's), by its artifact id. Never an assessment, so the round a successor reads, the first assessment among the subjects, is still
+ * the first rejecting verdict (`successorRoundOf`).
+ */
+export function roundStageRecordIdsOf(engine: EngineHandle, roundId: string | undefined): string[] {
+	if (roundId === undefined) return [];
+	const parts: ReadonlySet<string> = new Set([STAGE_PART.CHAPTER, STAGE_PART.DIAGNOSIS, STAGE_PART.HISTORIAN, STAGE_PART.STEP_BACK]);
+	return stageRecordsIn(engine)
+		.filter((r) => r.roundId === roundId && parts.has(r.part))
+		.map((r) => r.artifactId);
+}
+
+/** ⭐ D72 (§16 (3)) — a Decision's subjects with the round's stage records placed after its first `at` (the rejected unit and its rejecting verdicts). */
+export function withRoundRecords(subjects: readonly string[], at: number, records: readonly string[]): string[] {
+	return [...subjects.slice(0, at), ...records, ...subjects.slice(at)];
 }

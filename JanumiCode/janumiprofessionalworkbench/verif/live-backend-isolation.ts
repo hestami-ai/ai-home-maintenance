@@ -40,6 +40,11 @@
  * its absence as the ten do: set, every authoring review round reserves its worst case against it, and `0` stops every round with a
  * type before any reviewer call — so a shell that exported it for a paid half-B run turned the gate's authoring reviews into
  * stopped rounds (driven red: `live-backend-isolation.test.ts`, all four children, with it exported there and left off this list).
+ * ⭐⭐ AND A TWELFTH, `JPWB_HISTORIAN_CALL_MS` (`JAN-EXEC` Phase 7, package L17b2; design D86, the lead's ruling 16 and §27, item 4): the
+ * Historian's time bound (`apps/rph-demo/src/lib/server/tools/devin-historian.ts`). It selects no backend, but it keys on its absence as
+ * the eleven do: unset, the Historian is not run — so a shell that exported it for a paid run would change every gate test that expects
+ * the Historian not run for an unset bound (driven red: `live-backend-isolation.test.ts`, all four children, with it exported there and
+ * left off this list). It stays out of the replay's list (`LIVE_SELECTIONS_BESIDE_A_REPLAY`): a replay runs no stage.
  */
 export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -52,7 +57,8 @@ export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_DEVIN_BIN',
 	'JPWB_AGY_BIN',
 	'JPWB_REPLAY',
-	'JPWB_AUTHORING_REVIEW_ALLOWANCE'
+	'JPWB_AUTHORING_REVIEW_ALLOWANCE',
+	'JPWB_HISTORIAN_CALL_MS'
 ] as const;
 
 /** Remove every live-backend selection from `env` — the process's own, at a gate entry point. */

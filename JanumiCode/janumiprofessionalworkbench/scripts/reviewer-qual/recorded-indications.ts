@@ -14,8 +14,15 @@
 //   · ⛔ Each file's `IDENTITY` line is read first; the files must agree on model, digest and server version, and that identity must
 //     be the one the product is held to (`DECISION_MODEL_RECORDS_IDENTITY`) — records of any other identity are refused, never read.
 // ⭐ The source reports that identity (`DecisionModelRecords.identity`), which the RUN line records beside the candidate.
+//   · ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — §20 (the sponsor's choice, *"Record on 0.40.16, labelled"*): BESIDE THE ORIGINAL FILES, ONE
+//     FILE MORE, `probes-0.40.16.ndjson`, read under its OWN identity — the records' model and digest on server version 0.40.16, which its
+//     name labels — and refused, never read, where its identity is any other, where it holds a body another file holds, or where a
+//     further file appears in the folder. The originals are read as before, under `DECISION_MODEL_RECORDS_IDENTITY`. Each score the
+//     reader gives carries the server version of the file that holds it (`DecisionModelRecords.scoreVersions`). ⭐ §24 ruling 1: the
+//     second file gives the reader BODIES ALONE — its scores and its refused requests — its lines joining neither `entries` nor
+//     `refusedEntries`; and it is the probes' file, so a line of any other kind refuses the read.
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
 	DECISION_MODEL_RECORDS_IDENTITY,
@@ -29,6 +36,18 @@ import type { IndicationsSource } from '../../apps/rph-demo/src/lib/server/assur
 /** Where D54's records are committed, and the files the gate reads, in their order. */
 export const RECORDS_FOLDER = 'docs/tracking/reviewer-qualification/decision-model/';
 export const RECORDS_FILES = ['v13.ndjson', 'probes.ndjson'] as const;
+/**
+ * ⭐⭐ §20 — THE RECORDS' SECOND FILE: the probe questions no original file holds, recorded on server version 0.40.16 (`REG-D-152`'s
+ * server) by the records script's `probes-0.40.16` set, labelled by its name. One file, one version: any further file is refused.
+ */
+export const LABELLED_RECORDS_FILE = 'probes-0.40.16.ndjson';
+export const LABELLED_RECORDS_SERVER_VERSION = '0.40.16';
+/** The identity the second file must hold: the records' model and digest, on its label's server version alone. */
+export const labelledRecordsIdentity = (records: DecisionModelRecordsIdentity = DECISION_MODEL_RECORDS_IDENTITY): DecisionModelRecordsIdentity => ({
+	model: records.model,
+	digest: records.digest,
+	serverVersion: LABELLED_RECORDS_SERVER_VERSION
+});
 
 /** The records, read: their one identity, each body's score, and the bodies two records score differently. */
 export interface DecisionModelRecords {
@@ -47,6 +66,10 @@ export interface DecisionModelRecords {
 	 * before any request (`refused`). Such an entry is held, but holds no review: the validator refuses it before any reviewer call.
 	 */
 	readonly refusedEntries: ReadonlyMap<string, string>;
+	/** ⭐⭐ §20 — each scored body's server version: the version of the file that holds it. */
+	readonly scoreVersions: ReadonlyMap<string, string>;
+	/** ⭐⭐ §20 — the second file, read beside the originals under its own identity, where there is one: its name and that identity. */
+	readonly labelled?: { readonly name: string; readonly identity: DecisionModelRecordsIdentity };
 }
 export type RecordsRead = DecisionModelRecords | { readonly refusal: string };
 
@@ -176,7 +199,8 @@ function tallyScores(
  */
 export function readDecisionModelRecords(
 	files: readonly { readonly name: string; readonly text: string }[],
-	expected: DecisionModelRecordsIdentity = DECISION_MODEL_RECORDS_IDENTITY
+	expected: DecisionModelRecordsIdentity = DECISION_MODEL_RECORDS_IDENTITY,
+	labelled?: { readonly name: string; readonly text: string }
 ): RecordsRead {
 	if (files.length === 0) return { refusal: 'no decision-model records were found (D54)' };
 	const read = files.map((f) => ({ name: f.name, file: parsed(f.name, f.text) }));
@@ -205,7 +229,92 @@ export function readDecisionModelRecords(
 				refusalContradicted.add(q.bodySha256);
 			else refused.set(q.bodySha256, q);
 		}
-	return { identity: first, scores, contradicted, refused, refusalContradicted, entries, refusedEntries };
+	// ⭐⭐ §20 — each score's server version: the originals', the one they share.
+	const scoreVersions = new Map([...scores.keys()].map((sha) => [sha, first.serverVersion]));
+	const originals: DecisionModelRecords = { identity: first, scores, contradicted, refused, refusalContradicted, entries, refusedEntries, scoreVersions };
+	return labelled === undefined ? originals : withLabelledFile(originals, ok, labelled, expected);
+}
+
+/** An identity in words with its digest WHOLE: a digest that differs past its first twelve characters is named so. */
+const wholeIdentityWords = (i: DecisionModelRecordsIdentity): string => `${i.model} ${i.digest} on Ollama ${i.serverVersion}`;
+
+/** ⭐ §24 ruling 1 — the first line after a file's IDENTITY line whose kind is not PROBE: its number (as `parsed` counts) and its kind. */
+function kindOtherThanProbe(text: string): { readonly line: number; readonly kind: string } | undefined {
+	const lines = text.split('\n').filter((l) => l.trim() !== '');
+	for (const [n, line] of lines.slice(1).entries()) {
+		const kind = (JSON.parse(line) as { kind?: unknown }).kind;
+		if (kind !== 'PROBE') return { line: n + 2, kind: String(kind) };
+	}
+	return undefined;
+}
+
+/** Every body a parsed file holds — scored or refused — each with the file that holds it. */
+const bodiesHeld = (file: { readonly questions: readonly { sha: string }[]; readonly refused: readonly RecordedRefusal[] }): string[] => [
+	...file.questions.map((q) => q.sha),
+	...file.refused.map((q) => q.bodySha256)
+];
+
+/**
+ * ⭐⭐ §20 — THE SECOND FILE, READ BESIDE THE ORIGINALS, UNDER ITS OWN IDENTITY: the records' model and digest on its label's server version
+ * (`labelledRecordsIdentity`). ⛔ Refused, never read: another identity; a body another file holds (each body is held by one file, so no
+ * score is read on two versions at once). Its questions and refusals are tallied as the originals' are, its scores carrying its version.
+ * ⭐ §24 ruling 1 — AND IT GIVES BODIES ALONE. A line of it records requests, not a review: its set asks only the bodies no file holds, and
+ * each body once across entries, so no record tells whether a line holds its entry's whole review. So its lines join neither `entries`
+ * nor `refusedEntries` — those are the originals' alone — and whether a review is refused, and where, stays the static source's decision,
+ * request by request over every file's bodies. ⛔ It is the probes' file (§20): a line of any kind but PROBE refuses the whole read, so
+ * every case is scored from the originals.
+ */
+function withLabelledFile(
+	originals: DecisionModelRecords,
+	read: readonly { readonly name: string; readonly file: Exclude<ReturnType<typeof parsed>, string> }[],
+	labelled: { readonly name: string; readonly text: string },
+	expected: DecisionModelRecordsIdentity
+): RecordsRead {
+	const file = parsed(labelled.name, labelled.text);
+	if (typeof file === 'string') return { refusal: file };
+	const own = labelledRecordsIdentity(expected);
+	if (!sameIdentity(file.identity, own))
+		return {
+			refusal: `${labelled.name} was made on ${wholeIdentityWords(file.identity)}, not the identity its label names: ${wholeIdentityWords(own)} — the records’ model and digest, on another server version alone (D54; §20)`
+		};
+	const foreign = kindOtherThanProbe(labelled.text);
+	if (foreign !== undefined)
+		return {
+			refusal: `${labelled.name} line ${foreign.line} is a ${foreign.kind} line: the second file holds probe questions alone, and every case is scored from the originals (D54; §24 ruling 1)`
+		};
+	const holders = new Map<string, string>();
+	for (const r of read) for (const sha of bodiesHeld(r.file)) if (!holders.has(sha)) holders.set(sha, r.name);
+	const repeated = bodiesHeld(file).find((sha) => holders.has(sha));
+	if (repeated !== undefined)
+		return {
+			refusal: `${labelled.name} holds a body another file holds: ${repeated.slice(0, 12)}… in ${holders.get(repeated)} — each body is held by one file (D54; §20)`
+		};
+	const scores = new Map(originals.scores);
+	const contradicted = new Set(originals.contradicted);
+	tallyScores([{ file }], scores, contradicted);
+	const scoreVersions = new Map(originals.scoreVersions);
+	for (const q of file.questions) scoreVersions.set(q.sha, own.serverVersion);
+	// Its refusals beside its own scores, as the originals' are read: a body it scores and refuses, or refuses twice with two answers.
+	const refused = new Map(originals.refused);
+	const refusalContradicted = new Set(originals.refusalContradicted);
+	for (const q of file.refused) {
+		const earlier = refused.get(q.bodySha256);
+		const clash = scores.has(q.bodySha256) || (earlier !== undefined && (earlier.status !== q.status || earlier.response !== q.response));
+		if (clash) refusalContradicted.add(q.bodySha256);
+		else refused.set(q.bodySha256, q);
+	}
+	return {
+		identity: originals.identity,
+		scores,
+		contradicted,
+		refused,
+		refusalContradicted,
+		// ⭐ §24 ruling 1 — the originals' alone: a line of the second file records requests, not its entry's review.
+		entries: originals.entries,
+		refusedEntries: originals.refusedEntries,
+		scoreVersions,
+		labelled: { name: labelled.name, identity: own }
+	};
 }
 
 /**
@@ -244,22 +353,42 @@ export interface RecordsOnFile {
 
 /** ⭐ Z3 — D53 — the committed records under `root`, with their files' sha256 (`RecordsOnFile`). */
 export function committedRecordsOnFile(root: URL): RecordsOnFile {
-	const files = RECORDS_FILES.flatMap((f) => {
+	const files = [...RECORDS_FILES, LABELLED_RECORDS_FILE].flatMap((f) => {
 		const path = fileURLToPath(new URL(`${RECORDS_FOLDER}${f}`, root));
 		return existsSync(path) ? [{ name: f, sha256: createHash('sha256').update(readFileSync(path)).digest('hex') }] : [];
 	});
 	return { read: committedRecords(root), files };
 }
 
-/** ⭐ The committed records under `root` (a `file:` URL ending in `/`): both files, read and held to the product's identity. */
+/** ⭐⭐ §20 — the records files in the folder under `root` beside the originals and the second file: each refused, never read. */
+function furtherRecordsFiles(root: URL): string[] {
+	const folder = fileURLToPath(new URL(RECORDS_FOLDER, root));
+	if (!existsSync(folder)) return [];
+	const known = new Set<string>([...RECORDS_FILES, LABELLED_RECORDS_FILE]);
+	return readdirSync(folder)
+		.filter((f) => f.endsWith('.ndjson') && !known.has(f))
+		.sort((a, b) => Number(a > b) - Number(a < b));
+}
+
+/**
+ * ⭐ The committed records under `root` (a `file:` URL ending in `/`): both files, read and held to the product's identity — ⭐⭐ (§20) and
+ * the second file beside them where it is committed, read under its own identity; a further file refused, never read.
+ */
 export function committedRecords(root: URL): RecordsRead {
+	const further = furtherRecordsFiles(root);
+	if (further.length > 0)
+		return {
+			refusal: `the records folder holds a further file: ${further.map((f) => `${RECORDS_FOLDER}${f}`).join(', ')} — beside ${[...RECORDS_FILES, LABELLED_RECORDS_FILE].join(', ')} no records file is read (D54; §20)`
+		};
 	const files: { name: string; text: string }[] = [];
 	for (const f of RECORDS_FILES) {
 		const path = fileURLToPath(new URL(`${RECORDS_FOLDER}${f}`, root));
 		if (!existsSync(path)) return { refusal: `the committed decision-model records are absent: ${RECORDS_FOLDER}${f} (D54)` };
 		files.push({ name: `${RECORDS_FOLDER}${f}`, text: readFileSync(path, 'utf8') });
 	}
-	return readDecisionModelRecords(files);
+	const second = fileURLToPath(new URL(`${RECORDS_FOLDER}${LABELLED_RECORDS_FILE}`, root));
+	const labelled = existsSync(second) ? { name: `${RECORDS_FOLDER}${LABELLED_RECORDS_FILE}`, text: readFileSync(second, 'utf8') } : undefined;
+	return readDecisionModelRecords(files, DECISION_MODEL_RECORDS_IDENTITY, labelled);
 }
 
 /** The repository the scripts run in: two folders up from this file. */

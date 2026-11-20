@@ -699,6 +699,21 @@ function halfBLane(script: HalfBScript) {
 		rerunRejectedWork: async () => {
 			throw new Error('nothing re-runs rejected work here');
 		},
+		// ⭐⭐ L17b2 (D82; the lead's §15.3 (1), §16) — the loop's offers: none, their reads not logged; its acts never pressed. So half B's runs reach a
+		// refused Record Assurance as before: nothing of the loop offered, the unit left as found.
+		stageOffered: async () => false,
+		runAssuranceStage: async () => {
+			throw new Error('no assurance stage runs here');
+		},
+		sponsorDecides: async () => null,
+		historianAgainOffered: async () => false,
+		rerunHistorian: async () => {
+			throw new Error('no Historian is asked again here');
+		},
+		sendBackOffered: async () => [],
+		sendWorkBack: async () => {
+			throw new Error('no work is sent back here');
+		},
 		markSatisfied: async (unit) => {
 			calls.push(`markSatisfied ${unit.slug}`);
 			// ⭐ Package M (D6) — and Mark Satisfied ACCEPTS it: the units that wait for it are offered next.
@@ -1266,7 +1281,8 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 		writeFileSync(store, '');
 		const ready = async (_program: string, args: readonly string[]) => ({
 			exitCode: 0,
-			stdout: args[0] === 'models' ? 'glm-5-3-flash-max\n' : 'devin 3000\n',
+			// ⭐ L17b2 (ruling 6 (C); §16) — ~~`'devin 3000\n'`~~: a paid boot is refused on another devin version than the one whose tools were measured.
+			stdout: args[0] === 'models' ? 'glm-5-3-flash-max\n' : 'devin 3000.11.234 (92c83011d113)\n',
 			stderr: '',
 			failure: null
 		});
@@ -1278,7 +1294,12 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 			bootOf({
 				paid: true,
 				env: { ...ADMITTED, JPWB_PHASE7_PRIOR_REVIEWER_CALLS: '0', ...env },
-				serverEnv: { JPWB_DEMO_DB: store, ...(env.JPWB_PHASE7_HALF === 'B' ? { [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '4596' } : {}) },
+				// ⭐ L17b2 (ruling 6 (C); §16) — and the Historian's time bound handed, as a paid boot now needs it (`JPWB_HISTORIAN_CALL_MS`, ruling 16).
+				serverEnv: {
+					JPWB_DEMO_DB: store,
+					JPWB_HISTORIAN_CALL_MS: '600000',
+					...(env.JPWB_PHASE7_HALF === 'B' ? { [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '4596' } : {})
+				},
 				store,
 				run: ready
 			});
@@ -1300,7 +1321,8 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 		writeFileSync(store, '');
 		const ready = async (_program: string, args: readonly string[]) => ({
 			exitCode: 0,
-			stdout: args[0] === 'models' ? 'glm-5-3-flash-max\n' : 'devin 3000\n',
+			// ⭐ L17b2 (ruling 6 (C); §16) — ~~`'devin 3000\n'`~~: a paid boot is refused on another devin version than the one whose tools were measured.
+			stdout: args[0] === 'models' ? 'glm-5-3-flash-max\n' : 'devin 3000.11.234 (92c83011d113)\n',
 			stderr: '',
 			failure: null
 		});
@@ -1308,7 +1330,12 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 			bootOf({
 				paid: true,
 				env: { ...ADMITTED, JPWB_PHASE7_PRIOR_REVIEWER_CALLS: '1117', JPWB_PHASE7_HALF: 'B', JPWB_AGENT_MODEL: 'openai-codex/gpt-5.6-sol' },
-				serverEnv: { JPWB_DEMO_DB: store, ...(allowance === undefined ? {} : { [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: allowance }) },
+				// ⭐ L17b2 (ruling 6 (C); §16) — and the Historian's time bound handed, as a paid boot now needs it (`JPWB_HISTORIAN_CALL_MS`, ruling 16).
+				serverEnv: {
+					JPWB_DEMO_DB: store,
+					JPWB_HISTORIAN_CALL_MS: '600000',
+					...(allowance === undefined ? {} : { [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: allowance })
+				},
 				store,
 				run: ready
 			});

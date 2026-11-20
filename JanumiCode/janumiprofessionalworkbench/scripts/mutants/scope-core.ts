@@ -46,6 +46,34 @@ export function parseUnifiedDiff(stdout: string): Hunk[] {
 	return hunks;
 }
 
+/** What a child's read of the change set returned: the fields of `spawnSync`'s result a failure is named by. */
+export interface ChangeSetRead {
+	readonly status: number | null;
+	readonly signal: string | null;
+	readonly error?: (Error & { readonly code?: string }) | undefined;
+	readonly stderr?: string | null;
+}
+
+/**
+ * Why a read of the change set FAILED, named by its cause — its status, its signal, its error's code and message, and git's stderr —
+ * or `undefined` where git completed.
+ *
+ * ⭐ `REG-F-584`'s buffer (`JAN-EXEC` Phase 7, package L17b2; the lead's ruling 1). The tool once said only "git diff failed: " and
+ * git's stderr, which was EMPTY when the read failed for want of buffer: the measured failure was status null, signal SIGTERM and error
+ * ENOBUFS, none of them named. A failed read yields no change set — the caller parses nothing of it, so no part of a diff is ever read
+ * as the whole. ⚠ Completed is git's exit 0 or 1 with no error: the rule the tool's status check has held since it was written.
+ */
+export function changeSetReadFailure(r: ChangeSetRead): string | undefined {
+	if (r.error === undefined && (r.status === 0 || r.status === 1)) return undefined;
+	const error =
+		r.error === undefined
+			? 'no error'
+			: `error ${r.error.code ?? r.error.name}: ${r.error.message}`;
+	const stderr = (r.stderr ?? '').trimEnd();
+	const said = stderr === '' ? '(empty)' : stderr;
+	return `status ${String(r.status)}, signal ${String(r.signal)}, ${error}; stderr: ${said}`;
+}
+
 /**
  * Locate an anchor in a file's text. Returns a REASON string rather than a range when the anchor is absent or
  * ambiguous — an unlocatable anchor means the ledger cannot decide what is guarded, which must be reported

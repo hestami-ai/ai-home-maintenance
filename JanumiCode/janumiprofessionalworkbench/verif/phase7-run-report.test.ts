@@ -5443,7 +5443,9 @@ describe('⭐⭐ L16 (D71) — the report and its audit know the re-run of the w
 		expect([act.forbidden, act.found.map((f) => [f.aggregateId, f.unit, f.why]), act.note]).toEqual([
 			false,
 			[['dec_rework', 'design', 'a person’s re-run of the work its declared reviews rejected: plan plan_design_b, superseding plan plan_design']],
-			'allowed by the run plan’s rule alone (REG-D-105 (4), as REG-D-163 (2) amends it): once per unit its declared reviews reject at its sign-off, each listed beside the Decision that made it'
+			// ⭐ L17b2 (D82; the lead’s §16) — ~~"… amends it): once per unit its declared reviews reject at its sign-off, each listed …"~~: no count bounds the
+			// way back now (`REG-D-166` (8)), so the note says when the rule presses it — each time the round’s records offer it.
+			'allowed by the run plan’s rule alone (REG-D-105 (4), as REG-D-163 (2) amends it): each time the round’s records offer it, on a unit its declared reviews reject at its sign-off (D82), each listed beside the Decision that made it'
 		]);
 		expect(r.problems, 'the re-run was read as a second Begin & Execute').toEqual([]);
 		expect(r.audit.forbiddenFound, 'the re-run’s own acts were read as forbidden ones').toBe(0);
@@ -5491,5 +5493,37 @@ describe('⭐⭐ L16 (D71) — the report and its audit know the re-run of the w
 		);
 		expect(source('apps/rph-demo/e2e-live-exec/phase7-operator.ts')).toContain(`export const AFTER_RERUN = '${AFTER_RERUN_SUFFIX}';`);
 		expect(REJECTED_RERUN_NOTE).toContain('REG-D-163 (2)');
+	});
+});
+
+// ── ⭐⭐ L17b2 — design D82 (`REG-D-166` (5), (8); the lead's ruling 14 and §16, accepting §15.3 (8)): THE AUDIT'S READINGS TAKE THE LOOP'S NEW ACTS,
+// NAMED, NOTHING REMOVED ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+//
+// ⭑ The run plan's rule now presses the round's assurance stage, the Historian asked again, and the send-back the round's records offer (D82): each is
+// an act the audit names among the other acts, allowed by that rule, with a note saying when the rule presses it. P7-3's forbidden acts are unchanged —
+// "abandon followed by re-proposing" stays forbidden, since a replacement supersedes and does not abandon — and every act the audit named before is
+// named still. A replacement's proposals, which `reproposals` reads, are D81's (package L17c).
+describe('⭐⭐ L17b2 (D82; ruling 14; §16) — the audit names the loop’s new acts, each allowed by the run plan’s rule, nothing removed', () => {
+	it('⛔ RED FIRST — the round’s assurance stage, the Historian asked again and the send-back are each named, allowed, with the note of when the rule presses it; the acts named before are named still, the forbidden ones first as before', () => {
+		const r = reportOf(aRun()).report;
+		const stage = actOf(r, 'runAssuranceStage');
+		const again = actOf(r, 'rerunHistorian');
+		const sent = actOf(r, 'sendWorkBack');
+		expect([stage.forbidden, again.forbidden, sent.forbidden], 'a new act of the loop was read as forbidden').toEqual([false, false, false]);
+		const says = (note: string | undefined, ...words: string[]) => words.filter((w) => !(note ?? '').includes(w));
+		expect(
+			[
+				says(stage.note, 'allowed by the run plan', 'D82', 'records no Decision'),
+				says(again.note, 'allowed by the run plan', 'D82', 'did not conclude', 'records no Decision'),
+				says(sent.note, 'allowed by the run plan', 'D82', 'beside the Decision that made it')
+			],
+			'a new act’s note does not say when the run plan’s rule presses it'
+		).toEqual([[], [], []]);
+		expect(
+			['abandonPwu', 'proposePwu (re-proposal)', 'rerunReview', 'rerunWork', 'rerunDeclaredReviews', 'rerunRejectedWork', 'recordBlockingFinding'].filter(
+				(name) => !r.audit.acts.some((a) => a.act === name)
+			),
+			'an act the audit named before is named no more'
+		).toEqual([]);
 	});
 });

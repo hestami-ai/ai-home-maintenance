@@ -556,14 +556,16 @@ describe('JAN-CRITREAD J2-1 — ⭐ the review in parts, B3 (REG-D-125): pwaType
 				applicable: (context!.context!.applicablePolicies as { name: string }[]).map((p) => p.name)
 			};
 		});
+		// ⭐ RESTATED (`JAN-EXEC` Phase 7, package L17b2 — design D78; `REG-D-166` (3)): the seeded Historian names no kind now, so
+		// each part lists it among those its kind may take, in the library's order — ~~four~~ five each; the declared lists unchanged.
 		expect(named, 'each part: its declared policies named, and those its kind may take').toEqual([
 			{
 				declared: ['Intent Preservation', 'Test Adequacy', 'Fitness For Purpose'],
-				applicable: ['Assumption Disclosure', 'Intent Preservation', 'Test Adequacy', 'Fitness For Purpose']
+				applicable: ['Assumption Disclosure', 'Historical Consistency', 'Intent Preservation', 'Test Adequacy', 'Fitness For Purpose']
 			},
 			{
 				declared: ['Intent Preservation', 'Fitness For Purpose'],
-				applicable: ['Intent Fidelity', 'Decomposition Coverage', 'Intent Preservation', 'Fitness For Purpose']
+				applicable: ['Intent Fidelity', 'Decomposition Coverage', 'Historical Consistency', 'Intent Preservation', 'Fitness For Purpose']
 			}
 		]);
 		for (const b of production)

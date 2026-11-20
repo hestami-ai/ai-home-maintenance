@@ -2702,10 +2702,31 @@ export const REJECTED_RERUN_OPTION = 'RERUN_REJECTED_WORK';
 /** ⭐⭐ Package L16 — D71 — the suffix of the lane's action files of a unit's sign-off after that re-run (`phase7-operator.ts`, `AFTER_RERUN`). */
 export const AFTER_RERUN_SUFFIX = 'AfterRerun';
 
-/** ⭐⭐ Package L16 — D71 — why the act is listed and not forbidden: the run plan's rule alone allows it, once per unit. */
+/**
+ * ⭐⭐ Package L16 — D71 — why the act is listed and not forbidden: the run plan's rule alone allows it, ~~once per unit~~. ⭐⭐ `JAN-EXEC` Phase 7, package
+ * L17b2 — D82 (`REG-D-166` (8); the lead's §16, accepting §15.3 (8)) — ~~"… amends it): once per unit its declared reviews reject at its sign-off, each
+ * listed …"~~: no count bounds the way back now, so the note says when the rule presses it — each time the round's records offer it.
+ */
 export const REJECTED_RERUN_NOTE =
-	'allowed by the run plan’s rule alone (REG-D-105 (4), as REG-D-163 (2) amends it): once per unit its declared reviews reject at its ' +
-	'sign-off, each listed beside the Decision that made it';
+	'allowed by the run plan’s rule alone (REG-D-105 (4), as REG-D-163 (2) amends it): each time the round’s records offer it, on a unit its declared ' +
+	'reviews reject at its sign-off (D82), each listed beside the Decision that made it';
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D82 (`REG-D-166` (5), (8); the lead's ruling 14 and §16, accepting §15.3 (8)) — THE LOOP'S THREE ACTS, each
+ * allowed by the run plan's rule, named with when the rule presses it. ⚠ Their findings in the store — the stage's records by round, the Historian's
+ * second assessment of a round, the send-back's `REPLACE_REACHED_WORK` Decision — are design D81's (package L17c; §18), so until then each act is read
+ * from the lane's POSTs alone, and says so.
+ */
+const LOOP_FINDINGS_LATER = ' — its findings in the store are design D81’s (package L17c); until then the lane’s POSTs alone are counted';
+export const STAGE_NOTE =
+	'allowed by the run plan’s rule (D82): the assurance stage of each round a unit’s declared reviews reject at its sign-off; it records no Decision' +
+	LOOP_FINDINGS_LATER;
+export const HISTORIAN_AGAIN_NOTE =
+	'allowed by the run plan’s rule (D82): the Historian asked again, once per round whose Historian did not conclude (D73); it records no Decision' +
+	LOOP_FINDINGS_LATER;
+export const SEND_BACK_NOTE =
+	'allowed by the run plan’s rule (D82): the way back the round’s records offer (D72, D73), each listed beside the Decision that made it' +
+	LOOP_FINDINGS_LATER;
 
 /**
  * ⭐ `E12F` F3 (`REG-D-112` (a)) — EACH RE-RUN OF A UNIT'S DECLARED REVIEWS THAT DID NOT CONCLUDE, by its Decision: the unit, and
@@ -2850,6 +2871,11 @@ function otherActs(v: AuditView, undertakingId: string | null, lane: LaneRows): 
 			posted(lane, ['rerunRejectedWork']),
 			{ note: REJECTED_RERUN_NOTE }
 		),
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D82 — the loop's three acts, each allowed by the run plan's rule: their POSTs counted, and the log not read
+		// for them until design D81 reads their findings (`auditable: false`, so a verdict never says "none" of a log it did not read).
+		act('runAssuranceStage', false, [], posted(lane, ['runAssuranceStage']), { auditable: false, note: STAGE_NOTE }),
+		act('rerunHistorian', false, [], posted(lane, ['rerunHistorian']), { auditable: false, note: HISTORIAN_AGAIN_NOTE }),
+		act('sendWorkBack', false, [], posted(lane, ['sendWorkBack']), { auditable: false, note: SEND_BACK_NOTE }),
 		...PAGE_ONLY_ACTS.map(([name, type]) =>
 			act(name, false, handEventsOf(v, type).map((e) => findingOf(e, onPlan(e), type)), posted(lane, [name]))
 		),

@@ -1039,14 +1039,19 @@ describe('⭐⭐ D3a (REG-D-127) — the floor hands each part the policy librar
 			name: 'Test Adequacy',
 			purpose: 'Determine whether the available tests are sufficient to support the claims being made.'
 		});
+		// ⭐ RESTATED (`JAN-EXEC` Phase 7, package L17b2 — design D78; `REG-D-166` (3)): the seeded Historian names no kind now, so it
+		// is among those every kind may take, in the library's order — ~~the three~~ four. The rule is the same: the library's ACTIVE
+		// non-floor policies its kind names, or that name none.
 		expect(applicable.map((p) => p.id), 'the library’s ACTIVE non-floor policies its kind names, or that name none').toEqual([
+			'pol_historical_consistency',
 			'pol_intent_preservation',
 			'pol_test_adequacy',
 			DEMO_POLICY_ID
 		]);
-		// ⭑ CONTROL — a type of a kind no seeded policy names is shown the no-kind policy alone.
+		// ⭑ CONTROL — a type of a kind no seeded policy names is shown the ~~no-kind policy alone~~ policies that name no kind alone:
+		// the Historian's, after D78, and the demo's.
 		const build = prompts.find((p) => partOf(p) === BUILD)!;
-		expect((partLine(build, 'context').applicablePolicies as { id: string }[]).map((p) => p.id)).toEqual([DEMO_POLICY_ID]);
+		expect((partLine(build, 'context').applicablePolicies as { id: string }[]).map((p) => p.id)).toEqual(['pol_historical_consistency', DEMO_POLICY_ID]);
 		expect(partLine(build, 'subject').declaredPolicies, 'a type that declares none, named as none').toEqual([]);
 	});
 });

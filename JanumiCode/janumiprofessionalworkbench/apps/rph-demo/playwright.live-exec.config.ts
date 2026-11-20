@@ -140,6 +140,11 @@ export default defineConfig({
 			// Unset, a folder is minted under it as before, now once per run: the worker's load of this config names the
 			// runner's folder instead of minting a second (`run-folder.ts`).
 			JPWB_DEMO_DB: liveExecStore(process.env),
+			// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — the lead's ruling 6 (C), with ruling 16 (§15.3 (7)) — THE HISTORIAN'S TIME BOUND, passed through from the
+			// operator's shell (required, with no default; design D84 fixes its value): laid over here so that the boot reads it as the server is handed it
+			// (`OVERLAY_KEYS`, `phase7-operator.ts`), and refuses a paid run whose server could not run its Historian. Blank where the shell sets none, which
+			// the product reads as unset (`historianCallBound`, `src/lib/server/tools/devin-historian.ts`).
+			JPWB_HISTORIAN_CALL_MS: process.env.JPWB_HISTORIAN_CALL_MS ?? '',
 			...passthrough,
 			// ⭐⭐ `JAN-EXEC` Phase 7, package L2 — D20 (`REG-F-580`; `REG-D-135` (4)) — THE AUTHORING REVIEW'S ALLOWANCE, for a paid
 			// half-B run alone: the limit less the calls spent before the run and the negative control's 4, which every authoring

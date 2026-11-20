@@ -620,6 +620,37 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		expect(stateOf(A)?.assessmentState).toBe('SATISFIED');
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — the lead's ruling 22 (L17b2 facts §2.5): GATE B READ ONLY AN ENTRY'S STRING `action`
+	// (`.filter((a): a is string => …)`), so an entry whose action is not a string — a number, null, an object, or none at all — passed the
+	// policy's permitted set unread. This package makes the first validator that recommends an action (the Historian, design D73), so the
+	// gate holds every entry: one whose action is not one of the policy's permitted is refused, a non-string included, named in the same list
+	// as the others — its value as JSON, and an absent action as `undefined` (the builder's reading of "naming it as it names the others").
+	// Each entry is completed on an assessment of its own, so no entry's outcome reaches another's.
+	it('⛔ RED FIRST — L17b2 ruling 22 — §11 Gate B: a recommended action that is not a string is refused, named as the others are', () => {
+		createPolicy('NONE'); // permittedControlActions: ['CONTINUE']
+		const cases = [
+			['asm_01ARZ3NDEKTSV4RRFFQ69G5A42', { action: 42 }, '[42]'],
+			['asm_01ARZ3NDEKTSV4RRFFQ69G5A43', { action: null }, '[null]'],
+			['asm_01ARZ3NDEKTSV4RRFFQ69G5A44', { action: { name: 'CHANGE_MODEL' } }, '[{"name":"CHANGE_MODEL"}]'],
+			['asm_01ARZ3NDEKTSV4RRFFQ69G5A45', {}, '[undefined]']
+		] as const;
+		for (const [A, entry, named] of cases) {
+			requestAssessment(A);
+			const r = engine.dispatch(
+				cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+					validatorResult: { ...verdict(A, 'reviewer-x'), recommendedControlActions: [entry] }
+				})
+			);
+			const what = JSON.stringify(entry);
+			expect.soft(r.status, `${what} passed Gate B`).toBe('REJECTED');
+			expect.soft(r.error?.code ?? '', `${what}: the refusal's code`).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+			expect
+				.soft(r.error?.message ?? '', `${what} is not named as the others are`)
+				.toContain(`the validator recommended control action(s) ${named} that this policy does not permit (§11). Permitted: [CONTINUE].`);
+			expect.soft(stateOf(A)?.assessmentState, `${what}: completed past the policy`).toBe('ASSESSING');
+		}
+	});
+
 	it('§6.1 requiredEvidence ENFORCED: SATISFIED is rejected while mandatory evidence is unmet, then stands once submitted (Gate A)', () => {
 		const ev = (id: string) => ({
 			id,

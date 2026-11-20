@@ -41,11 +41,14 @@
  * would have nothing to say. It belongs in the EDIT loop, which is where the feedback is worth having.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DECLARED_MUTANTS, isHistory, type DeclaredMutant } from './ledger.js';
 import {
 	anchorRange,
+	changeSetReadFailure,
 	classifyRunnerTranscript,
 	isProductionPath,
 	overlaps,
@@ -80,18 +83,46 @@ function locate(m: DeclaredMutant): Anchor | string {
 	return { mutant: m, file: m.file, startLine: r.startLine, endLine: r.endLine };
 }
 
+/**
+ * The change set's text, READ WHOLE, or why it could not be read.
+ *
+ * ⭐ `REG-F-584`'s buffer (`JAN-EXEC` Phase 7, package L17b2; the lead's ruling 1). This read `git diff`'s stdout through
+ * `spawnSync`'s default buffer, 1 MiB, so a larger change set ended the tool with "git diff failed: " and nothing after — the call
+ * returned status null, signal SIGTERM, error ENOBUFS and a PARTIAL diff (1,077,248 characters, measured on a copy of the tool), and
+ * only the status check kept that part from being read as the whole. ⭑ So git now writes the change set to a file of its own
+ * (`--output=<file>`) in a fresh temporary folder, and the file is read whole: no buffer bounds the change set, so there is no bound
+ * left for one to outgrow (the package's whole tree as one diff is 91,574,677 bytes, past a 64 MiB `maxBuffer` too). The folder is
+ * removed after, whatever the read's outcome; and a read that fails is named by its cause (`changeSetReadFailure`), never parsed.
+ */
+function readChangeSet(
+	args: readonly string[],
+	revision: string
+): { readonly diff: string } | { readonly failure: string } {
+	let dir: string | undefined;
+	try {
+		dir = mkdtempSync(join(tmpdir(), 'jpwb-mutants-change-set-'));
+		const file = join(dir, 'change-set.diff');
+		const r = spawnSync('git', [...args, `--output=${file}`, revision], { cwd: ROOT, encoding: 'utf8' });
+		const failure = changeSetReadFailure(r);
+		return failure === undefined ? { diff: readFileSync(file, 'utf8') } : { failure };
+	} catch (e) {
+		return { failure: `the change set could not be read: ${e instanceof Error ? e.message : String(e)}` };
+	} finally {
+		if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
+	}
+}
+
 function changedHunks(): Hunk[] {
 	// `--relative` makes git report paths relative to THIS package rather than the monorepo root, so they line
 	// up with the ledger's `file` fields without string surgery.
 	const args = ['diff', '--unified=0', '--no-color', '--relative'];
-	if (RANGE !== undefined) args.push(RANGE);
-	else args.push('HEAD'); // worktree AND index against the last commit — what an agent has actually changed
-	const r = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
-	if (r.status !== 0 && r.status !== 1) {
-		process.stderr.write(`mutants:changed — git diff failed: ${r.stderr ?? ''}\n`);
+	// RANGE, or the worktree AND index against the last commit — what an agent has actually changed
+	const read = readChangeSet(args, RANGE ?? 'HEAD');
+	if ('failure' in read) {
+		process.stderr.write(`mutants:changed — git diff failed: ${read.failure}\n`);
 		process.exit(2);
 	}
-	return parseUnifiedDiff(r.stdout ?? '');
+	return parseUnifiedDiff(read.diff);
 }
 
 const hits = (a: Anchor, h: Hunk) => overlaps(a.file, a, h);

@@ -82,3 +82,41 @@ describe('Product Realization PWA ontology', () => {
 		expect(getConformanceProfile('HIGH_ASSURANCE')?.minIndependence).toBe('DIFFERENT_MODEL');
 	});
 });
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — design D78 (`REG-D-166` (3)) ─────────────────────────────────────────────────────────────
+// THE HISTORIAN'S KINDS EMPTIED, AND THE SEED'S OWN ACCOUNT OF THE FIELD RESTATED. Each catalog policy's `sourceSection` counts
+// `appliesToPwuKinds` among its fields "AUTHORED (no ratified source)". For `pol_historical_consistency` that is no longer so: its
+// kinds are empty by the sponsor's ruling, so its account strikes the field in that list, in place, and says what ruled it and why.
+// ⭑ CONTROL: every other catalog policy keeps its kinds, and still counts them authored.
+const AUTHORED_CLAUSE = (sourceSection: string): string => {
+	const from = sourceSection.indexOf('AUTHORED (no ratified source): ');
+	const to = sourceSection.indexOf(' (DOC-004 §9.1', from);
+	return from < 0 || to < 0 ? '' : sourceSection.slice(from, to);
+};
+const sourceSectionOf = (policyId: string): string => (getSeedPolicy(policyId) as { sourceSection?: string } | undefined)?.sourceSection ?? '';
+const D78_RULED =
+	"RULED appliesToPwuKinds (REG-D-166 (3), 2026-11-16; design D78): EMPTY, so the policy governs every kind of unit and the harness can assess a rejected unit of any kind under it. It replaces the authored ['ARCHITECTURE_DECISION'], struck from the AUTHORED list above.";
+
+describe('⭐⭐ L17b2 (D78) — the seeded Historian governs every kind of unit, and its account of the field says so', () => {
+	it('⛔ RED FIRST — pol_historical_consistency’s kinds are empty, its account strikes the field among the authored ones, in place, and states the ruling', () => {
+		const historian = getSeedPolicy('pol_historical_consistency')!;
+		const clause = AUTHORED_CLAUSE(sourceSectionOf('pol_historical_consistency'));
+		expect(clause, 'arrangement: the account has its AUTHORED clause').not.toBe('');
+		expect.soft(historian.appliesToPwuKinds ?? [], 'its kinds').toEqual([]);
+		expect.soft(clause, 'the field struck in place in the AUTHORED list').toContain('~~appliesToPwuKinds~~');
+		expect.soft(clause.replaceAll('~~appliesToPwuKinds~~', ''), 'the field still counted authored').not.toContain('appliesToPwuKinds');
+		expect.soft(sourceSectionOf('pol_historical_consistency'), 'the ruling stated').toContain(D78_RULED);
+	});
+
+	it('⭑ CONTROL — every other catalog policy keeps its kinds, and still counts them authored, unstruck; none states D78’s ruling', () => {
+		const others = seedPolicies.filter((p) => p.policyId !== 'pol_historical_consistency');
+		expect(others, 'arrangement: the eleven').toHaveLength(11);
+		for (const p of others) {
+			const clause = AUTHORED_CLAUSE(sourceSectionOf(p.policyId));
+			expect.soft((p.appliesToPwuKinds ?? []).length, `${p.policyId}: its kinds`).toBeGreaterThan(0);
+			expect.soft(clause, `${p.policyId}: the field counted authored`).toContain('appliesToPwuKinds');
+			expect.soft(clause, `${p.policyId}: the field struck`).not.toContain('~~appliesToPwuKinds~~');
+			expect.soft(sourceSectionOf(p.policyId), `${p.policyId}: D78’s ruling stated`).not.toContain('REG-D-166 (3)');
+		}
+	});
+});

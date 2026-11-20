@@ -38,6 +38,11 @@ import {
 	PHASE7_RECORD_ASSURANCE_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
 	PHASE7_UNIT_REVIEWER_CALLS,
+	// ⭐ L17b2 (ruling 15; the lead's §16) — the run plan's workhorse, by this PWA's type.
+	PHASE7_WORKHORSE_TYPE,
+	// ⭐ L17b2 (§18) — the loop's press bounds, computed from the Historian's own setting the boot recorded.
+	phase7AssuranceStageMs,
+	phase7HistorianAgainMs,
 	REVIEWER_MODEL_VARIABLE
 } from '../apps/rph-demo/e2e-live-exec/lane-config.js';
 import {
@@ -79,6 +84,16 @@ import {
 	rerunDeclared,
 	rejectedRerunOffered,
 	rerunRejectedWork,
+	// ⭐ L17b2 (D82; the lead's §15.3 (1), §16) — the loop's acts on the page: the stage and the Historian's re-ask.
+	historianAgainOffered,
+	rerunHistorian,
+	runAssuranceStage,
+	stageOffered,
+	// ⭐ L17b2 (§18) — and the sponsor's case and D72's send-back on the page: 2c's page functions, their tests written first, in 2b.
+	sendBackOffered,
+	sendWorkBack,
+	sponsorDecides,
+	SEND_BACK_RATIONALE,
 	reviewerReadiness,
 	reviewerUnderTest,
 	runTheLane,
@@ -107,6 +122,8 @@ import {
 	type UnitState
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import { PHASE7_PWA, PRODUCT_BRIEF, promptMarkers } from '../scripts/phase7/pwa-content.js';
+// ⭐ L17b2 (§18; the lead's ruling 14 and §7) — the page's own words for the sponsor's case, so the page test reads what the page shows.
+import { sponsorDecidesStatement } from '../apps/rph-demo/src/lib/server/execution/loop-rule.js';
 import { PHASE7_ARCHIVE_UNITS } from '../scripts/phase7/run-archive.js';
 import { withheldOf } from '../scripts/phase7/run-report-core.js';
 import { readinessUnitOf, startReadiness } from '@janumipwb/rph-projections';
@@ -335,6 +352,24 @@ describe('⛔ the spec, from source: Playwright’s own `test`, its own timeout,
 		expect(anyMethodCalls(sf, 'waitForResponse')).toEqual([]);
 		expect(callsTo(sf, 'pressAction')).toEqual([]);
 		expect(callsTo(sf, 'pressFormAction')).toEqual([]);
+		// ⭐⭐ L17b2 (D82; the lead's §15.3 (1), §16) — and the loop's acts: each offer read, and each act pressed, on the unit's own row, by its id — the
+		// stage and the Historian's re-ask waited for the bound the lane hands them, as Record Assurance is; the send-back given the lane's target. Last, so
+		// every check above is observed whatever this one finds.
+		expect(
+			['stageOffered', 'runAssuranceStage', 'historianAgainOffered', 'rerunHistorian', 'sponsorDecides', 'sendBackOffered', 'sendWorkBack'].map((act) => [
+				act,
+				callsTo(sf, act)
+			]),
+			'the loop’s acts are not wired on the unit’s own row, by its id'
+		).toEqual([
+			['stageOffered', [['unitRowById(page, unit.unitId!)']]],
+			['runAssuranceStage', [['page', 'unitRowById(page, unit.unitId!)', 'actionFields', 'timeoutMs']]],
+			['historianAgainOffered', [['unitRowById(page, unit.unitId!)']]],
+			['rerunHistorian', [['page', 'unitRowById(page, unit.unitId!)', 'actionFields', 'timeoutMs']]],
+			['sponsorDecides', [['unitRowById(page, unit.unitId!)']]],
+			['sendBackOffered', [['unitRowById(page, unit.unitId!)']]],
+			['sendWorkBack', [['page', 'unitRowById(page, unit.unitId!)', 'targetId', 'actionFields']]]
+		]);
 	});
 
 	it('⭐ the page is loaded afresh on the Undertaking the setup created, and its overview shown', () => {
@@ -410,6 +445,12 @@ describe('⛔ D4 — the operator bounds every Begin & Execute by one phase’s 
 			// ⭐⭐ Package L16 — D71 (`REG-D-163` (2)) — the rule's re-run of the work a unit's declared reviews rejected: bounded as the rule's
 			// re-run of a stopped unit's work is, one phase's allowance (it runs the unit's work again).
 			['rerunRejectedWork', "'rerunRejectedWork'", 'PHASE7_UNIT_ALLOWANCE_MS'],
+			// ⭐⭐ L17b2 (D82; the lead's §15.3 (6), §16) — the loop's acts, beside D71's: the stage and the Historian's re-ask waited for the bound the lane
+			// hands them, computed from the boot's settings (the Historian's own, `JPWB_HISTORIAN_CALL_MS`, unset until D84); the send-back, which calls no
+			// model, bounded as a sign-off act is.
+			['runAssuranceStage', "'runAssuranceStage'", 'timeoutMs'],
+			['rerunHistorian', "'rerunHistorian'", 'timeoutMs'],
+			['sendWorkBack', "'sendWorkBack'", 'PHASE7_SIGN_OFF_MS'],
 			['markSatisfied', "'markSatisfied'", 'PHASE7_SIGN_OFF_MS'],
 			// ⭐ P7-6R R-1f — the rule's acts: an abandonment, bounded as a sign-off act; a re-run, as a phase (a re-run of the
 			// work runs the phase again).
@@ -744,7 +785,16 @@ describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Sat
  * paid lane waited out its bound and threw, ending the run `lane-error` with its final archive never taken. A field's
  * button stands with it: `rerun-review` with `rerun-review-rationale`, and `Abandon`'s field is `abandon-rationale`.
  */
-function recoveryRow(offered: readonly string[]) {
+// ⭐ L17b2 (§18) — ~~`function recoveryRow(offered: readonly string[])`~~: and what the row shows — a text per test id (`texts`), and a select's
+// options (`options`, each its value and its label) — each read as Playwright reads it, and only once the row is waited for; a select it does not
+// carry cannot be chosen in. A caller that passes neither is answered as before.
+function recoveryRow(
+	offered: readonly string[],
+	shows: {
+		readonly texts?: Readonly<Record<string, string>>;
+		readonly options?: Readonly<Record<string, readonly { readonly value: string; readonly label: string }[]>>;
+	} = {}
+) {
 	const log: string[] = [];
 	const asked: { action: string | undefined; timeout: number | undefined }[] = [];
 	let shown = false;
@@ -754,7 +804,8 @@ function recoveryRow(offered: readonly string[]) {
 		off: () => undefined,
 		waitForResponse: (predicate: (r: unknown) => boolean, options?: { timeout?: number }) => {
 			asked.push({
-				action: ['rerunReview', 'rerunWork', 'abandonPwu', 'rerunDeclaredReviews', 'rerunRejectedWork'].find((a) =>
+				// ⭐ L17b2 — ~~`[…, 'rerunRejectedWork']`~~ and the loop's acts.
+				action: ['rerunReview', 'rerunWork', 'abandonPwu', 'rerunDeclaredReviews', 'rerunRejectedWork', 'runAssuranceStage', 'rerunHistorian', 'sendWorkBack'].find((a) =>
 					predicate(response(`${PAGE_URL}?/${a}`, 'POST'))
 				),
 				timeout: options?.timeout
@@ -780,6 +831,38 @@ function recoveryRow(offered: readonly string[]) {
 		fill: async (text: string, o?: { timeout?: number }) => {
 			if (!carried(name)) throw absent('fill', name, o);
 			log.push(`fill ${name}: ${text} (${o?.timeout})`);
+		},
+		// ⭐ L17b2 (§18) — what the element shows, and a select's choice and options.
+		textContent: async (o?: { timeout?: number }) => {
+			if (!shown || !offered.includes(name)) throw absent('textContent', name, o);
+			return shows.texts?.[name] ?? '';
+		},
+		innerText: async (o?: { timeout?: number }) => {
+			if (!shown || !offered.includes(name)) throw absent('innerText', name, o);
+			return shows.texts?.[name] ?? '';
+		},
+		selectOption: async (value: string | { value?: string }, o?: { timeout?: number }) => {
+			if (!shown || !offered.includes(name)) throw absent('selectOption', name, o);
+			const chosen = typeof value === 'string' ? value : (value.value ?? '');
+			if (!(shows.options?.[name] ?? []).some((x) => x.value === chosen)) throw absent('selectOption', `${name} option ${chosen}`, o);
+			log.push(`select ${name}: ${chosen} (${o?.timeout})`);
+			return [chosen];
+		},
+		locator: (selector: string) => {
+			if (selector !== 'option') throw new Error(`the fake row reads a select's options alone, not ${selector}`);
+			const opts = () => (shown && offered.includes(name) ? (shows.options?.[name] ?? []) : []);
+			const option = (x: { readonly value: string; readonly label: string }) => ({
+				getAttribute: async (attribute: string) => (attribute === 'value' ? x.value : null),
+				textContent: async () => x.label,
+				innerText: async () => x.label
+			});
+			return {
+				count: async () => opts().length,
+				nth: (i: number) => option(opts()[i] ?? { value: '', label: '' }),
+				all: async () => opts().map(option),
+				allTextContents: async () => opts().map((x) => x.label),
+				allInnerTexts: async () => opts().map((x) => x.label)
+			};
 		}
 	});
 	const row = {
@@ -913,7 +996,11 @@ describe('⭐ D3 — the boot record', () => {
 	// config's PROPERTY ASSIGNMENTS alone: the config also SPREADS the authoring review's allowance over its server
 	// (`...phase7AuthoringReviewAllowanceEnv(process.env)`, package L2), and the boot records it now, so the overlay is six — the five
 	// properties and that spread's one key, in the config's order. The lane keys it spreads (`...passthrough`) stay the operator's.
-	it('⭐ the overlay is the ~~five~~ six keys the config lays over the shell for its server — ⭐ R3-C, PI_OFFLINE among them; ⭐ D26, the allowance it spreads — read from the config’s source', () => {
+	// ⭐⭐ L17b2 (the lead's ruling 6 (C), with ruling 16; §15.3 (7), accepted at §16) — RESTATED: ~~"the overlay is the … six keys …"~~ — the config passes the
+	// Historian's time bound through from the operator's shell (`JPWB_HISTORIAN_CALL_MS: process.env.JPWB_HISTORIAN_CALL_MS ?? ''`, a property, after
+	// `JPWB_DEMO_DB`), so that the boot reads it as the server is handed it; the overlay is seven. Its promise is kept whole: the overlay is exactly the
+	// config's keys, read from its source, each mapped to what the server was handed or null — over one key more, and its own check added beside the allowance's.
+	it('⭐ the overlay is the ~~five~~ ~~six~~ seven keys the config lays over the shell for its server — ⭐ R3-C, PI_OFFLINE among them; ⭐ D26, the allowance it spreads; ⭐ L17b2, the Historian’s time bound it passes through — read from the config’s source', () => {
 		const config = parsed(CONFIG);
 		const env = nodes(config, ts.isPropertyAssignment).find(
 			(p) =>
@@ -941,6 +1028,8 @@ describe('⭐ D3 — the boot record', () => {
 		expect(keys, 'the config no longer spreads the allowance where the overlay records it').toContain(
 			AUTHORING_REVIEW_ALLOWANCE_VARIABLE
 		);
+		// ⭐ L17b2 — and the Historian's time bound, passed through.
+		expect(keys, 'the config no longer passes the Historian’s time bound where the overlay records it').toContain('JPWB_HISTORIAN_CALL_MS');
 		expect(
 			overlayOf({
 				RPH_DEMO_MODE: 'server',
@@ -952,6 +1041,8 @@ describe('⭐ D3 — the boot record', () => {
 			JPWB_HARNESS: null,
 			JPWB_SEED: null,
 			JPWB_DEMO_DB: 'D:/run/demo.sqlite',
+			// ⭐ L17b2 — ~~six keys, no `JPWB_HISTORIAN_CALL_MS` among them~~: and the Historian's time bound, which the server here was handed none of.
+			JPWB_HISTORIAN_CALL_MS: null,
 			[AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: null,
 			PI_OFFLINE: null
 		});
@@ -1100,14 +1191,18 @@ describe('⭐ D3 — the boot: what the run starts from, and EVERY reason it may
 		const boot = await bootOf({
 			paid: true,
 			env: { ...keys, [PHASE7_PRIOR_CALLS_VARIABLE]: '3' },
+			// ⭐ L17b2 (ruling 6 (C); §16) — ~~the server handed no Historian time bound; devin at 3000.6.14 (`READY`)~~: a clean PAID boot now needs the
+			// Historian able to run — its time bound handed to the server (`JPWB_HISTORIAN_CALL_MS`, required, no default: ruling 16) and devin at the version
+			// whose tools were measured (ruling 2 (A)) — so this clean boot has both; its promise, a clean boot refusing nothing, is as it was.
 			serverEnv: {
 				RPH_DEMO_MODE: 'server',
 				JPWB_HARNESS: '1',
 				JPWB_SEED: 'empty',
-				JPWB_DEMO_DB: store
+				JPWB_DEMO_DB: store,
+				JPWB_HISTORIAN_CALL_MS: '600000'
 			},
 			store,
-			run: scripted(READY).run
+			run: scripted({ ...READY, '--version': { exitCode: 0, stdout: 'devin 3000.11.234 (92c83011d113)\n' } }).run
 		});
 		expect(boot.refusals).toEqual([]);
 		expect(boot.prior).toBe(3);
@@ -1124,7 +1219,9 @@ describe('⭐ D3 — the boot: what the run starts from, and EVERY reason it may
 		const boot = await bootOf({
 			paid: true,
 			env: keys,
-			serverEnv: { JPWB_DEMO_DB: 'D:/elsewhere/demo.sqlite' },
+			// ⭐ L17b2 (ruling 6 (C); §16) — ~~`{ JPWB_DEMO_DB: … }`~~ and the Historian's time bound handed, so this boot's reasons stay its four. Devin's version is
+			// unread here (`--version` failed), which the readiness refuses already: no second refusal for it (a reading for Stage 2).
+			serverEnv: { JPWB_DEMO_DB: 'D:/elsewhere/demo.sqlite', JPWB_HISTORIAN_CALL_MS: '600000' },
 			store,
 			run: scripted({ ...READY, '--version': { exitCode: null, failure: 'spawn devin ENOENT' } })
 				.run
@@ -1136,6 +1233,68 @@ describe('⭐ D3 — the boot: what the run starts from, and EVERY reason it may
 			`${store} does not exist: the server made no store in the run folder`
 		]);
 		expect(boot.record.refusals).toEqual(boot.refusals);
+	});
+
+	// ⭐⭐ L17b2 — the lead's ruling 6 (C), with ruling 2 (A) and 16, as §16 accepted §15.3 (7): A PAID RUN THAT COULD NOT RUN ITS JUDGE IS REFUSED AT ITS
+	// BOOT, before any paid call — never found out at its first rejection. Each reason named: the Historian's time bound not handed to the server, and
+	// devin's installed version not the one whose tools were measured (3000.11.234), the version found named beside it. ⭑ A reviewer that is not devin is
+	// refused at every boot already (`reviewerUnderTest`), held here so that it stays; a dry boot, which makes no paid call, is refused for neither.
+	it('⛔ RED FIRST — a paid boot where the Historian could not run is refused, each reason named: its time bound unset (JPWB_HISTORIAN_CALL_MS), and devin’s version not the one whose tools were measured; ⭑ CONTROL: a dry boot is refused for neither, and a reviewer that is not devin is refused as today', async () => {
+		const store = join(folder('historian-boot'), 'demo.sqlite');
+		writeFileSync(store, '');
+		/** Devin at 3000.6.14 (`READY`), not the measured version, and the server handed no Historian time bound. */
+		const boot = (paid: boolean, env: Readonly<Record<string, string>> = {}) =>
+			bootOf({
+				paid,
+				env: { ...keys, [PHASE7_PRIOR_CALLS_VARIABLE]: '3', ...env },
+				serverEnv: { RPH_DEMO_MODE: 'server', JPWB_HARNESS: '1', JPWB_SEED: 'empty', JPWB_DEMO_DB: store },
+				store,
+				run: scripted(READY).run
+			});
+		const historians = (refusals: readonly string[]) => refusals.filter((r) => r.includes('JPWB_HISTORIAN_CALL_MS') || r.includes('3000.11.234'));
+		const paid = await boot(true);
+		expect
+			.soft(paid.refusals.filter((r) => r.includes('JPWB_HISTORIAN_CALL_MS') && r.includes('design D84 measures it')).length, 'a paid boot whose server was handed no Historian time bound was not refused, naming it')
+			.toBe(1);
+		expect
+			.soft(paid.refusals.filter((r) => r.includes('3000.11.234') && r.includes('3000.6.14')).length, 'a paid boot on another devin version than the one measured was not refused, naming both')
+			.toBe(1);
+		expect.soft(historians((await boot(false)).refusals), 'a dry boot, which makes no paid call, was refused for the Historian').toEqual([]);
+		expect
+			.soft((await boot(true, { JPWB_ASSURANCE_TOOL: 'agy' })).refusals.some((r) => r.includes('the selected reviewer, devin')), 'a paid boot whose reviewer is not devin was booted')
+			.toBe(true);
+	});
+
+	// ⭐⭐ L17b2, Stage 3 — a test the mutants owed (the boot's refusal of a time bound the product does not take survived every test: each boot test hands the
+	// server '600000' or no bound at all) — A PAID BOOT WHOSE SERVER WAS HANDED A HISTORIAN TIME BOUND THE PRODUCT DOES NOT TAKE IS REFUSED AS AN UNSET ONE IS:
+	// not a positive whole number of milliseconds, or above Node's largest timer (`historianCallBound`, the product's own reader), the value as handed and the
+	// product's why named. ⭑ The largest bound the product takes is not refused.
+	it('⛔ a paid boot whose server was handed a Historian time bound the product does not take — not a positive whole number of milliseconds, or above Node’s largest timer — is refused, the value and the product’s why named; ⭑ CONTROL: the largest it takes is not refused', async () => {
+		const store = join(folder('historian-boot-bound'), 'demo.sqlite');
+		writeFileSync(store, '');
+		const boot = (bound: string) =>
+			bootOf({
+				paid: true,
+				env: { ...keys, [PHASE7_PRIOR_CALLS_VARIABLE]: '3' },
+				serverEnv: { RPH_DEMO_MODE: 'server', JPWB_HARNESS: '1', JPWB_SEED: 'empty', JPWB_DEMO_DB: store, JPWB_HISTORIAN_CALL_MS: bound },
+				store,
+				run: scripted(READY).run
+			});
+		const bounds = (refusals: readonly string[]) => refusals.filter((r) => r.includes('JPWB_HISTORIAN_CALL_MS'));
+		for (const [bound, why] of [
+			['abc', 'is not a positive whole number of milliseconds'],
+			['0', 'is not a positive whole number of milliseconds'],
+			['2147483648', 'is above 2147483647 ms']
+		] as const) {
+			const named = bounds((await boot(bound)).refusals);
+			expect
+				.soft(
+					named.filter((r) => r.includes(`the server was handed JPWB_HISTORIAN_CALL_MS=${JSON.stringify(bound)}`) && r.includes(why) && r.includes('design D84 measures it')).length,
+					`a paid boot whose server was handed JPWB_HISTORIAN_CALL_MS=${JSON.stringify(bound)} was not refused, the value and why named`
+				)
+				.toBe(1);
+		}
+		expect.soft(bounds((await boot('2147483647')).refusals), '⭑ CONTROL — the largest bound the product takes was refused').toEqual([]);
 	});
 });
 
@@ -1577,6 +1736,11 @@ interface Script {
 				 */
 				rejected?: RejectedScript;
 				/**
+				 * ⭐⭐ L17b2 (D82) — the round's loop (`LoopScript`), as `SignOffScript` has it: this element's type named it nowhere, so a script giving one did not
+				 * type-check (`tsc -p verif`), though it ran. A type alone: what the hands read of it is unchanged.
+				 */
+				loop?: LoopScript;
+				/**
 				 * ⭐ `E12F` F3 — after a refused Record Assurance: whether the row offers re-running the declared reviews that did
 				 * not conclude, and what the re-run came to — its answer, the store after it, the reviewer calls it recorded.
 				 */
@@ -1595,6 +1759,16 @@ interface Script {
 	readonly refusedReviews?: Readonly<Record<string, number>>;
 	/** The unit titles the setup reads: the five, unless said. */
 	readonly titles?: readonly string[];
+	/**
+	 * ⭐⭐ L17b2 (ruling 15; the lead's §16) — each unit's TYPE's name, by slug, as the store holds it (`pwuTypeId` → `pwuTypes`), where the workhorse is
+	 * read: given, the store holds a type per unit, named as said or else as the unit is titled; absent, the store holds no type, as before.
+	 */
+	readonly typeNames?: Readonly<Record<string, string>>;
+	/**
+	 * ⭐⭐ L17b2 (§18; ruling 16) — the Historian's time bound as the server was handed it (`JPWB_HISTORIAN_CALL_MS`), on the boot's overlay: absent, the
+	 * overlay holds none, as before.
+	 */
+	readonly historianCallMs?: string;
 	/** The read, counted from 1, that throws as a server gone would. */
 	readonly readThrowsAt?: number;
 	/**
@@ -1695,7 +1869,9 @@ function laneOf(script: Script) {
 						inputRequirements: [],
 						workLifecycleState: s?.lifecycleState ?? 'PROPOSED',
 						executionState: s?.executionState ?? 'NOT_STARTED',
-						assuranceState: s?.assuranceState ?? 'UNASSESSED'
+						assuranceState: s?.assuranceState ?? 'UNASSESSED',
+						// ⭐ L17b2 — and its type, where the script names the types (`Script.typeNames`).
+						...(script.typeNames === undefined ? {} : { pwuTypeId: `pwut_${u.slug}` })
 					}
 				};
 			}),
@@ -1733,15 +1909,38 @@ function laneOf(script: Script) {
 				}))
 			],
 			// ⭐ D16 — each named unit's stopped attempt: its work product, its command evidence, and their floors, refused.
-			...refusedStore(script.refusedReviews ?? {})
+			...refusedStore(script.refusedReviews ?? {}),
+			// ⭐ L17b2 — each unit's type, named as the script says, else as the unit is titled; none where the script names no type.
+			...(script.typeNames === undefined
+				? {}
+				: { pwuTypes: PHASE7_ARCHIVE_UNITS.map((u) => ({ id: `pwut_${u.slug}`, state: { name: script.typeNames?.[u.slug] ?? u.title } })) })
 		}) as unknown as EngineSnapshot;
 	/** ⭐⭐ Package L16 — D71 — how many times each unit's work was re-run after its declared reviews rejected it. */
 	const rejectedRounds = new Map<string, number>();
+	/**
+	 * ⭐⭐ L17b2, Stage 3b — THE HARNESS'S BOUND, FOR A SCRIPT — never the lane's: how many times a script may have D71's re-run of one unit pressed
+	 * before this harness stops it (`rerunRejectedWork`). ⛔ The lane has no count (`REG-D-166` (6): "There is no retry count", and "the spend limit
+	 * stays the one hard stop"): this bound is no rule of the run, and holds nothing of the product. No test's script presses the act more than a few
+	 * times; the spend limit, 4,600 calls, stops a round that records its whole worst case (236) after 19.
+	 */
+	const SCRIPTED_ROUNDS_BOUND = 50;
 	/** A unit's sign-off script — ⭐ D71: the round after each re-run of its rejected work, where the script gives one. */
 	const signOffOf = (unit: RunUnit): SignOffScript => {
 		let s: SignOffScript = script.signOffs?.[unit.slug] ?? { ra: null };
 		for (let n = rejectedRounds.get(unit.slug) ?? 0; n > 0 && s.rejected?.again !== undefined; n--) s = s.rejected.again;
 		return s;
+	};
+	/**
+	 * ⭐⭐ L17b2 (D82; the lead's §16) — THE ROUND'S LOOP AS THE PAGE SHOWS IT: a round is the unit's sign-off between two re-runs of its work; its stage,
+	 * once pressed, is offered no more (`staged`); before it, no way back and no statement is shown (ruling 3); after it, the script's first offers, and
+	 * after each re-ask the next (`loopReads`). A script with no loop reads as before: its D71 offer as its `rejected` says, and no read of the loop logged.
+	 */
+	const staged = new Set<string>();
+	const loopReads = new Map<string, number>();
+	const roundOf = (unit: RunUnit): string => `${unit.slug}#${rejectedRounds.get(unit.slug) ?? 0}`;
+	const loopNow = (unit: RunUnit): LoopOffers | undefined => {
+		const loop = signOffOf(unit).loop;
+		return loop === undefined || !staged.has(roundOf(unit)) ? undefined : loop.offers[loopReads.get(roundOf(unit)) ?? 0];
 	};
 	const hands: LaneHands = {
 		setUp: async (note) => {
@@ -1839,7 +2038,58 @@ function laneOf(script: Script) {
 			const r = signOffOf(unit).rejected;
 			if (r === undefined) return false;
 			calls.push(`offersRejectedRerun ${unit.slug}`);
-			return r.offered;
+			// ⭐ L17b2 (ruling 3) — ~~`return r.offered;`~~ under a loop, offered only after the round's stage, as the loop's offers say; else as before.
+			return signOffOf(unit).loop === undefined ? r.offered : loopNow(unit)?.rerun === true;
+		},
+		// ⭐⭐ L17b2 (D82; the lead's §15.3 (1), §16) — the round's stage, the Historian asked again, the sponsor's statement and the send-back: each read
+		// logged only where the script gives a loop, so a script written before reads its calls as before.
+		stageOffered: async (unit) => {
+			const loop = signOffOf(unit).loop;
+			if (loop === undefined) return false;
+			calls.push(`offersStage ${unit.slug}`);
+			return loop.stage !== undefined && !staged.has(roundOf(unit));
+		},
+		// ⭐ L17b2 (§18) — ~~`async (unit) =>`~~: and the bound the lane hands the press, logged as Record Assurance's is (`bounds`).
+		runAssuranceStage: async (unit, timeoutMs) => {
+			calls.push(`runAssuranceStage ${unit.slug}`);
+			bounds.push([`runAssuranceStage ${unit.slug}`, timeoutMs]);
+			const stage = signOffOf(unit).loop?.stage;
+			if (stage === undefined) throw new Error(`the script stages no ${unit.slug}`);
+			staged.add(roundOf(unit));
+			loopReads.set(roundOf(unit), 0);
+			reviewerCallCount += stage.calls ?? 0;
+			return stage.outcome;
+		},
+		sponsorDecides: async (unit) => {
+			if (signOffOf(unit).loop === undefined) return null;
+			calls.push(`sponsorDecides ${unit.slug}`);
+			return loopNow(unit)?.sponsorDecides ?? null;
+		},
+		historianAgainOffered: async (unit) => {
+			if (signOffOf(unit).loop === undefined) return false;
+			calls.push(`offersHistorianAgain ${unit.slug}`);
+			return loopNow(unit)?.historianAgain !== undefined;
+		},
+		// ⭐ L17b2 (§18) — ~~`async (unit) =>`~~: and the bound the lane hands the press, logged as Record Assurance's is (`bounds`).
+		rerunHistorian: async (unit, timeoutMs) => {
+			calls.push(`rerunHistorian ${unit.slug}`);
+			bounds.push([`rerunHistorian ${unit.slug}`, timeoutMs]);
+			const again = loopNow(unit)?.historianAgain;
+			if (again === undefined) throw new Error(`the script asks the Historian of ${unit.slug} nothing again`);
+			loopReads.set(roundOf(unit), (loopReads.get(roundOf(unit)) ?? 0) + 1);
+			reviewerCallCount += again.calls ?? 0;
+			return again.outcome;
+		},
+		sendBackOffered: async (unit) => {
+			if (signOffOf(unit).loop === undefined) return [];
+			calls.push(`offersSendBack ${unit.slug}`);
+			return loopNow(unit)?.sendBack ?? [];
+		},
+		sendWorkBack: async (unit, targetId) => {
+			calls.push(`sendWorkBack ${unit.slug} ${targetId}`);
+			const sent = signOffOf(unit).loop?.sendBack;
+			if (sent === undefined) throw new Error(`the script sends no work of ${unit.slug} back`);
+			return sent.outcome;
 		},
 		rerunRejectedWork: async (unit) => {
 			calls.push(`rerunRejectedWork ${unit.slug}`);
@@ -1848,7 +2098,16 @@ function laneOf(script: Script) {
 			plans.set(unit.unitId!, (plans.get(unit.unitId!) ?? 1) + 1);
 			if (r.after) store.set(unit.unitId!, r.after);
 			reviewerCallCount += r.calls ?? 0;
-			rejectedRounds.set(unit.slug, (rejectedRounds.get(unit.slug) ?? 0) + 1);
+			// ⭐⭐ L17b2, Stage 3b — THE HARNESS'S OWN BOUND (`SCRIPTED_ROUNDS_BOUND`): D82 bounds the rounds by the spend limit alone, and a script's round
+			// after its last `again` repeats — so under a rule whose limit never stops (the mutant `PQ7-M235b`, under which it counts no call), or a script
+			// whose acts record no call, the scripted lane pressed this act for ever. Its hands answer at once, so no timer ever fired: vitest's own time
+			// bound could not end the test, and the mutant runner, which sets none, would never have returned. Past the bound the hand throws, saying so.
+			const round = (rejectedRounds.get(unit.slug) ?? 0) + 1;
+			if (round > SCRIPTED_ROUNDS_BOUND)
+				throw new Error(
+					`the script’s loop does not end: D71’s re-run of ${unit.slug} was pressed ${SCRIPTED_ROUNDS_BOUND} times, and is pressed again — the spend limit is D82’s one hard stop, and it has not stopped this run`
+				);
+			rejectedRounds.set(unit.slug, round);
 			return r.outcome;
 		},
 		markSatisfied: async (unit) => {
@@ -1889,7 +2148,8 @@ function laneOf(script: Script) {
 			mode: script.paid ? 'paid' : 'dry',
 			node: process.version,
 			inherited: {},
-			overlay: overlayOf(undefined),
+			// ⭐ L17b2 (§18) — ~~`overlayOf(undefined)`~~: and the Historian's time bound as the server was handed it, where the script names one.
+			overlay: overlayOf(script.historianCallMs === undefined ? undefined : { JPWB_HISTORIAN_CALL_MS: script.historianCallMs }),
 			readiness: null,
 			priorReviewerCalls: script.prior ?? 0,
 			refusals: script.refusals ?? []
@@ -3784,6 +4044,25 @@ interface SignOffScript {
 	calls?: number;
 	rerun?: { offered: boolean; outcome?: ActionOutcome; after?: UnitState; calls?: number };
 	rejected?: RejectedScript;
+	/** ⭐⭐ L17b2 (D82) — after a refused Record Assurance whose row offers no declared re-run: the round's stage and what the page offers after it. */
+	loop?: LoopScript;
+}
+/**
+ * ⭐⭐ L17b2 (D82; the lead's rulings 14, 15 and 20, §16) — ONE ROUND'S LOOP: its stage — what its press came to and the reviewer calls it recorded
+ * (absent: not offered) — and what the page offers after it, read afresh: the first entry after the stage, the next after each re-ask; and what the
+ * send-back came to, where one is pressed. D71's re-run, offered here (`rerun`), is pressed by the round's `rejected` script, as before.
+ */
+interface LoopScript {
+	readonly stage?: { readonly outcome: ActionOutcome; readonly calls?: number };
+	readonly offers: readonly LoopOffers[];
+	readonly sendBack?: { readonly outcome: ActionOutcome };
+}
+/** ⭐⭐ L17b2 — what the page offers once the round's stage has run: the sponsor's statement, the Historian asked again, D71's re-run, the send-back's candidates. */
+interface LoopOffers {
+	readonly sponsorDecides?: string;
+	readonly historianAgain?: { readonly outcome: ActionOutcome; readonly calls?: number };
+	readonly rerun?: boolean;
+	readonly sendBack?: readonly { readonly id: string; readonly title: string }[];
 }
 /** ⭐⭐ Package L16 — D71 — the row's offer of re-running the work its declared reviews rejected, what the act came to, and the round after. */
 interface RejectedScript {
@@ -3800,9 +4079,21 @@ interface RejectedScript {
 // `withheld`, as today (P7-6's rule (3), which abandons, is not extended).
 /** ⭐ D71 — a unit its declared reviews rejected at its sign-off: under assurance, its execution SUCCEEDED, its assurance REJECTED. */
 const REJECTED = unitState('UNDER_ASSURANCE', 'SUCCEEDED', 'REJECTED', 'SUCCEEDED');
+// ⭐⭐ L17b2 — D82 (`REG-D-166` (8); the lead's §16) — ~~ONCE by the rule … a second rejection leaves it as found~~: no count bounds the way back now.
+// After each refusal the lane presses the round's assurance stage, its worst case counted first (2: the writer's call and the Historian's; ruling 20,
+// as §16 restates it), then the way back the page offers by the round's records, and the sign-off again under the same rule; the Historian's recorded
+// judgment and the spend limit bound it (`REG-D-148`). The describe after this one holds the rest of the loop.
+/** ⭐ L17b2 — a round's stage, answered, its two reviewer calls recorded: the narrative writer's and the Historian's. */
+const STAGED = { outcome: answered('success'), calls: 2 } as const;
+/** ⭐ L17b2 — the loop's presses a run made, in order: the stage, the re-ask, the send-back and D71's re-run. */
+const loopPresses = (l: ReturnType<typeof laneOf>): string[] => l.only('runAssuranceStage', 'rerunHistorian', 'sendWorkBack', 'rerunRejectedWork');
 
-describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declared reviews rejected: once, its whole press counted first', () => {
-	it('⛔ RED FIRST — PAID: a Record Assurance its declared reviews REJECT, whose row offers re-running the work with their findings, has it re-run ONCE by the rule, its whole press counted; its sign-off again, accepted, Mark Satisfied follows', async () => {
+describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declared reviews rejected: ~~once,~~ ⭐ (D82) after the round’s assurance stage, with no count — its whole press counted first', () => {
+	// ⭐ L17b2 (D82; the lead’s §16) — RESTATED: ~~"… has it re-run ONCE by the rule, its whole press counted; …"~~ — no count bounds the way back now
+	// (`REG-D-166` (8)): the round’s stage first, its two reviewer calls counted before it; then the way back the page offers — here D71’s re-run alone,
+	// the diagnosis having named this unit. Its old promise kept: the re-run’s whole press counted, its sign-off again, accepted, Mark Satisfied after
+	// it. The title restated by the struck-word convention: `P6X-L16-M45` and `-M47`, which quote it, move with it at Stage 3.
+	it('⛔ RED FIRST — PAID: a Record Assurance its declared reviews REJECT, whose row offers re-running the work with their findings, has it re-run ~~ONCE~~ by the rule ⭐ after the round’s assurance stage, each press’s worst case counted first; its sign-off again, accepted, Mark Satisfied follows', async () => {
 		const l = laneOf({
 			paid: true,
 			presses: ALL_COMPLETE,
@@ -3812,6 +4103,8 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 					ra: answered('failure'),
 					raAfter: REJECTED,
 					calls: 12,
+					// ⭐ L17b2 — the round’s stage, then the page offering D71’s re-run alone.
+					loop: { stage: STAGED, offers: [{ rerun: true }] },
 					rejected: { offered: true, outcome: answered('success'), after: COMPLETED, calls: 6, again: GREEN }
 				}
 			}
@@ -3819,10 +4112,16 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 		const record = await l.run();
 
 		const design = record.units[2]!.signOff!;
-		expect(l.only('rerunRejectedWork', 'offersRejectedRerun'), 'the rule did not re-run the rejected work once').toEqual([
-			'offersRejectedRerun design',
+		// ⭐ L17b2 — ~~`l.only('rerunRejectedWork', 'offersRejectedRerun')`, 'the rule did not re-run the rejected work once'~~: the loop’s presses, in order.
+		expect(loopPresses(l), 'the rule did not press the round’s stage, then re-run the rejected work').toEqual([
+			'runAssuranceStage design',
 			'rerunRejectedWork design'
 		]);
+		// ⭐ L17b2 (ruling 20, as §16 restates it) — the stage pressed after its worst case was counted: its two reviewer calls.
+		expect(
+			[design.stage?.envelopeType, design.stageLimitCheck?.ahead, design.stageLimitCheck?.counted],
+			'the stage was not pressed after its worst case was counted'
+		).toEqual(['success', 2, COUNTED_AHEAD.assuranceStage]);
 		expect(
 			[design.rejectedRerun?.envelopeType, design.rejectedRerunLimitCheck?.ahead, design.rejectedRerunLimitCheck?.counted],
 			'the re-run was not pressed after its whole press was counted'
@@ -3831,13 +4130,20 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 			[design.afterRerun?.recordAssurance?.envelopeType, design.afterRerun?.markSatisfied?.after, design.afterRerun?.refused],
 			'the sign-off after the re-run did not accept the unit'
 		).toEqual(['success', SATISFIED, null]);
+		// ⭐ L17b2 — and the stage’s own: ~~three files~~ four.
 		expect(
-			['03-design-rerunRejectedWork', '03-design-recordAssuranceAfterRerun', '03-design-markSatisfiedAfterRerun'].map((a) => l.action(a)),
+			['03-design-runAssuranceStage', '03-design-rerunRejectedWork', '03-design-recordAssuranceAfterRerun', '03-design-markSatisfiedAfterRerun'].map((a) =>
+				l.action(a)
+			),
 			'the acts after the re-run kept no record of their own'
-		).toEqual([true, true, true]);
+		).toEqual([true, true, true, true]);
 	});
 
-	it('⛔ RED FIRST — rejected again, it is LEFT AS FOUND: the act is never pressed twice, nor its offer read again, and no Mark Satisfied follows', async () => {
+	// ⭐ L17b2 (D82; the lead’s §16) — RESTATED, INVERTED: ~~"rejected again, it is LEFT AS FOUND: the act is never pressed twice, nor its offer read
+	// again, and no Mark Satisfied follows"~~ — D82 strikes the count (`REG-D-166` (8)): rejected again, the next round’s stage runs, and the way back its
+	// records offer is pressed again; Mark Satisfied follows only a sign-off that accepts the unit. The title restated by the struck-word convention:
+	// `P6X-L16-M45` and `-M46`, which quote it, move with it at Stage 3 (M46’s line, *"once"* itself, retires — §16).
+	it('⛔ RED FIRST — rejected again, ~~it is LEFT AS FOUND: the act is never pressed twice, nor its offer read again, and no Mark Satisfied follows~~ ⭐ the next round’s stage and its way back, with no count: the act pressed again after that round’s stage, and Mark Satisfied only once a sign-off accepts the unit', async () => {
 		const l = laneOf({
 			paid: true,
 			presses: ALL_COMPLETE,
@@ -3846,6 +4152,7 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 				design: {
 					ra: answered('failure'),
 					raAfter: REJECTED,
+					loop: { stage: STAGED, offers: [{ rerun: true }] },
 					rejected: {
 						offered: true,
 						outcome: answered('success'),
@@ -3853,6 +4160,7 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 						again: {
 							ra: answered('failure'),
 							raAfter: REJECTED,
+							loop: { stage: STAGED, offers: [{ rerun: true }] },
 							rejected: { offered: true, outcome: answered('success'), after: COMPLETED, again: GREEN }
 						}
 					}
@@ -3862,19 +4170,33 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 		const record = await l.run();
 
 		const design = record.units[2]!.signOff!;
-		expect(l.only('rerunRejectedWork', 'offersRejectedRerun'), 'the rule re-ran the rejected work more than once').toEqual([
-			'offersRejectedRerun design',
+		// ⭐ L17b2 — ~~'the rule re-ran the rejected work more than once'~~: each round’s stage, then its way back.
+		expect(loopPresses(l), 'the rule did not run each round’s stage and its way back, with no count').toEqual([
+			'runAssuranceStage design',
+			'rerunRejectedWork design',
+			'runAssuranceStage design',
 			'rerunRejectedWork design'
 		]);
+		// ⭐ L17b2 — ~~`[…, design.afterRerun?.rejectedRerun, …]` equal to `['Record Assurance', undefined, null, null]`, 'a unit rejected again was pressed
+		// on'~~: rejected again (its refusal kept), the second round’s stage and re-run pressed, and the unit accepted after them — never before.
 		expect(
-			[design.afterRerun?.refused?.act, design.afterRerun?.rejectedRerun, design.afterRerun?.markSatisfied, design.markSatisfied],
-			'a unit rejected again was pressed on'
-		).toEqual(['Record Assurance', undefined, null, null]);
+			[
+				design.afterRerun?.refused?.act,
+				design.afterRerun?.stage?.envelopeType,
+				design.afterRerun?.rejectedRerun?.envelopeType,
+				design.afterRerun?.afterRerun?.markSatisfied?.after,
+				design.afterRerun?.markSatisfied,
+				design.markSatisfied
+			],
+			'a unit rejected again was not taken round the loop again, or was marked satisfied before a sign-off accepted it'
+		).toEqual(['Record Assurance', 'success', 'success', SATISFIED, null, null]);
 	});
 
 	it('⛔ RED FIRST — the limit refuses the re-run, its whole press counted: not pressed, recorded, and the run ends paid-limit', async () => {
 		// ⭐ The arithmetic: design's press fits (prior + 0 recorded + 4 + 210 = limit − 6), its sign-off fits (prior + 4 + 24), and its
 		// Record Assurance records 12 calls, so the re-run's whole press does not (prior + 12 + 4 + 210 = limit + 6).
+		// ⭐ L17b2 (D82) — and the round’s stage before it: its check fits (prior + 12 + 4 + 2 = limit − 202) and it records its 2 calls, so the re-run’s
+		// whole press does not (~~prior + 12 + 4 + 210 = limit + 6~~ prior + 14 + 4 + 210 = limit + 8).
 		const l = laneOf({
 			paid: true,
 			prior: PHASE7_PAID_LIMIT - 220,
@@ -3885,6 +4207,7 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 					ra: answered('failure'),
 					raAfter: REJECTED,
 					calls: 12,
+					loop: { stage: STAGED, offers: [{ rerun: true }] },
 					rejected: { offered: true, outcome: answered('success'), after: COMPLETED }
 				}
 			}
@@ -3892,6 +4215,11 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 		const record = await l.run();
 
 		const design = record.units[2]!.signOff!;
+		// ⭐ L17b2 — the round’s stage first, within the limit. Soft, so the check after it is observed at HEAD, where no stage is pressed.
+		expect.soft([design.stageLimitCheck?.allowed, design.stage?.envelopeType], 'arrangement: the round’s stage was pressed first, within the limit').toEqual([
+			true,
+			'success'
+		]);
 		expect(
 			[design.rejectedRerunLimitCheck?.allowed, design.rejectedRerun, l.only('rerunRejectedWork')],
 			'the re-run was pressed past the limit'
@@ -3899,14 +4227,24 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 		// The lane's own spelling, as its other limit notes have it (`the sign-off's own … counted`): an ASCII apostrophe.
 		expect(design.notPressed ?? '').toContain("the re-run's whole press counted");
 		expect(record.end?.reason).toBe('paid-limit');
+		// ⭐⭐ L17b2, Stage 3b (the lead's §33, item 4; brief-3b item 7) — STRENGTHENED (a test gap the mutant found: `limitStopped` blind to the re-run's
+		// check SURVIVED this test) — AND THE LANE STOPS THERE: no later unit's press is checked. A lane that went on still ended `paid-limit`, at the next
+		// unit's own check (prior + 14 + 4 + 210 = limit + 8), so the run's end alone did not tell the two apart — E12-M64's class, the pin Stage 3 gave the
+		// stage's test below. The limb is package L16's.
+		expect(
+			[record.units[3]!.limitCheck, record.units[4]!.limitCheck],
+			'the lane went on to check a later press after the limit refused the re-run'
+		).toEqual([null, null]);
 	});
 
 	it('⭑ CONTROL — a Record Assurance refused whose row offers no such act is left as found, its record as before', async () => {
-		const record = await laneOf({
+		// ⭐ L17b2 — ~~`const record = await laneOf({ … }).run();`~~ the lane kept, so its presses can be read.
+		const l = laneOf({
 			paid: true,
 			presses: ALL_COMPLETE,
 			signOffs: { root: GREEN, design: { ra: answered('failure'), raAfter: REJECTED, rejected: { offered: false } } }
-		}).run();
+		});
+		const record = await l.run();
 
 		const design = record.units[2]!.signOff!;
 		expect([design.refused?.act, 'rejectedRerun' in design, 'afterRerun' in design, 'rejectedRerunLimitCheck' in design]).toEqual([
@@ -3915,6 +4253,11 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 			false,
 			false
 		]);
+		// ⭐ L17b2 (D82) — and, its row offering no stage and no way back either, nothing of the loop is pressed or recorded: its record as before.
+		expect(
+			['stage' in design, 'stageLimitCheck' in design, 'historianAgain' in design, 'sendBack' in design, 'sponsorDecides' in design, loopPresses(l)],
+			'a unit whose row offers nothing of the loop had some of it pressed or recorded'
+		).toEqual([false, false, false, false, false, []]);
 	});
 
 	it('⛔ RED FIRST — the act on the page: offered by the row’s own test id; the rule’s rationale typed into its own field, its own button pressed, waited for one phase’s allowance', async () => {
@@ -3929,9 +4272,609 @@ describe('⭐⭐ L16 (D71) — the rule’s re-run of the work a unit’s declar
 			[`fill rerun-rejected-work-rationale: ${REJECTED_RERUN_RATIONALE} (${PHASE7_UI_MS})`, `click rerun-rejected-work (${PHASE7_UI_MS})`],
 			[{ action: 'rerunRejectedWork', timeout: PHASE7_UNIT_ALLOWANCE_MS }]
 		]);
+		// ⭐ L17b2 (D82; the lead’s §16) — ~~'… as REG-D-163 (2) amends it: … has its work re-run once, with their findings.'~~: no count bounds the way back
+		// now (`REG-D-166` (8)), and the rationale the lane types into the person’s Decision says the rule as it stands — after the round’s stage, each time
+		// the round’s records offer it. (The run plan’s other *"re-run once"*, `REG-D-105` (4)’s for a stopped unit’s review, is not D82’s and stands.)
 		expect(REJECTED_RERUN_RATIONALE, 'the rationale does not name the rule and the ruling').toBe(
-			'The run plan’s rule, REG-D-105 (4), as REG-D-163 (2) amends it: a unit its declared reviews reject at its sign-off has its work re-run once, with their findings.'
+			'The run plan’s rule, REG-D-105 (4), as REG-D-163 (2) and D82 amend it: a unit its declared reviews reject at its sign-off has its work re-run with their findings, after the round’s assurance stage, each time the round’s records offer it.'
 		);
 		expect(REJECTED_RERUN_ACT).toBe('Re-run the work with the reviews’ findings');
+	});
+});
+
+// ── ⭐⭐ L17b2 — design D82 with D73, D87 and D72 (`REG-D-166` (5), (6), (8); `REG-D-148`; the lead's rulings 6 (C), 14, 15 and 20 on Stage 0, and §16):
+// THE LOOP AFTER A DECLARED REJECTION, AS THE LANE PRESSES IT ────────────────────────────────────────────────────────────────────────────────────
+//
+// ⭑ After a Record Assurance answered with a refusal and no declared re-run offered: the round's assurance stage, its two reviewer calls counted first;
+// then the page read afresh — the sponsor deciding ends the run `withheld`, the case named in the page's words, nothing more pressed; the Historian
+// asked again where offered, its one call counted first, and the page read again; D71's re-run where it alone is offered; the send-back to the one
+// candidate offered; and, the way back the person's choice, the candidate whose TYPE is the workhorse's, read from the store — none or several: nothing
+// pressed, the run ends `withheld`, why named. No count bounds the rounds; the spend limit is the one hard stop. A run with no rejection presses what it
+// presses today.
+/** ⭐ L17b2 — what a page says where the Historian recommends the sponsor's decision, and where it did not conclude twice (the page's words are Stage 2's; the lane carries them). */
+const SAID_STUCK = 'The Historian asks for the sponsor’s decision: the same failure comes back, round on round. No way back is offered: the sponsor decides.';
+const SAID_TWICE = 'The Historian did not reach a judgment, asked twice. No way back is offered: the sponsor decides.';
+/** ⭐ L17b2 — every act the lane presses, as its hands log them: the presses' order, whatever the reads between them. */
+const allPresses = (l: ReturnType<typeof laneOf>): string[] =>
+	l.only('beginExecute', 'recordAssurance', 'markSatisfied', 'rerunDeclared', 'recover', 'runAssuranceStage', 'rerunHistorian', 'sendWorkBack', 'rerunRejectedWork');
+/** ⭐ L17b2 — a unit's title, by its slug, as the run record names it. */
+const titleOf = (slug: string): string => PHASE7_ARCHIVE_UNITS.find((u) => u.slug === slug)!.title;
+
+describe('⭐⭐ L17b2 (D82; rulings 6 (C), 14, 15, 20; §16) — the loop after a declared rejection: the stage, the Historian asked again, the way back the page offers and the workhorse by type, with no count; the two pausing cases end the run withheld', () => {
+	it('⛔ RED FIRST — what the stage’s and the re-ask’s counts say: the writer’s and the Historian’s calls counted; the Hypothesizer’s and the Unsticking Agent’s Pi turns named, executor turns the limit does not count (ruling 20, as §16 restates it)', () => {
+		const counted = COUNTED_AHEAD as Readonly<Record<string, unknown>>;
+		const stage = String(counted.assuranceStage);
+		expect(
+			['narrative writer', 'Historian', 'Hypothesizer', 'Unsticking Agent', 'executor turns'].filter((w) => !stage.includes(w)),
+			`the stage’s count does not say what it counts and what it leaves out: ${stage}`
+		).toEqual([]);
+		expect(String(counted.historianAgain), 'the re-ask’s count does not name the Historian’s one call').toContain('Historian');
+	});
+
+	it('⛔ RED FIRST — PAID: the round’s stage, then the Historian asked again where the page offers it, its one call counted first; then the way back the page offers after it', async () => {
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					calls: 12,
+					loop: { stage: STAGED, offers: [{ historianAgain: { outcome: answered('success'), calls: 1 } }, { rerun: true }] },
+					rejected: { offered: true, outcome: answered('success'), after: COMPLETED, calls: 6, again: GREEN }
+				}
+			}
+		});
+		const record = await l.run();
+
+		const design = record.units[2]!.signOff!;
+		expect(loopPresses(l), 'the Historian was not asked again between the stage and the way back').toEqual([
+			'runAssuranceStage design',
+			'rerunHistorian design',
+			'rerunRejectedWork design'
+		]);
+		expect(
+			[design.historianAgain?.envelopeType, design.historianAgainLimitCheck?.ahead, design.historianAgainLimitCheck?.counted],
+			'the re-ask was not pressed after its one call was counted'
+		).toEqual(['success', 1, COUNTED_AHEAD.historianAgain]);
+		expect(
+			[design.afterRerun?.markSatisfied?.after, l.action('03-design-runAssuranceStage'), l.action('03-design-rerunHistorian')],
+			'the unit was not accepted after the way back, or the stage or the re-ask kept no record of its own'
+		).toEqual([SATISFIED, true, true]);
+	});
+
+	it('⛔ RED FIRST — the Historian recommending the sponsor’s decision: the page offers no way back and says the sponsor decides; the lane presses nothing more and ends the run withheld, the case named in the page’s words (ruling 14)', async () => {
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, design: { ra: answered('failure'), raAfter: REJECTED, calls: 12, loop: { stage: STAGED, offers: [{ sponsorDecides: SAID_STUCK }] } } }
+		});
+		const record = await l.run();
+
+		const presses = allPresses(l);
+		expect([presses.at(-1), loopPresses(l)], 'the lane pressed something after the stage, or no stage').toEqual(['runAssuranceStage design', ['runAssuranceStage design']]);
+		expect(record.units[2]!.signOff?.sponsorDecides, 'the page’s statement that the sponsor decides was not recorded').toBe(SAID_STUCK);
+		expect([record.end?.reason, record.end?.detail ?? ''], 'the run did not end withheld, the case named in the page’s words').toEqual([
+			'withheld',
+			expect.stringContaining(`${titleOf('design')}: ${SAID_STUCK}`)
+		]);
+	});
+
+	it('⛔ RED FIRST — the Historian not concluded twice: asked again once, then the page says the sponsor decides; the lane presses nothing more and ends the run withheld, the case named in the page’s words (ruling 14)', async () => {
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					calls: 12,
+					loop: { stage: STAGED, offers: [{ historianAgain: { outcome: answered('success'), calls: 1 } }, { sponsorDecides: SAID_TWICE }] }
+				}
+			}
+		});
+		const record = await l.run();
+
+		const presses = allPresses(l);
+		expect([presses.at(-1), loopPresses(l)], 'the lane pressed something after the second ask, or asked otherwise').toEqual([
+			'rerunHistorian design',
+			['runAssuranceStage design', 'rerunHistorian design']
+		]);
+		expect([record.end?.reason, record.end?.detail ?? ''], 'the run did not end withheld, the case named in the page’s words').toEqual([
+			'withheld',
+			expect.stringContaining(`${titleOf('design')}: ${SAID_TWICE}`)
+		]);
+	});
+
+	it('⛔ RED FIRST — the page offering the send-back to one earlier unit alone (the diagnosis named it): the work sent back there, whatever its type, the act kept', async () => {
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					calls: 12,
+					loop: {
+						stage: STAGED,
+						offers: [{ sendBack: [{ id: 'pwu_requirements', title: titleOf('requirements') }] }],
+						sendBack: { outcome: answered('success') }
+					}
+				}
+			}
+		});
+		const record = await l.run();
+
+		const sent = record.units[2]!.signOff?.sendBack;
+		expect(loopPresses(l), 'the work was not sent back to the one unit the page offers').toEqual(['runAssuranceStage design', 'sendWorkBack design pwu_requirements']);
+		expect([sent?.targetId, sent?.targetTitle, sent?.act?.envelopeType, l.action('03-design-sendWorkBack')], 'the send-back was not recorded').toEqual([
+			'pwu_requirements',
+			titleOf('requirements'),
+			'success',
+			true
+		]);
+	});
+
+	it('⛔ RED FIRST — the way back the person’s choice: the work sent back to the candidate whose TYPE is the workhorse’s, Source Construction, read from the store, never a title; none of that type, or more than one: nothing pressed, the run ends withheld, why named (ruling 15)', async () => {
+		expect(PHASE7_WORKHORSE_TYPE, 'the workhorse is not the type the sponsor named').toBe('Source Construction');
+		/** The person's choice: D71's re-run beside two candidates — the first TITLED as the workhorse's type, never of it unless the store says so. */
+		const choice = (typeNames: Readonly<Record<string, string>>) =>
+			laneOf({
+				paid: true,
+				presses: ALL_COMPLETE,
+				typeNames,
+				signOffs: {
+					root: GREEN,
+					design: {
+						ra: answered('failure'),
+						raAfter: REJECTED,
+						calls: 12,
+						loop: {
+							stage: STAGED,
+							offers: [
+								{
+									rerun: true,
+									sendBack: [
+										{ id: 'pwu_requirements', title: 'Source Construction' },
+										{ id: 'pwu_implementation', title: titleOf('implementation') }
+									]
+								}
+							],
+							sendBack: { outcome: answered('success') }
+						},
+						rejected: { offered: true, outcome: answered('success'), after: COMPLETED, calls: 6, again: GREEN }
+					}
+				}
+			});
+		const one = choice({ implementation: 'Source Construction' });
+		const oneRecord = await one.run();
+		expect.soft(loopPresses(one), 'the work was not sent back to the one candidate of the workhorse’s type').toEqual([
+			'runAssuranceStage design',
+			'sendWorkBack design pwu_implementation'
+		]);
+		expect.soft(oneRecord.units[2]!.signOff?.sendBack?.targetId, 'the send-back is not recorded with its target').toBe('pwu_implementation');
+		for (const [typeNames, why] of [
+			[{}, 'no candidate of the type Source Construction'],
+			[{ requirements: 'Source Construction', implementation: 'Source Construction' }, '2 candidates of the type Source Construction']
+		] as const) {
+			const l = choice(typeNames);
+			const record = await l.run();
+			expect.soft([allPresses(l).at(-1), loopPresses(l)], `${why}: the lane pressed a way back, or something after the stage`).toEqual([
+				'runAssuranceStage design',
+				['runAssuranceStage design']
+			]);
+			const detail = record.end?.detail ?? '';
+			expect.soft(
+				[record.end?.reason, detail.includes(`${titleOf('design')}: the way back is the person`), detail.includes(why)],
+				`${why}: the run did not end withheld, why named`
+			).toEqual([
+				'withheld',
+				true,
+				true
+			]);
+		}
+	});
+
+	it('⛔ RED FIRST — the limit refuses the round’s stage, its two reviewer calls counted: not pressed, recorded, and the run ends paid-limit', async () => {
+		// The arithmetic: as the re-run’s in the describe above, but Record Assurance records 215 calls, so the stage’s check does not fit (prior + 215 + 4 + 2
+		// = limit + 1), while the press and the sign-off before it did (limit − 6, limit − 192).
+		const l = laneOf({
+			paid: true,
+			prior: PHASE7_PAID_LIMIT - 220,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					calls: 215,
+					loop: { stage: STAGED, offers: [{ rerun: true }] },
+					rejected: { offered: true, outcome: answered('success'), after: COMPLETED }
+				}
+			}
+		});
+		const record = await l.run();
+
+		const design = record.units[2]!.signOff!;
+		expect(
+			[design.stageLimitCheck?.allowed, design.stageLimitCheck?.ahead, design.stageLimitCheck?.counted, loopPresses(l)],
+			'the stage was pressed past the limit, or its count was not its two calls'
+		).toEqual([false, 2, COUNTED_AHEAD.assuranceStage, []]);
+		expect([record.end?.reason, (design.notPressed ?? '') !== ''], 'the run did not end paid-limit, the stage’s refusal recorded').toEqual(['paid-limit', true]);
+		// ⭐⭐ L17b2, Stage 3 — STRENGTHENED (a test gap the mutants found: `limitStopped` blind to the stage's check survived this test) — AND THE LANE STOPS
+		// THERE: no later unit's press is checked. A lane that went on still ended `paid-limit`, at the next unit's own check (prior + 215 + 4 + 210 = limit +
+		// 209), so the run's end alone did not tell the two apart — E12-M64's class, held as the declared re-run's test above holds it.
+		expect(
+			[record.units[3]!.limitCheck, record.units[4]!.limitCheck],
+			'the lane went on to check a later press after the limit refused the round’s stage'
+		).toEqual([null, null]);
+	});
+
+	// ⭐⭐ L17b2, Stage 3 — a test the mutants owed (the Historian asked again pressed past its limit, and `limitStopped` blind to the re-ask's check, each
+	// survived every test: every re-ask the tests script ran with the limit far off) — THE LIMIT REFUSES THE HISTORIAN ASKED AGAIN, ITS ONE CALL COUNTED. The
+	// arithmetic, as the stage's above: Record Assurance records 214 calls, so the stage's check fits (prior + 214 + 4 + 2 = the limit, which the lane may
+	// reach) and the stage records its 2, while the re-ask's does not (prior + 216 + 4 + 1 = limit + 1). And the lane stops there: no later unit's press is
+	// checked.
+	it('⛔ the limit refuses the Historian asked again, its one call counted: not pressed, recorded, the run ends paid-limit, and no later unit’s press is checked', async () => {
+		const l = laneOf({
+			paid: true,
+			prior: PHASE7_PAID_LIMIT - 220,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					calls: 214,
+					loop: { stage: STAGED, offers: [{ historianAgain: { outcome: answered('success'), calls: 1 } }, { rerun: true }] },
+					rejected: { offered: true, outcome: answered('success'), after: COMPLETED }
+				}
+			}
+		});
+		const record = await l.run();
+
+		const design = record.units[2]!.signOff!;
+		expect.soft([design.stageLimitCheck?.allowed, design.stage?.envelopeType], 'arrangement: the round’s stage was pressed first, within the limit').toEqual([true, 'success']);
+		expect(
+			[design.historianAgainLimitCheck?.allowed, design.historianAgainLimitCheck?.ahead, design.historianAgainLimitCheck?.counted, loopPresses(l)],
+			'the Historian was asked again past the limit, or its count was not its one call'
+		).toEqual([false, 1, COUNTED_AHEAD.historianAgain, ['runAssuranceStage design']]);
+		expect([record.end?.reason, (design.notPressed ?? '') !== ''], 'the run did not end paid-limit, the re-ask’s refusal recorded').toEqual(['paid-limit', true]);
+		expect(
+			[record.units[3]!.limitCheck, record.units[4]!.limitCheck],
+			'the lane went on to check a later press after the limit refused the Historian asked again'
+		).toEqual([null, null]);
+	});
+
+	// ⭐⭐ L17b2, Stage 3b (the lead's §33, item 4; brief-3b items 8 to 11) — TESTS THE MUTANTS OWED, each driven as a mutant first and each SURVIVING
+	// every test above: the send-back's rationale was read only against itself; no script made the rejected unit the workhorse, or offered D71's re-run
+	// beside exactly one candidate; and every scripted stage, re-ask and send-back answered success.
+	it('⛔ RED FIRST — the send-back’s rationale names the rule, the rulings that amend it and its two cases, word for word (its words are 2c’s: the lead’s §27, reading 13)', () => {
+		expect(SEND_BACK_RATIONALE, 'the rationale does not name the rule, the rulings that amend it and its two cases').toBe(
+			'The run plan’s rule, REG-D-105 (4), as D82 amends it (REG-D-166 (5), (8)): a unit its declared reviews reject at its sign-off has its work sent back by replacement, after the round’s assurance stage, to the unit the round’s records name — or, where the way back is the person’s choice, to the one candidate of this PWA’s workhorse type, Source Construction.'
+		);
+	});
+
+	/** D71's re-run as a loop's script presses it: answered, the unit's work completed, its sign-off again accepted. */
+	const RERUN_ACCEPTED = { offered: true, outcome: answered('success'), after: COMPLETED, calls: 6, again: GREEN } as const;
+	/** A rejected Design whose round's loop is `loop`, under the type names given (absent: none named). */
+	const rejectedDesign = (loop: LoopScript, typeNames?: Readonly<Record<string, string>>) =>
+		laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			...(typeNames === undefined ? {} : { typeNames }),
+			signOffs: { root: GREEN, design: { ra: answered('failure'), raAfter: REJECTED, calls: 12, loop, rejected: RERUN_ACCEPTED } }
+		});
+	const REQUIREMENTS = { id: 'pwu_requirements', title: titleOf('requirements') } as const;
+	const IMPLEMENTATION = { id: 'pwu_implementation', title: titleOf('implementation') } as const;
+
+	it('⛔ RED FIRST — the way back the person’s choice, the rejected unit itself the one unit of the workhorse’s type: where the page offers its re-run, its own work re-run in place, never sent back; ⭑ where the page does not offer it, the unit is no candidate — nothing pressed, the run ends withheld, why named (ruling 15)', async () => {
+		const lane = (rerun: boolean) =>
+			rejectedDesign(
+				{ stage: STAGED, offers: [{ ...(rerun ? { rerun: true } : {}), sendBack: [REQUIREMENTS, IMPLEMENTATION] }], sendBack: { outcome: answered('success') } },
+				{ design: PHASE7_WORKHORSE_TYPE }
+			);
+		const offered = lane(true);
+		const offeredRecord = await offered.run();
+		expect.soft(loopPresses(offered), 'its re-run offered: the rejected unit’s own work was not re-run in place, alone').toEqual([
+			'runAssuranceStage design',
+			'rerunRejectedWork design'
+		]);
+		expect.soft(offeredRecord.units[2]!.signOff?.sendBack, 'its re-run offered: the work was sent back though the rejected unit itself was the choice').toBeUndefined();
+		const notOffered = lane(false);
+		const notOfferedRecord = await notOffered.run();
+		expect.soft([allPresses(notOffered).at(-1), loopPresses(notOffered)], '⭑ its re-run not offered: the lane pressed a way back, or something after the stage').toEqual([
+			'runAssuranceStage design',
+			['runAssuranceStage design']
+		]);
+		const detail = notOfferedRecord.end?.detail ?? '';
+		expect.soft(
+			[notOfferedRecord.end?.reason, detail.includes(`${titleOf('design')}: the way back is the person`), detail.includes('no candidate of the type Source Construction')],
+			'⭑ its re-run not offered: the run did not end withheld, why named'
+		).toEqual(['withheld', true, true]);
+	});
+
+	it('⛔ RED FIRST — D71’s re-run offered beside exactly one send-back candidate is the person’s choice, by type: the rejected unit the workhorse — its own work re-run in place; the candidate the workhorse — the work sent back to it; neither — nothing pressed, the run ends withheld, why named (ruling 15)', async () => {
+		const lane = (typeNames: Readonly<Record<string, string>>) =>
+			rejectedDesign({ stage: STAGED, offers: [{ rerun: true, sendBack: [REQUIREMENTS] }], sendBack: { outcome: answered('success') } }, typeNames);
+		const own = lane({ design: PHASE7_WORKHORSE_TYPE });
+		await own.run();
+		expect.soft(loopPresses(own), 'the rejected unit the workhorse: its own work was not re-run in place — the one candidate was taken').toEqual([
+			'runAssuranceStage design',
+			'rerunRejectedWork design'
+		]);
+		const other = lane({ requirements: PHASE7_WORKHORSE_TYPE });
+		await other.run();
+		expect.soft(loopPresses(other), 'the candidate the workhorse: the work was not sent back to it').toEqual([
+			'runAssuranceStage design',
+			'sendWorkBack design pwu_requirements'
+		]);
+		const neither = lane({});
+		const record = await neither.run();
+		expect.soft([allPresses(neither).at(-1), loopPresses(neither)], 'neither the workhorse: the lane pressed a way back, or something after the stage').toEqual([
+			'runAssuranceStage design',
+			['runAssuranceStage design']
+		]);
+		expect.soft(
+			[record.end?.reason, (record.end?.detail ?? '').includes('no candidate of the type Source Construction')],
+			'neither the workhorse: the run did not end withheld, why named'
+		).toEqual(['withheld', true]);
+	});
+
+	// ⭐⭐ L17b2, Stage 3b — THE HARNESS'S OWN BOUND, HELD (Part I's title pass met a mutant, `PQ7-M235b`, under which this file never ended: the limit
+	// counted no call, so the scripted loop — unbounded since D82 — spun for ever, and no timer could fire). Here the script's acts record no call, so the
+	// limit never stops the run on the code either: the harness stops it at its bound, saying so.
+	it('⭑ THE HARNESS ITSELF — a script whose loop the limit never stops is stopped by the harness at its fiftieth re-run of the unit’s work, saying so, where it would have spun for ever', async () => {
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					loop: { stage: { outcome: answered('success') }, offers: [{ rerun: true }] },
+					rejected: { offered: true, outcome: answered('success'), after: COMPLETED }
+				}
+			}
+		});
+		const ended = await l.run().then(
+			(record) => `the run ended ${record.end?.reason ?? 'with no end'}`,
+			(e: unknown) => (e instanceof Error ? e.message : String(e))
+		);
+		expect(ended, 'a scripted loop the limit never stops was not stopped by the harness').toContain('the script’s loop does not end: D71’s re-run of design was pressed 50 times');
+		expect(l.only('rerunRejectedWork').length, 'the harness did not stop it at its bound').toBe(51);
+	});
+
+	// ⭑ THE RULE THE LANE ALREADY KEEPS for a sign-off act (P7-6's rules; E12F F3 and E12's re-review F1, above): an act the server REFUSES is left as
+	// found — the refusal that stands is that act's, by its own name; nothing follows it for the unit, and the run ends `withheld`, the units that wait
+	// for it never started. An act with NO ANSWER ends the run there, named for the act (D4): the server may still be running it. The loop's three
+	// presses follow it (`loopPress`, `sendBack`).
+	/** The loop's three presses, each as a script whose press comes to `outcome`: its name, its script, the presses up to it, and its act's name. */
+	const loopPressesComingTo = (outcome: ActionOutcome) =>
+		[
+			['the round’s stage', { stage: { outcome }, offers: [{ rerun: true }] }, ['runAssuranceStage design'], 'Run the assurance stage'],
+			[
+				'the Historian asked again',
+				{ stage: STAGED, offers: [{ historianAgain: { outcome } }, { rerun: true }] },
+				['runAssuranceStage design', 'rerunHistorian design'],
+				'Ask the Historian again'
+			],
+			[
+				'the send-back',
+				{ stage: STAGED, offers: [{ sendBack: [REQUIREMENTS] }], sendBack: { outcome } },
+				['runAssuranceStage design', 'sendWorkBack design pwu_requirements'],
+				'Send the work back'
+			]
+		] as const satisfies readonly (readonly [string, LoopScript, readonly string[], string])[];
+
+	it('⛔ RED FIRST — a loop press the server refuses stops the round there, the refusal recorded under its own act’s name — the round’s stage, the Historian asked again, the send-back: nothing of the round is pressed after it, no Mark Satisfied follows, and the run ends withheld, the root that waits for the unit never started', async () => {
+		for (const [which, loop, presses, act] of loopPressesComingTo(answered('failure'))) {
+			const l = rejectedDesign(loop);
+			const record = await l.run();
+			const design = record.units[2]!.signOff!;
+			expect.soft(loopPresses(l), `${which}, refused: the round did not stop there`).toEqual(presses);
+			expect.soft(design.refused, `${which}, refused: the refusal is not recorded under its own act’s name`).toEqual({ act, reason: '{"type":"failure"}' });
+			expect.soft(
+				[design.markSatisfied, record.units[0]!.beginExecute, record.end?.reason],
+				`${which}, refused: Mark Satisfied followed, the root that waits for the unit was started, or the run did not end withheld`
+			).toEqual([null, null, 'withheld']);
+		}
+	});
+
+	it('⛔ RED FIRST — a loop press with NO ANSWER ends the run there, named for its own act — the round’s stage, the Historian asked again, the send-back, each outlasting its bound or lost in transit: nothing more is pressed, and the refusal that stands is that act’s (D4)', async () => {
+		const BOUND = 123_456;
+		const unanswered = [
+			['outlasting its bound', { ...OUTLASTED, timedOutAfterMs: BOUND }, 'allowance-exceeded', (act: string) => `${titleOf('design')}'s ${act} outlasted its allowance of ${BOUND} ms`],
+			[
+				'lost in transit',
+				LOST_IN_TRANSIT,
+				'request-failed',
+				(act: string) => `${titleOf('design')}'s ${act} failed in transit (net::ERR_EMPTY_RESPONSE): the server may have stopped, or may still be running it`
+			]
+		] as const;
+		for (const [how, outcome, reason, detailOf] of unanswered)
+			for (const [which, loop, presses, act] of loopPressesComingTo(outcome)) {
+				const l = rejectedDesign(loop);
+				const record = await l.run();
+				expect.soft([record.end?.reason, record.end?.detail], `${which}, ${how}: the run did not end there, named for its own act`).toEqual([reason, detailOf(act)]);
+				expect.soft(allPresses(l).at(-1), `${which}, ${how}: the lane pressed something after a press with no answer`).toBe(presses.at(-1));
+				expect.soft(record.units[2]!.signOff?.refused?.act, `${which}, ${how}: the refusal that stands is not that act’s`).toBe(act);
+			}
+	});
+
+	it('⭑ CONTROL (D82) — a run with no rejection presses what it presses today: no stage, no re-ask, no send-back, nor any of their offers read', async () => {
+		const script = (loop: boolean) => ({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, design: { ...GREEN, ...(loop ? { loop: { stage: STAGED, offers: [{ rerun: true }] } } : {}) } }
+		});
+		const withLoop = laneOf(script(true));
+		await withLoop.run();
+		const without = laneOf(script(false));
+		await without.run();
+
+		expect(
+			withLoop.only('offersStage', 'runAssuranceStage', 'offersHistorianAgain', 'rerunHistorian', 'sponsorDecides', 'offersSendBack', 'sendWorkBack'),
+			'the loop was read or pressed in a run with no rejection'
+		).toEqual([]);
+		expect(withLoop.calls, 'a run with no rejection pressed otherwise than today').toEqual(without.calls);
+	});
+
+	it('⛔ RED FIRST — the stage and the Historian’s re-ask on the page: each offered by the row’s own test id, the row waited for first; each its own button pressed, no rationale asked, waited for the bound the lane hands it', async () => {
+		const offering = recoveryRow(['run-assurance-stage', 'ask-historian-again']);
+		const other = recoveryRow(['rerun-rejected-work']);
+		expect(
+			[await stageOffered(offering.row), await historianAgainOffered(offering.row), await stageOffered(other.row), await historianAgainOffered(other.row)],
+			'an offer was not read by its own test id, or another offer was read as it'
+		).toEqual([true, true, false, false]);
+		const staged = recoveryRow(['run-assurance-stage']);
+		const asked = recoveryRow(['ask-historian-again']);
+
+		expect([(await runAssuranceStage(staged.page, staged.row, decode, 1_234_000)).envelopeType, (await rerunHistorian(asked.page, asked.row, decode, 567_000)).envelopeType]).toEqual([
+			'success',
+			'success'
+		]);
+
+		expect([staged.log, staged.asked, asked.log, asked.asked], 'an act was not its own button, pressed with no rationale and waited for the bound handed it').toEqual([
+			[`click run-assurance-stage (${PHASE7_UI_MS})`],
+			[{ action: 'runAssuranceStage', timeout: 1_234_000 }],
+			[`click ask-historian-again (${PHASE7_UI_MS})`],
+			[{ action: 'rerunHistorian', timeout: 567_000 }]
+		]);
+	});
+
+	// ⭐⭐ L17b2 (§18; the lead's ruling 14 and §7) — THE SPONSOR'S CASE ON THE PAGE, test first: the statement is the page's (`+page.svelte`,
+	// `sponsor-decides`), worded by the product (`sponsorDecidesStatement`), so this test reads what the page shows — the case, and for
+	// REQUEST_HUMAN_DECISION the Historian's reason as it gave it — and holds that the lane reads it whole, by its own test id, once the row is shown.
+	it('⛔ RED FIRST — the sponsor’s case on the page: read by the row’s own test id once the row is waited for, the page’s statement whole — the case, and the Historian’s reason as it gave it; none where the row says nothing', async () => {
+		const REASON = 'The loop is stuck: the same failure, round on round.';
+		const asks = (reason: string) => ({ historianAsks: [{ concluded: true, recommendedControlAction: { action: 'REQUEST_HUMAN_DECISION', reason } }] });
+		const stuck = sponsorDecidesStatement({ reading: asks(REASON) as never, choice: { kind: 'SPONSOR_DECIDES', because: 'REQUEST_HUMAN_DECISION' } });
+		const twice = sponsorDecidesStatement({
+			reading: { historianAsks: [{ concluded: false, recommendedControlAction: null }, { concluded: false, recommendedControlAction: null }] } as never,
+			choice: { kind: 'SPONSOR_DECIDES', because: 'NOT_CONCLUDED_TWICE' }
+		});
+		expect(
+			[stuck.includes('asks for the sponsor’s decision'), stuck.includes(REASON), twice.includes('did not reach a judgment'), twice.includes('twice')],
+			'arrangement: the page’s statement names its case, and the reason where the Historian gave one'
+		).toEqual([true, true, true, true]);
+		expect([stuck, twice].every((s) => s.includes('the sponsor decides')), 'arrangement: the page’s statement says the sponsor decides').toBe(true);
+		const read: (string | null)[] = [];
+		for (const said of [stuck, twice]) read.push(await sponsorDecides(recoveryRow(['sponsor-decides'], { texts: { 'sponsor-decides': said } }).row));
+		const quiet = recoveryRow(['run-assurance-stage']);
+		read.push(await sponsorDecides(quiet.row));
+		expect(read, 'the sponsor’s case was not read whole by the row’s own test id, or was read where the row says nothing').toEqual([stuck, twice, null]);
+	});
+
+	// ⭐⭐ L17b2 (§18; D72; §17.13 (2)) — D72'S SEND-BACK ON THE PAGE, test first: its candidates read from the row's own select
+	// (`send-work-back-target`, each `<option value={c.id}>{c.title}</option>`, `+page.svelte`), in their order; the act choosing the target in that
+	// select, typing the rule's rationale into its own field, pressing its own button, and waiting for the bound of a sign-off act (it calls no model).
+	it('⛔ RED FIRST — D72’s send-back on the page: its candidates read from the row’s own select, each option’s value and label, in order; the act chooses the target there, types the rule’s rationale into its own field, presses its own button, waited for a sign-off act’s bound', async () => {
+		const CANDIDATES = [
+			{ value: 'pwu_source', label: 'Source Construction' },
+			{ value: 'pwu_tests', label: 'Unit Test Suite' }
+		];
+		const offering = recoveryRow(['send-work-back-target', 'send-work-back'], { options: { 'send-work-back-target': CANDIDATES } });
+		expect(await sendBackOffered(offering.row), 'the candidates were not read from the row’s own select, value and label, in order').toEqual([
+			{ id: 'pwu_source', title: 'Source Construction' },
+			{ id: 'pwu_tests', title: 'Unit Test Suite' }
+		]);
+		expect(await sendBackOffered(recoveryRow(['rerun-rejected-work']).row), 'a row with no send-back offered one').toEqual([]);
+		const pressed = recoveryRow(['send-work-back-target', 'send-work-back'], { options: { 'send-work-back-target': CANDIDATES } });
+
+		expect((await sendWorkBack(pressed.page, pressed.row, 'pwu_tests', decode)).envelopeType).toBe('success');
+
+		expect(
+			[pressed.log.filter((l) => !l.startsWith('wait for the row')), pressed.asked],
+			'the act did not choose the target in its own select, type the rationale into its own field and press its own button, waited for a sign-off act’s bound'
+		).toEqual([
+			[
+				`select send-work-back-target: pwu_tests (${PHASE7_UI_MS})`,
+				`fill send-work-back-rationale: ${SEND_BACK_RATIONALE} (${PHASE7_UI_MS})`,
+				`click send-work-back (${PHASE7_UI_MS})`
+			],
+			[{ action: 'sendWorkBack', timeout: PHASE7_SIGN_OFF_MS }]
+		]);
+	});
+
+	// ⭐⭐ L17b2 (§18; §27 reading 5) — THE LANE HANDS EACH LOOP PRESS THAT CALLS A MODEL THE BOUND COMPUTED FROM THE BOOT'S RECORD: the Historian's
+	// setting as the server was handed it (the boot's overlay, `JPWB_HISTORIAN_CALL_MS`), read by the product's own reader (`historianCallBound`). A server
+	// handed none runs no Historian, so its term is none: a paid boot is refused there (ruling 6 (C)), and only a boot made by hand reaches the loop so.
+	it('⛔ RED FIRST — the stage and the Historian’s re-ask are each waited for the bound computed from the Historian’s setting the boot recorded; a server handed none runs no Historian, its term none', async () => {
+		const script = (historianCallMs?: string): Script => ({
+			paid: true,
+			presses: ALL_COMPLETE,
+			...(historianCallMs === undefined ? {} : { historianCallMs }),
+			signOffs: {
+				root: GREEN,
+				design: {
+					ra: answered('failure'),
+					raAfter: REJECTED,
+					calls: 12,
+					loop: { stage: STAGED, offers: [{ historianAgain: { outcome: answered('success'), calls: 1 } }, { rerun: true }] },
+					rejected: { offered: true, outcome: answered('success'), after: COMPLETED, calls: 6, again: GREEN }
+				}
+			}
+		});
+		const handed = laneOf(script('600000'));
+		await handed.run();
+		const none = laneOf(script());
+		await none.run();
+		const loopBounds = (l: ReturnType<typeof laneOf>) =>
+			l.bounds.filter(([act]) => act.startsWith('runAssuranceStage') || act.startsWith('rerunHistorian'));
+		expect([loopBounds(handed), loopBounds(none)], 'a loop press was not waited for the bound computed from the boot’s record').toEqual([
+			[
+				['runAssuranceStage design', phase7AssuranceStageMs(600_000)],
+				['rerunHistorian design', phase7HistorianAgainMs(600_000)]
+			],
+			[
+				['runAssuranceStage design', phase7AssuranceStageMs(0)],
+				['rerunHistorian design', phase7HistorianAgainMs(0)]
+			]
+		]);
+	});
+
+	// ⭐⭐ L17b2 (§18 (5); §17.13 (5)) — WRITE-ONCE ACROSS ROUNDS. A round is a unit's sign-off between two re-runs of its work, and each round's acts keep
+	// files of their own: the first round's as named before (`recordAssurance`, `runAssuranceStage`, `rerunRejectedWork`, …), the round after the first
+	// re-run D71's (`…AfterRerun`), and the round after the n-th re-run `…AfterRerun<n>`. So no act's file is refused as written before (`writeOnce`, a
+	// refusal that would end the run `lane-error`), and none is overwritten.
+	it('⛔ RED FIRST — writeOnce: each round’s acts keep files of their own — the first round’s as named before, the round after the first re-run …AfterRerun, after the n-th …AfterRerun<n> — so a unit rejected three times, then accepted, keeps every act of every round, and the run completes', async () => {
+		/** One round its declared reviews reject: its stage, then D71's re-run the page offers alone, then `again`, the round after it. */
+		const rejectedOnce = (again: SignOffScript): SignOffScript => ({
+			ra: answered('failure'),
+			raAfter: REJECTED,
+			loop: { stage: STAGED, offers: [{ rerun: true }] },
+			rejected: { offered: true, outcome: answered('success'), after: COMPLETED, again }
+		});
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: rejectedOnce(rejectedOnce(rejectedOnce(GREEN))),
+				implementation: GREEN,
+				'end-to-end': GREEN
+			}
+		});
+		const record = await l.run();
+
+		const round = ['runAssuranceStage design', 'rerunRejectedWork design'];
+		expect(loopPresses(l), 'each round’s stage and way back were not pressed, round on round').toEqual([...round, ...round, ...round]);
+		const kept = ['', 'AfterRerun', 'AfterRerun2'].flatMap((suffix) =>
+			['recordAssurance', 'runAssuranceStage', 'rerunRejectedWork'].map((act) => `03-design-${act}${suffix}`)
+		);
+		expect(
+			[...kept, '03-design-recordAssuranceAfterRerun3', '03-design-markSatisfiedAfterRerun3'].filter((name) => !l.action(name)),
+			'a round’s act kept no file of its own'
+		).toEqual([]);
+		expect(
+			[record.end?.reason, record.units[2]!.signOff?.afterRerun?.afterRerun?.afterRerun?.markSatisfied?.after],
+			'a round’s file collided, or the unit was not accepted at its fourth sign-off'
+		).toEqual(['complete', SATISFIED]);
 	});
 });

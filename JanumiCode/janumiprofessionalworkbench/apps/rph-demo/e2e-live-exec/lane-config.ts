@@ -597,13 +597,76 @@ export function phase7SignOffUnitMs(policies: number): number {
 	);
 }
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — design D82 (`REG-D-166` (5), (8); the lead's rulings 15 and 20, as §16 restates it, and §18) — THE LOOP AFTER
+// A DECLARED REJECTION: WHAT ITS PRESSES COUNT, WHAT THEY ARE WAITED FOR, AND THE WORKHORSE ─────────────────────────────────────────────────────────────
+// After a Record Assurance its declared reviews reject, the lane presses the round's assurance stage, the Historian asked again where the page offers it,
+// and the way back the round's records offer — with no count: the spend limit stays the one hard stop (`REG-D-148`), each press's worst case counted
+// first (`REG-D-135` (4)). ⛔ This module imports nothing, so what the product holds is restated here with its source line, and held to the lane's use by
+// `verif/phase7-live-spec.test.ts` and to its arithmetic by `verif/live-exec-lane-config.test.ts`.
+
+/**
+ * ⭐⭐ L17b2 (ruling 20, as §16 restates it) — WHAT THE ROUND'S ASSURANCE STAGE COUNTS, IN REVIEWER CALLS: TWO, the ASSURANCE exchanges it records, which
+ * are what the limit counts (`recordedReviewerCalls`):
+ *   · the narrative writer's one call — the selected reviewer's own transport, once, never repaired (D76; `src/lib/server/assurance/assurance-stage.ts:187`,
+ *     `writeChapter`'s `devinPrint`), its role on the ASSURANCE plane (`assurance-stage-roles.ts:8-9`);
+ *   · the Historian's one call, which does not repair (ruling 20; `historian-part.ts:581`, `devinHistorianCall`), its exchange on the ASSURANCE plane
+ *     (`historian-part.ts:438`; ruling 11).
+ * ⚠ The Hypothesizer's turn and, on an open recurrence, the Unsticking Agent's are Pi executor turns, recorded on the EXECUTION plane
+ * (`stage-helper-run.ts:202`, `:255`), which the reviewer-call limit does not count, as it counts no Begin & Execute's executor turns (§15.1; §16).
+ */
+export const PHASE7_ASSURANCE_STAGE_REVIEWER_CALLS = 2;
+
+/**
+ * ⭐⭐ L17b2 (ruling 20; §16) — WHAT THE HISTORIAN ASKED AGAIN COUNTS: ONE, its call (`assurance-stage.ts:598`, `rerunHistorian`, which runs its part again,
+ * `:629`; the call `historian-part.ts:581`). ⚠ The Unsticking Agent that a re-ask recording a recurrence brings (§27 reading 5) is a Pi turn, uncounted.
+ */
+export const PHASE7_HISTORIAN_AGAIN_REVIEWER_CALLS = 1;
+
+/**
+ * ⭐⭐ L17b2 (§18) — THE HELPER TURNS THE STAGE'S PRESS WAITS FOR: the Hypothesizer's, and the Unsticking Agent's, which an open recurrence can bring in any
+ * round (D73, D75) — each one Pi turn (`stage-helper-run.ts:202`, `session.turn`).
+ */
+export const PHASE7_STAGE_HELPER_TURNS = 2;
+
+/**
+ * ⭐⭐ L17b2 (D82; the lead's §18) — THE ROUND'S ASSURANCE STAGE'S PRESS BOUND, from the Historian's time bound as the boot read it (`historianCallMs`; its
+ * setting `JPWB_HISTORIAN_CALL_MS`, required, with no default, its value design D84's): the narrative writer's call at one reviewer call's bound
+ * (`LANE_BUDGET.reviewerCallMs`, `:340`: devin's kill, `devin-reviewer.ts:376`); the Historian's; and each helper turn at the bound the lane already uses for
+ * one executor turn (`LANE_BUDGET.executorCallMs`, `:346` — an allowance, as there: neither a helper's turn nor an executor's try carries a time bound
+ * inside the product, so this press bound is the stop for both, §18). ⭐⭐ And (Stage 3's part 0, the lead's §31 (1)) the lane's page margin, a sign-off
+ * act's own bound (`PHASE7_SIGN_OFF_MS`): the Historian asked again's bound (`phase7HistorianAgainMs`) and Record Assurance's (`phase7RecordAssuranceMs`)
+ * carry the same margin beside their calls, and the stage's press does its own page work too — the helpers' workspace copies, the Historian's folder
+ * written through the port, three parts recorded — so a bound of its calls alone would give the press up, at the worst case of every call, while the
+ * server still records, and end the run `allowance-exceeded`. ⚠ Not counted, as no other press of the lane counts them: devin's free-tier waits
+ * (`devinPrint`, D46), the Historian's `devin --version` read (its own 30 s bound, `devin-historian.ts`), ~~and the act's own page work~~ ⭐ and the act's
+ * page work past the margin, which is an allowance, as Record Assurance's is.
+ */
+export const phase7AssuranceStageMs = (historianCallMs: number): number =>
+	LANE_BUDGET.reviewerCallMs + historianCallMs + PHASE7_STAGE_HELPER_TURNS * LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS;
+
+/**
+ * ⭐⭐ L17b2 (D82; §18, as the lead's §27 reading 5 amends it) — THE HISTORIAN ASKED AGAIN'S PRESS BOUND: the Historian's; the Unsticking Agent's turn, which
+ * a re-ask that records a recurrence brings (`LANE_BUDGET.executorCallMs`); and the lane's page margin, read as a sign-off act's own bound
+ * (`PHASE7_SIGN_OFF_MS`), which Record Assurance's bound adds beside its reviews (`phase7RecordAssuranceMs`).
+ */
+export const phase7HistorianAgainMs = (historianCallMs: number): number =>
+	historianCallMs + LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS;
+
+/**
+ * ⭐⭐ L17b2 — D82 (`REG-D-166` (5); the lead's ruling 15) — THE RUN PLAN'S WORKHORSE, BY THIS PWA'S TYPE: where the way back the page offers is the
+ * person's choice, the lane sends the work to the one candidate whose TYPE is named so — its type's name read from the store, never a title — or re-runs
+ * the rejected unit's own work where it is itself of that type; none of that type, or more than one, and nothing is pressed (`phase7-operator.ts`).
+ */
+export const PHASE7_WORKHORSE_TYPE = 'Source Construction';
+
 /**
  * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's) — ⭐⭐ `P76F-C` C8: ~~THE WORST
  * CASE OF THE LANE'S OWN BOUNDS, every act waited for up to its bound and counted by it~~ ⛔ `P76F-D` D4: overstated — the
  * setup's acts are not counted by their bounds, and those bounds alone pass its allowance (`PHASE7_SETUP_MS`). What is
- * true: EVERY PHASE AND RECOVERY ACT COUNTED BY ITS BOUND — each Begin & Execute and what follows it, the limit's reads,
- * the run plan's rule, the sign-offs, the final screenshot and read — PLUS THE SETUP'S ALLOWANCE, which is not a worst
- * case:
+ * true: ~~EVERY PHASE AND RECOVERY ACT COUNTED BY ITS BOUND~~ ⭐⭐ L17b2 (Stage 3's part 0, the lead's §31 (2)): THE ACTS
+ * LISTED BELOW, EACH COUNTED BY ITS BOUND, AND NO OTHER (what it does not count is said after the sum) — each Begin & Execute
+ * and what follows it, the limit's reads, the run plan's rule ⭐ on a stopped phase (`REG-D-105` (4)), the sign-offs, the
+ * final screenshot and read — PLUS THE SETUP'S ALLOWANCE, which is not a worst case:
  *   · the setup allowance (boot, the PWA, the Undertaking, every archive's copying) — 1,800 s, ⚠ an allowance: its own
  *     acts at their bounds pass it, and the archive's copying has none;
  *   · the root's Begin & Execute and each phase's, each with what follows it (`PHASE7_UNIT_RUN_MS`) — 5 × 38,940 s =
@@ -618,7 +681,10 @@ export function phase7SignOffUnitMs(policies: number): number {
  *   · the final screenshot and the final archive's read — 120 s + 300 s = 420 s;
  * = 419,640 s (116.6 hours). ⭐ Package L, D13 — each review six calls, so 1,800 + 5 × 55,740 + 1,200 + 4 × 58,080 +
  * 5 × 15,120 + 420 = 590,040 s (163.9 hours), under Node's timer ceiling. ⭐ package X, D35 (devin’s bound 480 s): 1,800 + 5 × 106,140 +
- * 1,200 + 4 × 108,480 + 5 × 26,640 + 420 = 1,101,240 s (305.9 hours), still under Node's timer ceiling. ~~= 590,040 s~~ ~~= 419,640 s~~ ~~= 391,440 s (108.7 hours)~~
+ * 1,200 + 4 × 108,480 + 5 × 26,640 + 420 = 1,101,240 s (305.9 hours), still under Node's timer ceiling. ⭐⭐ Package Z3, D51's Time bullet (2026-11-07),
+ * moved the terms and not this sum — read again at L17b2 (§31 (2)): 1,800 + 5 × 148,140 + 1,200 + 4 × 150,480 + 5 × 36,240 + 420 = 1,527,240 s
+ * (424.2 hours), the value this module computes and its test holds (`verif/live-exec-lane-config.test.ts`), still under Node's timer ceiling.
+ * ~~= 1,101,240 s (305.9 hours)~~ ~~= 590,040 s~~ ~~= 419,640 s~~ ~~= 391,440 s (108.7 hours)~~
  * before `E12F`'s limit read and re-run. ~~= 372,240 s (103.4
  * hours)~~ before E2's declared reviews. ~~1,800 s + 4 × 38,160 s +
  * 4 × 1 × 38,160 s = 307,080 s (85.3 hours)~~ ⛔ counted the five
@@ -629,6 +695,17 @@ export function phase7SignOffUnitMs(policies: number): number {
  * outlast its 1,800 s allowance, and every later term is then short by that much. Disclosed, not closed: counting the
  * setup's acts needs their number, which this module cannot read (`PHASE7_SETUP_MS`). ⚠ It must stay under Node's timer
  * ceiling, 2,147,483,647 ms, past which a timer fires at once.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 (Stage 3's part 0, the lead's §31 (2)) — WHAT IT DOES NOT COUNT:
+ *   · NO ROUND OF D82'S LOOP after a unit's declared reviews reject it — the round's assurance stage, the Historian asked again,
+ *     D72's send-back, D71's re-run of the rejected work, and the round's sign-off after each: D82 presses them with no count of
+ *     the rounds, so no fixed figure can count them;
+ *   · AND SO NO D71 RE-RUN SINCE PACKAGE L16, which added the act (`REG-D-163` (2)) and counted it here nowhere.
+ * WHY A RUN STILL ENDS FIRST: the spend limit, the one hard stop (`PHASE7_PAID_LIMIT`, `REG-D-148`), is read before each such
+ * press, which counts its worst case first — each D71 re-run its 210 calls (`PHASE7_UNIT_REVIEWER_CALLS`), each stage its 2,
+ * each re-ask its 1 — so the calls left bound the rounds, and in practice the limit ends a loop long before this timeout.
+ * ⚠ A bound by calls, not by time: rounds that each ran to their time bounds could still outlast it, and Playwright would then
+ * end the server mid-act (`REG-F-527`'s class) — disclosed, not closed. Whether the timeout changes is package L17c's, with D82's
+ * rules for the live run. Its value is unchanged.
  */
 export const PHASE7_TEST_TIMEOUT_MS =
 	PHASE7_SETUP_MS +

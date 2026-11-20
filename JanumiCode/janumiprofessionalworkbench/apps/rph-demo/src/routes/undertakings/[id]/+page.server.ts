@@ -194,10 +194,23 @@ import { RERUN_REJECTED_WORK, rejectedRerunOffer } from '$lib/server/execution/r
 import {
 	REPLACE_REACHED_WORK,
 	replacementPlan,
+	roundStageRecordIdsOf,
 	sendBackOffer,
 	supersededWorkNotice,
+	withRoundRecords,
 	type ReplacedUnit
 } from '$lib/server/execution/send-back';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D73's rule with D87 and D72 (the lead's rulings 3, 4, 7 and 14) — the way back the round's records offer,
+// read once for the page's offers, its acts and the lane (`wayBackOffer`).
+import {
+	offersRerunInPlace,
+	rerunRefusedByRule,
+	sendBackCandidatesOf,
+	sendBackRefusedByRule,
+	sponsorDecidesStatement,
+	wayBackOffer,
+	type SponsorDecidesBecause
+} from '$lib/server/execution/loop-rule';
 // ⭐⭐ `JAN-EXEC` Phase 7, package L17b1 — design D85 (`REG-D-167` (4); `REG-D-169`) — where each executor session is kept and how it opens; D77
 // (`REG-D-166` (4)) — what a successor's first turn and D71's re-run carry after the instruction, and the tactic record; D74 to D76 (`REG-D-166` (3)) —
 // the assurance stage at a rejected sign-off, which the page offers once per round (the lead's ruling (B)).
@@ -218,7 +231,13 @@ import { splitExecutionEnvelope } from '$lib/server/execution/execution-contract
 import { describedThrow } from '$lib/server/described-throw';
 import { IN_MEMORY_SESSION, type ExecutorSessionPlace } from '$lib/server/execution/producer-session';
 import { feedbackForRerun, feedbackForSuccessor, successorRoundOf, takeTacticRecord } from '$lib/server/execution/successor-feedback';
-import { assuranceStageOffer, runAssuranceStage } from '$lib/server/assurance/assurance-stage';
+import {
+	assuranceStageOffer,
+	rerunHistorian,
+	runAssuranceStage,
+	type AssuranceStageDeps,
+	type StagePartOutcome
+} from '$lib/server/assurance/assurance-stage';
 import type { StageRecordDeps } from '$lib/server/assurance/assurance-stage-records';
 import { runProcessResultFloor } from '$lib/server/execution/process-result-floor';
 import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer';
@@ -771,6 +790,27 @@ export const load: PageServerLoad = ({ params }) => {
 		const offer = assuranceStageOffer(engine, p.id);
 		if (!('refusedBecause' in offer)) assuranceStageByPwu[p.id] = { roundId: offer.roundId };
 	}
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D73's rule with D87 and D72 (`REG-D-166` (2), (5), (6); `REG-D-167` (1), (2); the lead's rulings 3, 4, 7
+	// and 14) — THE WAY BACK, AS THE ROUND'S RECORDS OFFER IT (`wayBackOffer`, the one reading this page's acts and the lane read too): D71's re-run
+	// and D72's send-back above, each offered only where the round's choice is it — neither before the round's stage has run and its Historian
+	// concluded; the send-back to the one unit the diagnosis names, or to every candidate where the person chooses; the Historian asked again where
+	// it did not conclude once (`historianAgainByPwu`); and, where no way back is offered because the sponsor decides, the case in plain words
+	// (`sponsorDecidesByPwu`). ⭑ A unit with no round is offered each as its own reading says, which refuses it anyway.
+	const ruledRerunByPwu: typeof rejectedRerunByPwu = {};
+	const ruledSendBackByPwu: typeof sendBackByPwu = {};
+	const historianAgainByPwu: Record<string, { readonly roundId: string }> = {};
+	const sponsorDecidesByPwu: Record<string, { readonly because: SponsorDecidesBecause; readonly said: string }> = {};
+	for (const p of pwus) {
+		const loop = wayBackOffer(engine, p.id);
+		const rerun = rejectedRerunByPwu[p.id];
+		const sendBack = sendBackByPwu[p.id];
+		if (rerun !== undefined && (loop === undefined || offersRerunInPlace(loop.choice))) ruledRerunByPwu[p.id] = rerun;
+		const candidates = loop === undefined ? (sendBack?.candidates ?? []) : sendBackCandidatesOf(loop.choice);
+		if (sendBack !== undefined && candidates.length > 0) ruledSendBackByPwu[p.id] = { candidates };
+		if (loop?.choice.kind === 'ASK_HISTORIAN_AGAIN') historianAgainByPwu[p.id] = { roundId: loop.roundId };
+		if (loop?.choice.kind === 'SPONSOR_DECIDES')
+			sponsorDecidesByPwu[p.id] = { because: loop.choice.because, said: sponsorDecidesStatement({ reading: loop.reading, choice: loop.choice }) };
+	}
 
 	// Tier-2 execution SEQUENCE (JAN-EXECPLAN DWP-04, fork C): arrange the Undertaking's PWU INSTANCES by their TYPES'
 	// hand-off dependency (reuse buildPwaExport — version-scoped to the bound (pwaId, pwaVersion) — then layerHandoff),
@@ -817,9 +857,12 @@ export const load: PageServerLoad = ({ params }) => {
 		recoveryByPwu,
 		awaitingChoiceStepIds,
 		declaredRerunByPwu,
-		rejectedRerunByPwu,
-		sendBackByPwu,
+		// ⭐ L17b2 — each offered as the round's rule says (above); their shapes as before.
+		rejectedRerunByPwu: ruledRerunByPwu,
+		sendBackByPwu: ruledSendBackByPwu,
 		assuranceStageByPwu,
+		historianAgainByPwu,
+		sponsorDecidesByPwu,
 		sequence,
 		assessments,
 		disclosures,
@@ -2463,6 +2506,34 @@ function stageRecordDepsOf(): StageRecordDeps {
 		now: hostNow,
 		runSteps: (steps) => runSteps(steps.map((s): Step => [s[0], s[1], s[2], s[3]]))
 	};
+}
+
+/**
+ * ⭐ L17b2 — WHAT A PRESS OF THE ASSURANCE STAGE, OR OF ITS HISTORIAN ONCE MORE, IS HANDED: the stage's records, the executor, the shared workspace and
+ * the sessions root, as L17b1's act handed them; and the reviewer's batch for the Historian's assessment (`runMultiParty`, as the declared reviews'
+ * steps go out under the reviewer's credential).
+ */
+function stageDepsOf(testMode: boolean): AssuranceStageDeps {
+	return {
+		...stageRecordDepsOf(),
+		engine: getEngine(),
+		dispatchExchange: (payload, aggregateId) => dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
+		testMode,
+		executor: selectExecutor({ testMode }),
+		sandboxOf: (undertakingId) => resolveUndertakingSandbox(undertakingId),
+		sessionsRoot: durableSessionsRoot(process.env),
+		runReviewerSteps: (steps) => runMultiParty(steps.map((s): Step => [s[0], s[1], s[2], s[3]]), [])
+	};
+}
+
+/** ⭐ L17b2 — the parts of a press, as the page returns them: each part, its status, and its record and why where it has them. */
+function stagePartsSeen(parts: readonly StagePartOutcome[]) {
+	return parts.map((p) => ({
+		part: p.part,
+		status: p.status,
+		...(p.artifactId ? { artifactId: p.artifactId } : {}),
+		...(p.why ? { why: p.why } : {})
+	}));
 }
 
 /** What one model unit's run needs: the started plan and step, its binding, its executor, and its type's facts. */
@@ -4814,6 +4885,10 @@ export const actions: Actions = {
 		const offer = rejectedRerunOffer(getEngine(), pwuId);
 		if ('refusedBecause' in offer)
 			return fail(400, { error: `Re-running the work its declared reviews rejected refused: ${offer.refusedBecause}` });
+		// ⭐⭐ L17b2 (D73's rule; the lead's ruling 3, §16 (4)) — AFTER its rationale and the unit's state: the round's rule — offered only where the
+		// round's choice is the re-run in place, or the person's choice with it; never before its stage has run and its Historian concluded.
+		const ruled = rerunRefusedByRule(wayBackOffer(getEngine(), pwuId));
+		if (ruled !== undefined) return fail(400, { error: `Re-running the work its declared reviews rejected refused: ${ruled}` });
 		const { pwu, pwuType, pwuTypeId, typeFacts } = unitTypeOf(pwuId);
 		// ⚠ Unreachable after the offer, which refuses a unit a model does not work (`rejectedRerunOffer`): kept as the narrowing the
 		// type-checker needs (named in package L16's facts; no mutant is owed it).
@@ -4926,6 +5001,10 @@ export const actions: Actions = {
 					`Sending the work back refused: ${targetId || 'no unit'} is not among the units whose work this unit’s work used ` +
 					`(${offer.candidates.map((c) => `"${c.title}" ${c.id}`).join(', ')}) (REG-D-166 (1); design D72).`
 			});
+		// ⭐⭐ L17b2 (D73's rule; the lead's ruling 3, §16 (4)) — AFTER its rationale, the unit's state and its target: the round's rule — the work sent
+		// back only to a unit the round's choice offers; never before its stage has run and its Historian concluded.
+		const ruled = sendBackRefusedByRule(wayBackOffer(getEngine(), pwuId), targetId);
+		if (ruled !== undefined) return fail(400, { error: `Sending the work back refused: ${ruled}` });
 		const plan = replacementPlan(getEngine(), targetId, mintUiId);
 		if ('refusedBecause' in plan) return fail(400, { error: `Sending the work back refused: ${plan.refusedBecause}` });
 		// ⭐ Read BEFORE the act moves them: the superseded units that were accepted with a work product — the ones whose file the act overwrites.
@@ -4938,7 +5017,12 @@ export const actions: Actions = {
 				decisionId,
 				'REPLAN',
 				REPLACE_REACHED_WORK,
-				[pwuId, ...offer.rejected.map((v) => v.assessmentId), ...plan.replaced.map((r) => r.oldId).filter((id) => id !== pwuId)],
+				// ⭐ L17b2 (D72; the lead's §16 (3)) — and, between the verdicts and the reach, the round's stage records in the stage's order.
+				withRoundRecords(
+					[pwuId, ...offer.rejected.map((v) => v.assessmentId), ...plan.replaced.map((r) => r.oldId).filter((id) => id !== pwuId)],
+					1 + offer.rejected.length,
+					roundStageRecordIdsOf(getEngine(), offer.rejected[0]?.assessmentId)
+				),
 				offer.consideredObservationIds,
 				// ⭐ The person's words, then the ruling that provides the replacement (`recovery-authority.ts`).
 				decisionRationale(rationale, REPLACE_REACHED_WORK_CITATION)
@@ -4971,26 +5055,24 @@ export const actions: Actions = {
 	runAssuranceStage: async ({ request }) => {
 		const pwuId = await pwuIdFrom(request);
 		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
-		const testMode = isTestMode();
-		const done = await runAssuranceStage(pwuId, {
-			...stageRecordDepsOf(),
-			engine: getEngine(),
-			dispatchExchange: (payload, aggregateId) => dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
-			testMode,
-			executor: selectExecutor({ testMode }),
-			sandboxOf: (undertakingId) => resolveUndertakingSandbox(undertakingId),
-			sessionsRoot: durableSessionsRoot(process.env)
-		});
+		// ⭐ L17b2 — its deps now one form with the re-ask's (`stageDepsOf`), the Historian's assessment issued under the reviewer's credential.
+		const done = await runAssuranceStage(pwuId, stageDepsOf(isTestMode()));
 		if ('refusedBecause' in done) return fail(400, { error: `The assurance stage refused: ${done.refusedBecause}` });
-		return {
-			advanced: 'assurance-stage',
-			stage: done.parts.map((p) => ({
-				part: p.part,
-				status: p.status,
-				...(p.artifactId ? { artifactId: p.artifactId } : {}),
-				...(p.why ? { why: p.why } : {})
-			}))
-		};
+		return { advanced: 'assurance-stage', stage: stagePartsSeen(done.parts) };
+	},
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — design D73 (`REG-D-166` (6); the lead's ruling 7) — ASK THE HISTORIAN AGAIN ───────────────────────────
+	//
+	// ⭑ OFFERED where the round's Historian did not conclude once — INCONCLUSIVE, refused at its completion, or not run (`historianAgainByPwu`, the round's
+	// rule) — with no rationale, since it records no Decision and moves no state, as the stage. ONE PRESS (`rerunHistorian`): the Historian's part again,
+	// and the Unsticking Agent after it where its answer records a recurrence and the round has no step-back yet. ⭑ Not concluded twice, the page offers
+	// no way back and says the sponsor decides; a third ask is refused.
+	rerunHistorian: async ({ request }) => {
+		const pwuId = await pwuIdFrom(request);
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const done = await rerunHistorian(pwuId, stageDepsOf(isTestMode()));
+		if ('refusedBecause' in done) return fail(400, { error: `Asking the Historian again refused: ${done.refusedBecause}` });
+		return { advanced: 'historian-asked-again', stage: stagePartsSeen(done.parts) };
 	},
 
 	// ── ABANDON — S-1 of ROADMAP-decision-subject-scope (REG-F-077) ──────────────────────────────────────────

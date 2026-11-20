@@ -287,7 +287,9 @@ describe('⛔ D53’s refusals before a paid call — each against doubles', () 
 			`D53 — D54’s records hold ${CASES.length} of the ${CASES.length} current cases, none refused (${committed.files.map((f) => `${f.name} sha256 ${f.sha256}`).join(', ')})`
 		);
 		expect(r.said, 'past the records, at the decision model').toContain('REFUSED (D53): the live re-derivation asks the decision model, and it is not configured');
-		expect(committed.files.map((f) => f.name)).toEqual(['v13.ndjson', 'probes.ndjson']);
+		// ~~`['v13.ndjson', 'probes.ndjson']`~~ ⭐ RESTATED under §24 ruling 2 (`JAN-EXEC` Phase 7, package L17b2): the committed records are
+		// three files since the second, `probes-0.40.16.ndjson` (§20) — D53's evidence names every file its read uses.
+		expect(committed.files.map((f) => f.name)).toEqual(['v13.ndjson', 'probes.ndjson', 'probes-0.40.16.ndjson']);
 		// ⛔ THE CONTROL: the committed v13 file without one case’s line.
 		const short = await d53({ records: onFile(text, 'P12-RR-07-CUT') });
 		expect(short.code).toBe(2);

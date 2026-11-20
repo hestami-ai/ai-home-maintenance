@@ -1,6 +1,8 @@
 // Proves seedWorkbench stands up the full RPH-DOC-010 picture LIVE in one call: one PUBLISHED Product Realization
 // PWA with its PWU Types, one Undertaking bound to it, and that Undertaking's 9-node Professional Work Graph —
 // all via real commands. The query surface returns the read-model the UI renders.
+import type { DomainCommand } from '@janumipwb/rph-contracts';
+import { policyApplicability } from '@janumipwb/rph-domain';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { describe, expect, it } from 'vitest';
@@ -222,5 +224,135 @@ describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 		expect(mobile?.qualifiedSuccess).toBe(false);
 		const arch = graph.nodes.find((n) => n.label === 'Architecture Definition');
 		expect(arch?.baselined).toBe(true);
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — design D78 (`REG-D-166` (3)) ─────────────────────────────────────────────────────────
+	// THE SEEDED HISTORIAN GOVERNS EVERY KIND OF UNIT. The harness assesses a rejected unit of any kind under
+	// `pol_historical_consistency` (D73), and the kernel refuses to assess a unit whose kind a policy's kinds exclude (the request's
+	// applicability block in `assurance.ts`, over `policyApplicability`). So the seed's `appliesToPwuKinds` is emptied, and an empty
+	// list reaches the store as no kind condition at all (`seedAdditivePolicies`: "absent reads as unrestricted"). Its tests: every kind
+	// the vocabulary names, and one it does not, read by the kernel's own applicability over the stored policy; and a unit of each
+	// kind, proposed and asked for through the command, as the harness asks. ⭑ CONTROL: every other seeded policy's kinds as they were.
+	const HISTORIAN = 'pol_historical_consistency';
+	/** Every kind a template or a catalog policy names, and one no catalog names (an authored graph's kinds are the author's). */
+	const EVERY_KIND = [
+		...[...new Set([...ontology.pwuTemplates.map((t) => t.pwuKind), ...ontology.seedPolicies.flatMap((p) => p.appliesToPwuKinds ?? [])])].sort(),
+		'A_KIND_NO_CATALOG_NAMES'
+	];
+	const storedApplicability = (engine: ReturnType<typeof build>, policyId: string) =>
+		listByType(engine, 'ASSURANCE_POLICY').find((p) => p.id === policyId)!.state.applicability as {
+			readonly objectTypeConditions?: readonly string[];
+			readonly pwuKindConditions?: readonly string[];
+		};
+
+	it('⛔ RED FIRST — D78: the seeded pol_historical_consistency governs a unit of each kind — no kind condition stored, the kernel’s applicability excluding none, and a unit of each kind assessable under it through the command', () => {
+		const engine = build();
+		const applicability = storedApplicability(engine, HISTORIAN);
+		expect(EVERY_KIND.length, 'arrangement: the fifteen kinds the catalog and the templates name, and one more').toBe(16);
+		expect.soft(applicability.pwuKindConditions, 'a kind condition is stored').toBeUndefined();
+		expect
+			.soft(
+				EVERY_KIND.filter(
+					(pwuKind) => policyApplicability(applicability as never, { objectType: 'PROFESSIONAL_WORK_UNIT', pwuKind } as never) === 'NOT_APPLICABLE'
+				),
+				'the kinds the stored policy excludes'
+			)
+			.toEqual([]);
+		// Through the command, as the harness asks it: a unit of each kind, proposed under one provisioned intent, then one request each.
+		let n = 0;
+		const send = (commandType: string, targetAggregateType: string, targetAggregateId: string, payload: unknown) => {
+			n += 1;
+			const command: DomainCommand = {
+				commandId: `d78-${n}`,
+				commandType,
+				commandSchemaVersion: 1,
+				targetAggregateType,
+				targetAggregateId,
+				issuedAt: '2026-07-12T00:00:00Z',
+				correlationId: 'l17b2-d78',
+				idempotencyKey: `d78-idem-${n}`,
+				payload
+			};
+			return engine.dispatch(command);
+		};
+		const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5K00';
+		for (const [type, payload] of [
+			['CaptureIntent', { intentId: INTENT, originatingExpression: 'Assess any kind of unit.', ontologyId: 'product-realization-pwa', ontologyVersion: '1.3.0' }],
+			['BeginIntentDiscovery', {}],
+			['ProvisionIntent', { ambiguityIds: [] }]
+		] as const)
+			expect(send(type, 'INTENT', INTENT, payload).status, `arrangement: ${type}`).toBe('ACCEPTED');
+		const refused = EVERY_KIND.flatMap((pwuKind, k) => {
+			const nn = String(k + 1).padStart(2, '0');
+			const [pwuId, assessmentId] = [`pwu_01ARZ3NDEKTSV4RRFFQ69G5K${nn}`, `asm_01ARZ3NDEKTSV4RRFFQ69G5K${nn}`];
+			const proposed = send('ProposePwu', 'PROFESSIONAL_WORK_UNIT', pwuId, {
+				pwuId,
+				pwuKind,
+				title: `A unit of ${pwuKind}`,
+				description: 'd',
+				intentId: INTENT,
+				boundaries: { inScope: ['a'], outOfScope: ['b'], permittedChanges: [], prohibitedChanges: [] },
+				obligationIds: [],
+				constraintIds: [],
+				assumptionIds: [],
+				expectedOutputs: [{ artifactType: 'DOCUMENT', description: 'n', verificationCriteria: ['r'] }],
+				assurancePolicyIds: [],
+				riskProfile: { consequence: 'HIGH', uncertainty: 'MEDIUM', irreversibility: 'MEDIUM', securitySensitivity: 'HIGH', regulatoryExposure: 'LOW' }
+			});
+			expect(proposed.status, `arrangement: a unit of ${pwuKind} proposed: ${proposed.error?.message ?? ''}`).toBe('ACCEPTED');
+			const asked = send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+				assessmentId,
+				assurancePolicyId: HISTORIAN,
+				policyVersion: '1.0.0',
+				subjectObjectIds: [pwuId],
+				subjectSemanticVersions: { [pwuId]: 1 },
+				claimIds: []
+			});
+			return asked.status === 'ACCEPTED' ? [] : [pwuKind];
+		});
+		expect.soft(refused, 'the kinds whose unit the kernel will not let the Historian assess').toEqual([]);
+	});
+
+	it('⭑ CONTROL — D78 moves the Historian’s kinds alone: every other seeded policy’s kinds are stored as they were', () => {
+		const engine = build();
+		const others = Object.fromEntries(
+			ontology.seedPolicies
+				.filter((p) => p.policyId !== HISTORIAN)
+				.map((p) => [p.policyId, storedApplicability(engine, p.policyId).pwuKindConditions])
+		);
+		expect(others).toEqual({
+			pol_intent_fidelity: ['INTENT_AND_PRODUCT_DEFINITION', 'INTENT_DISCOVERY', 'PRODUCT_BOUNDARY', 'PRODUCT_REALIZATION'],
+			pol_intent_completeness: ['INTENT_AND_PRODUCT_DEFINITION', 'PRODUCT_BOUNDARY'],
+			pol_assumption_disclosure: [
+				'INTENT_AND_PRODUCT_DEFINITION',
+				'PRODUCT_BEHAVIOR_DEFINITION',
+				'ARCHITECTURE_DEFINITION',
+				'ARCHITECTURE_DECISION',
+				'IMPLEMENTATION_PLANNING',
+				'WORK_DECOMPOSITION',
+				'PRODUCT_IMPLEMENTATION',
+				'INTEGRATED_PRODUCT_VALIDATION',
+				'INTENT_DISCOVERY'
+			],
+			pol_requirement_coverage: ['PRODUCT_BEHAVIOR_DEFINITION', 'USER_JOURNEY_DEFINITION', 'REQUIREMENT_DEFINITION'],
+			pol_decomposition_coverage: ['ARCHITECTURE_DEFINITION', 'IMPLEMENTATION_PLANNING', 'WORK_DECOMPOSITION', 'PRODUCT_REALIZATION'],
+			pol_constraint_propagation: ['IMPLEMENTATION_PLANNING', 'WORK_DECOMPOSITION'],
+			pol_architecture_coverage: ['ARCHITECTURE_DEFINITION', 'ARCHITECTURE_CONCERN'],
+			pol_intent_preservation: [
+				'PRODUCT_BEHAVIOR_DEFINITION',
+				'ARCHITECTURE_DEFINITION',
+				'IMPLEMENTATION_PLANNING',
+				'WORK_DECOMPOSITION',
+				'PRODUCT_IMPLEMENTATION',
+				'INTEGRATED_PRODUCT_VALIDATION',
+				'PRODUCT_BASELINE_PROMOTION',
+				'PRODUCT_REALIZATION',
+				'USER_JOURNEY_DEFINITION',
+				'REQUIREMENT_DEFINITION'
+			],
+			pol_test_adequacy: ['PRODUCT_IMPLEMENTATION', 'INTEGRATED_PRODUCT_VALIDATION'],
+			pol_fitness_for_purpose: ['INTEGRATED_PRODUCT_VALIDATION', 'PRODUCT_REALIZATION', 'PRODUCT_BASELINE_PROMOTION'],
+			pol_baseline_promotion: ['PRODUCT_BASELINE_PROMOTION']
+		});
 	});
 });

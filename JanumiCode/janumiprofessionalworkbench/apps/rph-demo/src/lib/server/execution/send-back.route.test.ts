@@ -44,6 +44,26 @@ const seam = vi.hoisted(() => ({
 	declared: [] as { readonly policyId: string; readonly prompt: string; readonly content: string }[],
 	/** Set, the workspace refuses a write to a path this answers true for, with this reason (D69's route test's seam). */
 	refuseWrite: undefined as undefined | { readonly when: (path: string) => boolean; readonly because: string },
+	// ⭐ L17b2 (ruling 3; the lead's §13) — the Historian's four seams, `assurance-stage.route.test.ts`'s, copied byte for byte.
+	/**
+	 * ⭐ L17b2 (D73, D86) — what devin answers as the Historian, given its prompt: its answer's text, the session export it writes, or a failure of the
+	 * call; undefined, a clean answer — every criterion met, nothing recurring, nothing recommended — and an export with no step.
+	 */
+	historian: undefined as
+		| undefined
+		| ((call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string }),
+	/** ⭐ L17b2 (D86) — each call devin was given as the Historian: its argv, its working folder and its bound, and what its folder and its user configuration held at the call. */
+	historianCalls: [] as {
+		readonly args: readonly string[];
+		readonly cwd: string;
+		readonly timeout: number;
+		readonly files: Readonly<Record<string, string>>;
+		readonly userConfig: string;
+	}[],
+	/** ⭐ L17b2 (ruling 2 (A)) — what `devin --version` answers the Historian's check: the version whose tools were measured, unless a case says another. */
+	historianVersion: 'devin 3000.11.234 (92c83011d113)',
+	/** ⭐ L17b2 (ruling 6) — set, the Historian's call is given the seams the stage handed it (`historianExec`), not this file's program. */
+	historianPassThrough: false,
 	/** What the declared reviewer answers a policy's review: set in `beforeEach`, every criterion MET. */
 	answer: (() => {
 		throw new Error('arrangement: no declared answer set');
@@ -156,6 +176,64 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 	};
 });
 
+// ⭐⭐ L17b2 (D86; the lead's rulings 2, 6, 8 and 16) — THE HISTORIAN'S REAL CALL, ITS PROGRAM REPLACED AT THE SEAM, as the floor's devin is above:
+// `devin --version` answered by the case (`seam.historianVersion`), and the session by the case's answer (`seam.historian`), its export written where
+// the argv names it; what the folder and the user configuration held at the call kept (`seam.historianCalls`). Where a case hands the stage a seam of
+// its own (`historianExec`, ruling 6), the call is given that seam (`seam.historianPassThrough`). ⚠ The module is package L17b2's: until it exists
+// nothing imports it, so this factory never runs (vitest gives a mock of an absent module its unresolved id).
+// ⭐ L17b2 (ruling 3; the lead's §13) — `assurance-stage.route.test.ts`'s mock, copied byte for byte, so that the three route files' arrangements are one.
+vi.mock('../tools/devin-historian.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../tools/devin-historian.js')>();
+	const fs = await import('node:fs');
+	const path = await import('node:path');
+	/** Every file under `root`, by its path relative to it, `/`-separated, with its text. */
+	const tree = (root: string): Record<string, string> => {
+		const out: Record<string, string> = {};
+		const walk = (dir: string): void => {
+			for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+				const at = path.join(dir, e.name);
+				if (e.isDirectory()) walk(at);
+				else out[path.relative(root, at).split(path.sep).join('/')] = fs.readFileSync(at, 'utf8');
+			}
+		};
+		walk(root);
+		return out;
+	};
+	/** A clean answer over the policy's rubric: each of HC-01 to HC-05 met, nothing recurring, nothing recommended. */
+	const clean = JSON.stringify({
+		findings: ['HC-01', 'HC-02', 'HC-03', 'HC-04', 'HC-05'].map((id) => ({ criterionId: id, failed: false, statement: 'met' })),
+		recommendation: 'SATISFIED',
+		residualUncertainty: [],
+		recurrence: null,
+		recommendedControlAction: null
+	});
+	return {
+		...actual,
+		devinHistorianCall: vi.fn(
+			(call: Parameters<typeof actual.devinHistorianCall>[0], given: Parameters<typeof actual.devinHistorianCall>[1]) =>
+				seam.historianPassThrough
+					? actual.devinHistorianCall(call, given)
+					: actual.devinHistorianCall(call, {
+							versionOf: async () => seam.historianVersion,
+							exec: async (_file: string, args: readonly string[], options: { readonly cwd: string; readonly timeout: number }) => {
+								const after = (flag: string): string => args[args.indexOf(flag) + 1] ?? '';
+								seam.historianCalls.push({
+									args: [...args],
+									cwd: options.cwd,
+									timeout: options.timeout,
+									files: tree(options.cwd),
+									userConfig: fs.existsSync(after('--config')) ? fs.readFileSync(after('--config'), 'utf8') : ''
+								});
+								const answered = seam.historian?.({ prompt: fs.readFileSync(after('--prompt-file'), 'utf8') }) ?? {};
+								if (answered.fails !== undefined) throw new Error(answered.fails);
+								fs.writeFileSync(after('--export'), answered.export ?? JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [] }));
+								return { stdout: answered.stdout ?? clean };
+							}
+						})
+		)
+	};
+});
+
 // ⭑ THE DECLARED POLICIES' REVIEWER, STOOD IN FOR AT ITS SEAM: what it was shown is kept, and its answer is the case's (`seam.answer`), so a
 // criterion can be recorded with any of the five outcomes — a reviewer's own reply reaches three (MET, NOT_MET, UNABLE_TO_DETERMINE).
 vi.mock('../assurance/index.js', async (importOriginal) => {
@@ -191,6 +269,8 @@ import { actions as unitPage, load as unitLoad } from '../../../routes/undertaki
 import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
 import { dispatch, getArtifactStore, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import { resolveUndertakingSandbox } from './workspace-host.js';
+// ⭐ L17b2, Stage 3 — the offer itself, for its direct test (the test the mutants owed `P6X-L17A-M33`, below).
+import { sendBackOffer } from './send-back.js';
 
 const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -298,19 +378,35 @@ async function instantiated(types: readonly FixtureType[]): Promise<{
 	};
 }
 
+/** ⭐ L17b2 (ruling 3) — one part of a press of the assurance stage, as the page returns it (`assurance-stage.route.test.ts`'s, copied). */
+interface StagePartSeen {
+	readonly part: string;
+	readonly status: string;
+	readonly artifactId?: string;
+	readonly why?: string;
+}
+
 /** A page action on the fixture's Undertaking, as the page posts it. ⚠ An action the page does not have answers as an error, never a throw. */
+// ⭐ L17b2 (ruling 3) — ~~`Promise<{ readonly advanced?: string; readonly error?: string; readonly supersededWorkNotNoticed?: string }>`~~: and the
+// stage's parts, where the press was the assurance stage's (`assurance-stage.route.test.ts`'s `press`, its `stage` copied).
 async function press(
 	u: Fixture,
 	action: Action,
 	fields: Readonly<Record<string, string>>
-): Promise<{ readonly advanced?: string; readonly error?: string; readonly supersededWorkNotNoticed?: string }> {
+): Promise<{
+	readonly advanced?: string;
+	readonly error?: string;
+	readonly supersededWorkNotNoticed?: string;
+	readonly stage?: readonly StagePartSeen[];
+}> {
 	const act = (unitPage as Record<string, ((e: never) => Promise<unknown>) | undefined>)[action];
 	if (act === undefined) return { error: `the page has no action ${action}` };
 	const r = (await act(event(`/undertakings/${u.undertakingId}`, action, fields, u.undertakingId) as never)) as
-		| { advanced?: string; supersededWorkNotNoticed?: string; data?: { error?: string } }
+		| { advanced?: string; supersededWorkNotNoticed?: string; stage?: readonly StagePartSeen[]; data?: { error?: string } }
 		| undefined;
 	return {
 		...(r?.advanced === undefined ? {} : { advanced: r.advanced }),
+		...(r?.stage === undefined ? {} : { stage: r.stage }),
 		...(r?.supersededWorkNotNoticed === undefined ? {} : { supersededWorkNotNoticed: r.supersededWorkNotNoticed }),
 		...(r?.data?.error === undefined ? {} : { error: r.data.error })
 	};
@@ -422,7 +518,8 @@ const TYPES = (specPolicies: readonly string[] = [], buildPolicies: readonly str
 ];
 
 type Fixture = Awaited<ReturnType<typeof instantiated>>;
-type Action = 'beginExecute' | 'recordAssurance' | 'markSatisfied' | 'rerunRejectedWork' | 'sendWorkBack';
+// ⭐ L17b2 (ruling 3) — ~~`… | 'rerunRejectedWork' | 'sendWorkBack';`~~ and the assurance stage (`runAssuranceStage`), pressed before either way back.
+type Action = 'beginExecute' | 'recordAssurance' | 'markSatisfied' | 'rerunRejectedWork' | 'sendWorkBack' | 'runAssuranceStage';
 
 /** What the Undertaking page offers each unit for sending its work back (`sendBackByPwu`), read as the page loads. */
 const sendBackOffers = (u: Fixture): Record<string, unknown> | undefined =>
@@ -501,9 +598,34 @@ async function verificationRejected(types: readonly FixtureType[] = TYPES()) {
 const sendBackToSource = (r: Awaited<ReturnType<typeof verificationRejected>>) =>
 	press(r.u, 'sendWorkBack', { pwuId: r.ids.verification, targetId: r.ids.source, rationale: TYPED });
 
+// ── ⭐⭐ L17b2 — §4.13's item 3 (ruling 3; the lead's §13): THE ROUND'S STAGE FIRST, ITS HISTORIAN CONCLUDING, BEFORE EITHER WAY BACK ──────────────────
+//
+// ⭑ After L17b2 neither D71's re-run nor D72's send-back is offered until the round's Historian assessment is recorded (ruling 3; D72's "When"), so each
+// test of this file that reads either offer or presses either act straight after a rejection runs the round's stage first, through the page
+// (`stageFirst`), its Historian's time bound set (ruling 16) so that it concludes — the seam's clean answer (`seam.historian` unset): every criterion
+// met, nothing recurring, nothing recommended. The page's executor is the stand-in and its shared workspace in memory, so the Hypothesizer is not run
+// (`stage-helper-run.ts`: "runs on Pi's harness alone") and the way back is the person's choice: D71's re-run beside every candidate, as before L17b2.
+// The narrative's writer is answered by the floor's seam as it is (`seam.review` unset), so its chapter fails its check: none of this file's promises is
+// about the narrative. ⭑ `historianBoundSet` and `stageFirst` are `assurance-stage.route.test.ts`'s, copied byte for byte.
+/** ⭐ L17b2 — the Historian's time bound, set: required, with no default (ruling 16); design D84 fixes its value. */
+const historianBoundSet = (): void => {
+	vi.stubEnv('JPWB_HISTORIAN_CALL_MS', '600000');
+};
+/** ⭐ L17b2 — the round's stage pressed through the page, its Historian's time bound set so that it concludes; the parts the page returned. */
+async function stageFirst(u: Fixture, pwuId: string): Promise<readonly StagePartSeen[]> {
+	historianBoundSet();
+	const pressed = await press(u, 'runAssuranceStage', { pwuId });
+	expect(pressed.advanced, `arrangement: the round’s stage, first — ${pressed.error ?? ''}`).toBe('assurance-stage');
+	return pressed.stage ?? [];
+}
+
 describe('⭐⭐ L17a (D72) — the page offers "Send the work back to" an earlier unit, and only where D72 says', () => {
 	it('⛔ RED FIRST — on the unit its declared reviews rejected, naming the units whose work its work used: never itself, never a unit it did not use', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the offer read straight after the rejection~~: the way back is offered only once the round’s stage has run
+		// and its Historian concluded, so the stage runs first (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is the
+		// offer, not the narrative. The Hypothesizer not run, the way back is the person’s choice: every candidate, in the offer’s order, as before.
+		await stageFirst(r.u, r.ids.verification);
 
 		expect(sendBackOffers(r.u)?.[r.ids.verification], 'the page does not offer the act on the rejected unit, with its candidates').toEqual({
 			candidates: [
@@ -530,17 +652,53 @@ describe('⭐⭐ L17a (D72) — the page offers "Send the work back to" an earli
 			"Assurance recorded, and the declared review did not conclude in this PWU's favour"
 		);
 		expect(axesOf(spec.id), 'arrangement: the Specification rejected at its sign-off').toEqual(['UNDER_ASSURANCE', 'SUCCEEDED', 'REJECTED']);
+		// ⭐ L17b2 (ruling 3; the lead’s §13) — ~~the offers read straight after the rejection~~: before a round’s stage no way back is offered on any unit,
+		// so "nowhere else" read then would hold of every unit at once and tell nothing. So the Specification’s round’s stage runs first (`stageFirst`), its
+		// Historian concluding, its writer failing its check (`seam.review` unset), and the page then offers a way back THERE — D71’s re-run, this CONTROL’s
+		// own positive, below — while the send-back is read where it must stay absent: on the Specification, whose work used no other unit’s, and on Docs,
+		// never rejected, after that same stage.
+		await stageFirst(u, spec.id);
 
 		const offers = sendBackOffers(u) ?? {};
 
 		expect([offers[spec.id], offers[u.unitOf('Docs').id]], 'offered on the first unit, or on one never rejected').toEqual([undefined, undefined]);
 		expect(rejectedOffers(u)?.[spec.id], 'D71’s re-run in place, its offer unchanged').toEqual({ policies: [COVERAGE], findings: 1 });
 	});
+
+	// ⭐⭐ L17b2, Stage 3 — a test the mutants owed (`P6X-L17A-M33`, a rejected unit whose work used no other unit’s offered the act, survived every test:
+	// after L17b2 the page shows a way back only where the round’s rule offers it, and the rule offers no send-back with no candidate — so the page, and the
+	// CONTROL above, cannot see the offer itself; as the lead’s §16 (5) gave `P6X-L16-M34` a direct test of `rejectedRerunOffer`). THE OFFER ITSELF
+	// (`sendBackOffer`): a unit its declared reviews rejected whose work used no other unit’s is offered no send-back — refused, in the offer’s own words —
+	// before its round’s stage and after it; ⭑ a rejected unit whose work used another’s is offered it, its candidates the units its work used (an
+	// arrangement: the offer refuses not everything).
+	it('⭑ CONTROL — the offer itself (`sendBackOffer`): a rejected unit whose work used no other unit’s is offered no send-back, refused in the offer’s own words, before its round’s stage and after it; one whose work used another’s is offered it', async () => {
+		const r = await verificationRejected();
+		const offered = sendBackOffer(getEngine(), r.ids.verification);
+		expect('candidates' in offered && offered.candidates.length > 0, 'arrangement: a rejected unit whose work used another’s is offered the send-back').toBe(true);
+		const u = await instantiated(TYPES([COVERAGE]));
+		const spec = u.unitOf('Specification');
+		expect((await press(u, 'beginExecute', { pwuId: spec.id })).error, 'arrangement: the Specification ran').toBeUndefined();
+		const cov = policyOf(COVERAGE).criteria.map((c) => c.id);
+		seam.answer = (policyId) => answerOf(policyId, { 0: ['NOT_MET', 'Requirement 3 has no acceptance criterion.'] }, cov[0]);
+		expect((await press(u, 'recordAssurance', { pwuId: spec.id })).error ?? '', 'arrangement: the Specification rejected').toContain(
+			"Assurance recorded, and the declared review did not conclude in this PWU's favour"
+		);
+		const refused = {
+			refusedBecause:
+				'its work used no other unit’s work, so there is no earlier unit to send it back to; re-running its own work is a re-run in place (REG-D-163 (2))'
+		};
+		expect.soft(sendBackOffer(getEngine(), spec.id), 'a rejected unit whose work used no other unit’s is offered the send-back, before its round’s stage').toEqual(refused);
+		await stageFirst(u, spec.id);
+		expect.soft(sendBackOffer(getEngine(), spec.id), 'a rejected unit whose work used no other unit’s is offered the send-back, after its round’s stage').toEqual(refused);
+	});
 });
 
 describe('⭐⭐ L17a (D72) — the act, in one batch: the Decision, the new units parents first, the decomposition, the supersessions', () => {
 	it('⛔ RED FIRST — the person’s Decision; a new unit of each reached unit’s type, parents before children, each with the old one’s shape re-pointed; the new composite’s decomposition over its current children; each old unit superseded by its successor', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is the act’s one batch, its events counted from after the stage.
+		const staged = await stageFirst(r.u, r.ids.verification);
 		const before = eventCount();
 
 		const sent = await sendBackToSource(r);
@@ -550,10 +708,21 @@ describe('⭐⭐ L17a (D72) — the act, in one batch: the Decision, the new uni
 		expect(decisions.length, 'one Decision records the act').toBe(1);
 		const decision = decisions[0]!;
 		const verdictIds = r.verdicts.map((v) => v.assessmentId);
-		expect(
-			[decision.state.decisionType, decision.state.status, decision.state.subjectObjectIds],
-			'the Decision is not the act’s: REPLAN, EFFECTIVE, its subjects the rejected unit, its verdicts and the reach'
-		).toEqual(['REPLAN', 'EFFECTIVE', [r.ids.verification, ...verdictIds, r.ids.build, r.ids.source, r.ids.tests]]);
+		// ⭐ L17b2 (D72; the lead’s §16 (3)) — ~~'… its subjects the rejected unit, its verdicts and the reach'~~: and, between the verdicts and the reach, the
+		// round’s stage records in the stage’s order — each part the stage recorded (the chapter, the diagnosis, the Historian’s; a step-back where one
+		// ran), read from the stage’s own answer — so the round a successor reads, the first assessment among the subjects, is still the first rejecting
+		// verdict (the stage route file’s derivation tests hold it). Both checks soft, so the checks after them are observed at HEAD, where the act names no
+		// stage record and the stage has no Historian.
+		const stageRecords = staged.flatMap((p) => (p.artifactId === undefined ? [] : [p.artifactId]));
+		expect
+			.soft(staged.flatMap((p) => (p.artifactId === undefined ? [] : [p.part])), 'arrangement: the stage recorded its chapter, its diagnosis and the Historian’s part')
+			.toEqual(['narrative-chapter', 'fault-diagnosis', 'historical-assessment']);
+		expect
+			.soft(
+				[decision.state.decisionType, decision.state.status, decision.state.subjectObjectIds],
+				'the Decision is not the act’s: REPLAN, EFFECTIVE, its subjects the rejected unit, its verdicts, the round’s stage records and the reach'
+			)
+			.toEqual(['REPLAN', 'EFFECTIVE', [r.ids.verification, ...verdictIds, ...stageRecords, r.ids.build, r.ids.source, r.ids.tests]]);
 		const rationale = String(decision.state.rationale ?? '');
 		expect([rationale.startsWith(`${TYPED}\n\n${CITATION_OPENING}`)], 'its rationale is not the person’s words, then the ruling').toEqual([true]);
 
@@ -625,6 +794,9 @@ describe('⭐⭐ L17a (D72) — the act, in one batch: the Decision, the new uni
 
 	it('⛔ RED FIRST — each superseded unit’s accepted-work file holds a notice, never its old work; a kept unit’s file is untouched', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is the accepted-work files, read from after the stage.
+		await stageFirst(r.u, r.ids.verification);
 		const ws = workspaceOf(r.u);
 		const kept = await Promise.all(
 			(
@@ -662,6 +834,9 @@ describe('⭐⭐ L17a (D72) — the act, in one batch: the Decision, the new uni
 
 	it('⛔ RED FIRST — a notice that cannot be written is stated, file by file, and the act stands', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset) — pressed before the workspace is made to refuse the notices.
+		await stageFirst(r.u, r.ids.verification);
 		seam.refuseWrite = {
 			when: (p) => p === fileOf('Source', r.ids.source) || p === fileOf('Tests', r.ids.tests),
 			because: 'the workspace refused the write (a case)'
@@ -694,6 +869,10 @@ describe('⭐⭐ L17a (D72) — the act, in one batch: the Decision, the new uni
 
 	it('⛔ RED FIRST — refused before anything is dispatched: with no rationale; with a target that is not a candidate; on a unit in no such state', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the act pressed straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset), so the act is offered and each refusal below is for its own reason alone;
+		// the events counted from after the stage.
+		await stageFirst(r.u, r.ids.verification);
 		const events = eventCount();
 
 		const untyped = await press(r.u, 'sendWorkBack', { pwuId: r.ids.verification, targetId: r.ids.source });
@@ -715,6 +894,10 @@ describe('⭐⭐ L17a (D72) — the act, in one batch: the Decision, the new uni
 
 	it('⭑ CONTROL — D71’s re-run in place stays as it is: offered on the same rejected unit, it re-runs the work of that unit, and supersedes nothing', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~D71’s offer read and its re-run pressed straight after the rejection~~: after the round’s stage, its Historian
+		// concluding (`stageFirst`), its writer failing its check (`seam.review` unset). The way back the person’s choice, D71’s re-run is offered beside the
+		// send-back; pressed, it carries the round’s feedback after its findings, which this CONTROL does not pin.
+		await stageFirst(r.u, r.ids.verification);
 
 		expect(rejectedOffers(r.u)?.[r.ids.verification], 'D71’s offer changed').toEqual({ policies: [COVERAGE, INTENT], findings: 2 });
 		const rerun = await press(r.u, 'rerunRejectedWork', { pwuId: r.ids.verification, rationale: TYPED });
@@ -730,6 +913,9 @@ describe('⭐⭐ L17a (D72) — the act, in one batch: the Decision, the new uni
 describe('⭐⭐ L17a (D72) — after the act, every reader follows the links', () => {
 	it('⛔ RED FIRST — start readiness on the page: Begin & Execute offered on the new Source, its producer kept and accepted; withheld on each unit that waits for a successor, naming the successor, never the superseded unit', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is start readiness, not the narrative.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const [build2, verification2, source2, tests2] = ['Build', 'Verification', 'Source', 'Tests'].map((t) => currentOf(r.u, t).id) as [
 			string,
@@ -758,6 +944,10 @@ describe('⭐⭐ L17a (D72) — after the act, every reader follows the links', 
 
 	it('⛔ RED FIRST — D69’s hand-over: the new Tests is pointed at the new Source’s file, written from the new work; the old Source’s file keeps its notice', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is D69’s hand-over; the new Tests’ turn carries the round’s feedback
+		// after its instruction, which names no accepted-work file.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		const source2 = currentOf(r.u, 'Source').id;
 		await acceptCurrent(r.u, 'Source');
@@ -780,6 +970,9 @@ describe('⭐⭐ L17a (D72) — after the act, every reader follows the links', 
 
 	it('⛔ RED FIRST — D69’s hand-over follows the links at a unit that recorded a superseded unit: the root, started once the successors are accepted, is handed their files, and the superseded units’ notices stay', async () => {
 		const r = await verificationRejected();
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is D69’s hand-over through the links, not the narrative.
+		await stageFirst(r.u, r.ids.verification);
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		for (const title of ['Source', 'Tests', 'Build', 'Verification']) await acceptCurrent(r.u, title);
 		const [build2, verification2] = ['Build', 'Verification'].map((t) => currentOf(r.u, t).id) as [string, string];
@@ -802,6 +995,9 @@ describe('⭐⭐ L17a (D72) — after the act, every reader follows the links', 
 
 	it('⛔ RED FIRST — a composite’s declared reviews are shown its CURRENT children’s work: the new Source’s and Tests’, the kept Lint’s — never the superseded units’', async () => {
 		const r = await verificationRejected(TYPES([], [INTENT]));
+		// ⭐ L17b2 (ruling 3; D72’s “When”) — ~~the work sent back straight after the rejection~~: after the round’s stage, its Historian concluding
+		// (`stageFirst`), its writer failing its check (`seam.review` unset): this promise is what a composite’s declared review is shown, not the narrative.
+		await stageFirst(r.u, r.ids.verification);
 		const [oldSource, oldTests, lint] = await Promise.all([r.ids.source, r.ids.tests, r.ids.lint].map((id) => workProductOf(id)));
 		expect((await sendBackToSource(r)).error, 'arrangement: the act').toBeUndefined();
 		for (const title of ['Source', 'Tests']) await acceptCurrent(r.u, title);
@@ -833,6 +1029,11 @@ beforeEach(() => {
 	seam.opens = 0;
 	seam.declared.length = 0;
 	seam.refuseWrite = undefined;
+	// ⭐ L17b2 — the Historian's seams, reset: a clean answer, the version measured, this file's program.
+	seam.historian = undefined;
+	seam.historianCalls.length = 0;
+	seam.historianVersion = 'devin 3000.11.234 (92c83011d113)';
+	seam.historianPassThrough = false;
 	seam.answer = (policyId) => answerOf(policyId);
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);

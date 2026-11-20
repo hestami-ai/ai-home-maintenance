@@ -68,7 +68,12 @@ const EXPORTED: Readonly<Record<string, string>> = {
 	// (`review-allowance.ts`): it selects no backend, but it keys on its absence exactly as the ten do — set, every authoring review
 	// round reserves its worst case against it, and `0` stops every round with a type before any reviewer call — so a shell that
 	// exported it for a paid half-B run would turn the gate's authoring reviews into stopped rounds.
-	JPWB_AUTHORING_REVIEW_ALLOWANCE: '0'
+	JPWB_AUTHORING_REVIEW_ALLOWANCE: '0',
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 (design D86; the lead's §27, item 4) — A TWELFTH, THE HISTORIAN'S TIME BOUND
+	// (`tools/devin-historian.ts`): it selects no backend, but it keys on its absence as the eleven do — unset, the Historian is not run —
+	// so a shell that exported it for a paid run would change every gate test that expects the Historian not run for an unset bound.
+	// ⛔ Exported into this instrument's children alone, which run the probe and nothing else, under a PATH that finds no program.
+	JPWB_HISTORIAN_CALL_MS: '600000'
 };
 
 /**
@@ -137,7 +142,9 @@ describe('⭐ D8 — a gate entry point started with every live-backend variable
 		// here, once; the titles and messages name the variables, never their number (the E4 polish round).
 		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D26, which names it) — ~~10~~ 11: the authoring review's
 		// allowance, `JPWB_AUTHORING_REVIEW_ALLOWANCE`, is stripped from the gate as the other live-backend variables are.
-		expect(Object.keys(EXPORTED)).toHaveLength(11);
+		// ⛔ MOVED 2026-11-19 (`JAN-EXEC` Phase 7, package L17b2; the lead's §27, item 4) — ~~11~~ 12: the Historian's time bound,
+		// `JPWB_HISTORIAN_CALL_MS`, is stripped from the gate as the other live-backend variables are.
+		expect(Object.keys(EXPORTED)).toHaveLength(12);
 		for (const [k, v] of Object.entries(EXPORTED)) expect(env[k]).toBe(v);
 		expect(Object.keys(env).filter((k) => /^path$/i.test(k))).toEqual(['PATH']);
 		expect(env.PATH).toBe(NO_PROGRAMS);

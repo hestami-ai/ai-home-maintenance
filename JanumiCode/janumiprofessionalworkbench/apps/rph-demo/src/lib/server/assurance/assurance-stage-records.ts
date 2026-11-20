@@ -15,10 +15,14 @@ import type { ActorReference } from '@janumipwb/rph-contracts';
 import { listByType, type EngineHandle } from '@janumipwb/rph-engine';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 
-/** The parts of the stage, as their artifacts' `artifactType` names them, and a unit's tactic record (D77). */
+/**
+ * The parts of the stage, as their artifacts' `artifactType` names them, and a unit's tactic record (D77). ⭐ L17b2 (D73, D86; ruling 5) — and the
+ * Historian's, third in the stage: `historical-assessment`, beside its assessment on the kernel.
+ */
 export const STAGE_PART = {
 	CHAPTER: 'narrative-chapter',
 	DIAGNOSIS: 'fault-diagnosis',
+	HISTORIAN: 'historical-assessment',
 	STEP_BACK: 'step-back',
 	TACTIC: 'tactic-record',
 	TACTIC_FINDING: 'tactic-record-finding'
@@ -54,6 +58,13 @@ export interface StagePartToRecord {
 	readonly limitations: readonly string[];
 	/** A tactic record's attempt (`<stepId>#<n>`), named in the evidence's `stage` alone (see the header). */
 	readonly attemptKey?: string;
+	/**
+	 * ⭐ L17b2 (D73's rule) — a diagnosis's named unit, in its evidence's `stage` too (`named`): the round's rule reads it at once, as the page's
+	 * synchronous `load` must, where the record's bytes come back only from an async store. Absent where the diagnosis names none.
+	 */
+	readonly named?: string | null;
+	/** ⭐ L17b2 (D73's rule; ruling 5) — the assessment a Historian's record made, in its evidence's `stage` too (`assessment`), for the same reason. */
+	readonly assessmentId?: string;
 }
 
 /** ⭐ RECORD ONE PART: its bytes on the content plane, then its artifact and its SOURCE evidence in one batch. */
@@ -101,7 +112,9 @@ export async function recordStagePart(
 						undertakingId: p.undertakingId,
 						unitId: p.unitId,
 						status: p.status,
-						...(p.attemptKey === undefined ? {} : { attempt: p.attemptKey })
+						...(p.attemptKey === undefined ? {} : { attempt: p.attemptKey }),
+						...(typeof p.named === 'string' ? { named: p.named } : {}),
+						...(p.assessmentId === undefined ? {} : { assessment: p.assessmentId })
 					},
 					artifactId,
 					storageKey: ref.storageKey,
@@ -132,6 +145,10 @@ export interface StageRecord {
 	readonly storageKey: string;
 	readonly contentHash: string;
 	readonly limitations: readonly string[];
+	/** ⭐ L17b2 — a diagnosis's named unit, as its evidence names it (`StagePartToRecord.named`); absent where it names none. */
+	readonly named?: string;
+	/** ⭐ L17b2 — the assessment a Historian's record made, as its evidence names it (`StagePartToRecord.assessmentId`). */
+	readonly assessmentId?: string;
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -159,11 +176,57 @@ export function stageRecordsIn(engine: EngineHandle): StageRecord[] {
 					status: str(stage.status) as StagePartStatus,
 					storageKey: str(ref.storageKey),
 					contentHash: str(ref.contentHash),
-					limitations
+					limitations,
+					...(typeof stage.named === 'string' ? { named: stage.named } : {}),
+					...(typeof stage.assessment === 'string' ? { assessmentId: stage.assessment } : {})
 				}
 			];
 		})
 		.sort((a, b) => (order.get(a.evidenceId) ?? 0) - (order.get(b.evidenceId) ?? 0));
+}
+
+/** ⭐⭐ L17b2 (D73; ruling 7) — one ask of the Historian in a round, as the record holds it. */
+export interface HistorianAskRecord {
+	/** Its stage record, `historical-assessment`. */
+	readonly record: StageRecord;
+	/** The assessment it made, where it made one: a call that failed, an answer not read or a completion refused made none. */
+	readonly assessmentId?: string;
+	/** That assessment's state, as the kernel holds it. */
+	readonly assessmentState?: string;
+	/** Whether it concluded: its record `recorded`, and its assessment a verdict — SATISFIED, CONDITIONALLY_SATISFIED or REJECTED. */
+	readonly concluded: boolean;
+	/** The control action it recommended: its completion event's first `recommendedControlActions` entry (the object holds none, `assurance.ts`). */
+	readonly recommendedControlAction: { readonly action: string; readonly reason: string } | null;
+}
+
+/** ⭐ L17b2 — the verdicts a Historian's assessment concludes with; INCONCLUSIVE, and an independence violation, do not conclude. */
+const CONCLUDED_VERDICTS: ReadonlySet<string> = new Set(['SATISFIED', 'CONDITIONALLY_SATISFIED', 'REJECTED']);
+
+/**
+ * ⭐⭐ L17b2 (D73's rule; rulings 5, 7) — THE ROUND'S ASKS OF THE HISTORIAN, in the order recorded: each `historical-assessment` stage record of the round,
+ * with the assessment it names in its evidence, that assessment's state, and the action its completion EVENT recommended. ⭑ Read from the engine alone,
+ * so the page's synchronous `load` and its acts read the same thing (§16 (4)).
+ */
+export function historianAsksOf(engine: EngineHandle, roundId: string): HistorianAskRecord[] {
+	const recommended = new Map<string, unknown>();
+	for (const e of engine.readAllEvents())
+		if (e.eventType === 'AssuranceAssessmentCompleted')
+			recommended.set(e.aggregateId, ((e.payload ?? {}) as { recommendedControlActions?: unknown }).recommendedControlActions);
+	return stageRecordsIn(engine)
+		.filter((r) => r.roundId === roundId && r.part === STAGE_PART.HISTORIAN)
+		.map((record): HistorianAskRecord => {
+			const id = record.assessmentId;
+			const state = id === undefined ? undefined : (engine.loadObject(id)?.state as { assessmentState?: unknown } | undefined)?.assessmentState;
+			const actions = id === undefined ? undefined : recommended.get(id);
+			const first = (Array.isArray(actions) ? actions[0] : undefined) as { action?: unknown; reason?: unknown } | undefined;
+			return {
+				record,
+				...(id === undefined ? {} : { assessmentId: id }),
+				...(typeof state === 'string' ? { assessmentState: state } : {}),
+				concluded: record.status === 'recorded' && typeof state === 'string' && CONCLUDED_VERDICTS.has(state),
+				recommendedControlAction: first === undefined ? null : { action: str(first.action), reason: str(first.reason) }
+			};
+		});
 }
 
 /** ⭐ A RECORD'S BYTES, re-hashed against the record: `undefined` when gone or when they do not hash to what it names. */

@@ -217,6 +217,12 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 		// records no Decision and moves no state; the server refuses it unless the unit is in that state and its round has no stage record yet
 		// (`assuranceStageOffer`). This census reddened on its arrival, which is its job.
 		'runAssuranceStage',
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D73 with the lead's ruling 7 on its Stage 0 (`REG-D-166` (6): an INCONCLUSIVE assessment is asked once
+		// more): the person's "Ask the Historian again" on a unit whose round's Historian did not conclude — one more Historian assessment of the round,
+		// beside the first. It records no Decision and moves no state; the server refuses it unless the round has one Historian assessment and it did not
+		// conclude (`wayBackOffer`). Pinned in the package's Stage 1, before the act exists, at its place right after the stage's own act: this census is
+		// red until Stage 2 adds it there, which is its job.
+		'rerunHistorian',
 		// S-1a (REG-F-104): abandonment is one of the three acts DOC-001 §5.2 reserves to Governance, and it
 		// had no caller from any surface. This census reddened on arrival, which is its job.
 		'abandonPwu',

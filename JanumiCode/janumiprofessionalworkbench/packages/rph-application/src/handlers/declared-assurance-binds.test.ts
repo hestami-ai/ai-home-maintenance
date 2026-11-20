@@ -27,6 +27,11 @@ import { testDirectory } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — ruling 18: the readers of the latest assessment per policy, each asked directly.
+import { latestAssessmentByPolicy } from './assessment-index.js';
+import { floorGateBlock } from './floor-gate.js';
+import type { HandlerContext } from './kit.js';
+import { rejectedDeclaredVerdicts } from './rework-authorization.js';
 
 const TS = '2026-09-14T00:00:00Z';
 const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'Controller' };
@@ -1123,5 +1128,156 @@ describe('a declared assurance policy BINDS (RPH-PWU-007 / RPH-ASR-012)', () => 
 		expect(refused.message, 'the refusal must name the ITEM, not only the baseline').toContain(pwu);
 		expect(refused.message, 'and the policy whose word is missing').toContain(polDeclared);
 		expect(refused.message).toContain('composed disposition EVIDENCE_REQUIRED');
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — the lead's ruling 18 (design D73: the Historian's assessment is *"a separate assessment, never
+	// folded into the unit's own assurance"*) ───────────────────────────────────────────────────────────────────────────────────────────────
+	//
+	// THE HISTORIAN'S ASSESSMENT NEVER SPEAKS FOR A DECLARED POLICY, IN THE KERNEL. The harness assesses a rejected unit under
+	// `pol_historical_consistency` beside its declared reviews (D73). A unit whose type declares that policy too — the ARCHITECTURE_DECISION
+	// template does, and after D78 any kind may take it — had the Historian's later assessment read as its declared verdict by every reader of
+	// `latestAssessmentByPolicy`: the satisfaction guard on both axes (RPH-PWU-007, RPH-ASR-012), D71's rework guard, the floor gate and the
+	// baseline promotion (R21). MEASURED before these were written (L17b2 facts §4.3): a completed assessment's STATE holds no validator id;
+	// its completion EVENT does (`AssuranceAssessmentCompleted.validatorId`); an unregistered validator completes. So the Historian's
+	// assessments are told apart by the validator id their completion records.
+	describe('⭐⭐ L17b2, ruling 18 — the Historian’s assessment never speaks for a declared policy', () => {
+		const HISTORIAN = 'historian.historical-consistency';
+		const DECLARED = 'reviewer.declared-policy';
+		/** The readers' context: the store, which is all each reads. */
+		const ctx = (): HandlerContext => ({ store }) as unknown as HandlerContext;
+
+		/** `assess`, its completion recorded under `validatorId` (`assess` records `reviewer`). */
+		const assessBy = (validatorId: string, assessmentId: string, policyId: string, subject: string, disposition: string): void => {
+			ok(
+				dispatch(
+					'RequestAssuranceAssessment',
+					{
+						assessmentId,
+						assurancePolicyId: policyId,
+						policyVersion: '1.0.0',
+						subjectObjectIds: [subject],
+						subjectSemanticVersions: { [subject]: 1 },
+						claimIds: []
+					},
+					assessmentId,
+					'ASSURANCE_ASSESSMENT'
+				),
+				`request ${assessmentId}`
+			);
+			ok(dispatch('BeginAssuranceAssessment', {}, assessmentId, 'ASSURANCE_ASSESSMENT'), `begin ${assessmentId}`);
+			ok(
+				dispatch(
+					'CompleteAssuranceAssessment',
+					{
+						validatorResult: {
+							validatorId,
+							validatorVersion: '1',
+							policyId,
+							policyVersion: '1.0.0',
+							assessmentId,
+							subjectObjectIds: [subject],
+							subjectSemanticVersions: { [subject]: 1 },
+							claimResults: [],
+							evidenceConsideredIds: [],
+							evidenceRejected: [],
+							observations: [],
+							dispositionRecommendation: disposition,
+							recommendedControlActions: [],
+							residualUncertainty: [],
+							limitations: [],
+							executionProvenance: {
+								evaluator: { actorId: 'rev-1', actorType: 'HUMAN', displayName: 'Reviewer' }
+							}
+						}
+					},
+					assessmentId,
+					'ASSURANCE_ASSESSMENT'
+				),
+				`complete ${assessmentId} ${disposition} as ${validatorId}`
+			);
+			expect(stateOf(assessmentId).assessmentState, `the arrangement: ${assessmentId} reads ${disposition}`).toBe(disposition);
+		};
+
+		/** A unit declaring one policy, reviewed REJECTED under it, then assessed by the Historian under it SATISFIED. */
+		const rejectedThenHistorian = (tag: string): { readonly pol: string; readonly pwu: string; readonly declared: string; readonly historian: string } => {
+			const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5${tag}${n}`;
+			const [pol, pwu, declared, historian] = [id('pol', '01'), id('pwu', '02'), id('asm', '03'), id('asm', '04')];
+			seedPolicy(pol);
+			proposePwu(pwu, [pol]);
+			assessBy(DECLARED, declared, pol, pwu, 'REJECTED');
+			assessBy(HISTORIAN, historian, pol, pwu, 'SATISFIED');
+			return { pol, pwu, declared, historian };
+		};
+
+		it('⛔ RED FIRST — the index: a later Historian assessment under a declared policy is left out, so the declared REJECTED is the policy’s latest word', () => {
+			const { pol, pwu, declared } = rejectedThenHistorian('V');
+			expect(latestAssessmentByPolicy(ctx(), pwu).get(pol)?.assessmentId, 'the Historian’s assessment speaks for the declared policy').toBe(
+				declared
+			);
+		});
+
+		it('⛔ RED FIRST — Mark Satisfied (RPH-PWU-007): a unit whose declared policy reads REJECTED is still refused, though a later Historian assessment under that policy reads SATISFIED', () => {
+			const { pwu, polDeclared, asmCited } = arrangeWorkLifecycle('W', 'REJECTED');
+			assessBy(HISTORIAN, 'asm_01ARZ3NDEKTSV4RRFFQ69G5W77', polDeclared, pwu, 'SATISFIED');
+			const refused = claimSatisfied(pwu, [asmCited]);
+			expect(refused.status, `expected a refusal: ${refused.message ?? ''}`).toBe('REJECTED');
+			expect(refused.code).toBe('RPH_INVARIANT_VIOLATION');
+			expect(stateOf(pwu).workLifecycleState, 'the work axis must not have moved').toBe('UNDER_ASSURANCE');
+		});
+
+		it('⛔ RED FIRST — the PWU fold (RPH-ASR-012): an assurance SATISFIED citing the Historian’s SATISFIED assessment is refused while the declared review reads REJECTED', () => {
+			const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5X${n}`;
+			const [pol, pwu, declared, historian] = [id('pol', '01'), id('pwu', '02'), id('asm', '03'), id('asm', '04')];
+			seedPolicy(pol);
+			proposePwu(pwu, [pol]);
+			driveToReady(pwu);
+			assessBy(DECLARED, declared, pol, pwu, 'REJECTED');
+			assessBy(HISTORIAN, historian, pol, pwu, 'SATISFIED');
+			driveAssuranceToAssessing(pwu);
+			const refused = setAssurance(pwu, 'SATISFIED', [historian]);
+			expect(refused.status, `expected a refusal: ${refused.message ?? ''}`).toBe('REJECTED');
+			expect(refused.code).toBe('RPH_INVARIANT_VIOLATION');
+			expect(stateOf(pwu).assuranceState, 'the assurance axis must not have moved').toBe('ASSESSING');
+		});
+
+		it('⛔ RED FIRST — D71’s rework guard: the unit’s REJECTED declared verdict is still read, though a later Historian assessment under the same policy reads SATISFIED', () => {
+			const { pwu, declared } = rejectedThenHistorian('Y');
+			expect(
+				rejectedDeclaredVerdicts(ctx(), pwu, 1).map((v) => v.assessmentId),
+				'the rework guard no longer sees the REJECTED declared verdict'
+			).toEqual([declared]);
+		});
+
+		it('⛔ RED FIRST — the floor gate: a unit no model produced, whose one assessment is the Historian’s, is not made subject to the floor by it', () => {
+			const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5Z${n}`;
+			const [pol, pwu, historian] = [id('pol', '01'), id('pwu', '02'), id('asm', '04')];
+			seedPolicy(pol);
+			proposePwu(pwu, []);
+			assessBy(HISTORIAN, historian, pol, pwu, 'SATISFIED');
+			expect(floorGateBlock(ctx(), pwu, { aiProduced: false, now: TS }), 'the Historian’s assessment made the floor apply').toBeNull();
+		});
+
+		it('⛔ RED FIRST — the baseline promotion (R21): an item whose declared policy was re-assessed REJECTED is refused, though a later Historian assessment under that policy reads SATISFIED', () => {
+			const { pwu, polDeclared, asmCited } = arrangeWorkLifecycle('M', 'SATISFIED');
+			ok(claimSatisfied(pwu, [asmCited]), 'the PWU reaches SATISFIED lawfully');
+			const promotion = promoteWith(pwu, 'M');
+			assessBy(DECLARED, 'asm_01ARZ3NDEKTSV4RRFFQ69G5M77', polDeclared, pwu, 'REJECTED');
+			assessBy(HISTORIAN, 'asm_01ARZ3NDEKTSV4RRFFQ69G5M78', polDeclared, pwu, 'SATISFIED');
+			const refused = promotion.promote();
+			expect(refused.status, `expected a refusal: ${refused.message ?? ''}`).toBe('REJECTED');
+			expect(refused.message).toContain('UNSUPPORTED_ITEM_ASSURANCE');
+			expect(refused.message, 'the refusal names the policy whose word is REJECTED').toContain(polDeclared);
+		});
+
+		it('⭑ CONTROL — a later DECLARED review still speaks for its policy: remediation clears a REJECTED, as before', () => {
+			const id = (p: string, n: string) => `${p}_01ARZ3NDEKTSV4RRFFQ69G5V${n}`;
+			const [pol, pwu, rejected, remediated] = [id('pol', '01'), id('pwu', '02'), id('asm', '03'), id('asm', '05')];
+			seedPolicy(pol);
+			proposePwu(pwu, [pol]);
+			assessBy(DECLARED, rejected, pol, pwu, 'REJECTED');
+			assessBy(DECLARED, remediated, pol, pwu, 'SATISFIED');
+			expect(latestAssessmentByPolicy(ctx(), pwu).get(pol)?.assessmentId).toBe(remediated);
+			expect(rejectedDeclaredVerdicts(ctx(), pwu, 1)).toEqual([]);
+		});
 	});
 });

@@ -7,9 +7,10 @@
 // identities disagree; records whose identity is not the one the product is held to (`DECISION_MODEL_RECORDS_IDENTITY`).
 // ⛔ No model: the records here are made by the product's own client against the local stub (`decision-model-stub.testing.ts`).
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
 	createValidatorRegistry,
 	FLOOR_POLICY_IDS,
@@ -22,6 +23,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 import { DECISION_MODEL_RECORDS_IDENTITY } from '../apps/rph-demo/src/lib/server/assurance/decision-model-identity.js';
 import { startDecisionModelStub, stubScore, STUB_MODEL } from '../apps/rph-demo/src/lib/server/assurance/decision-model-stub.testing.js';
 import { decisionModelBody } from '../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
+import { refusedRequestReason } from '../apps/rph-demo/src/lib/server/assurance/decision-model-client.js';
 import {
 	createAgyReasoningReviewValidator,
 	reviewPrompt,
@@ -30,7 +32,13 @@ import {
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { workProductReviewInput } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import { makeRecords, type RecordsEntry } from '../scripts/reviewer-qual/decision-model-records.js';
-import { committedRecordsIdentity, readDecisionModelRecords, recordedIndications } from '../scripts/reviewer-qual/recorded-indications.js';
+import {
+	committedRecords,
+	committedRecordsIdentity,
+	readDecisionModelRecords,
+	recordedIndications,
+	type DecisionModelRecords
+} from '../scripts/reviewer-qual/recorded-indications.js';
 
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 const DIR = mkdtempSync(join(tmpdir(), 'jpwb-recorded-indications-'));
@@ -53,8 +61,12 @@ const B = answer('{"summary":"The log is empty."}');
 const UNRECORDED = answer('{"summary":"No record was made of this review."}');
 
 /** ⭐ Records made as D54's are made — the product's own client, the records script's format — against the stub, here. */
-async function stubRecords(entries: readonly RecordsEntry[], name: string): Promise<string> {
-	const stub = await startDecisionModelStub({ digest: DECISION_MODEL_RECORDS_IDENTITY.digest, version: DECISION_MODEL_RECORDS_IDENTITY.serverVersion });
+async function stubRecords(
+	entries: readonly RecordsEntry[],
+	name: string,
+	version: string = DECISION_MODEL_RECORDS_IDENTITY.serverVersion
+): Promise<string> {
+	const stub = await startDecisionModelStub({ digest: DECISION_MODEL_RECORDS_IDENTITY.digest, version });
 	try {
 		const file = join(DIR, `${name}.ndjson`);
 		const out = await makeRecords({
@@ -202,6 +214,190 @@ describe('⭐ Z2b (D54) — the static source answers each request from the reco
 		const posing = readDecisionModelRecords([{ name: 'y.ndjson', text: `${JSON.stringify({ kind: 'CASE', id: 'A', model, digest, serverVersion, questions: [] })}\n` }]);
 		expect('refusal' in posing && posing.refusal).toBe('y.ndjson does not begin with its IDENTITY line (D54)');
 		expect(sha256('')).toHaveLength(64);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — §20 (the sponsor's choice, *"Record on 0.40.16, labelled"*) — THE RECORDS' SECOND FILE, READ
+// UNDER ITS OWN IDENTITY. The original files are read as before, under `DECISION_MODEL_RECORDS_IDENTITY`: the tests above hold that any
+// other identity among them is refused, never read — the old promise, unchanged. Beside them, one file, `probes-0.40.16.ndjson`: the
+// records' model and digest on server version 0.40.16, and nothing else. It is refused, never read, where its model, its digest or its
+// version is another; where it holds a body another file holds; and where a further file appears beside the three. Each score the
+// reader gives carries the server version of the file that holds it.
+describe('⭐⭐ L17b2 (§20) — the records’ second file, labelled 0.40.16, read under its own identity', () => {
+	const LABELLED = 'probes-0.40.16.ndjson';
+	const FOLDER = 'docs/tracking/reviewer-qualification/decision-model/';
+	const ON_16 = { ...DECISION_MODEL_RECORDS_IDENTITY, serverVersion: '0.40.16' };
+	const made = { v13: '', probes: '', u: '', a: '' };
+	const asText = (p: string, name: string = p) => ({ name, text: readFileSync(p, 'utf8') });
+	const originals = () => [asText(made.v13), asText(made.probes)];
+	/** The body hashes a review asks, by the records' model. */
+	const bodiesOf = async (input: ReasoningReviewInput): Promise<string[]> => {
+		let out: string[] = [];
+		await reviewPrompt(input, async (requests, material) => {
+			out = requests.map((r) => sha256(decisionModelBody(STUB_MODEL, material, r)));
+			return { scores: Object.fromEntries(requests.map((r) => [r.key, 0])) };
+		});
+		return out;
+	};
+	/** The second file with its IDENTITY line's `field` set to `value`. */
+	const relabelled = (field: string, value: string) => {
+		const [head, ...rest] = readFileSync(made.u, 'utf8').trimEnd().split('\n');
+		return { name: LABELLED, text: `${[JSON.stringify({ ...(JSON.parse(head!) as object), [field]: value }), ...rest].join('\n')}\n` };
+	};
+	/** The three readers' views of one call: the read's refusal, or the word 'read'. */
+	const outcome = (r: ReturnType<typeof readDecisionModelRecords>): string => ('refusal' in r ? r.refusal : 'read');
+	/** `readDecisionModelRecords`, handed the second file as its third argument (§20's form). */
+	const readWith = (labelled: { name: string; text: string }) =>
+		(readDecisionModelRecords as (...a: unknown[]) => ReturnType<typeof readDecisionModelRecords>)(originals(), DECISION_MODEL_RECORDS_IDENTITY, labelled);
+
+	it('⭐ arrangement: the original files on the product’s identity; the second file on 0.40.16, made by the same client against the stub', async () => {
+		made.v13 = await stubRecords(ENTRIES, 'l17b2-v13');
+		made.probes = await stubRecords([{ kind: 'PROBE', id: 'P', input: B }], 'l17b2-probes');
+		made.u = await stubRecords([{ kind: 'PROBE', id: 'U', input: UNRECORDED }], 'l17b2-labelled-u', '0.40.16');
+		made.a = await stubRecords([{ kind: 'PROBE', id: 'A', input: A }], 'l17b2-labelled-a', '0.40.16');
+		expect(JSON.parse(readFileSync(made.u, 'utf8').split('\n')[0]!)).toMatchObject({ kind: 'IDENTITY', ...ON_16 });
+	});
+
+	it('⛔ RED FIRST — accepted under its own identity: a review only it holds is sent, and each score carries the server version of its file', async () => {
+		const records = readWith(asText(made.u, LABELLED));
+		expect.soft(outcome(records), 'the records read').toBe('read');
+		const r = records as unknown as {
+			identity?: unknown;
+			labelled?: unknown;
+			scoreVersions?: ReadonlyMap<string, string>;
+		};
+		expect.soft(r.identity, 'the originals’ identity, the product’s').toEqual(DECISION_MODEL_RECORDS_IDENTITY);
+		expect.soft(r.labelled, 'the second file, by its name and its identity').toEqual({ name: LABELLED, identity: ON_16 });
+		const [a, u] = [await bodiesOf(A), await bodiesOf(UNRECORDED)];
+		expect.soft(a.map((s) => r.scoreVersions?.get(s)), 'the originals’ scores, each on 0.40.15').toEqual(a.map(() => '0.40.15'));
+		expect.soft(u.map((s) => r.scoreVersions?.get(s)), 'the second file’s scores, each on 0.40.16').toEqual(u.map(() => '0.40.16'));
+		const { prompts, failed } = await reviewed(UNRECORDED, recordedIndications(records));
+		expect.soft([prompts.length, failed], 'the review only the second file holds, sent').toEqual([1, []]);
+	});
+
+	it('⛔ RED FIRST — refused, never read, where its identity is another: its model, its digest, or a server version but its label’s', () => {
+		const otherDigest = `${DECISION_MODEL_RECORDS_IDENTITY.digest.slice(0, 12)}${'f'.repeat(52)}`;
+		for (const [field, value] of [
+			['model', 'another-model:7b'],
+			['digest', otherDigest],
+			['serverVersion', '0.40.17'],
+			['serverVersion', DECISION_MODEL_RECORDS_IDENTITY.serverVersion]
+		] as const) {
+			const r = readWith(relabelled(field, value));
+			expect.soft(outcome(r), `${field} ${value}: refused`).toContain(`${LABELLED} was made on `);
+			expect.soft(outcome(r), `${field} ${value}: the identity it is held to, named`).toContain(
+				`not the identity its label names: ${ON_16.model} ${ON_16.digest} on Ollama 0.40.16`
+			);
+			expect.soft(outcome(r), `${field} ${value}: its own value, named`).toContain(value);
+		}
+	});
+
+	it('⛔ RED FIRST — refused, never read, where it holds a body another file holds', () => {
+		const r = readWith(asText(made.a, LABELLED));
+		expect.soft(outcome(r)).toMatch(/^probes-0\.40\.16\.ndjson holds a body another file holds: [0-9a-f]{12}… in .*l17b2-v13\.ndjson/);
+	});
+
+	it('⛔ RED FIRST — the committed folder: the second file read beside the originals, and a further file refused, never read', () => {
+		const root = join(DIR, 'l17b2-root');
+		const folder = join(root, ...FOLDER.split('/').filter((s) => s !== ''));
+		mkdirSync(folder, { recursive: true });
+		copyFileSync(made.v13, join(folder, 'v13.ndjson'));
+		copyFileSync(made.probes, join(folder, 'probes.ndjson'));
+		copyFileSync(made.u, join(folder, LABELLED));
+		const url = pathToFileURL(`${root}/`);
+		const read = committedRecords(url);
+		expect.soft(outcome(read), 'the three files read').toBe('read');
+		expect.soft((read as { labelled?: unknown }).labelled, 'the second file among them').toEqual({ name: `${FOLDER}${LABELLED}`, identity: ON_16 });
+		copyFileSync(made.u, join(folder, 'probes-0.40.17.ndjson'));
+		const further = committedRecords(url);
+		expect.soft(outcome(further), 'a further file, refused').toContain(`the records folder holds a further file: ${FOLDER}probes-0.40.17.ndjson`);
+	});
+
+	// ⭐⭐ §22 (the lead's reading of `withLabelledFile`) — AN ENTRY'S REFUSAL IS ITS REVIEW'S: the refusal the product meets first. An original
+	// set asks a review whole, from its first request to the client's first refusal; the second set asks only the bodies no file held, so
+	// its line for an entry is the review's tail. The records run made two such lines (`W-OVERSIZE-EDGES`, `P-OVERSIZE-FENCES`): the
+	// originals hold each review refused at `c00`, and the second file a refusal at `c01`, a body after it the product never sends. Here the
+	// same shape on review A, built by hand: the originals refuse its first request, the second file its second.
+	it('⛔ RED FIRST — an entry the originals record refused at its first request keeps their words: the second file’s refusal of a later request is no refusal of the entry’s review (§22)', async () => {
+		let asked: { requests: readonly IndicationRequest[]; material: string } | undefined;
+		await reviewPrompt(A, async (requests, material) => {
+			asked = { requests, material };
+			return { scores: Object.fromEntries(requests.map((r) => [r.key, 0])) };
+		});
+		const [first, second] = asked!.requests;
+		const response = '{"error":"text and schema must not exceed 64 KiB"}';
+		const refusedAt = (r: IndicationRequest) => ({
+			kind: 'PROBE',
+			id: 'E',
+			questions: [],
+			refusedRequest: { key: r.key, kind: r.kind, bodySha256: sha256(decisionModelBody(STUB_MODEL, asked!.material, r)), status: 413, response }
+		});
+		const fileOf = (identity: object, line: object) => `${JSON.stringify({ kind: 'IDENTITY', set: 'by-hand', ...identity })}\n${JSON.stringify(line)}\n`;
+		const records = readDecisionModelRecords(
+			[{ name: 'original.ndjson', text: fileOf(DECISION_MODEL_RECORDS_IDENTITY, refusedAt(first!)) }],
+			DECISION_MODEL_RECORDS_IDENTITY,
+			{ name: LABELLED, text: fileOf(ON_16, refusedAt(second!)) }
+		);
+		expect(outcome(records), 'arrangement: the two files read').toBe('read');
+		const words = refusedRequestReason(first!.key, 413, response);
+		const met = await recordedIndications(records)(asked!.requests, asked!.material);
+		expect('refusal' in met ? met.refusal : '', 'the control: the review is refused at its first request, as the product meets it').toBe(words);
+		expect
+			.soft('refusal' in records ? undefined : records.refusedEntries.get('PROBE E'), 'the entry’s words: its review’s refusal, not the second file’s later request')
+			.toBe(words);
+	});
+
+	// ⭐⭐ §24 ruling 1 — THE SECOND FILE GIVES THE READER BODIES ALONE: its scores, each on its version, and its refused requests, by body.
+	// A line of it records requests, not a review (its set asks only bodies no file holds, and each body once across entries), so its lines
+	// join neither `entries` nor `refusedEntries`; and the file is the probes', so a line of any other kind refuses the whole read.
+	/** Review A's requests and material, asked of no model, and a request's body hash by the records' model. */
+	const reviewA = async () => {
+		let asked: { requests: readonly IndicationRequest[]; material: string } | undefined;
+		await reviewPrompt(A, async (requests, material) => {
+			asked = { requests, material };
+			return { scores: Object.fromEntries(requests.map((r) => [r.key, 0])) };
+		});
+		return { ...asked!, body: (r: IndicationRequest) => sha256(decisionModelBody(STUB_MODEL, asked!.material, r)) };
+	};
+	const fileWith = (identity: object, ...lines: object[]) =>
+		`${[JSON.stringify({ kind: 'IDENTITY', set: 'by-hand', ...identity }), ...lines.map((l) => JSON.stringify(l))].join('\n')}\n`;
+	const ORIGINAL = { name: 'original.ndjson', text: fileWith(DECISION_MODEL_RECORDS_IDENTITY, { kind: 'PROBE', id: 'P0', questions: [] }) };
+
+	it('⛔ RED FIRST — §24 ruling 1: a PROBE id only the second file holds joins neither `entries` nor `refusedEntries`; its score, its version and its refused request are read', async () => {
+		const a = await reviewA();
+		const [first, second] = a.requests;
+		const line = {
+			kind: 'PROBE',
+			id: 'ONLY-SECOND',
+			questions: [{ key: first!.key, kind: first!.kind, bodySha256: a.body(first!), score: 0.25 }],
+			refusedRequest: { key: second!.key, kind: second!.kind, bodySha256: a.body(second!), status: 413, response: '{"error":"text and schema must not exceed 64 KiB"}' }
+		};
+		const records = readDecisionModelRecords([ORIGINAL], DECISION_MODEL_RECORDS_IDENTITY, { name: LABELLED, text: fileWith(ON_16, line) });
+		expect(outcome(records), 'arrangement: the two files read').toBe('read');
+		const r = records as DecisionModelRecords;
+		expect.soft(r.entries.has('PROBE ONLY-SECOND'), 'the second file’s id among the entries').toBe(false);
+		expect.soft(r.refusedEntries.has('PROBE ONLY-SECOND'), 'the second file’s id among the refused entries').toBe(false);
+		expect.soft(r.entries.has('PROBE P0'), 'the control: the originals’ id among the entries').toBe(true);
+		expect.soft(r.scores.get(a.body(first!)), 'its score, read').toBe(0.25);
+		expect.soft(r.scoreVersions.get(a.body(first!)), 'on its version').toBe('0.40.16');
+		expect.soft(r.refused.get(a.body(second!))?.key, 'its refused request, by body').toBe(second!.key);
+	});
+
+	it('⛔ RED FIRST — §24 ruling 1: a line of the second file of any kind but PROBE refuses the whole read, naming the line — a CASE line, and a CONTROL line', async () => {
+		const a = await reviewA();
+		const [first] = a.requests;
+		const probe = { kind: 'PROBE', id: 'Q', questions: [{ key: first!.key, kind: first!.kind, bodySha256: a.body(first!), score: 0.5 }] };
+		for (const kind of ['CASE', 'CONTROL'] as const) {
+			const r = readDecisionModelRecords([ORIGINAL], DECISION_MODEL_RECORDS_IDENTITY, {
+				name: LABELLED,
+				text: fileWith(ON_16, probe, { kind, id: 'Q', questions: [] })
+			});
+			expect.soft(outcome(r), `a ${kind} line`).toBe(
+				`${LABELLED} line 3 is a ${kind} line: the second file holds probe questions alone, and every case is scored from the originals (D54; §24 ruling 1)`
+			);
+		}
+		const control = readDecisionModelRecords([ORIGINAL], DECISION_MODEL_RECORDS_IDENTITY, { name: LABELLED, text: fileWith(ON_16, probe) });
+		expect.soft(outcome(control), 'the control: its PROBE lines alone, read').toBe('read');
 	});
 });
 

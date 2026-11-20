@@ -28,6 +28,9 @@ export { PWU_SEMANTIC_LIFECYCLE_COMMANDS } from './handlers/pwu.js';
 // that must pin it (`JAN-CRITREAD` `DD-3`, `REG-D-070` §5.1).
 export { newlyReferencedAssurancePolicyIds } from './handlers/pwa-authoring.js';
 export { validatorNamedBy } from './handlers/assurance.js';
+// The Historian's validator id — ONE definition, shared by the kernel's index, which leaves its assessments out, and by the app's
+// Historian, which records it (`JAN-EXEC` Phase 7, package L17b2; the lead's ruling 18).
+export { HISTORIAN_VALIDATOR_ID } from './handlers/assessment-index.js';
 export type { OwnedLifecycleTarget } from './handlers/pwu.js';
 export type { CommandHandler, HandlerContext } from './handlers/kit.js';
 export { verifyExchangeContent, readAnswerSpan } from './exchange-resolution.js';

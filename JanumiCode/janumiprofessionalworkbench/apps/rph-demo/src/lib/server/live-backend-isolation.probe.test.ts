@@ -45,7 +45,10 @@ const LIVE_BACKEND_VARIABLES = [
 	'JPWB_AGENT_MODEL',
 	// ⭐ `JAN-EXEC` Phase 7, package O (design D26) — the eleventh: the authoring review's allowance (`review-allowance.ts`), which
 	// keys on its absence as the ten do: set, every authoring review round reserves its worst case against it.
-	'JPWB_AUTHORING_REVIEW_ALLOWANCE'
+	'JPWB_AUTHORING_REVIEW_ALLOWANCE',
+	// ⭐ `JAN-EXEC` Phase 7, package L17b2 (the lead's §27, item 4) — the twelfth: the Historian's time bound (`tools/devin-historian.ts`),
+	// which keys on its absence as the eleven do: unset, the Historian is not run.
+	'JPWB_HISTORIAN_CALL_MS'
 ] as const;
 
 describe('⭐ D8 — a gate process inherits no live-backend selection', () => {

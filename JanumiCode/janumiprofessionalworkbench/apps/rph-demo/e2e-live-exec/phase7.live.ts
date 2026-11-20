@@ -39,6 +39,14 @@ import {
 	rerunDeclared,
 	rejectedRerunOffered,
 	rerunRejectedWork,
+	// ⭐⭐ L17b2 (D82; the lead's §15.3 (1), §16) — the loop's acts on the page.
+	historianAgainOffered,
+	rerunHistorian,
+	runAssuranceStage,
+	sendBackOffered,
+	sendWorkBack,
+	sponsorDecides,
+	stageOffered,
 	runTheLane,
 	screenshot,
 	startOfferOf,
@@ -118,7 +126,13 @@ import { STORE_FILE } from './run-folder';
 //      their bound: a sign-off that would cross it is not pressed, nor is any later one, and the run ends `paid-limit`.
 //      ⭐ `E12F` F3 — a Record Assurance answered with a refusal, whose row then offers re-running the declared reviews that
 //      did not conclude, has them re-run once by the rule (`REG-D-105` (4), `REG-D-112` (a)), the limit read first, then
-//      Mark Satisfied if it was accepted. ⛔ E12's re-review F1 — a sign-off act with NO ANSWER ends the run there, as a
+//      Mark Satisfied if it was accepted. ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — D82, after D71 (`REG-D-166` (5), (6), (8); `REG-D-163` (2)) — a
+//      Record Assurance its declared reviews REJECT, whose row offers no declared re-run: the round's assurance stage, the Historian asked again where
+//      the page offers it, and the way back the round's records offer — D71's re-run in place, or D72's send-back by replacement, to the unit the
+//      diagnosis names or, where the way back is the person's choice, the workhorse by this PWA's type — each press's worst case counted first, no
+//      count of the rounds; the sign-off again after each re-run, and a replacement's units taken in and pressed in the page's order. Where the page
+//      says the sponsor decides, or the workhorse cannot be chosen, nothing more is pressed and the run ends `withheld`, the case named.
+//      ⛔ E12's re-review F1 — a sign-off act with NO ANSWER ends the run there, as a
 //      Begin & Execute with none does (D4): nothing is pressed beside it, and the final archive is taken. Dry, no phase was
 //      pressed, so the root's alone — ~~by these same acts (D11)~~ rehearsed up to the reviewer call, and nothing pressed
 //      (`REG-D-112` (b)).
@@ -158,7 +172,7 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 	}) => {
 		test.setTimeout(PHASE7_TEST_TIMEOUT_MS);
 		// ⛔ NO ACT WAITS UNBOUNDED: this lane sets no action timeout, so a click on a button that never came would wait out
-		// the ~~43-hour~~ ~~85-hour~~ ~~103-hour~~ ⭐ 116.6-hour test (P7-6 B4; `P76F-C` C8; `E12F` F2, F3). Begin & Execute and the sign-off acts pass bounds of their own ⭐ — and,
+		// the ~~43-hour~~ ~~85-hour~~ ~~103-hour~~ ~~⭐ 116.6-hour~~ ⭐ 424.2-hour (L17b2) test (P7-6 B4; `P76F-C` C8; `E12F` F2, F3). Begin & Execute and the sign-off acts pass bounds of their own ⭐ — and,
 		// since P7-6 B3, every fill and click the lane makes.
 		page.setDefaultTimeout(PHASE7_UI_MS);
 		const paid = process.env[PHASE7_PAID_VARIABLE] === '1';
@@ -238,6 +252,15 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 				// the act.
 				rejectedRerunOffered: (unit) => rejectedRerunOffered(unitRowById(page, unit.unitId!)),
 				rerunRejectedWork: (unit) => rerunRejectedWork(page, unitRowById(page, unit.unitId!), actionFields),
+				// ⭐⭐ L17b2 — D82 (the lead's §15.3 (1), §16) — the loop's hands: the round's stage and the Historian asked again, each waited for the bound the
+				// lane hands it; the sponsor's case; D72's send-back, its candidates and the act — each on the unit's own row, by its id.
+				stageOffered: (unit) => stageOffered(unitRowById(page, unit.unitId!)),
+				runAssuranceStage: (unit, timeoutMs) => runAssuranceStage(page, unitRowById(page, unit.unitId!), actionFields, timeoutMs),
+				historianAgainOffered: (unit) => historianAgainOffered(unitRowById(page, unit.unitId!)),
+				rerunHistorian: (unit, timeoutMs) => rerunHistorian(page, unitRowById(page, unit.unitId!), actionFields, timeoutMs),
+				sponsorDecides: (unit) => sponsorDecides(unitRowById(page, unit.unitId!)),
+				sendBackOffered: (unit) => sendBackOffered(unitRowById(page, unit.unitId!)),
+				sendWorkBack: (unit, targetId) => sendWorkBack(page, unitRowById(page, unit.unitId!), targetId, actionFields),
 				// ⭐ P7-6R R-1f — the run plan's rule's two hands: the row's offers, and one act on the row (`REG-D-105` (4)).
 				recoveryOffers: (unit) => recoveryOffers(unitRowById(page, unit.unitId!)),
 				recover: (unit, act) => recover(page, unitRowById(page, unit.unitId!), act, actionFields),

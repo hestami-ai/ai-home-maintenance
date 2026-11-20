@@ -449,6 +449,21 @@
 													<button class="mini" type="submit" data-testid="run-assurance-stage">Run the assurance stage</button>
 												</form>
 											{/if}
+											<!-- ⭐⭐ JAN-EXEC Phase 7, package L17b2 — D73 (the lead's ruling 7) — ASK THE HISTORIAN AGAIN. Offered ONLY where the round's Historian did
+											     not conclude once — INCONCLUSIVE, refused at its completion, or not run — as the server reads it (`historianAgainByPwu`, the round's rule): its
+											     part again, recorded. It records no Decision and moves no state, so it asks for no rationale. -->
+											{#if data.historianAgainByPwu[p.id]}
+												<form method="POST" action="?/rerunHistorian" use:enhance class="findingform">
+													<input type="hidden" name="pwuId" value={p.id} />
+													<button class="mini" type="submit" data-testid="ask-historian-again">Ask the Historian again</button>
+												</form>
+											{/if}
+											<!-- ⭐⭐ L17b2 — D73, D87 (the lead's ruling 14 and §7) — WHERE NO WAY BACK IS OFFERED BECAUSE THE SPONSOR DECIDES: the case in plain words, as the
+											     server words it (`sponsorDecidesByPwu`) — the Historian asks for the sponsor's decision, with its reason as it gave it; or it did not reach a
+											     judgment twice — then that no way back is offered and the sponsor decides. -->
+											{#if data.sponsorDecidesByPwu[p.id]}
+												<span class="hint" data-testid="sponsor-decides">{data.sponsorDecidesByPwu[p.id].said}</span>
+											{/if}
 											<!-- REJECTION IS OFFERED ONLY WHERE A BLOCKING FINDING ACTUALLY STANDS (S-1b / B-3).
 											     The predicate is the SAME question the engine's `hasBlockingObservationFor` asks —
 											     a BLOCKING/CRITICAL observation whose subjectObjectIds include this PWU — so the

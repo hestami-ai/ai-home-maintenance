@@ -216,27 +216,55 @@ describe('⭐⭐ L12 — D67, through the route and the product’s floor: the t
 	// now records a second context assembly policy (`ctx-default-loop`) before this file's first command, and each prompt's one host-computed line,
 	// "The candidate's subject hash (host-computed): …" — a hash over the stored PWA and its types, objects the store stamps — moved with it. Every other
 	// byte of every prompt is HEAD's: measured, all 24 of this file's prompts equal to HEAD's with that one hash masked, none equal without it.
+	// ⭐ RESTATED 2026-11-18 (`JAN-EXEC` Phase 7, package L17b2 — design D78; `REG-D-166` (3)): the six values re-measured (on a scratch copy at
+	// 7f5e83a5 with the seeded Historian's kinds emptied — L17b2 facts §4.10), each old one kept struck beside it. The seeded Historian names no
+	// kind now, so each part's context line lists it among the policies its kind may take: one entry, its id, name and purpose. ⭑ The old promise
+	// is kept by the control after it: each prompt with that one entry taken out is L17b1's value, byte for byte.
 	it('⭑ CONTROL — the reviewer prompts of the first two rounds are HEAD’s, byte for byte', async () => {
 		const pwaId = draftPwa();
 
 		await postInstruction(pwaId, PLAN);
 
 		const sha256 = (prompt: string) => createHash('sha256').update(prompt, 'utf8').digest('hex');
+		expect
+			.soft(
+				seam.reviews.filter((r) => r.round <= 2).map((r) => [r.round, r.typeName, sha256(r.prompt)]),
+				'a reviewer prompt of the first two rounds is not HEAD’s, byte for byte'
+			)
+			.toEqual([
+				// ~~'3aed56599538c482ca8dc1e1d8f83b77fad998f8eaf6f22eb6fcb2060eaec3a4'~~ ~~'6bc5f11025ddd7afd9c634e036fa5c97342020097585c4cf39bb5d61ceee3611'~~
+				[1, 'Realize', '62e3ec4b372e9de34c8a0c22340fa9230931171a7a36d3a9b53246cae38b1de9'],
+				// ~~'eb7d546657d7bc4348b089327947f1f35ec3ba0f17e33ed556e65c0e47dda811'~~ ~~'216f0ac06cba6b057e49484d1d590ecacd618457f69f769836093c21bfc7d9f3'~~
+				[1, 'Check', 'a76fc53603db64002f4ddf86871e6879295d9596fb305667d4f5802b64e40666'],
+				// ~~'3ad1a328e37810b5a19e7767ce114d126f76457c8ef86476c0171649ca511633'~~ ~~'e637b461062676620eaef620ebfb2cbbc39c5617573e23c1a24bbb29c611367d'~~
+				[2, 'Realize', '061a88e4b8b05ba51803a985ea93e52a7c6beef7bf62097c4b7ad5c69be01e34'],
+				// ~~'5eaff24a86ef45e6fa9a1062a7fc6b6e82e08e46013ff8286c87d1415a357925'~~ ~~'57640a8ff795611387060d285dcac804545a3d33b245090d3a2e2d600a82c9f9'~~
+				[2, 'Check', '9f52d6ce600e5b276d193f6b50dfe66e94b86948aa4f152c7f8d7a46cce36f13'],
+				// ~~'e2ba3e63bd8147c6f313c3d961d481484c8eb3fc75c1681fb7b082833b4056ec'~~ ~~'ab2c8df2320770229e044492d132ef47979a3494d6a6933eda2db84fc2dd307f'~~
+				[2, 'Product Realization', 'f323119610792aa662760f8148db047ea7d6571adc5acc7794b3bb8fd5599325'],
+				// ~~'14813b924e99bbbc9ae42e5d5ca29a6dc7bb4091d3d04232dd3a345b99d6e471'~~ ~~'b0804ea2dd6d49cca2857d1c9152a5ee260f1c17b0cfe886cbcc02211ac9efb8'~~
+				[2, 'Architecture Definition', '7077e3768b19f6bf809145970912a40c34aa965c4386f776da4e0705431c089c']
+			]);
+		// ⭑ CONTROL (L17b2, D78) — and nothing else moved: each prompt with the Historian's one entry taken out is L17b1's value.
+		const historian = JSON.stringify({
+			id: 'pol_historical_consistency',
+			name: 'Historical Consistency',
+			purpose:
+				'Determine whether current work repeats known failure, conflicts with an active decision, ignores recorded rationale, or diverges from precedent without explanation.'
+		});
+		const withoutTheHistorian = (prompt: string): string => {
+			for (const form of [`${historian},`, `,${historian}`, historian]) if (prompt.includes(form)) return prompt.replace(form, '');
+			return prompt;
+		};
 		expect(
-			seam.reviews.filter((r) => r.round <= 2).map((r) => [r.round, r.typeName, sha256(r.prompt)]),
-			'a reviewer prompt of the first two rounds is not HEAD’s, byte for byte'
+			seam.reviews.filter((r) => r.round <= 2).map((r) => [r.round, r.typeName, sha256(withoutTheHistorian(r.prompt))]),
+			'a reviewer prompt of the first two rounds, the Historian’s one entry taken out, is not L17b1’s, byte for byte'
 		).toEqual([
-			// ~~'3aed56599538c482ca8dc1e1d8f83b77fad998f8eaf6f22eb6fcb2060eaec3a4'~~
 			[1, 'Realize', '6bc5f11025ddd7afd9c634e036fa5c97342020097585c4cf39bb5d61ceee3611'],
-			// ~~'eb7d546657d7bc4348b089327947f1f35ec3ba0f17e33ed556e65c0e47dda811'~~
 			[1, 'Check', '216f0ac06cba6b057e49484d1d590ecacd618457f69f769836093c21bfc7d9f3'],
-			// ~~'3ad1a328e37810b5a19e7767ce114d126f76457c8ef86476c0171649ca511633'~~
 			[2, 'Realize', 'e637b461062676620eaef620ebfb2cbbc39c5617573e23c1a24bbb29c611367d'],
-			// ~~'5eaff24a86ef45e6fa9a1062a7fc6b6e82e08e46013ff8286c87d1415a357925'~~
 			[2, 'Check', '57640a8ff795611387060d285dcac804545a3d33b245090d3a2e2d600a82c9f9'],
-			// ~~'e2ba3e63bd8147c6f313c3d961d481484c8eb3fc75c1681fb7b082833b4056ec'~~
 			[2, 'Product Realization', 'ab2c8df2320770229e044492d132ef47979a3494d6a6933eda2db84fc2dd307f'],
-			// ~~'14813b924e99bbbc9ae42e5d5ca29a6dc7bb4091d3d04232dd3a345b99d6e471'~~
 			[2, 'Architecture Definition', 'b0804ea2dd6d49cca2857d1c9152a5ee260f1c17b0cfe886cbcc02211ac9efb8']
 		]);
 	});

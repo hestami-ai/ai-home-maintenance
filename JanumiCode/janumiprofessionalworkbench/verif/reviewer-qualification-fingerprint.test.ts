@@ -5611,14 +5611,16 @@ describe('⭐⭐ D3a (REG-D-127) — the part probes carry the policy material: 
 	const named = (id: string) => SEEDED_PROBE_LIBRARY.find((p) => p.id === id)!;
 	const shown = (id: string) => ({ id, name: named(id).name, purpose: named(id).purpose });
 
-	it('⭐ T-DECLARED-POLICIES — each declared policy with the seeded library’s id, name and purpose, in its declared order, and one the library does not hold by its id alone; its kind is no seeded policy’s, so it lists none', () => {
+	// ⭐ RESTATED (`JAN-EXEC` Phase 7, package L17b2 — design D78; `REG-D-166` (3)): the seeded Historian names no kind now, so a kind
+	// no other seeded policy names lists it alone — ~~so it lists none~~. The declared list is unchanged.
+	it('⭐ T-DECLARED-POLICIES — each declared policy with the seeded library’s id, name and purpose, in its declared order, and one the library does not hold by its id alone; its kind is no seeded policy’s, so it lists ~~none~~ ⭐ the one that names no kind, the Historian (L17b2, D78)', () => {
 		const { subject, context } = linesOf('T-DECLARED-POLICIES');
 		expect(subject.declaredPolicies).toEqual([
 			shown('pol_intent_preservation'),
 			shown('pol_assumption_disclosure'),
 			{ id: 'pol_wall_repair_rules' }
 		]);
-		expect(context.applicablePolicies).toEqual([]);
+		expect(context.applicablePolicies).toEqual([shown('pol_historical_consistency')]);
 	});
 
 	it('⭐ T-APPLICABLE-POLICIES — the ACTIVE non-floor policies whose kinds name the subject’s kind, name none or are an empty list, in the library’s order; ⛔ CONTROLS: a floor policy, a DRAFT one, a SUSPENDED one and another kind’s are in no line of its prompt', () => {
@@ -5634,11 +5636,14 @@ describe('⭐⭐ D3a (REG-D-127) — the part probes carry the policy material: 
 			expect(prompt.includes(id), id).toBe(false);
 	});
 
-	it('⭐ T-SEEDED-LIBRARY — a PRODUCT_IMPLEMENTATION type declaring Intent Preservation alone is shown Test Adequacy’s id, name and purpose among the three policies its kind may take, in its prompt', () => {
+	// ⭐ RESTATED (`JAN-EXEC` Phase 7, package L17b2 — design D78; `REG-D-166` (3)): the seeded Historian names no kind now, so it is
+	// among those the kind may take, in the library's order — ~~three~~ four. Test Adequacy is shown as before.
+	it('⭐ T-SEEDED-LIBRARY — a PRODUCT_IMPLEMENTATION type declaring Intent Preservation alone is shown Test Adequacy’s id, name and purpose among the ~~three~~ ⭐ four (L17b2, D78) policies its kind may take, in its prompt', () => {
 		const { subject, context } = linesOf('T-SEEDED-LIBRARY');
 		expect(subject.declaredPolicies).toEqual([shown('pol_intent_preservation')]);
 		expect(context.applicablePolicies).toEqual([
 			shown('pol_assumption_disclosure'),
+			shown('pol_historical_consistency'),
 			shown('pol_intent_preservation'),
 			shown('pol_test_adequacy')
 		]);
@@ -5674,15 +5679,33 @@ const PAST_A_BOUND: Readonly<Record<'growth' | 'whole', RegExp>> = {
 		/^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 \(REG-D-146; D52\)\. No indication is dropped to fit it, so the review is refused\. No model was called\.$/,
 	whole: /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 35500 \(REG-D-146; D52\)\. No indication is dropped to fit it, so the review is refused\. No model was called\.$/
 };
-/** Each refusal probe's input as it was at `8bbe8f1b` — the canonical JSON's sha256: kept byte for byte. */
+/**
+ * Each refusal probe's input as it was at `8bbe8f1b` — the canonical JSON's sha256: kept byte for byte.
+ * ⭐ RESTATED (`JAN-EXEC` Phase 7, package L17b2 — design D78; `REG-D-166` (3)): but T-ACCOUNT-BREAKS, a part probe, whose context line
+ * lists the seeded Historian now, which names no kind — its value re-measured (on a scratch copy at 7f5e83a5 with the kinds emptied, L17b2
+ * facts §4.10), the old one kept struck beside it, and the old promise held by `REFUSAL_PROBE_INPUT_SHA256_BEFORE_D78`: its input with the
+ * Historian's one entry taken out is the input at `8bbe8f1b`, byte for byte.
+ */
 const REFUSAL_PROBE_INPUT_SHA256: Readonly<Record<string, string>> = {
-	'T-ACCOUNT-BREAKS': '5c86d17b61f2be46ef20635d32336503a5ca4205608553d0ed636e28ef8745a8',
+	// ~~'5c86d17b61f2be46ef20635d32336503a5ca4205608553d0ed636e28ef8745a8'~~
+	'T-ACCOUNT-BREAKS': '047b41b05b780a8b9c6652e0952b920369d8a95b8fb3496281b1035ac6e0eaae',
 	'W-ACCOUNT-BREAKS': '7426a4603db3fd58f380006f3cf6895f35d09e2084e2da6b24a39b483694745b',
 	'P-ACCOUNT-BREAKS': '74e3c2013d881ab1c265c0277051b0f5f8920bbb3bec7db4aad76b4cf81a1c86',
 	'P-OVERSIZE-SURROGATE': '7e25d7a3dc0a5fe25f1d9217c48d9a3bc05c3d7b96aef15f7490654c0bb98229',
 	'P-OVERSIZE-ROOM-EDGES': 'a6500444793a107db6f5460d535691befb6683ed786c89faa5643f9e9bbb0073',
 	'P-OVERSIZE-ALL': '1a88dbf68b5c1367a870cdaebdfc453d8e18ff51bedea577103069222aac1d99'
 };
+/** ⭐ L17b2 (D78): the input at `8bbe8f1b` of each refusal probe D78 moved, held with the Historian's one entry taken out. */
+const REFUSAL_PROBE_INPUT_SHA256_BEFORE_D78: Readonly<Record<string, string>> = {
+	'T-ACCOUNT-BREAKS': '5c86d17b61f2be46ef20635d32336503a5ca4205608553d0ed636e28ef8745a8'
+};
+/** ⭐ L17b2 (D78): `content` with the seeded Historian's one entry — its id, name and purpose, as a part lists it — taken out, once. */
+function withoutTheHistorian(content: string): string {
+	const h = SEEDED_PROBE_LIBRARY.find((p) => p.id === 'pol_historical_consistency')!;
+	const entry = JSON.stringify({ id: h.id, name: h.name, purpose: h.purpose });
+	for (const form of [`${entry},`, `,${entry}`, entry]) if (content.includes(form)) return content.replace(form, '');
+	return content;
+}
 /**
  * The growth of `input`'s measured prompt beyond today's, AS THE VALIDATOR MEASURES IT: the statement of its own growth
  * bound, read with the method padded past that bound by a known length (`reviewPrompt`'s `text`). ⚠ Not `todayPromptOf`,
@@ -5714,7 +5737,14 @@ describe('⭐⭐ JAN-EXEC Phase 7, package Z1b — D52’s refusal probes, and t
 		});
 		for (const [id, bound] of Object.entries(Z1B.D52_REFUSAL_PROBES ?? {})) {
 			const input = probeInputOf(id);
-			expect(sha256(canonicalJson(input)), `${id}: its input, byte for byte as at 8bbe8f1b`).toBe(REFUSAL_PROBE_INPUT_SHA256[id]);
+			expect.soft(sha256(canonicalJson(input)), `${id}: its input, byte for byte as at 8bbe8f1b`).toBe(REFUSAL_PROBE_INPUT_SHA256[id]);
+			// ⭑ CONTROL (L17b2, D78) — the old promise of a probe D78 moved: its input at 8bbe8f1b, the Historian's one entry taken out.
+			const beforeD78 = REFUSAL_PROBE_INPUT_SHA256_BEFORE_D78[id];
+			if (beforeD78 !== undefined)
+				expect(
+					sha256(canonicalJson({ ...input, content: withoutTheHistorian(input.content) })),
+					`${id}: its input, the Historian’s one entry taken out, byte for byte as at 8bbe8f1b`
+				).toBe(beforeD78);
 			const [head, statement, ...content] = BASE.probePrompts.get(id)!.split('\n');
 			expect(head, `${id}: refused before any prompt`).toBe(REFUSED);
 			expect(statement, `${id}: refused past its ${bound} bound, with D52’s statement`).toMatch(PAST_A_BOUND[bound]);

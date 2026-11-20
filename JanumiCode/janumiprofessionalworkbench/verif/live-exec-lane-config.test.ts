@@ -65,6 +65,8 @@ import {
 	PHASE7_SHOW_OVERVIEW_MS,
 	PHASE7_SIGN_OFF_MS,
 	PHASE7_SIGN_OFF_UNIT_MS,
+	// ⭐⭐ L17b2 (D82; §18) — the loop's press bounds, computed from the Historian's own setting: their helper turns, and the two functions.
+	PHASE7_STAGE_HELPER_TURNS,
 	PHASE7_DECLARED_RERUN_MS,
 	PHASE7_TEST_TIMEOUT_MS,
 	PHASE7_UI_MS,
@@ -77,7 +79,9 @@ import {
 	TEST_TIMEOUT_MS,
 	WIRED_EXECUTORS,
 	laneKeysRefusal,
+	phase7AssuranceStageMs,
 	phase7DeclaredRerunMs,
+	phase7HistorianAgainMs,
 	phase7DeclaredReviewsMs,
 	phase7RecordAssuranceMs,
 	phase7SignOffUnitMs,
@@ -872,7 +876,12 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// ⭐⭐ Package L — D13 (`REG-D-135` (3)) — AND WAS *"419,640 s"*: each review is now up to six calls, so each phase's allowance,
 	// each re-run's and each sign-off's declared reviews grow with it: 1,800 + 5 × 55,740 + 1,200 + 4 × 58,080 + 5 × 15,120 + 420
 	// = 590,040 s.
-	it('⛔ the spec’s test timeout — every phase and recovery act at its bound, plus the setup’s allowance, ~~419,640 s~~ ~~590,040 s~~ 1,101,240 s (package X, D35) — stays under Node’s timer ceiling', () => {
+	// ⭐⭐ L17b2, Stage 3b (the lead's §33, surprise 1; brief-3b item 13) — THE TITLE RESTATED, no check touched: ~~"every phase and recovery act at its
+	// bound"~~ — it counts the acts its message below lists, each at its bound, and no round of D82's loop, nor any D71 re-run since package L16 (§31
+	// (2); `lane-config.ts` says what it leaves out, why in practice a run still ends first, and its ⚠: a bound by calls, not by time — rounds that each
+	// ran to their time bounds could still outlast it, disclosed, not closed); and ~~"1,101,240 s (package X, D35)"~~ — package Z3 moved the terms and
+	// the value this test holds, and not the title: 1,527,240 s.
+	it('⛔ the spec’s test timeout — ~~every phase and recovery act at its bound~~ ⭐ the root’s run and each phase’s, the limit’s reads, one re-run and one abandonment for each phase, the five sign-offs and the final screenshot and read, each at its bound (no round of D82’s loop: L17b2, §31 (2)), plus the setup’s allowance, ~~419,640 s~~ ~~590,040 s~~ ~~1,101,240 s (package X, D35)~~ ⭐ 1,527,240 s (package Z3, D51) — stays under Node’s timer ceiling', () => {
 		// ⚠ FIRST, so a figure pushed past the ceiling reddens here by this message, not by the arithmetic below it.
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
@@ -887,7 +896,9 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
 			// ⛔ MOVED 2026-11-07 (Z3 — D51): the message's ~~106,140 s~~, ~~108,480 s~~ and ~~26,640 s~~.
-			'the timeout is not every phase and recovery act at its bound plus the setup’s allowance: 1,800 s setup (an ' +
+			// ⭐⭐ L17b2, Stage 3b (the lead's ruling on l17b2-facts.md §34.6) — THE MESSAGE'S WORDS RESTATED, the expectation untouched:
+			// ~~"every phase and recovery act at its bound"~~, as the title above.
+			'the timeout is not ~~every phase and recovery act at its bound~~ ⭐ each act this message lists at its bound (no round of D82’s loop: L17b2, §31 (2)) plus the setup’s allowance: 1,800 s setup (an ' +
 				'allowance, its own acts NOT counted by their bounds) + 5 × 148,140 s (the root’s run and each phase’s) + 4 × 300 s ' +
 				'(the limit’s reads) + 4 × 1 × 150,480 s (a re-run, an abandonment and the rule’s UI acts for each phase) + ' +
 				'5 × 36,240 s (the sign-offs, each Record Assurance its unit’s declared reviews, the limit’s read before it and ' +
@@ -903,7 +914,9 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 
 	// ⭐⭐ `P76F-C` C8 — EACH TERM, AT ITS BOUNDS: the arithmetic the timeout's comment states, held term by term, so a bound
 	// that moves reddens the term it moved, not only the total.
-	it('⭐ C8 — each counted term, every phase and recovery act at its bound', () => {
+	// ⭐⭐ L17b2, Stage 3b (the lead's ruling on l17b2-facts.md §34.6) — THE TITLE RESTATED, no check touched: ~~"every phase and recovery act
+	// at its bound"~~ — the terms are those the timeout counts, and it counts no round of D82's loop (§31 (2)).
+	it('⭐ C8 — each counted term, ~~every phase and recovery act at its bound~~ ⭐ each act the timeout counts at its bound (no round of D82’s loop: L17b2, §31 (2))', () => {
 		// The overview shown afresh: the navigation, the hydration wait, the tab's click.
 		expect(PHASE7_SHOW_OVERVIEW_MS).toBe(3 * PHASE7_UI_MS);
 		// One Begin & Execute and what follows it: the press, the overview again, the store read, the screenshot.
@@ -1023,6 +1036,43 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`7_500_000`~~: 300 s + 5 × 6 × 480 s.
 		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`14_700_000`~~: 300 s + 5 × (6 × 480 s + 1,200 s).
 		expect([phase7RecordAssuranceMs(0), phase7RecordAssuranceMs(5)]).toEqual([PHASE7_SIGN_OFF_MS, 20_700_000]);
+	});
+
+	// ⭐⭐ L17b2 (D82; the lead's §18, and §27 reading 5) — THE LOOP'S TWO PRESSES THAT CALL A MODEL ARE WAITED FOR BOUNDS COMPUTED FROM THE BOOT'S
+	// SETTINGS, never constants: the Historian's time bound is a setting (`JPWB_HISTORIAN_CALL_MS`, required, with no default, its value design D84's), and
+	// neither the helpers' turns nor an executor's try carries a time bound inside the product, so the lane's press bound is the stop for both (§18).
+	//   · the round's assurance stage — the narrative writer's one call, at one reviewer call's bound (`LANE_BUDGET.reviewerCallMs`: the selected
+	//     reviewer's own transport, once, D76); the Historian's; and each helper turn — the Hypothesizer's, and the Unsticking Agent's, which an open
+	//     recurrence can bring in any round — at the bound the lane already uses for one executor turn (`LANE_BUDGET.executorCallMs`); ⭐ and (Stage 3's
+	//     part 0, the lead's §31 (1)) the lane's page margin, a sign-off act's own bound (`PHASE7_SIGN_OFF_MS`), as the re-ask's bound and Record Assurance's
+	//     carry it: the stage's press does its own page work too — the helpers' workspace copies, the Historian's folder written through the port, three parts
+	//     recorded;
+	//   · the Historian asked again — the Historian's; the Unsticking Agent's turn, which a re-ask that records a recurrence brings (§27 reading 5); and
+	//     the lane's page margin, a sign-off act's own bound (`PHASE7_SIGN_OFF_MS`), as Record Assurance's bound counts its act beside its reviews;
+	//   · the send-back calls no model, and is waited for as a sign-off act is (`PHASE7_SIGN_OFF_MS`; the live spec's bounds list holds it).
+	it('⛔ RED FIRST — L17b2 (D82; §18) — the round’s stage and the Historian’s re-ask are waited for bounds computed from the Historian’s own setting: the writer’s call, the Historian’s and two helper turns ⭐ and the page’s margin (§31 (1)); the Historian’s, one helper turn and the page’s margin — each read by reference, no number stated', () => {
+		const H = 600_000;
+		expect([phase7AssuranceStageMs(H), phase7HistorianAgainMs(H)], 'a bound is not the sum of its terms').toEqual([
+			// ~~LANE_BUDGET.reviewerCallMs + H + PHASE7_STAGE_HELPER_TURNS * LANE_BUDGET.executorCallMs~~ ⭐ §31 (1): and the page's margin.
+			LANE_BUDGET.reviewerCallMs + H + PHASE7_STAGE_HELPER_TURNS * LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS,
+			H + LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS
+		]);
+		// The figures, at a bound of 600 s: ~~480 s + 600 s + 2 × 240 s = 1,560 s~~ ⭐ 480 s + 600 s + 2 × 240 s + 300 s = 1,860 s (§31 (1)); 600 s + 240 s +
+		// 300 s = 1,140 s — the two helper turns, the Hypothesizer's and the Unsticking Agent's.
+		// ~~`toEqual([1_560_000, 1_140_000, 2])`~~ ⭐ §31 (1): the stage's 1,860 s.
+		expect([phase7AssuranceStageMs(H), phase7HistorianAgainMs(H), PHASE7_STAGE_HELPER_TURNS]).toEqual([1_860_000, 1_140_000, 2]);
+		// The Historian's setting is counted once in each, as itself: a millisecond more is a millisecond more.
+		expect([phase7AssuranceStageMs(H + 1) - phase7AssuranceStageMs(H), phase7HistorianAgainMs(H + 1) - phase7HistorianAgainMs(H)]).toEqual([1, 1]);
+		// ⛔ BY REFERENCE: each reads the budget's own figures and the setting it is handed, and states no number.
+		const sf = parsed(LANE);
+		expect([madeOf(sf, 'phase7AssuranceStageMs'), madeOf(sf, 'phase7HistorianAgainMs')]).toEqual([
+			{
+				// ~~…, 'LANE_BUDGET.executorCallMs'],~~ ⭐ §31 (1): and the page's margin, last, by reference.
+				reads: ['historianCallMs', 'LANE_BUDGET.reviewerCallMs', 'historianCallMs', 'PHASE7_STAGE_HELPER_TURNS', 'LANE_BUDGET.executorCallMs', 'PHASE7_SIGN_OFF_MS'],
+				numbers: []
+			},
+			{ reads: ['historianCallMs', 'historianCallMs', 'LANE_BUDGET.executorCallMs', 'PHASE7_SIGN_OFF_MS'], numbers: [] }
+		]);
 	});
 
 	// ⭐ `JAN-EXEC` P7-6R — THE LIMIT IS NOW `REG-D-105` (1)'s, which amends `REG-D-102` (4): *"Raise limit to 200"*. The test

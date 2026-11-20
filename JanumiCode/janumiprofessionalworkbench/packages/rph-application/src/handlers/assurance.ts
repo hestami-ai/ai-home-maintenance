@@ -1971,6 +1971,14 @@ function parseCompletion(
 	return { ok: true, disposition, subjectIds, versions };
 }
 
+/** A recommended control action as Gate B names it in a refusal: a string as itself, anything else as its JSON, and an
+ *  absent action as `undefined` (`JAN-EXEC` Phase 7, package L17b2; the lead's ruling 22). */
+function namedControlAction(action: unknown): string {
+	if (typeof action === 'string') return action;
+	if (action === undefined) return 'undefined';
+	return JSON.stringify(action);
+}
+
 /** GATE B (Increment R) — permittedControlActions ENFORCED: a validator may only recommend a control action the
  *  policy permits (§11). Returns a rejection or null (pass).
  *
@@ -1982,7 +1990,13 @@ function parseCompletion(
  *  field disagreeing about what an empty set means, with only the authoring-path one tested for it.
  *
  *  Not exploitable when found — every shipped policy declares a non-empty set and every authoring path defaults to
- *  ESCALATE — so this was a FRAGILE SAFETY rather than a live hole, and is aligned here rather than left as one. */
+ *  ESCALATE — so this was a FRAGILE SAFETY rather than a live hole, and is aligned here rather than left as one.
+ *
+ *  ⭐ AND IT READ ONLY A STRING ACTION (`JAN-EXEC` Phase 7, package L17b2; the lead's ruling 22). Its filter kept the entries whose
+ *  `action` was a string outside the permitted set, so an entry whose action was a number, null, an object, or absent passed the
+ *  policy's set UNREAD — and that package makes the first validator that recommends an action (the Historian, design D73). So every
+ *  entry is held: an action that is not one of the permitted ones is refused whatever its type, and named in the same list as the
+ *  others (`namedControlAction`). */
 function rejectUnpermittedControlActions(
 	command: DomainCommand,
 	validatorResult: CompleteValidatorResult | undefined,
@@ -1994,7 +2008,8 @@ function rejectUnpermittedControlActions(
 	const permitted = new Set(permittedControlActions);
 	const offending = (validatorResult?.recommendedControlActions ?? [])
 		.map((r) => (r as { action?: unknown }).action)
-		.filter((a): a is string => typeof a === 'string' && !permitted.has(a));
+		.filter((a) => typeof a !== 'string' || !permitted.has(a))
+		.map(namedControlAction);
 	if (offending.length === 0) return null;
 	return reject(
 		command,

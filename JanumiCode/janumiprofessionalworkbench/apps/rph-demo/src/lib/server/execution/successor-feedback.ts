@@ -5,7 +5,8 @@
 // records it rests on (a chapter that failed its check named, its statements left out). The faulty unit's successor, then: the round's failed
 // criteria (D71's form); the diagnosis and, beside it, its guidance — advice that changes nothing of a unit's definition, outputs or criteria (D87);
 // the step-back where one is recorded; the two parts package L17b2 fills (the Historian's judgment, a `RESHAPE_PWU` recommendation's reason), rendered
-// only when handed in; and the request to write its tactic record. Each other successor: the line that it is redone because a unit its work used was
+// only when handed in ⭐ — and handed in now, read from the round's latest concluded Historian assessment (`stagePartsForTurn`, ruling 19); and the
+// request to write its tactic record. Each other successor: the line that it is redone because a unit its work used was
 // replaced. D71's re-run in place: the same parts after its findings, the failed criteria not repeated. A part with nothing recorded is left out whole.
 // ⭑ THE FAULTY UNIT'S SUCCESSOR (the lead's ruling on reading 16): L17a's act records no target, so it is derived from the record — among the units
 // the act's Decision made, the one none of whose recorded dependencies and none of whose children is another of them, the reach's start. Where the
@@ -15,9 +16,10 @@
 // and overwrites it with a notice; every deliverable view leaves the folder out (`deliverable-view.ts`). A record not written by the step's end, or
 // not one JSON object, is a finding, recorded, and the step goes on.
 import { acceptedWorkFile } from '@janumipwb/rph-application';
-import { listPwus, type EngineHandle } from '@janumipwb/rph-engine';
+import { listByType, listPwus, type EngineHandle } from '@janumipwb/rph-engine';
 import type { ArtifactStore, Workspace } from '@janumipwb/rph-ports';
 import {
+	historianAsksOf,
 	oneJsonObject,
 	recordStagePart,
 	STAGE_PART,
@@ -25,6 +27,8 @@ import {
 	stageRecordsIn,
 	type StageRecordDeps
 } from '../assurance/assurance-stage-records.js';
+// ⭐⭐ L17b2 (D87, D77; ruling 19) — the Historian's policy and its recurrence's code, from the stage's leaf, for its judgment as a turn shows it.
+import { HISTORIAN_POLICY_ID, KNOWN_FAILURE_RECURRENCE } from '../assurance/assurance-stage-roles.js';
 import { FEEDBACK_HEADING } from './executor-session.js';
 import { rejectingVerdictFindings } from './rejected-rerun.js';
 import type { TurnFeedback } from './run-model-step.js';
@@ -53,6 +57,17 @@ export interface StepBackForTurn {
 	readonly id: string;
 	readonly questions: readonly { readonly reconsider: string; readonly question: string }[];
 	readonly facts: readonly { readonly fact: string; readonly source: string }[];
+}
+
+/**
+ * ⭐⭐ L17b2 (D87, D77; ruling 19) — the round's concluded Historian as a turn shows it: its assessment, its judgment — its verdict on the loop, each
+ * criterion with its result and rationale, and, where it recorded one, its recurrence with the earlier records it names — and, where it recommends
+ * `RESHAPE_PWU`, its reason.
+ */
+export interface HistorianForTurn {
+	readonly assessmentId: string;
+	readonly judgment: string;
+	readonly reshapeReason?: string;
 }
 
 /** Whose turn it is. */
@@ -157,7 +172,14 @@ export async function stagePartsForTurn(
 	store: ArtifactStore,
 	undertakingId: string,
 	roundId: string
-): Promise<{ readonly ran: boolean; readonly chapters: ChapterForTurn[]; readonly diagnosis?: DiagnosisForTurn; readonly stepBack?: StepBackForTurn }> {
+): Promise<{
+	readonly ran: boolean;
+	readonly chapters: ChapterForTurn[];
+	readonly diagnosis?: DiagnosisForTurn;
+	readonly stepBack?: StepBackForTurn;
+	/** ⭐ L17b2 (ruling 19) — the round's latest concluded Historian assessment, as a turn shows it (`historianForTurn`). */
+	readonly historian?: HistorianForTurn;
+}> {
 	const all = stageRecordsIn(engine);
 	const chapters: ChapterForTurn[] = [];
 	for (const r of all.filter((x) => x.part === STAGE_PART.CHAPTER && x.undertakingId === undertakingId)) {
@@ -196,7 +218,45 @@ export async function stagePartsForTurn(
 			facts: items(sJson.facts).map((f) => ({ fact: str(f.fact), source: str(f.source) }))
 		};
 	}
-	return { ran, chapters, ...(diagnosis ? { diagnosis } : {}), ...(stepBack ? { stepBack } : {}) };
+	const historian = historianForTurn(engine, roundId);
+	return { ran, chapters, ...(diagnosis ? { diagnosis } : {}), ...(stepBack ? { stepBack } : {}), ...(historian ? { historian } : {}) };
+}
+
+/**
+ * ⭐⭐ L17b2 (D87, D77; ruling 19; §7 Q2) — THE ROUND'S LATEST CONCLUDED HISTORIAN, AS A TURN SHOWS IT, read from the record: its assessment's verdict,
+ * each criterion's recorded result and rationale in its policy's order, its `KNOWN_FAILURE_RECURRENCE` with the earlier records it cites, and a
+ * `RESHAPE_PWU` recommendation's reason from its completion. None where no ask of the round concluded.
+ */
+function historianForTurn(engine: EngineHandle, roundId: string): HistorianForTurn | undefined {
+	const latest = historianAsksOf(engine, roundId)
+		.filter((a) => a.concluded && a.assessmentId !== undefined)
+		.at(-1);
+	if (latest?.assessmentId === undefined) return undefined;
+	const id = latest.assessmentId;
+	const order = (((engine.loadObject(HISTORIAN_POLICY_ID)?.state ?? {}) as { criteria?: unknown }).criteria ?? []) as readonly { readonly id?: unknown }[];
+	const rank = new Map(order.map((c, i) => [str(c.id), i] as const));
+	const rows = new Map<string, { readonly result: string; readonly rationale: string }>();
+	for (const e of engine.readAllEvents()) {
+		if (e.eventType !== 'AssuranceCriterionEvaluated' || e.aggregateId !== id) continue;
+		const p = (e.payload ?? {}) as { criterionId?: unknown; result?: unknown; rationale?: unknown };
+		if (typeof p.criterionId === 'string') rows.set(p.criterionId, { result: str(p.result), rationale: str(p.rationale) });
+	}
+	const ranked = [...rows].sort(([a], [b]) => (rank.get(a) ?? rank.size) - (rank.get(b) ?? rank.size));
+	const recurrence = listByType(engine, 'ASSURANCE_OBSERVATION').find(
+		(o) => o.state.assessmentId === id && o.state.findingCode === KNOWN_FAILURE_RECURRENCE
+	);
+	const cited = strings(recurrence?.state.evidenceIds);
+	const judgment = [
+		`Its verdict on the loop (assessment ${id}): ${latest.assessmentState ?? ''}.`,
+		...ranked.map(([criterionId, r]) => `- ${criterionId} ${r.result}: ${r.rationale}`),
+		...(recurrence === undefined
+			? []
+			: [
+					`It finds this round’s failure an earlier one’s coming back: ${str(recurrence.state.statement)} (the earlier records it names: ${cited.length > 0 ? cited.join(', ') : 'none it was given'})`
+				])
+	].join('\n');
+	const action = latest.recommendedControlAction;
+	return { assessmentId: id, judgment, ...(action?.action === 'RESHAPE_PWU' ? { reshapeReason: action.reason } : {}) };
 }
 
 /** ⭐ A successor's place in the replacement that made it, read from the record. */
@@ -265,7 +325,9 @@ export async function feedbackForSuccessor(
 			for: { kind: 'FAULTY_SUCCESSOR', failedCriteria: rejectingVerdictFindings(engine, round.rejectedUnitId).findings, tacticRecordPath: path },
 			chapters: parts.chapters,
 			...('diagnosis' in parts && parts.diagnosis ? { diagnosis: parts.diagnosis } : {}),
-			...('stepBack' in parts && parts.stepBack ? { stepBack: parts.stepBack } : {})
+			...('stepBack' in parts && parts.stepBack ? { stepBack: parts.stepBack } : {}),
+			// ⭐ L17b2 (D87, D77; ruling 19) — the round's concluded Historian, in L17b1's two slots.
+			...historianSlotsOf('historian' in parts ? parts.historian : undefined)
 		});
 		return { round, feedback, ...(feedback === undefined ? {} : { tacticRecordPath: path }) };
 	}
@@ -297,9 +359,17 @@ export async function feedbackForRerun(
 		for: { kind: 'RERUN_IN_PLACE', tacticRecordPath: path },
 		chapters: parts.chapters,
 		...(parts.diagnosis ? { diagnosis: parts.diagnosis } : {}),
-		...(parts.stepBack ? { stepBack: parts.stepBack } : {})
+		...(parts.stepBack ? { stepBack: parts.stepBack } : {}),
+		// ⭐ L17b2 (D87, D77; ruling 19) — the round's concluded Historian, in L17b1's two slots.
+		...historianSlotsOf(parts.historian)
 	});
 	return feedback === undefined ? undefined : { feedback, tacticRecordPath: path };
+}
+
+/** ⭐ L17b2 (ruling 19) — L17b1's two slots of `successorFeedback`, filled from the round's concluded Historian; none where there is none. */
+function historianSlotsOf(h: HistorianForTurn | undefined): { readonly historianJudgment?: string; readonly reshapeReason?: string } {
+	if (h === undefined) return {};
+	return { historianJudgment: h.judgment, ...(h.reshapeReason === undefined ? {} : { reshapeReason: h.reshapeReason }) };
 }
 
 /** ⭐ D77, option D — the notice a tactic record is overwritten with once the host has taken it. */
