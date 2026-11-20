@@ -1221,6 +1221,12 @@ or disposed of.
   (`DESIGN §10.1`), where it must return the whole diff (red 17, `3J`). The admitting case, the range check handed
   `--range --run` with `HEAD` at the end and no tracked change, is a guard, green before and after, shown able to fail
   by `3G` (red 17).
+  ⭐ Amended 2026-11-19, before package L17b2's code lands (`REG-F-584`, its pointer of 2026-11-19; `DESIGN §10.9`,
+  red 17, amended). `3J` is no longer red at the base: package L17b2 fixed the change set's read in `scope.ts` (git
+  writes it to a file, which is read whole; `verif/mutants-scope-change-set.test.ts`; `P6X-L17B2-M1`, `-M2`, `-M116`
+  and `-M117`). This step moves that read into `runGit` and keeps it whole; `3J` is then its guard, green before and
+  after, shown able to fail by its mutant. Of the three records of `DESIGN §10.1`'s table this step fixes, the
+  buffer's dated pointer is written; the other two stay this step's.
 - **The work.** `parseNameStatus` over `git diff --name-status -z --no-renames`; the header rule (headers read only
   after a `diff --git` line, and each hunk's body consumed by its `@@` counts, `DESIGN` `D12`); untracked files in the
   edit loop; LOCAL without the production filter, which stays for UNGUARDED only; the change set's provenance line

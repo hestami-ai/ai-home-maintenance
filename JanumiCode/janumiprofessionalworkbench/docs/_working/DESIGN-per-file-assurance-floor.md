@@ -1233,6 +1233,15 @@ there too (780 entries with B7's ledger). The live ledger cannot carry it either
     `scope-run.ts`'s `runGit` must return the whole diff; it is observed first with today's call moved there unchanged
     (`spawnSync`'s default buffer, `scope.ts:89`), which fails with `ENOBUFS`, as `--range=91ec502d..8a703e2a`'s
     1,753,193-byte diff does today (`§10.1`).
+    ⭐ Amended 2026-11-19, before package L17b2's code lands (`l17b2-facts.md` §2.2, §4.1, §19.3, §19.4, §25;
+    `REG-F-584`, its pointer of 2026-11-19). The second transition is no longer red at the base. Package L17b2 fixed
+    the read in `scope.ts` itself: git writes the change set to a file (`--output=<file>`) in a fresh temporary
+    folder, and the file is read whole (`readChangeSet`); a read that fails is named by its cause
+    (`changeSetReadFailure`, `scope-core.ts`). `verif/mutants-scope-change-set.test.ts` holds a change set past
+    1,048,576 bytes read whole, with `P6X-L17B2-M1`, `-M2`, `-M116` and `-M117`. So today's call, moved unchanged
+    into `runGit`, returns the whole diff. At the build `3J` is a guard, green before and after, carried over to
+    `runGit` and shown able to fail by its mutant; `D12`'s rule stands, kept by the file. `--range=91ec502d..8a703e2a`
+    was not run again.
 18. RP6 (`5Q`): a whole-suite control's reach holds the closures of two fixture test files.
 19. ENTRY and GLOBAL, two transitions, each red before `S4.6`: an entry present in the base ledger with a
     `supersededBy` that the end removes is selected by ENTRY (`6D`); a change to `verdict.ts` alone selects each live

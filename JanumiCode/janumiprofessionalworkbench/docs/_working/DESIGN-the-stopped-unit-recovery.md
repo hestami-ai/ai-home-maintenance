@@ -241,7 +241,7 @@ Built by one builder and four fixers, each diff reviewed adversarially; merged i
     - **the unit not waiting** → left as found.
   - **What it never does.** It never presses a control the row does not offer. A stop that offers no re-run is left as found.
   - The limit is checked before each re-run.
-- **The spec's timeout** counts every phase and recovery act at its bound, plus the setup's allowance. The allowance is not a worst case, and the code says so.
+- **The spec's timeout** ~~counts every phase and recovery act at its bound, plus the setup's allowance~~ ⭐ RESTATED 2026-11-19 (`JAN-EXEC` Phase 7, package L17b2; `REG-F-668`): counted, when R-1 was built, every phase and recovery act at its bound, plus the setup's allowance; it counts neither D82's loop nor D71's re-run (since L16), and `apps/rph-demo/e2e-live-exec/lane-config.ts` says what it leaves out. The run's other bound is the spend limit: a bound by calls, not by time. The allowance is not a worst case, and the code says so.
 - **Not built in R-1:** R-2's five other stops, and the evidence join on every return path (`REG-F-511`).
 
 ## 8. How it fits with P7-6
