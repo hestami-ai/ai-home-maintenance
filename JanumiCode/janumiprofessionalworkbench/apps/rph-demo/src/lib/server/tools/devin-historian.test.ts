@@ -35,6 +35,7 @@ import {
 	historianToolCallsOf,
 	historianWorkspaceFiles,
 	recordNameClash,
+	workspaceCopyClash,
 	writeHistorianFolder
 } from './devin-historian.js';
 
@@ -183,6 +184,127 @@ describe('⭐⭐ L17b2 (D86; rulings 8, 9) — the Historian’s folder', () => 
 			);
 		}
 		expect.soft(foldersLeftBy(token), 'a refused write left its folder').toEqual([]);
+	});
+
+	// ⭐⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A02; the lead's r26 (2)) — TWO WORKSPACE FILES THAT LAND ON ONE NAME IN
+	// THE COPY: an in-memory workspace may hold `A.txt` and `a.txt`, and on a volume that does not tell case apart the copy wrote one over the other while
+	// its index said every file is copied. The same check the records have (`recordNameClash`), made of the copy targets before any folder is made.
+	it('⛔ RED FIRST — an in-memory workspace holding A.txt and a.txt: its copy is refused before any folder is made, both paths named, as Windows compares names; and no folder is left', async () => {
+		const token = `two-workspace-files-of-one-name-${process.pid}-${Date.now()}`;
+		const ws = createInMemoryWorkspace({ ownerKind: 'UNDERTAKING', ownerId: 'und_a02', purgeability: 'RETAINED_BY_PARTICIPATION' });
+		await ws.writeFile('A.txt', 'upper');
+		await ws.writeFile('a.txt', 'lower');
+		const read = await historianWorkspaceFiles(ws);
+		expect(read.ok, read.ok ? '' : read.why).toBe(true);
+		const files = read.ok ? read.files : [];
+		expect(files.map((f) => f.path).sort(), 'arrangement: the port lists both, each read whole').toEqual(['A.txt', 'a.txt']);
+		expect(files.every((f) => 'text' in f), 'arrangement: both are copied').toBe(true);
+		const settled = await settledWrite({ prompt: `${token} A.txt a.txt`, records: [], workspaceFiles: files });
+		if (settled.ok) dirs.push(settled.f.folder, settled.f.host);
+		expect.soft(settled.ok ? 'the folder was written, one workspace file over the other' : settled.why, 'the copy is not refused, naming both paths').toBe(
+			"two of the workspace's files land on one name in its copy, workspace/A.txt and workspace/a.txt, case not told apart: its folder is not written, so that neither is written over the other (design D86)"
+		);
+		// ⭑ And one path handed twice, as two record files of one name are refused: in the writer's own words.
+		const twice = await settledWrite({ prompt: `${token} twice`, records: [], workspaceFiles: [{ path: 'src/a.txt', text: '1' }, { path: 'src/a.txt', text: '2' }] });
+		if (twice.ok) dirs.push(twice.f.folder, twice.f.host);
+		expect.soft(twice.ok ? 'the folder was written, one workspace file over the other' : twice.why, 'one path handed twice is not refused').toBe(
+			"two of the workspace's files land on one name in its copy, workspace/src/a.txt, twice: its folder is not written, so that neither is written over the other (design D86)"
+		);
+		expect.soft(foldersLeftBy(token), 'a refused write left its folder').toEqual([]);
+	});
+
+	it('⭑ CONTROL — two workspace files whose names differ in more than case are each copied at its own path; and a name equal to a copied one but for case, itself not copied, writes nothing over it', async () => {
+		const token = `two-workspace-files-each-its-own-${process.pid}-${Date.now()}`;
+		const settled = await settledWrite({
+			prompt: token,
+			records: [],
+			workspaceFiles: [
+				{ path: 'A.txt', text: 'upper' },
+				{ path: 'b.txt', text: 'lower' },
+				{ path: 'a.txt', notCopied: NOT_TEXT_NOT_COPIED, byteSize: 3 }
+			]
+		});
+		if (settled.ok) dirs.push(settled.f.folder, settled.f.host);
+		expect(settled.ok ? '' : settled.why, 'a copy of files each its own was refused').toBe('');
+		if (settled.ok)
+			expect([readFileSync(join(settled.f.folder, 'workspace', 'A.txt'), 'utf8'), readFileSync(join(settled.f.folder, 'workspace', 'b.txt'), 'utf8')]).toEqual([
+				'upper',
+				'lower'
+			]);
+	});
+
+	// ⭐⭐ L17b2 (the lead's r27, r27a) — A02'S GENERAL FORM: the case check above closes the pair Codex's review found, not every form of two names
+	// that land on one file. On a volume that makes 8.3 short names, `ABCDEF~1.TXT` is a second name of `abcdefghij.txt`; lower-cased the two still
+	// differ, so only the write can find it. The copy creates each file and writes over none (`flag: 'wx'`): the second name is refused in D86's words,
+	// the path as the workspace gave it, never the absolute path EEXIST's own message holds. Where the volume of tmpdir(), on which the writer makes its
+	// folder, makes no short names, the pair is two files there, and the test is skipped, saying so.
+	/** ⭐ r27 — whether the volume of tmpdir() makes 8.3 short names: `long` written in a fresh folder there, then opened by `short`; said as found. */
+	const shortNameOpens = (long: string, short: string): { readonly made: boolean; readonly found: string } => {
+		const probe = mkdtempSync(join(tmpdir(), 'jpwb-short-names-'));
+		try {
+			writeFileSync(join(probe, long), 'the long name');
+			let read = '';
+			try {
+				read = readFileSync(join(probe, short), 'utf8');
+			} catch (e) {
+				read = `(${(e as { code?: string }).code ?? 'unread'})`;
+			}
+			const made = read === 'the long name';
+			return {
+				made,
+				found: made
+					? `in a fresh folder on the volume of tmpdir(), ${short} opens ${long}: that volume makes 8.3 short names`
+					: `in a fresh folder on the volume of tmpdir(), ${short} does not open ${long} ${read}: that volume makes no 8.3 short name for it, so the pair is two files there`
+			};
+		} finally {
+			rmSync(probe, { recursive: true, force: true });
+		}
+	};
+
+	it('⛔ RED FIRST — an in-memory workspace holding abcdefghij.txt then ABCDEF~1.TXT, its 8.3 short name: the write is refused in D86’s words, the path as the workspace gave it and no absolute one, and no folder is left; skipped, saying why, where the volume of tmpdir() makes no short names', async (ctx) => {
+		const volume = shortNameOpens('abcdefghij.txt', 'ABCDEF~1.TXT');
+		ctx.skip(!volume.made, `skipped: ${volume.found}`);
+		const token = `a-workspace-name-the-copy-holds-${process.pid}-${Date.now()}`;
+		const files = [
+			{ path: 'abcdefghij.txt', text: 'the long name' },
+			{ path: 'ABCDEF~1.TXT', text: 'the short name' }
+		];
+		expect(workspaceCopyClash(files), 'arrangement: the case check catches the pair, so it is not the write’s to find').toBeUndefined();
+		const settled = await settledWrite({ prompt: `${token} 8.3`, records: [], workspaceFiles: files });
+		let written = '';
+		if (settled.ok) {
+			dirs.push(settled.f.folder, settled.f.host);
+			const index = readFileSync(join(settled.f.folder, 'records', 'INDEX.md'), 'utf8');
+			const long = readFileSync(join(settled.f.folder, 'workspace', 'abcdefghij.txt'), 'utf8');
+			written = `the folder was written: its index says ${index.includes('Every file it lists is copied.') ? 'every file is copied' : 'a file is not copied'}, and abcdefghij.txt holds ${JSON.stringify(long)}`;
+		}
+		expect.soft(settled.ok ? written : settled.why, `the write is not refused in D86’s words, its path as the workspace gave it (${volume.found})`).toBe(
+			'a workspace file of its copy, workspace/ABCDEF~1.TXT, lands on a name its copy already holds, as this volume reads names: its folder is not written, so that neither is written over the other (design D86)'
+		);
+		expect
+			.soft(settled.ok ? [false, false] : [settled.why.includes(tmpdir()), /[A-Za-z]:[\\/]/.test(settled.why)], 'the refusal names an absolute path')
+			.toEqual([false, false]);
+		expect.soft(foldersLeftBy(token), 'a folder is left of a write that should be refused').toEqual([]);
+	});
+
+	it('⭑ CONTROL — pairs that are two files on this volume — a.txt and a.txt with a trailing dot, b.txt and b.txt with a trailing space — are each copied as two files, each with its own bytes', async () => {
+		const token = `pairs-that-are-two-files-${process.pid}-${Date.now()}`;
+		const files = [
+			{ path: 'a.txt', text: 'a' },
+			{ path: 'a.txt.', text: 'a, a trailing dot' },
+			{ path: 'b.txt', text: 'b' },
+			{ path: 'b.txt ', text: 'b, a trailing space' }
+		];
+		const settled = await settledWrite({ prompt: token, records: [], workspaceFiles: files });
+		if (settled.ok) dirs.push(settled.f.folder, settled.f.host);
+		expect(settled.ok ? '' : settled.why, 'a copy of pairs that are two files was refused').toBe('');
+		if (settled.ok) {
+			const workspace = join(settled.f.folder, 'workspace');
+			expect.soft(sorted(readdirSync(workspace)), 'the copy does not hold the four as four files').toEqual(sorted(files.map((f) => f.path)));
+			expect
+				.soft(files.map((f) => readFileSync(join(workspace, f.path), 'utf8')), 'a file of a pair does not hold its own bytes')
+				.toEqual(files.map((f) => f.text));
+		}
 	});
 });
 
@@ -590,6 +712,9 @@ describe('⭐⭐ L17b2 (D86; rulings 2 (B), 17) — the export read for its tool
 			['arguments that are not JSON', call({ function_name: 'read', arguments: '{not json' }), 'a call of its step 1 has arguments that are not JSON'],
 			['arguments that are a number', call({ function_name: 'read', arguments: 7 }), 'a call of its step 1 has arguments that are not an object'],
 			['arguments that are null, as JSON', call({ function_name: 'read', arguments: 'null' }), 'a call of its step 1 has arguments that are not an object'],
+			// ⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A03; the lead's r26 (3)) — and null itself, as the export writes
+			// it: the row above is a string that parses to null, and so never reached the reader's default for arguments that are missing.
+			['arguments that are null', call({ function_name: 'read', arguments: null }), 'a call of its step 1 has arguments that are not an object'],
 			['arguments that are a list', call({ function_name: 'read', arguments: ['records'] }), 'a call of its step 1 has arguments that are not an object']
 		];
 		for (const [shape, text, words] of shapes) {
@@ -604,6 +729,14 @@ describe('⭐⭐ L17b2 (D86; rulings 2 (B), 17) — the export read for its tool
 				`its tool calls could not be read from its export: ${words}, so what it read is not known — never a clean bill (L17b2 ruling 17)`
 			);
 		}
+	});
+
+	// ⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A03; the lead's r26 (3)) — the row above refuses explicit null; a call
+	// that gives no arguments at all is still a call with none, as a tool with no arguments is called.
+	it('⭑ CONTROL — a call with no arguments field is read as a call with none: its name, no place, inside the folder, and no finding', () => {
+		const read = historianToolCallsOf(JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [{ step_id: 1, source: 'agent', tool_calls: [{ tool_call_id: 'call_0', function_name: 'read' }] }] }), FOLDER);
+		expect.soft(read.calls, 'a call with no arguments field was not read as a call with none').toEqual([{ name: 'read', paths: [], inside: true, allowed: true }]);
+		expect.soft(read.findings, 'a call with no arguments field is a finding').toEqual([]);
 	});
 
 	it('⛔ RED FIRST — each argument a call names a place by is read for it, as the call gave it: file_path, path, notebook_path, cwd, and each string of the list paths', () => {

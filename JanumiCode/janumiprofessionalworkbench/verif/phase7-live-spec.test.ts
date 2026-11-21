@@ -4768,6 +4768,17 @@ describe('⭐⭐ L17b2 (D82; rulings 6 (C), 14, 15, 20; §16) — the loop after
 		const quiet = recoveryRow(['run-assurance-stage']);
 		read.push(await sponsorDecides(quiet.row));
 		expect(read, 'the sponsor’s case was not read whole by the row’s own test id, or was read where the row says nothing').toEqual([stuck, twice, null]);
+		// ⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A01; the lead's r26a) — and the third case beside the other two: the
+		// step-back a recurrence brings has no record in the round. The lane reads it whole, as it reads them, and so ends the run withheld as for them.
+		const noStepBack = sponsorDecidesStatement({ reading: { historianAsks: [] } as never, choice: { kind: 'SPONSOR_DECIDES', because: 'STEP_BACK_NOT_RECORDED' } });
+		expect(
+			[noStepBack.includes('the step-back it brings has no record in this round'), noStepBack.includes('the sponsor decides')],
+			'arrangement: the third case’s statement names its case and says the sponsor decides'
+		).toEqual([true, true]);
+		expect(
+			await sponsorDecides(recoveryRow(['sponsor-decides'], { texts: { 'sponsor-decides': noStepBack } }).row),
+			'the third sponsor’s case was not read whole by the row’s own test id'
+		).toBe(noStepBack);
 	});
 
 	// ⭐⭐ L17b2 (§18; D72; §17.13 (2)) — D72'S SEND-BACK ON THE PAGE, test first: its candidates read from the row's own select

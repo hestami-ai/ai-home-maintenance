@@ -235,6 +235,8 @@ import {
 	assuranceStageOffer,
 	rerunHistorian,
 	runAssuranceStage,
+	// ⭐ L17b2 (Codex's L17B2C-A01; the lead's r26 (1), r26a) — what the round's rule reads of the stage: its hold and the round's open recurrences.
+	WAY_BACK_STAGE_READERS,
 	type AssuranceStageDeps,
 	type StagePartOutcome
 } from '$lib/server/assurance/assurance-stage';
@@ -801,7 +803,7 @@ export const load: PageServerLoad = ({ params }) => {
 	const historianAgainByPwu: Record<string, { readonly roundId: string }> = {};
 	const sponsorDecidesByPwu: Record<string, { readonly because: SponsorDecidesBecause; readonly said: string }> = {};
 	for (const p of pwus) {
-		const loop = wayBackOffer(engine, p.id);
+		const loop = wayBackOffer(engine, p.id, WAY_BACK_STAGE_READERS);
 		const rerun = rejectedRerunByPwu[p.id];
 		const sendBack = sendBackByPwu[p.id];
 		if (rerun !== undefined && (loop === undefined || offersRerunInPlace(loop.choice))) ruledRerunByPwu[p.id] = rerun;
@@ -4887,7 +4889,7 @@ export const actions: Actions = {
 			return fail(400, { error: `Re-running the work its declared reviews rejected refused: ${offer.refusedBecause}` });
 		// ⭐⭐ L17b2 (D73's rule; the lead's ruling 3, §16 (4)) — AFTER its rationale and the unit's state: the round's rule — offered only where the
 		// round's choice is the re-run in place, or the person's choice with it; never before its stage has run and its Historian concluded.
-		const ruled = rerunRefusedByRule(wayBackOffer(getEngine(), pwuId));
+		const ruled = rerunRefusedByRule(wayBackOffer(getEngine(), pwuId, WAY_BACK_STAGE_READERS));
 		if (ruled !== undefined) return fail(400, { error: `Re-running the work its declared reviews rejected refused: ${ruled}` });
 		const { pwu, pwuType, pwuTypeId, typeFacts } = unitTypeOf(pwuId);
 		// ⚠ Unreachable after the offer, which refuses a unit a model does not work (`rejectedRerunOffer`): kept as the narrowing the
@@ -5003,7 +5005,7 @@ export const actions: Actions = {
 			});
 		// ⭐⭐ L17b2 (D73's rule; the lead's ruling 3, §16 (4)) — AFTER its rationale, the unit's state and its target: the round's rule — the work sent
 		// back only to a unit the round's choice offers; never before its stage has run and its Historian concluded.
-		const ruled = sendBackRefusedByRule(wayBackOffer(getEngine(), pwuId), targetId);
+		const ruled = sendBackRefusedByRule(wayBackOffer(getEngine(), pwuId, WAY_BACK_STAGE_READERS), targetId);
 		if (ruled !== undefined) return fail(400, { error: `Sending the work back refused: ${ruled}` });
 		const plan = replacementPlan(getEngine(), targetId, mintUiId);
 		if ('refusedBecause' in plan) return fail(400, { error: `Sending the work back refused: ${plan.refusedBecause}` });

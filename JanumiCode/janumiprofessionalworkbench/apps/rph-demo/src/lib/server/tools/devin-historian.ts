@@ -228,6 +228,52 @@ function workspaceTarget(root: string, path: string): string {
 	return at;
 }
 
+/**
+ * ⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A02; the lead's r26 (2)) — WHY THE WORKSPACE CANNOT ALL BE COPIED UNDER
+ * `workspace/`: two of the files it copies land on one name there, so one would be written over the other while the index says every file is copied. The
+ * check `recordNameClash` makes of the records, made of the copy targets: each copied file's path resolved as `workspaceTarget` resolves it, the names
+ * compared as Windows' file system compares them, case not told apart (an in-memory workspace may hold `A.txt` and `a.txt`). A file not copied writes
+ * nothing, so it clashes with none. `undefined` where each target is its own.
+ */
+export function workspaceCopyClash(files: readonly HistorianWorkspaceFile[]): string | undefined {
+	const root = resolve('/', 'workspace');
+	const seen = new Map<string, string>();
+	for (const f of files) {
+		if (!('text' in f)) continue;
+		const target = relative(root, resolve(root, f.path)).toLowerCase();
+		const before = seen.get(target);
+		if (before !== undefined) {
+			const paths = before === f.path ? `workspace/${f.path}, twice` : `workspace/${before} and workspace/${f.path}, case not told apart`;
+			return `two of the workspace's files land on one name in its copy, ${paths}: its folder is not written, so that neither is written over the other (design D86)`;
+		}
+		seen.set(target, f.path);
+	}
+	return undefined;
+}
+
+/**
+ * ⭐ L17b2 (the lead's r27, r27a (A)) — A WORKSPACE FILE THAT LANDS ON A NAME ITS COPY ALREADY HOLDS, refused at its write. The case check
+ * (`workspaceCopyClash`) comes first and needs no write; but a volume may read names by rules no check of the names can know — an 8.3 short name,
+ * `ABCDEF~1.TXT`, is a second name of `abcdefghij.txt` — so the copy creates each workspace file and writes over none (`flag: 'wx'`). A name the volume
+ * already holds answers EEXIST, and the write is refused in D86's words, the path as the workspace gave it, relative to the folder: never the absolute
+ * path EEXIST's own message names. One named kind, so that the Historian's part records it not run, as it does the case pair; every other write error
+ * is thrown as it was, and recorded failing.
+ */
+export class HistorianCopyRefusal extends Error {}
+
+/** ⭐ r27 — one workspace file of the copy, created and never written over: a name its copy already holds is a `HistorianCopyRefusal`. */
+async function writeWorkspaceFile(at: string, path: string, text: string): Promise<void> {
+	try {
+		await writeFile(at, text, { encoding: 'utf8', flag: 'wx' });
+	} catch (e) {
+		if ((e as { code?: unknown }).code !== 'EEXIST') throw e;
+		throw new HistorianCopyRefusal(
+			`a workspace file of its copy, workspace/${path}, lands on a name its copy already holds, as this volume reads names: its folder is not written, ` +
+				'so that neither is written over the other (design D86)'
+		);
+	}
+}
+
 /** ⭐ Ruling 9 — `records/INDEX.md`: each record file and what it is, then each workspace file not copied, with its size and why. */
 function indexOf(records: readonly HistorianRecordFile[], workspaceFiles: readonly HistorianWorkspaceFile[]): string {
 	const notCopied = workspaceFiles.filter((f): f is Extract<HistorianWorkspaceFile, { notCopied: string }> => 'notCopied' in f);
@@ -258,8 +304,11 @@ async function removeFolders(folder: string, host: string): Promise<string | und
 /**
  * ⭐⭐ Ruling 8 — WRITE THE HISTORIAN'S FOLDER (see the header): a fresh `jpwb-historian-` folder holding `prompt.txt`, `.devin/config.json`, `records/`
  * with its index, and `workspace/` with each file copied at its path; beside it, `<folder>.host/` holding the user configuration and, after the call, the
- * export. ⛔ A write that fails removes both and throws: the caller records the Historian not run, with why. ⭐ L17b2 addendum (the lead's §27,
- * item 7) — two record files of one name (`recordNameClash`) are refused before any folder is made: none is written.
+ * export. ⛔ A write that fails removes both and throws: the caller records the Historian ~~not run~~ failing, with why ⭐ [CORRECTED 2026-11-21, the
+ * lead's r27a: the part records a throw from here failing; its not-run cases are its checks before the folder is made] — and, since r27a (A), not run
+ * for a `HistorianCopyRefusal`, each workspace file being created and never written over (r27). ⭐ L17b2 addendum (the lead's §27,
+ * item 7) — two record files of one name (`recordNameClash`) are refused before any folder is made: none is written. ⭐ L17b2 (Codex's L17B2C-A02; the
+ * lead's r26 (2)) — and two workspace files that land on one name in the copy (`workspaceCopyClash`), the same way.
  */
 export async function writeHistorianFolder(input: {
 	readonly prompt: string;
@@ -268,6 +317,8 @@ export async function writeHistorianFolder(input: {
 }): Promise<HistorianFolder> {
 	const clash = recordNameClash(input.records);
 	if (clash !== undefined) throw new Error(clash);
+	const copyClash = workspaceCopyClash(input.workspaceFiles);
+	if (copyClash !== undefined) throw new Error(copyClash);
 	const folder = await mkdtemp(join(tmpdir(), 'jpwb-historian-'));
 	const host = `${folder}.host`;
 	try {
@@ -285,7 +336,8 @@ export async function writeHistorianFolder(input: {
 			if (!('text' in f)) continue;
 			const at = workspaceTarget(workspace, f.path);
 			await mkdir(dirname(at), { recursive: true });
-			await writeFile(at, f.text, 'utf8');
+			// ⭐ r27 — ~~`await writeFile(at, f.text, 'utf8');`~~, which wrote over a name the volume already held: created, never written over.
+			await writeWorkspaceFile(at, f.path, f.text);
 		}
 		const userConfigPath = join(host, 'config.json');
 		await writeFile(userConfigPath, HISTORIAN_USER_CONFIG, 'utf8');
@@ -458,7 +510,9 @@ function callOf(c: unknown, folder: string): HistorianToolCall | string {
 	if (typeof c !== 'object' || c === null || Array.isArray(c)) return 'is not an object';
 	const o = c as { function_name?: unknown; arguments?: unknown };
 	if (typeof o.function_name !== 'string' || o.function_name === '') return 'names no function';
-	let args: unknown = o.arguments ?? {};
+	// ⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A03; the lead's r26 (3)) — ~~`o.arguments ?? {}`~~: arguments that are
+	// missing are none, as a tool with no arguments is called; arguments that are null are not an object — the check below refuses them, never a clean bill.
+	let args: unknown = o.arguments === undefined ? {} : o.arguments;
 	if (typeof args === 'string')
 		try {
 			args = JSON.parse(args);

@@ -58,7 +58,7 @@ import { recordFilePath, recordRowsOf, renderUnitConversation, unitConversationO
 // ⭐⭐ Package L17b2 — design D73, D86 — the Historian's part, third in the stage (`historian-part.ts`); its seams' types; and the round's rule (D73's).
 import { historianPart, type HistorianPartOutcome } from './historian-part.js';
 import type { HistorianExec, HistorianVersionOf } from '../tools/devin-historian.js';
-import { wayBackOffer } from '../execution/loop-rule.js';
+import { wayBackOffer, type StageReaders } from '../execution/loop-rule.js';
 
 // ⭐ L17b2 — `HISTORIAN_POLICY_ID`, `KNOWN_FAILURE_RECURRENCE` and `REPLAY_RUNS_NO_STAGE` moved, their words as they were, to the leaf
 // `assurance-stage-roles.ts`, so the Historian's part reads them with no import cycle; re-exported here for every reader of this module.
@@ -266,6 +266,22 @@ const STAGES_RUNNING = new Set<string>();
 export function stageRunningRefusal(roundId: string): string {
 	return `the assurance stage of this round (${roundId}) is running now: one press per round at a time, and this one is refused rather than run beside it`;
 }
+
+/**
+ * ⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A01; the lead's r26 (1)(a), r26a) — WHETHER THIS PROCESS RUNS THE ROUND'S
+ * STAGE, OR ITS HISTORIAN'S RE-ASK, NOW: the hold above, read and never handed out, as the round's rule reads it (`wayBackOffer`), so that no way back is
+ * offered, and neither recovery act is taken, while a step-back the stage brings may yet be recorded. ⚠ This process's hold alone, as the hold is.
+ */
+export function stageIsRunning(roundId: string): boolean {
+	return STAGES_RUNNING.has(roundId);
+}
+
+/**
+ * ⭐ L17b2 (Codex's L17B2C-A01; the lead's r26 (1), r26a) — WHAT THE ROUND'S RULE READS OF THE STAGE (`StageReaders`): this process's hold, and the round's
+ * open recurrences as the stage and its re-ask read them. One pair, handed to `wayBackOffer` by the page's `load`, by D71's and D72's acts and by the
+ * re-ask alike, so that each reads the round the same way (§16 (4)).
+ */
+export const WAY_BACK_STAGE_READERS: StageReaders = { isRunning: stageIsRunning, openRecurrences: openRecurrencesOf };
 
 /**
  * ⭐⭐ ONE PRESS OF THE ASSURANCE STAGE (see the header). ⛔ Refused, before anything runs or is recorded, where the offer refuses. ⭐ The independent
@@ -580,8 +596,13 @@ function partRecordersOf(deps: AssuranceStageDeps, at: { readonly pwuId: string;
  */
 function notAskedAgainBecause(offer: NonNullable<ReturnType<typeof wayBackOffer>>): string {
 	const { choice, roundId } = offer;
+	// ⭐ L17b2 (Codex's L17B2C-A01; the lead's r26 (1)(a), r26a) — the round's stage or its re-ask running: refused as a second press is.
+	if (choice.kind === 'STAGE_RUNNING') return stageRunningRefusal(roundId);
 	if (choice.kind === 'RUN_STAGE')
 		return `the assurance stage of this round (${roundId}) has not run: the Historian is asked again only where the stage's own ask did not conclude (design D73; L17b2 ruling 7)`;
+	// ⭐ L17b2 (Codex's L17B2C-A01; the lead's r26a) — the sponsor's third case: the step-back a recurrence brings has no record in this round.
+	if (choice.kind === 'SPONSOR_DECIDES' && choice.because === 'STEP_BACK_NOT_RECORDED')
+		return `the Historian of this round (${roundId}) found a known failure coming back, and the step-back it brings has no record in this round: it is not asked again, and the sponsor decides (design D73, D82)`;
 	if (choice.kind === 'SPONSOR_DECIDES')
 		return choice.because === 'NOT_CONCLUDED_TWICE'
 			? `the Historian of this round (${roundId}) was asked twice and did not conclude: it is not asked a third time, and the sponsor decides (design D73; L17b2 rulings 7, 14)`
@@ -599,7 +620,7 @@ export async function rerunHistorian(
 	pwuId: string,
 	deps: AssuranceStageDeps
 ): Promise<AssuranceStageOutcome | { readonly refusedBecause: string }> {
-	const offer = wayBackOffer(deps.engine, pwuId);
+	const offer = wayBackOffer(deps.engine, pwuId, WAY_BACK_STAGE_READERS);
 	if (offer === undefined) {
 		const stage = assuranceStageOffer(deps.engine, pwuId);
 		return { refusedBecause: 'refusedBecause' in stage ? stage.refusedBecause : `the assurance stage of this round (${stage.roundId}) has not run` };

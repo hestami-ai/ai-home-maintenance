@@ -16,7 +16,11 @@ import { wayBackChoice, type RoundReading } from './loop-rule.js';
 const SOURCE = { id: 'pwu_source', title: 'Source Construction' };
 const TESTS = { id: 'pwu_tests', title: 'Unit Test Suite' };
 const NOTHING = { concluded: true, recommendedControlAction: null } as const;
+// ⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A01; the lead's r26 (1), r26a) — and the two readings that withhold the
+// way back until the round's step-back: nothing of the round running, and no step-back missing, in every case below but this file's last describe's.
 const round = (over: Partial<RoundReading>): RoundReading => ({
+	stageRunning: false,
+	stepBackNotRecorded: false,
 	stageRan: true,
 	historianAsks: [NOTHING],
 	diagnosis: { status: 'recorded', named: SOURCE.id },
@@ -107,5 +111,43 @@ describe('⭐⭐ L17b2 (D73, D87, D72) — the way back, chosen from the round�
 			kind: 'SEND_BACK',
 			candidate: SOURCE
 		});
+	});
+});
+
+// ⭐⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A01; the lead's r26 (1), r26a) — NO WAY BACK BEFORE THE ROUND'S STEP-BACK:
+// an open `KNOWN_FAILURE_RECURRENCE` observation "brings the Unsticking Agent (D75) before the way back" (D82). So none while the round's stage or its
+// Historian's re-ask runs — the step-back may yet be recorded (r26 (1)(a)) — and none, read from the record, where the round holds an open recurrence and
+// no step-back record of any status (r26a): the sponsor decides, a third case. ~~r26 (1)(b)'s "no step-back record of the round follows the latest
+// concluded ask"~~ — struck by r26a: a round has one step-back (D73).
+describe('⭐⭐ L17b2 (D82, D75; the lead’s r26 (1), r26a) — no way back before the round’s step-back', () => {
+	it('⛔ RED FIRST — while the round’s stage or its Historian’s re-ask runs: no way back, whatever the records hold — and before its chapter is recorded too', () => {
+		for (const diagnosis of [{ status: 'recorded', named: SOURCE.id }, { status: 'recorded', named: 'pwu_verification' }, undefined] as const)
+			expect.soft(wayBackChoice(round({ stageRunning: true, diagnosis })), `running, ${JSON.stringify(diagnosis)}`).toEqual({ kind: 'STAGE_RUNNING' });
+		expect.soft(wayBackChoice(round({ stageRunning: true, stageRan: false, historianAsks: [], diagnosis: undefined })), 'running, before its chapter').toEqual({
+			kind: 'STAGE_RUNNING'
+		});
+		expect.soft(wayBackChoice(round({ stageRunning: true, historianAsks: [{ concluded: false, recommendedControlAction: null }] })), 'running, its Historian asked again').toEqual({
+			kind: 'STAGE_RUNNING'
+		});
+	});
+
+	it('⛔ RED FIRST — the round holding an open recurrence and no step-back record: no way back — the sponsor decides, the step-back’s case — whatever the diagnosis names', () => {
+		for (const diagnosis of [{ status: 'recorded', named: SOURCE.id }, { status: 'recorded', named: 'pwu_verification' }, undefined] as const)
+			expect.soft(wayBackChoice(round({ stepBackNotRecorded: true, diagnosis })), JSON.stringify(diagnosis)).toEqual({
+				kind: 'SPONSOR_DECIDES',
+				because: 'STEP_BACK_NOT_RECORDED'
+			});
+	});
+
+	it('⭑ CONTROL — the Historian’s own cases stand before the step-back’s: its latest ask asking for the sponsor’s decision; not concluded once, the re-ask still offered (it runs the step-back the round has not had); not concluded twice; and with nothing running and no step-back missing, the way back the diagnosis’s, as before', () => {
+		const paused = { concluded: true, recommendedControlAction: { action: 'REQUEST_HUMAN_DECISION', reason: 'stuck' } };
+		const notConcluded = { concluded: false, recommendedControlAction: null };
+		expect.soft(wayBackChoice(round({ historianAsks: [paused], stepBackNotRecorded: true }))).toEqual({ kind: 'SPONSOR_DECIDES', because: 'REQUEST_HUMAN_DECISION' });
+		expect.soft(wayBackChoice(round({ historianAsks: [notConcluded], stepBackNotRecorded: true }))).toEqual({ kind: 'ASK_HISTORIAN_AGAIN' });
+		expect.soft(wayBackChoice(round({ historianAsks: [notConcluded, notConcluded], stepBackNotRecorded: true }))).toEqual({
+			kind: 'SPONSOR_DECIDES',
+			because: 'NOT_CONCLUDED_TWICE'
+		});
+		expect.soft(wayBackChoice(round({ stageRunning: false, stepBackNotRecorded: false }))).toEqual({ kind: 'SEND_BACK', candidate: SOURCE });
 	});
 });

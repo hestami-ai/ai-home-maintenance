@@ -5,7 +5,8 @@
 // ⭑ WHEN IT CANNOT RUN (ruling 6, 16; §7): recorded `not-run`, with why, and nothing called or recorded of it — the selected reviewer refused, a replay,
 // agy, or the stand-in with no `historianExec` (a test's seam, as `writerPrint` is the writer's); its time bound unset; the shared workspace unresolved,
 // or not read whole through the port; devin at a version other than the one its tools were measured at; ⭐ (the lead's §27, item 7) two of its record
-// files of one name, its folder then not written.
+// files of one name, its folder then not written; ⭐ (r26 (2); r27, r27a) two of its workspace files that land on one name in its copy — case not told
+// apart, before its folder is made, or as the volume reads names, at the copy's write (`HistorianCopyRefusal`).
 // ⭑ WHAT IT IS SHOWN (D73, D86; ruling 9): its prompt (`historianPrompt`) and a fresh folder (`writeHistorianFolder`) — `records/`, each named by its record's
 // id: every REJECTED declared verdict over a unit of the Undertaking (this round's and earlier ones'), each earlier round's Historian assessment, every
 // stage record of the Undertaking but this round's own Historian records, each way back's Decision, each unit with its states, and the recorded
@@ -32,10 +33,12 @@ import { firstMexIs } from '../execution/dropped-replies.js';
 import { governedToolCallReport } from '../tools/observed-tool-calls.js';
 import {
 	devinHistorianCall,
+	HistorianCopyRefusal,
 	historianCallBound,
 	historianToolCallsOf,
 	historianWorkspaceFiles,
 	recordNameClash,
+	workspaceCopyClash,
 	writeHistorianFolder,
 	type HistorianCallOutcome,
 	type HistorianExec,
@@ -560,6 +563,10 @@ async function historianAsk(ctx: HistorianPartContext): Promise<HistorianPartOut
 	// ⭐ L17b2 addendum (the lead's §27, item 7) — two of its record files of one name: its folder is not written, and it is not run, naming the name.
 	const clash = recordNameClash(records.files);
 	if (clash !== undefined) return notRun(clash);
+	// ⭐ L17b2, after the independent review of the committed code (Codex's L17B2C-A02; the lead's r26 (2)) — and two of the workspace's files that land
+	// on one name in its copy, case not told apart: the same, both paths named.
+	const copyClash = workspaceCopyClash(copied.files);
+	if (copyClash !== undefined) return notRun(copyClash);
 	const prompt = historianPrompt({
 		rejectedUnit: { id: ctx.pwuId, title: ctx.unitTitle },
 		policy,
@@ -572,6 +579,9 @@ async function historianAsk(ctx: HistorianPartContext): Promise<HistorianPartOut
 	try {
 		folder = await writeHistorianFolder({ prompt, records: records.files, workspaceFiles: copied.files });
 	} catch (e) {
+		// ⭐ L17b2 (the lead's r27, r27a (A)) — a workspace file that lands on a name its copy already holds, found only at its write (an 8.3 short name):
+		// the same refusal as the case pair above, so the same status — the Historian not run, in the writer's words. Every other write error stays failing.
+		if (e instanceof HistorianCopyRefusal) return notRun(e.message);
 		const why = `its folder could not be written: ${describedThrow(e)}`;
 		return ctx.record(STAGE_PART.HISTORIAN, 'failing', JSON.stringify({ failed: why }), [why]);
 	}
