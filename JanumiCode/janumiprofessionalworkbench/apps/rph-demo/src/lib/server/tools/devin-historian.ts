@@ -233,7 +233,10 @@ function workspaceTarget(root: string, path: string): string {
  * `workspace/`: two of the files it copies land on one name there, so one would be written over the other while the index says every file is copied. The
  * check `recordNameClash` makes of the records, made of the copy targets: each copied file's path resolved as `workspaceTarget` resolves it, the names
  * compared as Windows' file system compares them, case not told apart (an in-memory workspace may hold `A.txt` and `a.txt`). A file not copied writes
- * nothing, so it clashes with none. `undefined` where each target is its own.
+ * nothing, so it clashes with none. `undefined` where each target is its own. ⭐⭐ L17b2, after the independent re-review of the committed fix
+ * (Codex's L17B2F-A02; the lead's r28 (2)(a)) — and no file of the copy at a folder of another's path: each copied target's folders are compared,
+ * case not told apart, with the copied files' targets, in either order and at any depth (`A` beside `a/x.txt`, which an in-memory workspace holds
+ * apart), the file named first; the case words said only where the cases differ.
  */
 export function workspaceCopyClash(files: readonly HistorianWorkspaceFile[]): string | undefined {
 	const root = resolve('/', 'workspace');
@@ -248,7 +251,36 @@ export function workspaceCopyClash(files: readonly HistorianWorkspaceFile[]): st
 		}
 		seen.set(target, f.path);
 	}
+	// ⭐ r28 (2)(a) — each folder of each copied target, by its key, with the path it is a folder of and its own case; then each copied target looked up.
+	const keyOf = (name: string): string => name.toLowerCase();
+	// A file not copied writes nothing, so it is at no folder of another's path, nor is it one.
+	const copied = files.filter((f) => 'text' in f);
+	const folders = new Map<string, { readonly path: string; readonly folder: string }>();
+	for (const f of copied)
+		for (const folder of foldersOf(copyTargetOf(root, f.path))) if (!folders.has(keyOf(folder))) folders.set(keyOf(folder), { path: f.path, folder });
+	for (const f of copied) {
+		const target = copyTargetOf(root, f.path);
+		const under = folders.get(keyOf(target));
+		if (under !== undefined) {
+			const apart = under.folder === target ? '' : ', case not told apart';
+			return (
+				`two of the workspace's files land on one name in its copy, workspace/${f.path} as a file and as a folder of workspace/${under.path}${apart}: its ` +
+				'folder is not written, so that neither is written over the other (design D86)'
+			);
+		}
+	}
 	return undefined;
+}
+
+/** ⭐ r28 (2)(a) — a copied file's target under `workspace/`, as `workspaceTarget` resolves it, its parts joined by `/`. */
+function copyTargetOf(root: string, path: string): string {
+	return relative(root, resolve(root, path)).split(/[\\/]/).join('/');
+}
+
+/** ⭐ r28 (2)(a) — the folders of a copy target, outermost first: each of its prefixes that ends at one of its separators. */
+function foldersOf(target: string): string[] {
+	const parts = target.split('/');
+	return parts.slice(1).map((_, i) => parts.slice(0, i + 1).join('/'));
 }
 
 /**
@@ -270,6 +302,25 @@ async function writeWorkspaceFile(at: string, path: string, text: string): Promi
 		throw new HistorianCopyRefusal(
 			`a workspace file of its copy, workspace/${path}, lands on a name its copy already holds, as this volume reads names: its folder is not written, ` +
 				'so that neither is written over the other (design D86)'
+		);
+	}
+}
+
+/**
+ * ⭐⭐ L17b2 (Codex's L17B2F-A02; the lead's r28 (2)(b)) — THE FOLDER OF ONE WORKSPACE FILE OF THE COPY, made within the named kind's reach: in a fresh
+ * `mkdtemp` folder that only the copy writes, an EEXIST or an ENOTDIR from its `mkdir` means one of the copy's own names is in the way — a name the
+ * volume reads as another's, which no check of the names can know (`ABCDEF~1.TXT/x.txt` after `abcdefghij.txt`). Refused in D86's words, the path as
+ * the workspace gave it, never the absolute path the volume's own message names. Every other error of that `mkdir` is thrown as it was.
+ */
+async function makeWorkspaceFolder(folder: string, path: string): Promise<void> {
+	try {
+		await mkdir(folder, { recursive: true });
+	} catch (e) {
+		const code = (e as { code?: unknown }).code;
+		if (code !== 'EEXIST' && code !== 'ENOTDIR') throw e;
+		throw new HistorianCopyRefusal(
+			`a folder of a workspace file of its copy, workspace/${path}, lands on a name its copy already holds, as this volume reads names: its folder ` +
+				'is not written, so that neither is written over the other (design D86)'
 		);
 	}
 }
@@ -335,7 +386,8 @@ export async function writeHistorianFolder(input: {
 		for (const f of input.workspaceFiles) {
 			if (!('text' in f)) continue;
 			const at = workspaceTarget(workspace, f.path);
-			await mkdir(dirname(at), { recursive: true });
+			// ⭐ r28 (2)(b) — ~~`await mkdir(dirname(at), { recursive: true });`~~, whose EEXIST or ENOTDIR at a name the copy holds reached the part raw.
+			await makeWorkspaceFolder(dirname(at), f.path);
 			// ⭐ r27 — ~~`await writeFile(at, f.text, 'utf8');`~~, which wrote over a name the volume already held: created, never written over.
 			await writeWorkspaceFile(at, f.path, f.text);
 		}

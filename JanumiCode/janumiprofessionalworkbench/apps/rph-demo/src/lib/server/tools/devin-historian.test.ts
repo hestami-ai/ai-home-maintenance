@@ -29,6 +29,7 @@ import {
 	HISTORIAN_DISABLED_TOOLS,
 	HISTORIAN_PROJECT_CONFIG,
 	HISTORIAN_USER_CONFIG,
+	HistorianCopyRefusal,
 	NOT_TEXT_NOT_COPIED,
 	devinHistorianCall,
 	historianCallBound,
@@ -305,6 +306,87 @@ describe('⭐⭐ L17b2 (D86; rulings 8, 9) — the Historian’s folder', () => 
 				.soft(files.map((f) => readFileSync(join(workspace, f.path), 'utf8')), 'a file of a pair does not hold its own bytes')
 				.toEqual(files.map((f) => f.text));
 		}
+	});
+
+	// ⭐⭐ L17b2 (the lead's r28 (2); Codex's L17B2F-A02) — A FILE OF THE COPY AT A FOLDER OF ANOTHER'S PATH: the check above compared whole targets alone,
+	// and a workspace file's folder is made before its guarded write, so `A` then `a/x.txt` met the volume's own EEXIST at the folder, its absolute path
+	// in it, and the Historian was recorded failing. Each copied target's folders are now compared, case not told apart, with the copied files' targets,
+	// in either order and at any depth, before any folder is made; and a folder's `mkdir` that meets a name the copy holds (EEXIST, ENOTDIR), which only
+	// the volume can know — at an 8.3 short name — is a `HistorianCopyRefusal`, in D86's words.
+	it('⛔ RED FIRST — a file of the copy at a folder of another’s path — A then a/x.txt, a/x.txt then A, a then a/x.txt, A then a/b/x.txt — is refused before any folder is made, both paths named, the file first; and no folder is left', async () => {
+		const token = `a-file-at-a-folder-of-the-copy-${process.pid}-${Date.now()}`;
+		const cases: readonly (readonly [readonly string[], string])[] = [
+			[["A", "a/x.txt"], "two of the workspace's files land on one name in its copy, workspace/A as a file and as a folder of workspace/a/x.txt, case not told apart: its folder is not written, so that neither is written over the other (design D86)"],
+			[["a/x.txt", "A"], "two of the workspace's files land on one name in its copy, workspace/A as a file and as a folder of workspace/a/x.txt, case not told apart: its folder is not written, so that neither is written over the other (design D86)"],
+			[["a", "a/x.txt"], "two of the workspace's files land on one name in its copy, workspace/a as a file and as a folder of workspace/a/x.txt: its folder is not written, so that neither is written over the other (design D86)"],
+			[["A", "a/b/x.txt"], "two of the workspace's files land on one name in its copy, workspace/A as a file and as a folder of workspace/a/b/x.txt, case not told apart: its folder is not written, so that neither is written over the other (design D86)"]
+		];
+		for (const [paths, words] of cases) {
+			const settled = await settledWrite({ prompt: `${token} ${paths.join(' ')}`, records: [], workspaceFiles: paths.map((path) => ({ path, text: path })) });
+			if (settled.ok) dirs.push(settled.f.folder, settled.f.host);
+			expect.soft(settled.ok ? 'the folder was written' : settled.why, `${paths.join(' then ')}: not refused before any folder is made, both paths named`).toBe(words);
+		}
+		expect.soft(foldersLeftBy(token), 'a refused write left its folder').toEqual([]);
+	});
+
+	it('⛔ RED FIRST — a folder of the copy at an 8.3 short name — abcdefghij.txt then ABCDEF~1.TXT/x.txt, and then ABCDEF~1.TXT/b/x.txt — is refused at the write as a HistorianCopyRefusal, in D86’s words, the path as the workspace gave it and no absolute one, and no folder is left; skipped, saying why, where the volume of tmpdir() makes no short names', async (ctx) => {
+		const volume = shortNameOpens('abcdefghij.txt', 'ABCDEF~1.TXT');
+		ctx.skip(!volume.made, `skipped: ${volume.found}`);
+		const token = `a-folder-at-a-name-the-copy-holds-${process.pid}-${Date.now()}`;
+		const cases: readonly (readonly [string, string])[] = [
+			['ABCDEF~1.TXT/x.txt', 'a folder of a workspace file of its copy, workspace/ABCDEF~1.TXT/x.txt, lands on a name its copy already holds, as this volume reads names: its folder is not written, so that neither is written over the other (design D86)'],
+			['ABCDEF~1.TXT/b/x.txt', 'a folder of a workspace file of its copy, workspace/ABCDEF~1.TXT/b/x.txt, lands on a name its copy already holds, as this volume reads names: its folder is not written, so that neither is written over the other (design D86)']
+		];
+		for (const [second, words] of cases) {
+			const files = [
+				{ path: 'abcdefghij.txt', text: 'the long name' },
+				{ path: second, text: 'a file under the short name' }
+			];
+			expect(workspaceCopyClash(files), `arrangement: ${second}: the check before any folder is made catches it, so it is not the write’s to find`).toBeUndefined();
+			const settled = await writeHistorianFolder({ prompt: `${token} ${second}`, records: [], workspaceFiles: files }).then(
+				(f) => ({ ok: true as const, f }),
+				(e: unknown) => ({ ok: false as const, why: e instanceof Error ? e.message : String(e), named: e instanceof HistorianCopyRefusal })
+			);
+			if (settled.ok) dirs.push(settled.f.folder, settled.f.host);
+			expect
+				.soft(settled.ok ? 'the folder was written' : settled.why, `${second}: the folder’s refusal is not said in D86’s words, its path as the workspace gave it (${volume.found})`)
+				.toBe(words);
+			expect
+				.soft(settled.ok ? [false, false] : [settled.why.includes(tmpdir()), /[A-Za-z]:[\\/]/.test(settled.why)], `${second}: the refusal names an absolute path`)
+				.toEqual([false, false]);
+			expect.soft(!settled.ok && settled.named, `${second}: the refusal is not a HistorianCopyRefusal`).toBe(true);
+		}
+		expect.soft(foldersLeftBy(token), 'a refused write left its folder').toEqual([]);
+	});
+
+	it('⭑ CONTROL — names that are no file at a folder of another’s path are each copied, each with its own bytes: src/x.ts and SRC/y.ts, two files of one folder as this volume reads it; a and ab/x.txt; a.b/x.txt and a; and A, not copied, beside a/x.txt', async () => {
+		const token = `no-file-at-a-folder-of-the-copy-${process.pid}-${Date.now()}`;
+		for (const paths of [['src/x.ts', 'SRC/y.ts'], ['a', 'ab/x.txt'], ['a.b/x.txt', 'a']]) {
+			const settled = await settledWrite({ prompt: `${token} ${paths.join(' ')}`, records: [], workspaceFiles: paths.map((path) => ({ path, text: `the bytes of ${path}` })) });
+			if (settled.ok) dirs.push(settled.f.folder, settled.f.host);
+			expect.soft(settled.ok ? '' : settled.why, `${paths.join(' and ')}: a copy of names that are no file at a folder of another’s was refused`).toBe('');
+			if (settled.ok) {
+				const workspace = join(settled.f.folder, 'workspace');
+				expect
+					.soft(paths.map((p) => readFileSync(join(workspace, p), 'utf8')), `${paths.join(' and ')}: a file does not hold its own bytes`)
+					.toEqual(paths.map((p) => `the bytes of ${p}`));
+			}
+		}
+		// ⭑ And a file not copied, which writes nothing: A, not copied, beside a/x.txt.
+		const notCopied = await settledWrite({
+			prompt: `${token} A not copied`,
+			records: [],
+			workspaceFiles: [
+				{ path: 'A', notCopied: NOT_TEXT_NOT_COPIED, byteSize: 3 },
+				{ path: 'a/x.txt', text: 'the bytes of a/x.txt' }
+			]
+		});
+		if (notCopied.ok) dirs.push(notCopied.f.folder, notCopied.f.host);
+		expect.soft(notCopied.ok ? '' : notCopied.why, 'A, not copied, beside a/x.txt: the copy was refused').toBe('');
+		if (notCopied.ok)
+			expect
+				.soft(readFileSync(join(notCopied.f.folder, 'workspace', 'a', 'x.txt'), 'utf8'), 'A, not copied, beside a/x.txt: a/x.txt does not hold its own bytes')
+				.toBe('the bytes of a/x.txt');
 	});
 });
 

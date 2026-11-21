@@ -4953,7 +4953,10 @@ describe('⭐⭐ L17b2 (D82, D75, D86; the lead’s r26 (1), (2)) — no way bac
 			() => {
 				expect(pi.asked.filter((a) => !a.prompt.includes('You are the Hypothesizer')).length, 'arrangement: the Unsticking Agent’s turn has begun').toBe(1);
 			},
-			{ timeout: 60_000, interval: 20 }
+			// ⭐ r28 — ~~`{ timeout: 60_000, interval: 20 }`~~: the turn was waited for as long as the test's own 60 s, so where it never begins (a mutant
+			// that records no recurrence, or reads another record as the step-back) the test timed out, and the runner could not read the run. Now the
+			// arrangement fails inside the test's time, saying the turn never began.
+			{ timeout: 30_000, interval: 20 }
 		);
 		expect(stageEvidenceOf(HISTORIAN_PART).length, 'arrangement: the Historian’s record is made before the step-back’s').toBe(1);
 		const during = wayBackOffersOf(r.u, r.ids.verification);
@@ -5119,6 +5122,149 @@ describe('⭐⭐ L17b2 (D82, D75, D86; the lead’s r26 (1), (2)) — no way bac
 			.soft(part?.why ?? '', 'its not running is not said in the writer’s words, its path as the workspace gave it')
 			.toBe(
 				'a workspace file of its copy, workspace/ABCDEF~1.TXT, lands on a name its copy already holds, as this volume reads names: its folder is not written, so that neither is written over the other (design D86)'
+			);
+		expect
+			.soft([seam.historianCalls.length - calls, historianAssessmentsOf(r.ids.verification).length], 'a Historian that could not run was called, or recorded an assessment')
+			.toEqual([0, 0]);
+	});
+});
+
+// ⭐⭐ L17b2, after the independent re-review of the committed fix (Codex's L17B2F-A01, L17B2F-A02; the lead's r28 (1), (2)) — ONE STEP-BACK A ROUND,
+// WHICHEVER WAY ITS PART IS REACHED: the stage admits its round again while the round holds no chapter record, so a stage pressed again after its
+// chapter's record was refused reached the step-back part a second time, and the Unsticking Agent ran again (D73: "A round keeps its one step-back").
+// The part now reads the round's step-back first — one definition, a STEP_BACK stage record of the round of any status, which the re-ask's condition
+// reads too. And the copy: a file of it at a folder of another's path, refused before any folder is made, or at the write where only the volume knows.
+describe('⭐⭐ L17b2 (D73, D75, D86; the lead’s r28 (1), (2)) — one step-back a round, whichever way its part is reached; and no file of the copy at a folder of another’s path', () => {
+	/** The stage's batch, the chapter's record refused for the case: the stage records its other parts and goes on (`partRecordersOf`). */
+	const refusingChapter = (steps: Parameters<typeof runStepsHere>[0]) =>
+		steps.some((s) => s[0] === 'RecordArtifact' && (s[3] as { artifactType?: unknown }).artifactType === 'narrative-chapter')
+			? 'the store refuses the chapter’s record, for the case'
+			: runStepsHere(steps);
+	/** The Unsticking Agent's turns on Pi: every prompt but the Hypothesizer's. */
+	const unstickingTurns = (pi: ReturnType<typeof onPi>) => pi.asked.filter((a) => !a.prompt.includes('You are the Hypothesizer')).length;
+	/** The round's step-back records, of any status. */
+	const stepBacksOf = (roundId: string) =>
+		stageEvidenceOf('step-back').filter((e) => (e.state.contentReference as { stage?: { round?: string } } | undefined)?.stage?.round === roundId);
+	/** The Historian's answer, a recurrence of the round recorded. */
+	const recurringOf = (roundId: string) => () => ({ stdout: historianAnswer({ failed: ['HC-02'], recurrence: { recurs: true, statement: RECURRING, earlierRecords: [roundId] } }) });
+
+	it('⛔ RED FIRST — the stage pressed again after its chapter’s record was refused, the round’s step-back recorded the first time: no second Unsticking Agent turn, one step-back record in the round, and the step-back part not run, naming the record', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		historianBoundSet();
+		seam.review = chapterAnswering;
+		seam.historian = recurringOf(roundId);
+		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+		const first = await runAssuranceStage(r.ids.verification, { ...pi.deps, runSteps: refusingChapter });
+		expect(partOf(first, 'narrative-chapter')?.why ?? '', 'arrangement: the chapter’s record refused').toContain('its record was refused');
+		expect(partOf(first, 'step-back')?.status, 'arrangement: the round’s step-back recorded').toBe('recorded');
+		const held = stepBacksOf(roundId);
+		expect(held.length, 'arrangement: one step-back record in the round').toBe(1);
+		const id = String((held[0]!.state.contentReference as { artifactId: string }).artifactId);
+		const turns = unstickingTurns(pi);
+		const again = await runAssuranceStage(r.ids.verification, pi.deps);
+		expect('parts' in again ? '' : again.refusedBecause, 'arrangement: the stage does not admit its round again, no chapter recorded').toBe('');
+		expect.soft(unstickingTurns(pi) - turns, 'a second Unsticking Agent turn ran in the round').toBe(0);
+		expect.soft(stepBacksOf(roundId).length, 'the round holds a second step-back record').toBe(1);
+		expect
+			.soft(partOf(again, 'step-back'), 'the step-back part is not said not run, naming the round’s step-back')
+			.toEqual({ part: 'step-back', status: 'not-run', why: `the round has its step-back already (${id}, recorded): a round keeps its one step-back (design D73)` });
+	});
+
+	it('⛔ RED FIRST — the same, the round’s step-back recorded failing the first time, its answer not read: the stage pressed again runs no second Unsticking Agent turn and records no second step-back', async () => {
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		historianBoundSet();
+		seam.review = chapterAnswering;
+		seam.historian = recurringOf(roundId);
+		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: 'not a step-back' });
+		const first = await runAssuranceStage(r.ids.verification, { ...pi.deps, runSteps: refusingChapter });
+		expect(partOf(first, 'narrative-chapter')?.why ?? '', 'arrangement: the chapter’s record refused').toContain('its record was refused');
+		expect(partOf(first, 'step-back')?.status, 'arrangement: the round’s step-back recorded failing').toBe('failing');
+		const held = stepBacksOf(roundId);
+		expect(held.length, 'arrangement: one step-back record in the round').toBe(1);
+		const id = String((held[0]!.state.contentReference as { artifactId: string }).artifactId);
+		const turns = unstickingTurns(pi);
+		const again = await runAssuranceStage(r.ids.verification, pi.deps);
+		expect('parts' in again ? '' : again.refusedBecause, 'arrangement: the stage does not admit its round again, no chapter recorded').toBe('');
+		expect.soft(unstickingTurns(pi) - turns, 'a second Unsticking Agent turn ran though the round’s step-back is recorded failing').toBe(0);
+		expect.soft(stepBacksOf(roundId).length, 'the round holds a second step-back record').toBe(1);
+		expect
+			.soft(partOf(again, 'step-back'), 'the step-back part is not said not run, naming the round’s failing step-back')
+			.toEqual({ part: 'step-back', status: 'not-run', why: `the round has its step-back already (${id}, failing): a round keeps its one step-back (design D73)` });
+	});
+
+	// ⭑ CONTROL — what is not the round's step-back: a part not run and not recorded (no recurrence), and a step-back of another round, recorded first.
+	it('⭑ CONTROL — a step-back part not run and not recorded is no step-back of the round, nor is another round’s: the first stage’s chapter refused, its Historian recording no recurrence; pressed again, its Historian recording one, the step-back runs once and is recorded', async () => {
+		const other = await verificationRejected();
+		historianBoundSet();
+		seam.review = chapterAnswering;
+		seam.historian = recurringOf(other.verdicts[0]!.assessmentId);
+		const otherPi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', other.ids.source), stepBack: STEP_BACK });
+		expect(partOf(await runAssuranceStage(other.ids.verification, otherPi.deps), 'step-back')?.status, 'arrangement: another round’s step-back recorded').toBe('recorded');
+		const r = await verificationRejected();
+		const roundId = r.verdicts[0]!.assessmentId;
+		seam.historian = () => ({ stdout: historianAnswer({ failed: ['HC-02'] }) });
+		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+		const first = await runAssuranceStage(r.ids.verification, { ...pi.deps, runSteps: refusingChapter });
+		expect(partOf(first, 'narrative-chapter')?.why ?? '', 'arrangement: the chapter’s record refused').toContain('its record was refused');
+		expect([partOf(first, 'step-back')?.status, stepBacksOf(roundId).length], 'arrangement: the first stage’s step-back not run, and not recorded').toEqual(['not-run', 0]);
+		seam.historian = recurringOf(roundId);
+		const turns = unstickingTurns(pi);
+		const again = await runAssuranceStage(r.ids.verification, pi.deps);
+		expect
+			.soft([partOf(again, 'step-back')?.status, stepBacksOf(roundId).length, unstickingTurns(pi) - turns], 'the step-back did not run once and get recorded')
+			.toEqual(['recorded', 1, 1]);
+	});
+
+	it('⛔ RED FIRST — a shared workspace in memory holding A and a/x.txt, the port listing A first: the Historian is not run, both paths named — A as a file and as a folder of a/x.txt — and nothing of it is called or recorded', async () => {
+		const r = await verificationRejected();
+		historianBoundSet();
+		seam.review = chapterAnswering;
+		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+		const ws = createInMemoryWorkspace({ ownerKind: 'UNDERTAKING', ownerId: r.u.undertakingId, purgeability: 'RETAINED_BY_PARTICIPATION' });
+		await ws.writeFile('A', 'a file');
+		await ws.writeFile('a/x.txt', 'a file in a folder');
+		expect(
+			(await ws.list()).map((e) => e.path).filter((p) => p === 'A' || p === 'a/x.txt'),
+			'arrangement: the port does not list A first, so the copy would not write it first'
+		).toEqual(['A', 'a/x.txt']);
+		const calls = seam.historianCalls.length;
+		const done = await runAssuranceStage(r.ids.verification, { ...pi.deps, sandboxOf: () => ({ workspace: ws }) as never });
+		const part = partOf(done, HISTORIAN_PART);
+		expect.soft(part?.status, 'the Historian is not recorded not run, though a file of its copy lands on a folder of another’s path').toBe('not-run');
+		expect
+			.soft(part?.why ?? '', 'its not running does not name both paths, the file first')
+			.toBe(
+				"two of the workspace's files land on one name in its copy, workspace/A as a file and as a folder of workspace/a/x.txt, case not told apart: its folder is not written, so that neither is written over the other (design D86)"
+			);
+		expect
+			.soft([seam.historianCalls.length - calls, historianAssessmentsOf(r.ids.verification).length], 'a Historian that could not run was called, or recorded an assessment')
+			.toEqual([0, 0]);
+	});
+
+	it('⛔ RED FIRST — a shared workspace in memory holding ABCDEFGHIJ.txt and ABCDEF~1.TXT/x.txt, a folder at its 8.3 short name, the port listing the long name first: the Historian is not run, in the writer’s words for a folder, the path as the workspace gave it, and nothing of it is called or recorded; skipped, saying why, where the volume of tmpdir() makes no short names', async (ctx) => {
+		const volume = shortNameOpens('ABCDEFGHIJ.txt', 'ABCDEF~1.TXT');
+		ctx.skip(!volume.made, `skipped: ${volume.found}`);
+		const r = await verificationRejected();
+		historianBoundSet();
+		seam.review = chapterAnswering;
+		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+		const ws = createInMemoryWorkspace({ ownerKind: 'UNDERTAKING', ownerId: r.u.undertakingId, purgeability: 'RETAINED_BY_PARTICIPATION' });
+		await ws.writeFile('ABCDEFGHIJ.txt', 'the long name');
+		await ws.writeFile('ABCDEF~1.TXT/x.txt', 'a file under the short name');
+		expect(
+			(await ws.list()).map((e) => e.path).filter((p) => p === 'ABCDEFGHIJ.txt' || p === 'ABCDEF~1.TXT/x.txt'),
+			'arrangement: the port does not list the long name first, so the copy would not write it first'
+		).toEqual(['ABCDEFGHIJ.txt', 'ABCDEF~1.TXT/x.txt']);
+		const calls = seam.historianCalls.length;
+		const done = await runAssuranceStage(r.ids.verification, { ...pi.deps, sandboxOf: () => ({ workspace: ws }) as never });
+		const part = partOf(done, HISTORIAN_PART);
+		expect.soft(part?.status, `the Historian is not recorded not run, though a folder of its copy lands on a name the copy holds (${volume.found})`).toBe('not-run');
+		expect
+			.soft(part?.why ?? '', 'its not running is not said in the writer’s words for a folder, its path as the workspace gave it')
+			.toBe(
+				'a folder of a workspace file of its copy, workspace/ABCDEF~1.TXT/x.txt, lands on a name its copy already holds, as this volume reads names: its folder is not written, so that neither is written over the other (design D86)'
 			);
 		expect
 			.soft([seam.historianCalls.length - calls, historianAssessmentsOf(r.ids.verification).length], 'a Historian that could not run was called, or recorded an assessment')

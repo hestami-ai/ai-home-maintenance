@@ -41,6 +41,7 @@ import {
 	stageRecordsIn,
 	type StagePart,
 	type StagePartStatus,
+	type StageRecord,
 	type StageStep
 } from './assurance-stage-records.js';
 import { readDiagnosis, hypothesizerPrompt, type HypothesizerCandidate } from './hypothesizer.js';
@@ -496,11 +497,33 @@ interface StepBackContext {
 }
 
 /**
+ * ⭐⭐ L17b2, after the independent re-review of the committed fix (Codex's L17B2F-A01; the lead's r28 (1)(a)) — THE ROUND'S STEP-BACK, one definition:
+ * the round's first STEP_BACK stage record, of any status — recorded, failing, refused or not run each count, as the round's rule reads it
+ * (`stepBackNotRecorded`). Read by `stepBackPart` before it runs anything, and by the re-ask's condition (paired guards share one definition).
+ */
+function roundStepBackOf(engine: EngineHandle, roundId: string): StageRecord | undefined {
+	return stageRecordsIn(engine).find((r) => r.roundId === roundId && r.part === STAGE_PART.STEP_BACK);
+}
+
+/**
  * ⭐ L17b2 — THE UNSTICKING AGENT'S PART (D75), as the stage runs it fourth and the Historian's re-ask runs it after an answer whose recurrence brings it
- * (reading 6): L17b1's block, its text whole, its round's values read from `c`.
+ * (reading 6): L17b1's block, its text whole, its round's values read from `c`. ⭐⭐ r28 (1)(b) — and first, the round's one step-back (D73): the stage
+ * admits its round again while the round holds no chapter record, so a stage pressed again after its chapter's record was refused reaches this part a
+ * second time.
  */
 async function stepBackPart(c: StepBackContext): Promise<void> {
 	const { deps, engine, store, pwuId, roundId, roundVersion, undertakingId, unit, executor, shared, parts, record, helperNotRun } = c;
+	// ── 0. ⭐ r28 (1)(b) — THE ROUND'S ONE STEP-BACK (D73): where the round holds it, of any status, the Unsticking Agent is not run and nothing is
+	// recorded — a second STEP_BACK record, of any status, would itself be a second step-back.
+	const held = roundStepBackOf(engine, roundId);
+	if (held !== undefined) {
+		parts.push({
+			part: STAGE_PART.STEP_BACK,
+			status: 'not-run',
+			why: `the round has its step-back already (${held.artifactId}, ${held.status}): a round keeps its one step-back (design D73)`
+		});
+		return;
+	}
 	// ── 3. THE UNSTICKING AGENT (D75): when, and only when, the round has an open recurrence.
 	const recurrence = openRecurrencesOf(engine, pwuId, roundId);
 	if (recurrence.length === 0) parts.push({ part: STAGE_PART.STEP_BACK, status: 'not-run', why: 'the round has no open KNOWN_FAILURE_RECURRENCE observation (design D75)' });
@@ -663,7 +686,9 @@ async function historianAgainOfRound(pwuId: string, roundId: string, deps: Assur
 	});
 	parts.push(asked);
 	// ⭐ Reading 6 — the Unsticking Agent, where this ask's recurrence is open and the round has no step-back record yet.
-	const steppedBack = stageRecordsIn(engine).some((r) => r.roundId === roundId && r.part === STAGE_PART.STEP_BACK);
+	// ⭐ r28 (1)(a), (c) — ~~`stageRecordsIn(engine).some((r) => r.roundId === roundId && r.part === STAGE_PART.STEP_BACK)`~~: the one definition, the
+	// same reading; the re-ask calls no step-back part where the round has its step-back, and its parts are as before.
+	const steppedBack = roundStepBackOf(engine, roundId) !== undefined;
 	if (!steppedBack && openRecurrencesOf(engine, pwuId, roundId).length > 0)
 		await stepBackPart({ deps, engine, store, pwuId, roundId, roundVersion, undertakingId, unit, executor: deps.executor, shared, parts, record, helperNotRun });
 	return { roundId, parts };
