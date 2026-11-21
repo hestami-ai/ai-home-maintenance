@@ -217,9 +217,11 @@ const SECONDARY_PROGRAMS: readonly {
 	{
 		tsconfig: 'apps/rph-demo/tsconfig.vitest-config.json',
 		dirs: [],
-		files: ['apps/rph-demo/vitest.config.ts']
+		files: ['apps/rph-demo/vitest.config.ts', 'apps/rph-demo/vitest.d84.config.ts']
 	}
 ];
+// ⭐ `JAN-EXEC` Phase 7, design D84 (the lead's rulings r1, Q7) — the vitest-config program holds D84's measurement driver's own config beside the
+// app's (`apps/rph-demo/tsconfig.vitest-config.json`'s files), so a mutation of it is compiled by the program that type-checks it.
 
 /**
  * WHICH PROGRAM `tsc` BUILDS TO JUDGE A MUTATION OF `file` — the cases `pkgOf` never had (JAN-SELREV SR-1).

@@ -119,6 +119,30 @@ function asideLeftoverSession(folder: string): string[] {
 	return [`a session an earlier press of this round left (${left.map((f) => basename(f)).join(', ')}) was moved aside, never continued (design D85)`];
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 — design D84 (`REG-D-189` (2); `d84/d84-facts.md` §3.1; the lead's rulings r1) — A HELPER'S COPY, ONE DEFINITION: the shared
+ * workspace's folder copied, links kept as links; its process-output folder beside it; and the record's files written into the copy through the port,
+ * a file that cannot be written thrown. The helper (`runStageHelper`) makes its copy here, and so does D84's driver, which shows the Hypothesizer its
+ * copy before its call. ⚠ `shared` is the helper's run's own: the copy is never written there.
+ */
+export async function helperCopyOf(run: Pick<HelperRun, 'undertakingId' | 'recordFiles' | 'shared'>, dir: string, copyDir: string): Promise<Workspace> {
+	cpSync(dir, copyDir, { recursive: true, verbatimSymlinks: true, errorOnExist: true, force: false });
+	mkdirSync(`${copyDir}.process-output`, { recursive: true });
+	const copy = createFilesystemWorkspace({
+		ownerKind: 'UNDERTAKING',
+		ownerId: run.undertakingId,
+		purgeability: 'PURGEABLE_AT_EXPIRY',
+		directoryPath: copyDir
+	});
+	// ⭐⭐ Package L17b3 — design D89 — the recorded conversations the helper judges from, written into its copy before its turn; one that cannot be
+	// written fails the helper, said, as any failure of its run does.
+	for (const f of run.recordFiles) {
+		const written = await copy.writeFile(f.path, f.text);
+		if (!written.written) throw new Error(`the record file ${f.path} could not be written into its copy: ${written.refusedBecause}`);
+	}
+	return copy;
+}
+
 /** ⭐⭐ D74, D75 — RUN ONE HELPER: see the header for its order. */
 export async function runStageHelper(run: HelperRun, deps: HelperDeps): Promise<HelperOutcome> {
 	if (run.executor.kind !== 'PI')
@@ -158,20 +182,9 @@ export async function runStageHelper(run: HelperRun, deps: HelperDeps): Promise<
 			place = { kind: 'DURABLE', folder, opening: { kind: 'NEW' } };
 		}
 		const before = await takeManifest(run.shared);
-		cpSync(dir, copyDir, { recursive: true, verbatimSymlinks: true, errorOnExist: true, force: false });
-		mkdirSync(outDir, { recursive: true });
-		const copy = createFilesystemWorkspace({
-			ownerKind: 'UNDERTAKING',
-			ownerId: run.undertakingId,
-			purgeability: 'PURGEABLE_AT_EXPIRY',
-			directoryPath: copyDir
-		});
-		// ⭐⭐ Package L17b3 — design D89 — the recorded conversations the helper judges from, written into its copy before its turn; one that cannot be
-		// written fails the helper, said, as any failure of its run does.
-		for (const f of run.recordFiles) {
-			const written = await copy.writeFile(f.path, f.text);
-			if (!written.written) throw new Error(`the record file ${f.path} could not be written into its copy: ${written.refusedBecause}`);
-		}
+		// ⭐ D84 — the copy, its process-output folder and the record's files, made by the one definition D84's driver shows the copy by
+		// (`helperCopyOf`), in the order they were made here.
+		const copy = await helperCopyOf(run, dir, copyDir);
 		const output = createFilesystemWorkspace({
 			ownerKind: 'UNDERTAKING',
 			ownerId: run.undertakingId,

@@ -45,6 +45,11 @@
  * the eleven do: unset, the Historian is not run — so a shell that exported it for a paid run would change every gate test that expects
  * the Historian not run for an unset bound (driven red: `live-backend-isolation.test.ts`, all four children, with it exported there and
  * left off this list). It stays out of the replay's list (`LIVE_SELECTIONS_BESIDE_A_REPLAY`): a replay runs no stage.
+ * ⭐⭐ AND A THIRTEENTH, `JPWB_D84_PAID` (`JAN-EXEC` Phase 7, design D84 as amended 2026-11-21; the lead's rulings r1, Q5): the flag without
+ * which D84's measurement driver makes no call (`apps/rph-demo/src/lib/server/measurement/d84-files.ts`). It selects no backend, but it keys on
+ * its presence as the paid lane's own flag does: set, the driver's calls run — so a shell that exported it for the measurement must never
+ * reach a gate process (driven red: `live-backend-isolation.test.ts`, all four children, with it exported there and left off this list). It
+ * stays out of the replay's list: a replay runs no stage, and no call of D84's.
  */
 export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -58,7 +63,8 @@ export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_AGY_BIN',
 	'JPWB_REPLAY',
 	'JPWB_AUTHORING_REVIEW_ALLOWANCE',
-	'JPWB_HISTORIAN_CALL_MS'
+	'JPWB_HISTORIAN_CALL_MS',
+	'JPWB_D84_PAID'
 ] as const;
 
 /** Remove every live-backend selection from `env` — the process's own, at a gate entry point. */

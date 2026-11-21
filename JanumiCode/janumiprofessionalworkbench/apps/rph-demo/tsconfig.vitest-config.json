@@ -3,8 +3,9 @@
 	// this app's own `vitest run` (design D8), but `svelte-check`'s include list (`.svelte-kit/tsconfig.json`) names
 	// `vite.config.ts` and not this file, so nothing type-checked it. This project checks exactly that one file under
 	// the app's own compiler options; `check-types` runs it.
+	// ⭐ D84 (the lead's rulings r1, Q7) — and D84's measurement driver's own config, which nothing else type-checks either.
 	"extends": "./tsconfig.json",
 	"compilerOptions": { "noEmit": true },
 	"include": [],
-	"files": ["vitest.config.ts"]
+	"files": ["vitest.config.ts", "vitest.d84.config.ts"]
 }

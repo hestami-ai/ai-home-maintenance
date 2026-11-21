@@ -24,6 +24,8 @@
 // its answer was not read, or its assessment was refused. ⛔ It is never folded into the unit's own assurance: no hop is made, and the kernel's index
 // leaves out an assessment completed under its validator id (ruling 18).
 // ⛔ IT NEVER THROWS: whatever it throws, whatever the value, is its part's failure, said through the one describer (`describedThrow`).
+// ⭑ ⭐ D84 (`REG-D-189`) — WHAT IT IS SHOWN IS ONE FUNCTION, `historianInputOf`, which the part and D84's measurement driver both call, so the folder the
+// driver shows the sponsor is built from the same reading as the folder the part's call runs in.
 import { reasoningReviewResultFromJudgement, type FloorCriterion } from '@janumipwb/rph-assurance';
 import type { ActorReference, AssessmentCriterion, RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import { driveAssessmentToAssessing, listByType, listPwus, type EngineHandle } from '@janumipwb/rph-engine';
@@ -543,11 +545,29 @@ export async function historianPart(ctx: HistorianPartContext): Promise<Historia
 	}
 }
 
-/** One ask: who runs it, its bound, its copy, its folder and its call; its exchange; its assessment; its record. */
-async function historianAsk(ctx: HistorianPartContext): Promise<HistorianPartOutcome> {
+/** ⭐ D84 — what the Historian is shown, or why it is not run: who runs it, its bound, its copy of the workspace, its policy, its records, its prompt. */
+export type HistorianInput =
+	| { readonly ok: false; readonly why: string }
+	| {
+			readonly ok: true;
+			readonly runner: Extract<ReturnType<typeof historianRunnerOf>, { readonly ok: true }>;
+			readonly bound: Extract<ReturnType<typeof historianCallBound>, { readonly ok: true }>;
+			readonly copied: Extract<Awaited<ReturnType<typeof historianWorkspaceFiles>>, { readonly ok: true }>;
+			readonly policy: StoredPolicy;
+			readonly records: Awaited<ReturnType<typeof historianRecordsOf>>;
+			readonly prompt: string;
+	  };
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 — design D84 (`REG-D-189`; `d84/d84-facts.md` §3.1; the lead's rulings r1) — THE HISTORIAN'S INPUT, ONE DEFINITION: who runs
+ * it, its time bound, the workspace read through the port, its stored policy, its records, the two name checks and its prompt, read as its part reads
+ * them before its folder is written. Its part (`historianAsk`) and D84's driver both call this. ⛔ It writes and calls nothing: where a check refuses,
+ * it says why, and the part records the Historian not run in those words.
+ */
+export async function historianInputOf(ctx: HistorianPartContext): Promise<HistorianInput> {
 	const { deps } = ctx;
 	const { engine } = deps;
-	const notRun = (why: string): Promise<HistorianPartOutcome> => ctx.record(STAGE_PART.HISTORIAN, 'not-run', JSON.stringify({ notRun: why }), [why]);
+	const notRun = (why: string): HistorianInput => ({ ok: false, why });
 	const runner = historianRunnerOf(deps);
 	if (!runner.ok) return notRun(runner.why);
 	const bound = historianCallBound(process.env);
@@ -575,6 +595,18 @@ async function historianAsk(ctx: HistorianPartContext): Promise<HistorianPartOut
 		narrative: ctx.narrative,
 		records: records.files.map((f) => ({ file: f.file, what: f.what }))
 	});
+	return { ok: true, runner, bound, copied, policy, records, prompt };
+}
+
+/** One ask: who runs it, its bound, its copy, its folder and its call; its exchange; its assessment; its record. */
+async function historianAsk(ctx: HistorianPartContext): Promise<HistorianPartOutcome> {
+	const { deps } = ctx;
+	const { engine } = deps;
+	const notRun = (why: string): Promise<HistorianPartOutcome> => ctx.record(STAGE_PART.HISTORIAN, 'not-run', JSON.stringify({ notRun: why }), [why]);
+	// ⭐ D84 — what it is shown, read by the one definition D84's driver shows it by (`historianInputOf`); each check's words as they were here.
+	const input = await historianInputOf(ctx);
+	if (!input.ok) return notRun(input.why);
+	const { runner, bound, copied, policy, records, prompt } = input;
 	let folder: Awaited<ReturnType<typeof writeHistorianFolder>>;
 	try {
 		folder = await writeHistorianFolder({ prompt, records: records.files, workspaceFiles: copied.files });

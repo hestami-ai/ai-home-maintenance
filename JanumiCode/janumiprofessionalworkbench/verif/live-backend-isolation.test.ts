@@ -73,7 +73,11 @@ const EXPORTED: Readonly<Record<string, string>> = {
 	// (`tools/devin-historian.ts`): it selects no backend, but it keys on its absence as the eleven do — unset, the Historian is not run —
 	// so a shell that exported it for a paid run would change every gate test that expects the Historian not run for an unset bound.
 	// ⛔ Exported into this instrument's children alone, which run the probe and nothing else, under a PATH that finds no program.
-	JPWB_HISTORIAN_CALL_MS: '600000'
+	JPWB_HISTORIAN_CALL_MS: '600000',
+	// ⭐⭐ `JAN-EXEC` Phase 7, design D84 (as amended 2026-11-21; the lead's rulings r1, Q5) — A THIRTEENTH, D84'S PAID FLAG
+	// (`measurement/d84-files.ts`): set to `1`, the measurement driver's calls run, so it must never reach a gate process.
+	// ⛔ Exported into this instrument's children alone, which run the probe and nothing else, under a PATH that finds no program.
+	JPWB_D84_PAID: '1'
 };
 
 /**
@@ -144,7 +148,9 @@ describe('⭐ D8 — a gate entry point started with every live-backend variable
 		// allowance, `JPWB_AUTHORING_REVIEW_ALLOWANCE`, is stripped from the gate as the other live-backend variables are.
 		// ⛔ MOVED 2026-11-19 (`JAN-EXEC` Phase 7, package L17b2; the lead's §27, item 4) — ~~11~~ 12: the Historian's time bound,
 		// `JPWB_HISTORIAN_CALL_MS`, is stripped from the gate as the other live-backend variables are.
-		expect(Object.keys(EXPORTED)).toHaveLength(12);
+		// ⛔ MOVED 2026-11-21 (`JAN-EXEC` Phase 7, design D84; the lead's rulings r1, Q5) — ~~12~~ 13: D84's paid flag, `JPWB_D84_PAID`, is
+		// stripped from the gate as the other live-backend variables are.
+		expect(Object.keys(EXPORTED)).toHaveLength(13);
 		for (const [k, v] of Object.entries(EXPORTED)) expect(env[k]).toBe(v);
 		expect(Object.keys(env).filter((k) => /^path$/i.test(k))).toEqual(['PATH']);
 		expect(env.PATH).toBe(NO_PROGRAMS);

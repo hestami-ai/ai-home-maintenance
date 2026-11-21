@@ -13,6 +13,10 @@
 // with why, and the stage going on. ~~The Historian's assessment (D73, D86) is package L17b2's.~~
 // ⭑ ⭐ ASKED ONCE MORE (`rerunHistorian`; the lead's ruling 7): where the round's rule says the Historian did not conclude, its part again — and the
 // Unsticking Agent after it where its answer records a recurrence and the round has no step-back yet — the round held as a press holds it.
+// ⭑ ⭐⭐ ONE DEFINITION, FOR D84'S DRIVER (`REG-D-189`; design D84 as amended 2026-11-21): the round's context (`roundContextOf`), each role's input
+// (`chapterInputOf`, `hypothesizerInputOf`, `historianContextOf` with the Historian part's own `historianInputOf`) and the writer's and the
+// Hypothesizer's parts (`chapterPart`, `diagnosisPart`) are functions the press calls in its order and the driver calls one at a time. ⛔ The
+// Unsticking Agent's part stays this module's own (`stepBackPart`): the driver stops after the Historian.
 import type { ActorReference, RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import { listByType, listExecutionPlans, listPwus, type EngineHandle } from '@janumipwb/rph-engine';
 import { replacementCandidates } from '@janumipwb/rph-projections';
@@ -50,6 +54,7 @@ import {
 	checkNarrativeChapter,
 	narrativeChapterPrompt,
 	standInChapter,
+	type ChapterRecord,
 	type ChapterStatement
 } from './narrative-chapter.js';
 import { runStageHelper } from './stage-helper-run.js';
@@ -57,7 +62,7 @@ import { readStepBack, unstickingPrompt } from './unsticking-agent.js';
 import { HISTORIAN_POLICY_ID, KNOWN_FAILURE_RECURRENCE, NARRATIVE_WRITER_INVOKER, REPLAY_RUNS_NO_STAGE } from './assurance-stage-roles.js';
 import { recordFilePath, recordRowsOf, renderUnitConversation, unitConversationOf } from '../execution/earlier-attempt-record.js';
 // ⭐⭐ Package L17b2 — design D73, D86 — the Historian's part, third in the stage (`historian-part.ts`); its seams' types; and the round's rule (D73's).
-import { historianPart, type HistorianPartOutcome } from './historian-part.js';
+import { historianPart, type HistorianPartContext, type HistorianPartOutcome } from './historian-part.js';
 import type { HistorianExec, HistorianVersionOf } from '../tools/devin-historian.js';
 import { wayBackOffer, type StageReaders } from '../execution/loop-rule.js';
 
@@ -307,18 +312,56 @@ export async function runAssuranceStage(
 }
 
 
-/** One press's parts, in order, for the round its offer named (`runAssuranceStage`). */
-async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: AssuranceStageDeps): Promise<AssuranceStageOutcome> {
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 — design D84 (`REG-D-189`; `d84/d84-facts.md` §3.1; the lead's rulings r1) — ONE ROUND'S CONTEXT, as each part of the
+ * stage reads it: its deps, its unit and Undertaking, its round and its two recorders, and the parts recorded so far. Built once for a press
+ * (`stageOfRound`) and, by D84's measurement driver, once for each part it runs: the same reads, so the driver's part is the stage's part.
+ */
+export interface RoundContext {
+	readonly deps: AssuranceStageDeps;
+	readonly engine: EngineHandle;
+	readonly store: ArtifactStore;
+	readonly pwuId: string;
+	readonly unit: Record<string, unknown>;
+	readonly undertakingId: string;
+	readonly undertaking: Record<string, unknown>;
+	readonly roundId: string;
+	readonly roundVersion: number;
+	readonly parts: StagePartOutcome[];
+	readonly record: ReturnType<typeof partRecordersOf>['record'];
+	readonly helperNotRun: ReturnType<typeof partRecordersOf>['helperNotRun'];
+}
+
+/** ⭐ D84 — the round's context (`RoundContext`): the reads a press of the round opens with, as `stageOfRound` made them. */
+export function roundContextOf(pwuId: string, roundId: string, deps: AssuranceStageDeps): RoundContext {
 	const { engine, store } = deps;
 	const unit = (engine.loadObject(pwuId)?.state ?? {}) as Record<string, unknown>;
 	const undertakingId = str(unit.undertakingId);
 	const undertaking = (engine.loadObject(undertakingId)?.state ?? {}) as Record<string, unknown>;
-	const roundId = offer.roundId;
 	const roundVersion = Number(engine.loadObject(roundId)?.semanticVersion ?? 1);
 	const parts: StagePartOutcome[] = [];
 	// ⭐ L17b2 — the round's two recorders, now one form the stage and the Historian's re-ask share (`partRecordersOf`), their text as it was here.
 	const { record, helperNotRun } = partRecordersOf(deps, { pwuId, roundId, undertakingId });
+	return { deps, engine, store, pwuId, unit, undertakingId, undertaking, roundId, roundVersion, parts, record, helperNotRun };
+}
 
+/** ⭐ D84 — one chapter of the narrative so far, as `chaptersOf` reads it back. */
+export type NarrativeChapter = Awaited<ReturnType<typeof chaptersOf>>[number];
+
+/** ⭐ D84 — what the narrative writer is given (D76): the chapter's number, the records since the last chapter, the chapter before it, its prompt. */
+export interface ChapterInput {
+	readonly number: number;
+	readonly records: readonly ChapterRecord[];
+	readonly previous: NarrativeChapter | undefined;
+	readonly prompt: string;
+}
+
+/**
+ * ⭐⭐ D84 — THE WRITER'S INPUT, ONE DEFINITION: the chapter's records and its prompt, read from the record as the stage reads them before its writer's
+ * call. The stage (`stageOfRound`) and D84's driver both call this, so what the driver shows the sponsor is what the stage sends.
+ */
+export async function chapterInputOf(round: RoundContext): Promise<ChapterInput> {
+	const { engine, store, undertakingId, undertaking } = round;
 	// ── 1. THE CHAPTER (D76): first, from the records since the last chapter.
 	const before = stageRecordsIn(engine).filter((r) => r.part === STAGE_PART.CHAPTER && r.undertakingId === undertakingId);
 	const previousRecord = before.at(-1);
@@ -332,6 +375,13 @@ async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: Ass
 		previous,
 		records
 	});
+	return { number, records, previous, prompt };
+}
+
+/** ⭐⭐ D84 — THE CHAPTER'S PART (D76), first in the stage: the writer called once, its exchange and its record, its outcome added to the round's parts. */
+export async function chapterPart(round: RoundContext, input: ChapterInput): Promise<void> {
+	const { deps, store, roundId, roundVersion, parts, record } = round;
+	const { number, records, previous, prompt } = input;
 	const written = await writeChapter(prompt, () => standInChapter(number, records, previous?.id ?? null), deps);
 	if (!written.ran) parts.push(await record(STAGE_PART.CHAPTER, 'not-run', JSON.stringify({ notRun: written.why }), [written.why]));
 	else {
@@ -381,7 +431,29 @@ async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: Ass
 			})
 		);
 	}
+}
 
+/**
+ * ⭐ D84 — what the Hypothesizer is given (D74, D87, D89), and what the Historian shares with it: the executor, the narrative so far, the candidates,
+ * the failed criteria, the shared workspace and the recorded conversations — and the Hypothesizer's prompt.
+ */
+export interface HypothesizerInput {
+	readonly executor: ExecutorSelection;
+	readonly narrative: readonly NarrativeChapter[];
+	readonly candidates: readonly HypothesizerCandidate[];
+	readonly candidateIds: ReadonlySet<string>;
+	readonly findings: readonly { readonly code: string; readonly statement: string }[];
+	readonly shared: ReturnType<typeof sharedWorkspaceOf>;
+	readonly conversations: Awaited<ReturnType<typeof recordFilesOf>>;
+	readonly prompt: string;
+}
+
+/**
+ * ⭐⭐ D84 — THE HYPOTHESIZER'S INPUT, ONE DEFINITION: its prompt, its candidates and the conversation files its copy is given, read as the stage reads
+ * them after the chapter. The stage and D84's driver both call this; the Historian's context is built from the same reading (`historianContextOf`).
+ */
+export async function hypothesizerInputOf(round: RoundContext): Promise<HypothesizerInput> {
+	const { deps, engine, store, pwuId, unit, undertakingId } = round;
 	// ── 2. THE HYPOTHESIZER (D74, D87): in a copy of the shared workspace, its hashes compared.
 	const executor = deps.executor;
 	const narrative = await chaptersOf(engine, store, undertakingId);
@@ -392,6 +464,15 @@ async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: Ass
 	// ⭐ L17b2 (D89; ruling 9) — the recorded conversations of the rejected unit and of each candidate, rendered once for both the Hypothesizer and the
 	// Historian, so the two are given the same files, the same bytes, by construction.
 	const conversations = await recordFilesOf(engine, store, deps.tenantPrefix, candidates.map((c) => c.id));
+	// ⭐ D84 — the prompt built here, beside the reads it is built from: it was built inside the helper's call, and building it first changes nothing in it.
+	const prompt = hypothesizerPrompt({ rejectedUnit: { id: pwuId, title: str(unit.title) }, failedCriteria: findings, candidates, narrative, recordFiles: conversations.named });
+	return { executor, narrative, candidates, candidateIds, findings, shared, conversations, prompt };
+}
+
+/** ⭐⭐ D84 — THE HYPOTHESIZER'S PART (D74, D87), second in the stage: its one turn in a copy of the shared workspace, read and recorded. */
+export async function diagnosisPart(round: RoundContext, input: HypothesizerInput): Promise<void> {
+	const { deps, undertakingId, roundId, roundVersion, parts, record, helperNotRun } = round;
+	const { executor, candidateIds, shared, conversations, prompt } = input;
 	if (executor.kind === 'REFUSED')
 		parts.push(await record(STAGE_PART.DIAGNOSIS, 'not-run', JSON.stringify({ notRun: executor.reason }), [`no executor can run: ${executor.reason}`]));
 	else if (!shared.ok) parts.push(await record(STAGE_PART.DIAGNOSIS, 'not-run', JSON.stringify({ notRun: shared.why }), [shared.why]));
@@ -407,7 +488,8 @@ async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: Ass
 				undertakingId,
 				shared: shared.workspace,
 				executor,
-				prompt: hypothesizerPrompt({ rejectedUnit: { id: pwuId, title: str(unit.title) }, failedCriteria: findings, candidates, narrative, recordFiles: hypothesizerRecords.named }),
+				// ⭐ D84 — ~~`hypothesizerPrompt({ …, recordFiles: hypothesizerRecords.named })`~~: the prompt `hypothesizerInputOf` built, the same call.
+				prompt,
 				// ⭐ Package L17b3 (D89; `REG-D-173` (5)) — the recorded conversations of the rejected unit and of each candidate, in its copy.
 				recordFiles: hypothesizerRecords.files,
 				parse: (a) => {
@@ -453,28 +535,53 @@ async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: Ass
 			);
 		}
 	}
+}
+
+/**
+ * ⭐⭐ D84 — THE HISTORIAN'S CONTEXT (D73, D86, D89), from its round and the Hypothesizer's reading: the narrative, the failed criteria, the shared
+ * workspace and the very conversation files the Hypothesizer was given, and this sign-off's rejecting verdicts read as the part begins. The stage and
+ * D84's driver both build it here; what the Historian is shown is then read from it by `historianInputOf`.
+ */
+export function historianContextOf(round: RoundContext, input: HypothesizerInput): HistorianPartContext {
+	const { deps, engine, record, pwuId, unit, undertakingId, roundId, roundVersion } = round;
+	return {
+		deps,
+		record,
+		pwuId,
+		unitTitle: str(unit.title),
+		undertakingId,
+		roundId,
+		roundVersion,
+		shared: input.shared,
+		narrative: input.narrative,
+		failedCriteria: input.findings,
+		rejectingVerdictIds: rejectingVerdictFindings(engine, pwuId).rejected.map((v) => v.assessmentId),
+		// ⭐ D89 — the recorded conversations of the rejected unit and of each candidate: the Hypothesizer's very files.
+		conversations: input.conversations
+	};
+}
+
+/**
+ * One press's parts, in order, for the round its offer named (`runAssuranceStage`). ⭐ D84 — each part one function, which D84's driver runs alone, one
+ * at a time, its order and its reads as they were here.
+ */
+async function stageOfRound(pwuId: string, offer: AssuranceStageOffer, deps: AssuranceStageDeps): Promise<AssuranceStageOutcome> {
+	const round = roundContextOf(pwuId, offer.roundId, deps);
+	const { engine, store, undertakingId, unit, roundId, roundVersion, parts, record, helperNotRun } = round;
+
+	// ── 1. THE CHAPTER (D76): first, from the records since the last chapter (`chapterInputOf`, `chapterPart`).
+	await chapterPart(round, await chapterInputOf(round));
+
+	// ── 2. THE HYPOTHESIZER (D74, D87): in a copy of the shared workspace, its hashes compared (`hypothesizerInputOf`, `diagnosisPart`).
+	const helperInput = await hypothesizerInputOf(round);
+	await diagnosisPart(round, helperInput);
 
 	// ── ⭐⭐ 3. THE HISTORIAN (D73, D86; package L17b2): third — its assessment of the rejected unit under `pol_historical_consistency`, beside the
 	// declared reviews and never folded into them; its recurrence, where it records one, brings the Unsticking Agent below.
-	parts.push(
-		await historianPart({
-			deps,
-			record,
-			pwuId,
-			unitTitle: str(unit.title),
-			undertakingId,
-			roundId,
-			roundVersion,
-			shared,
-			narrative,
-			failedCriteria: findings,
-			rejectingVerdictIds: rejectingVerdictFindings(engine, pwuId).rejected.map((v) => v.assessmentId),
-			// ⭐ D89 — the recorded conversations of the rejected unit and of each candidate: the Hypothesizer's very files.
-			conversations
-		})
-	);
+	parts.push(await historianPart(historianContextOf(round, helperInput)));
 
 	// ── 4. THE UNSTICKING AGENT (D75): ⭐ its block moved, its text whole, into `stepBackPart`, which the Historian's re-ask runs too (reading 6).
+	const { executor, shared } = helperInput;
 	await stepBackPart({ deps, engine, store, pwuId, roundId, roundVersion, undertakingId, unit, executor, shared, parts, record, helperNotRun });
 	return { roundId, parts };
 }

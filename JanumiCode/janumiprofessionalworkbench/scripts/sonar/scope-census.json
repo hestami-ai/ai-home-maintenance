@@ -41,9 +41,9 @@
 		".tsx"
 	],
 	"counts": {
-		"files": 498,
+		"files": 508,
 		"byRoot": {
-			"apps": 208,
+			"apps": 218,
 			"packages": 141,
 			"scripts": 119,
 			"verif": 30
@@ -52,11 +52,11 @@
 			".cjs": 2,
 			".js": 17,
 			".mjs": 2,
-			".ts": 477
+			".ts": 487
 		},
 		"leftOut": {
 			".svelte (no analyzer)": 11,
-			"excluded by **/*.test.ts": 575,
+			"excluded by **/*.test.ts": 579,
 			"excluded by **/__tests__/**": 5
 		}
 	},
@@ -239,6 +239,14 @@
 		"apps/rph-demo/src/lib/server/identity.ts",
 		"apps/rph-demo/src/lib/server/lane-control-host.ts",
 		"apps/rph-demo/src/lib/server/lane-control.ts",
+		"apps/rph-demo/src/lib/server/measurement/d84-case.ts",
+		"apps/rph-demo/src/lib/server/measurement/d84-files.ts",
+		"apps/rph-demo/src/lib/server/measurement/d84-folder.ts",
+		"apps/rph-demo/src/lib/server/measurement/d84-probes.ts",
+		"apps/rph-demo/src/lib/server/measurement/d84-report.ts",
+		"apps/rph-demo/src/lib/server/measurement/d84-roles.ts",
+		"apps/rph-demo/src/lib/server/measurement/d84-steps.ts",
+		"apps/rph-demo/src/lib/server/measurement/d84.drive.ts",
 		"apps/rph-demo/src/lib/server/open-drafts.ts",
 		"apps/rph-demo/src/lib/server/optimistic-concurrency.ts",
 		"apps/rph-demo/src/lib/server/replay/recording.ts",
@@ -249,6 +257,7 @@
 		"apps/rph-demo/src/lib/server/replay/replay-store-rows.testing.ts",
 		"apps/rph-demo/src/lib/server/replay/replay-switch.ts",
 		"apps/rph-demo/src/lib/server/replay/replayed-runner.ts",
+		"apps/rph-demo/src/lib/server/stage-deps.ts",
 		"apps/rph-demo/src/lib/server/stipulations.ts",
 		"apps/rph-demo/src/lib/server/tools/backing-tool.ts",
 		"apps/rph-demo/src/lib/server/tools/devin-historian.ts",
@@ -285,6 +294,7 @@
 		"apps/rph-demo/svelte.config.js",
 		"apps/rph-demo/vite.config.ts",
 		"apps/rph-demo/vitest.config.ts",
+		"apps/rph-demo/vitest.d84.config.ts",
 		"packages/rph-application/src/command-bus.ts",
 		"packages/rph-application/src/context-assembly.ts",
 		"packages/rph-application/src/exchange-resolution.ts",

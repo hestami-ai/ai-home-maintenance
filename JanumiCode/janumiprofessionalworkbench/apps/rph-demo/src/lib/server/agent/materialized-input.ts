@@ -21,13 +21,20 @@
 // deps; the gate loads Pi's coding agent in one test alone, `tools/pi-executor.test.ts`: R3-C). This module is
 // therefore STRUCTURALLY typed against the two properties it touches.
 //
-// ── ⚠⚠ IN-MEMORY ONLY, AND THAT IS A CONTRACT, NOT AN OVERSIGHT ─────────────────────────────────────────────
-// Captured bytes are held for the life of the turn and never written anywhere. Persisting them is ICP-02, and
+// ── ~~⚠⚠ IN-MEMORY ONLY, AND THAT IS A CONTRACT, NOT AN OVERSIGHT~~ ───────────────────────────────────────────
+// ~~Captured bytes are held for the life of the turn and never written anywhere. Persisting them is ICP-02, and
 // it is BLOCKED behind ICP-03 (`REG-Q-B`) for a reason that is already a filed finding: no redaction exists
 // anywhere in this codebase (finding #60), and `domain_events` is immutable and permanent (§9.4). Writing an
 // unredacted provider payload into the event store would create exactly the unpurgeable artifact that
 // `transcript.ts` drops `thinking` to avoid — and PER-12 requires retained content to be purgeable at
-// retention expiry. **Do not wire this to durable storage until the purgeable plane exists.**
+// retention expiry. **Do not wire this to durable storage until the purgeable plane exists.**~~
+// ⭐ RESTATED 2026-11-21 (`REG-F-681`; `JAN-EXEC` Phase 7, design D84): THE CAPTURED REQUEST IS WRITTEN, AS RULED, AND THE
+// WORDS ABOVE OUTLIVED THE RULING. ICP-02 built the record (`REG-F-321`), and `REG-D-050` rules it: *"RULED: a materialized
+// assurance input PARTICIPATES, and is `RETAINED_BY_PARTICIPATION`."* Pi's adapter returns the composite of a turn's last
+// provider request, as this recorder captured it, as the try's `materializedInput` (`tools/pi-executor.ts`), and each try
+// stores it as its exchange's `materializedInputRef` — on the CONTENT plane, never in `domain_events`
+// (`execution/run-model-step.ts`, `assurance/stage-helper-run.ts`, `assurance/exchange-capture.ts`). What this module holds
+// itself, its list of captures, it holds for the session alone. No behaviour changed with these words.
 
 /** The two fields this module reads off Pi's resolved `Model`. Structural so Pi is never imported here. */
 export interface ResolvedModelRef {
