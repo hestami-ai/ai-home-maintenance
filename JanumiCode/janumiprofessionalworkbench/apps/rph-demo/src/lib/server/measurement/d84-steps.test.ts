@@ -150,23 +150,62 @@ describe('⭐⭐ D84 (r2, `D84R-A01` (b)) — one step at a time in a measuremen
 
 	it('⛔ RED FIRST — r4 (`D84S-A03`): a lock this call made and could not write — its file made exclusively, its write failing, as on a full disk — is removed before the error goes on; and the next step is admitted', async () => {
 		const folder = begun();
+		// ⭐ RESTATED (r5, `D84T-A01`): ~~`const failing = (): void => { throw Object.assign(new Error('ENOSPC: …'), { code: 'ENOSPC' }); };`~~ — the
+		// write's error made once, so the error that goes on can be held to it, the same object; and the error caught kept, beside its message.
+		const written = Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
 		const failing = (): void => {
-			throw Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
+			throw written;
 		};
+		let caught: unknown;
 
 		const thrown = (() => {
 			try {
 				takeLock(folder, { pid: 434344, at: '2026-11-21T20:00:00.000Z', step: 'report' }, failing);
 				return 'it did not throw';
 			} catch (e) {
+				caught = e;
 				return e instanceof Error ? e.message : String(e);
 			}
 		})();
 
 		expect.soft(thrown, 'arrangement: the lock’s write failed, and its error went on').toBe('ENOSPC: no space left on device, write');
 		expect(existsSync(join(folder, 'd84.lock')), 'a lock this call made and could not write was left').toBe(false);
+		// ⭐ r5 (`D84T-A01`) — ⭑ CONTROL: where the removal holds, the write's own error goes on, the same object, and nothing is kept on it.
+		expect(
+			[caught === written, typeof caught === 'object' && caught !== null && 'lockLeftBecause' in caught],
+			'⭑ CONTROL (r5, `D84T-A01`): the write’s own error did not go on, or went on with a lockLeftBecause though its lock was removed'
+		).toEqual([true, false]);
 		const next = await runD84Step(env(folder, 'report'), hostWith());
 		expect(next.ok, `the next step was refused by a lock no step holds — ${next.said.join('\n')}`).toBe(true);
+	});
+
+	it('⛔ RED FIRST — r5 (`D84T-A01`): a lock this call made, could not write and could not remove goes on as the write’s own error, the same object, the removal’s failure kept on it as its lockLeftBecause; the lock is left, and the next step refused, naming it', async () => {
+		const folder = begun();
+		const written = Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
+		const removal = Object.assign(new Error('EPERM: operation not permitted, unlink'), { code: 'EPERM' });
+		let caught: unknown;
+
+		try {
+			takeLock(
+				folder,
+				{ pid: 434345, at: '2026-11-22T05:00:00.000Z', step: 'report' },
+				() => {
+					throw written;
+				},
+				() => {
+					throw removal;
+				}
+			);
+		} catch (e) {
+			caught = e;
+		}
+
+		expect(caught, 'the error that went on is not the write’s own').toBe(written);
+		expect((caught as { lockLeftBecause?: unknown } | undefined)?.lockLeftBecause, 'the removal’s failure is not kept on the write’s error, as its lockLeftBecause').toBe(removal);
+		expect(existsSync(join(folder, 'd84.lock')), 'arrangement: the lock its removal could not remove is left').toBe(true);
+		const next = await runD84Step(env(folder, 'report'), hostWith());
+		const said = next.said.join('\n');
+		expect([next.ok, said.includes(LOCK_WORDS), said.includes('d84.lock')], 'the next step was not refused by the lock left, naming it').toEqual([false, true, true]);
 	});
 
 	it('⛔ RED FIRST — a step that throws still removes its lock, in its `finally`', async () => {

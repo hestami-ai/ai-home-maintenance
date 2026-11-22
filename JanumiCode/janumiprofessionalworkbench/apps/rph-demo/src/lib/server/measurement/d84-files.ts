@@ -279,17 +279,36 @@ function lockWords(held: Partial<LockRecord> | undefined): string {
 /** A lock's text, written into the file its call made (`fd`): the file system's own write, a test's seam in its place. */
 export type LockWrite = (fd: number, text: string) => void;
 
+/** ⭐ r5 (`D84T-A01`) — the removal of a lock's file its call made and could not write: the file system's own, a test's seam in its place. */
+export type LockRemove = (path: string) => void;
+
+/**
+ * ⭐ r5 (`D84T-A01`) — a removal's failure, kept on the first failure as its `lockLeftBecause`, where the first is an object that takes it (a file
+ * system error always is). A first failure that is no object, or takes no property, goes on as it is: nothing here may throw in its place.
+ */
+function keepLockLeft(first: unknown, left: unknown): void {
+	if (typeof first !== 'object' || first === null) return;
+	try {
+		Object.assign(first, { lockLeftBecause: left });
+	} catch {
+		// ⭑ A first failure that takes no property (frozen) goes on as it is.
+	}
+}
+
 /**
  * ⭐⭐ r2 (`D84R-A01` (b)) — TAKE THE FOLDER'S LOCK for one step: written exclusively, holding this process's id and the time; its `release` removes it,
  * and only while it is still this step's own. ⛔ A lock held, or left by a kill, refuses, naming it — and is never cleared here.
  * ⭐ r4 (`D84S-A03`): the file is made exclusively first (`wx`), then written. Once made it is this call's own, so a write or a close that fails removes
  * it before its error goes on, and no lock no step holds is left. A make that fails makes nothing, so it removes nothing, and another step's lock is
  * never touched.
+ * ⭐ r5 (`D84T-A01`): that removal is guarded. The FIRST failure goes on, the same object, whatever becomes of the removal. A removal that fails too
+ * leaves the lock, which the next step is refused by, naming it, as after a kill; its failure is kept on the first, as its `lockLeftBecause`.
  */
 export function takeLock(
 	folder: string,
 	lock: LockRecord,
-	write: LockWrite = (fd, text) => writeFileSync(fd, text, 'utf8')
+	write: LockWrite = (fd, text) => writeFileSync(fd, text, 'utf8'),
+	remove: LockRemove = (path) => rmSync(path, { force: true })
 ): { readonly release: () => void } | { readonly refusedBecause: string } {
 	const path = join(folder, D84_LAYOUT.lock);
 	const text = `${JSON.stringify(lock)}\n`;
@@ -323,8 +342,14 @@ export function takeLock(
 		failures.push(e);
 	}
 	if (failures.length > 0) {
-		rmSync(path, { force: true });
-		throw failures[0];
+		// ⭐ r5 (`D84T-A01`) — the first failure goes on, whatever becomes of the removal.
+		const first = failures[0];
+		try {
+			remove(path);
+		} catch (left) {
+			keepLockLeft(first, left);
+		}
+		throw first;
 	}
 	return {
 		release: () => {
