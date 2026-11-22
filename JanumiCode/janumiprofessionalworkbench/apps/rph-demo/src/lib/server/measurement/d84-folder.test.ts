@@ -190,6 +190,38 @@ describe('⭐⭐ D84 (T4; departure 6) — the measurement folder: the run folde
 		expect(problemsOf(made('good')), '⭑ CONTROL: an empty folder outside every tree, run folder and source is refused').toEqual([]);
 	});
 
+	it('⛔ RED FIRST — r2 (`D84R-A04`): asked of the physical paths too, through the host’s realpath — a folder whose physical path lies inside the source, a source whose physical path lies inside the folder, and a folder whose physical path lies in a run folder, each refused; ⭑ CONTROL: a folder whose physical path is its own admitted', () => {
+		const root = fresh('physical');
+		const made = (...parts: string[]): string => {
+			const at = join(root, ...parts);
+			mkdirSync(at, { recursive: true });
+			return at;
+		};
+		const source = made('archive', '06-final');
+		const run = made('runs', 'R');
+		writeFileSync(join(run, 'demo.sqlite'), '');
+		// ⭑ Three folders reached by a link, as a junction reaches its target: each lexical path its own, each physical path the host's realpath gives.
+		const links: Readonly<Record<string, string>> = {
+			[made('alias-in-source')]: made('archive', '06-final', 'm'),
+			[made('alias-in-run')]: made('runs', 'R', 'm'),
+			[made('source-alias')]: made('holder', 'inner')
+		};
+		const base = sandboxHost(root);
+		const host: MeasurementHost = { ...base, realpath: (p) => links[resolve(p)] ?? base.realpath(p) };
+		const problemsOf = (folder: string, from: string = source) => measurementFolderProblems(folder, from, host, false);
+		expect(problemsOf(join(root, 'alias-in-source')), 'a folder whose physical path lies inside the source was admitted').toContain(
+			'it lies inside the source it is to copy, or is it: the source is read and never written'
+		);
+		expect(problemsOf(made('holder'), join(root, 'source-alias')), 'a source whose physical path lies inside the folder was admitted').toContain(
+			'the source lies inside it: the copy would be made from a folder it is written in'
+		);
+		expect(
+			problemsOf(join(root, 'alias-in-run')).some((p) => p === `${run}, a folder above it, holds demo.sqlite: a run folder's marks, and no measurement is kept in a run folder`),
+			'a folder whose physical path lies in a run folder was admitted'
+		).toBe(true);
+		expect(problemsOf(made('own')), '⭑ CONTROL: a folder whose physical path is its own was refused').toEqual([]);
+	});
+
 	it('⛔ RED FIRST — begun once, its record written; a folder named as an earlier one admitted only where it is a measurement folder begun, and never this one', () => {
 		const root = fresh('begin');
 		const host = sandboxHost(root);

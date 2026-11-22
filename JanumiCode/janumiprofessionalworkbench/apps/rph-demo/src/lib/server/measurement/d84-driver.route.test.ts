@@ -567,7 +567,8 @@ function scriptedPi(diagnosis: string, seen: PiSent[], requests: string[]): D84T
 
 /** ⭐ D84 — the driver's programs, faked: devin answering the writer's chapter and the Historian's `historian`; Pi, `diagnosis`; each call kept. */
 function fakeTransports(o: { readonly historian: () => string; readonly diagnosis: string }) {
-	const sent = { writer: [] as DevinSent[], historian: [] as DevinSent[], pi: [] as PiSent[], requests: [] as string[], versions: 0 };
+	// ⭐ r2 (`D84R-B01`) — and each opening of Pi counted (`opens`), apart from its turns (`pi`): a session opened and never turned is seen.
+	const sent = { writer: [] as DevinSent[], historian: [] as DevinSent[], pi: [] as PiSent[], requests: [] as string[], versions: 0, opens: 0 };
 	const devinExec: DevinExec = async (file, args, options) => {
 		const call = devinSent(file, args, options);
 		const historian = call.userConfig !== undefined;
@@ -581,7 +582,10 @@ function fakeTransports(o: { readonly historian: () => string; readonly diagnosi
 	};
 	const transports: D84Transports = {
 		devinExec,
-		openPi: scriptedPi(o.diagnosis, sent.pi, sent.requests),
+		openPi: async (context, modelId, place) => {
+			sent.opens += 1;
+			return scriptedPi(o.diagnosis, sent.pi, sent.requests)(context, modelId, place);
+		},
 		devinVersion: async () => {
 			sent.versions += 1;
 			return VERSION;
@@ -790,6 +794,7 @@ describe('⭐⭐ D84 (T2, T13, T9, T10) — the driver’s steps over the ninth 
 		await prepareApproveCall(step, folder, 'hypothesizer');
 		const hypothesizerShown = tree(join(roleFolderOf(folder, 'hypothesizer'), D84_LAYOUT.shown));
 		expect(fake.sent.pi.length, 'the Hypothesizer’s Pi was not turned once').toBe(1);
+		expect(fake.sent.opens, '⭑ CONTROL (r2, `D84R-B01`): the approved Hypothesizer’s call did not open Pi once').toBe(1);
 		expect(hexOf(under(hypothesizerShown, 'copy/')), 'T2: the Hypothesizer was not opened in the copy it showed').toEqual(hexOf(fake.sent.pi[0]!.copy));
 		expect(hypothesizerShown.get('task.txt')?.toString('utf8'), 'T2: the Hypothesizer was not sent the task text it showed').toBe(fake.sent.pi[0]!.text);
 		const chapter = chapterAnswering(readFileSync(join(roleFolderOf(folder, 'writer'), D84_LAYOUT.shown, 'prompt.txt'), 'utf8'));
@@ -899,6 +904,71 @@ describe('⭐⭐ D84 (T2, T13, T9, T10) — the driver’s steps over the ninth 
 			refusedBecause: `the request the copy holds has sha256 ${sha256(request)}, and the call recorded ${'f'.repeat(64)}: it is not the request sent`
 		});
 		expect(existsSync(join(roleFolderOf(other, 'hypothesizer'), D84_LAYOUT.after)), 'a refused request wrote after/').toBe(false);
+	});
+});
+
+describe('⭐⭐ D84 (r2, (7)) — the Hypothesizer’s full request, written into after/ by its call step or by a step of its own', () => {
+	it('⛔ RED FIRST — the call step is not ok where the request could not be written into after/, its call record standing; the export step writes it alone, once, and is refused before any call record and where after/ is written already', async () => {
+		const c = await ninthRunCase();
+		const { deps } = driverDeps();
+		// ⭑ The content store, made to answer nothing for a key written while `armed` — the call's own records — as a store that lost them would.
+		let armed = false;
+		const written = new Set<string>();
+		const store = new Proxy(deps.store, {
+			get: (target, property) => {
+				if (property === 'put')
+					return async (...a: Parameters<typeof target.put>) => {
+						const ref = await target.put(...a);
+						if (armed) written.add(ref.storageKey);
+						return ref;
+					};
+				if (property === 'get') return async (key: string) => (armed && written.has(key) ? undefined : target.get(key));
+				const value: unknown = Reflect.get(target, property, target);
+				return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+			}
+		});
+		const lossy: AssuranceStageDeps = { ...deps, store };
+		const folder = measurementFolderFor(c.ids.verification);
+		const fake = fakeTransports({ historian: () => recurringHistorian('none'), diagnosis: diagnosisNaming(c.ids.source) });
+		const step = stepper(folder, hostOver(lossy, fake.transports));
+		expect((await step('case')).ok && (await step('policy')).ok, 'arrangement: the case and the policy').toBe(true);
+		// ⭑ Another folder of the same case, its case checked before any chapter is recorded (after one, the case check refuses, rightly).
+		const other = measurementFolderFor(c.ids.verification);
+		const otherStep = stepper(other, hostOver(lossy, fake.transports));
+		expect((await otherStep('case')).ok, 'arrangement: another folder’s case').toBe(true);
+		await prepareApproveCall(step, folder, 'writer');
+		expect((await step('prepare', { JPWB_D84_ROLE: 'hypothesizer' })).ok, 'arrangement: the Hypothesizer shown').toBe(true);
+		expect(
+			(await step('approve', { JPWB_D84_ROLE: 'hypothesizer', JPWB_D84_MANIFEST_SHA256: shownOf(folder, 'hypothesizer').sha256, JPWB_D84_WORDS: 'Approved as shown.' })).ok,
+			'arrangement: the Hypothesizer approved'
+		).toBe(true);
+
+		armed = true;
+		const called = await step('call', { JPWB_D84_ROLE: 'hypothesizer', JPWB_D84_PAID: '1' });
+		armed = false;
+
+		const after = join(roleFolderOf(folder, 'hypothesizer'), D84_LAYOUT.after, 'request.json');
+		expect([called.ok, existsSync(join(roleFolderOf(folder, 'hypothesizer'), D84_LAYOUT.call)), existsSync(after)], 'a call step whose request was not written was ok, or its call record did not stand').toEqual([
+			false,
+			true,
+			false
+		]);
+		expect(called.said.join('\n'), 'the call step does not name why its request was not written').toContain('not in the content store');
+		expect(fake.sent.pi.length, 'arrangement: the Hypothesizer was turned once').toBe(1);
+		const exported = await step('export');
+		expect([exported.ok, exported.said[0]?.startsWith('its full request is written into after/: sha256 ')], 'the export step did not write the request').toEqual([true, true]);
+		expect(readFileSync(after, 'utf8'), 'the export step did not write the request the call recorded').toBe(fake.sent.requests[0]);
+		// ⭑ Settled before it is expected: a step that throws (a second write refused by the file system) still reaches the check, naming it.
+		const twice = await step('export').catch((e: unknown) => ({ ok: false, said: [`the step threw: ${e instanceof Error ? e.message : String(e)}`] }));
+		expect(twice, 'the request was written twice').toEqual({
+			ok: false,
+			said: ['the Hypothesizer’s full request is written already (after/request.json): it is written once']
+		});
+		expect(await otherStep('export'), 'a request was exported before any call').toEqual({
+			ok: false,
+			said: ['the Hypothesizer has not been called (call.json): its full request is read after its call, never before']
+		});
+		expect(fake.sent.pi.length, 'the export ran a program').toBe(1);
 	});
 });
 
@@ -1136,6 +1206,11 @@ describe('⭐⭐ D84 (T7, T8; the lead’s rulings r1, Q10) — nothing is calle
 		const control = await callRole('writer', s.deps, s.at, s.fake.transports, paid);
 		expect('called' in control && control.called.outcome?.status, '⭑ CONTROL: the approved call did not run, recorded').toBe('recorded');
 		expect(s.fake.sent.writer.length, '⭑ CONTROL: the approved call did not run its program once').toBe(1);
+		const attempt = readJson<{ readonly manifestSha256?: unknown; readonly at?: unknown }>(join(writer, 'attempt.json'));
+		expect(
+			[attempt?.manifestSha256, typeof attempt?.at === 'string' && !Number.isNaN(Date.parse(attempt.at))],
+			'⭑ CONTROL (r2, `D84R-A01`): the call reserved no attempt before its program, naming the manifest approved and the time'
+		).toEqual([shown.sha256, true]);
 		expect(await callRole('writer', s.deps, s.at, s.fake.transports, paid), 'a role was called twice on one copy').toEqual({
 			refusedBecause: "the writer has been called (call.json): a role is called once on a copy (the lead's rulings r1, Q10)"
 		});
@@ -1243,7 +1318,12 @@ describe('⭐⭐ D84 (T7, T8; the lead’s rulings r1, Q10) — nothing is calle
 
 		if ('refusedBecause' in called) throw new Error(`the call was refused before its part: ${called.refusedBecause}`);
 		expect(asked, 'arrangement: the part asked for the shared workspace after the check').toBeGreaterThanOrEqual(3);
-		expect(s.fake.sent.pi.length, 'Pi was opened past the seam’s refusal').toBe(0);
+		// ⭐ RESTATED (r2, `D84R-B01`): ~~`expect(s.fake.sent.pi.length, 'Pi was opened past the seam’s refusal').toBe(0)`~~ — that count is of turns,
+		// which the fake keeps inside `turn`, so an opening made before the check and never turned passed it. Under its message now, the openings
+		// themselves counted, which an opening before the check reddens (`P6X-D84-M57`); and its old count of turns kept after it, under its true
+		// name. Stronger, never weaker: one check more, and none taken away.
+		expect(s.fake.sent.opens, 'Pi was opened past the seam’s refusal').toBe(0);
+		expect(s.fake.sent.pi.length, 'Pi was turned past the seam’s refusal').toBe(0);
 		expect([called.called.checkedAtSeam, called.called.seamRefusal?.startsWith("D84 refused the call at its transport (the Hypothesizer's copy)")], 'the call record does not say the seam refused').toEqual([false, true]);
 		expect(called.called.outcome?.status, 'the part was not recorded failing').not.toBe('recorded');
 		expect(String(called.called.outcome?.why ?? ''), 'the part’s record does not carry the seam’s words').toContain('D84 refused the call at its transport');

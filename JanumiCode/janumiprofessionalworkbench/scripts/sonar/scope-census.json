@@ -56,7 +56,7 @@
 		},
 		"leftOut": {
 			".svelte (no analyzer)": 11,
-			"excluded by **/*.test.ts": 579,
+			"excluded by **/*.test.ts": 580,
 			"excluded by **/__tests__/**": 5
 		}
 	},

@@ -2,12 +2,12 @@
 // to six small devin calls, each prepared, shown, approved and checked at its seam as a role's is, and counted apart; and the paid flag before each (T11).
 // ⛔ HERMETIC: devin's version and its program are this file's fakes; no process is started.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { HISTORIAN_PROJECT_CONFIG, HISTORIAN_USER_CONFIG } from '../tools/devin-historian.js';
-import { D84_LAYOUT, readJson, recordApproval, type Manifest } from './d84-files.js';
+import { D84_LAYOUT, readJson, recordApproval, writeOnce, type Manifest } from './d84-files.js';
 import { callProbe, prepareProbe, type ProbeCallRecord, type ProbeExec, type ProbeHost } from './d84-probes.js';
 import { gatherReport } from './d84-report.js';
 
@@ -142,6 +142,88 @@ describe('⭐⭐ D84 (T12; `REG-D-189` (3)) — a probe, prepared and shown, app
 		defined(other, '02-version');
 		const versioned = await prepareProbe(other, '02-version', hostOf('devin 3000.12.1 (other)'));
 		expect('refusedBecause' in versioned ? versioned.refusedBecause : 'it was not refused', 'a probe was shown for a devin at another version').toMatch(/^devin is at version 3000\.12\.1, and the Historian's two tool lists were measured at 3000\.11\.234/);
+	});
+
+	it('⛔ RED FIRST — r2 (`D84R-A01`): a probe whose call’s children cannot be listed after its call leaves no call record, and is not called again: its attempt, made before its program, refuses the second call with no program run', async () => {
+		const folder = fresh('children');
+		defined(folder, '01-children', { listChildren: true });
+		const shown = await prepareProbe(folder, '01-children', hostOf());
+		if ('refusedBecause' in shown) throw new Error(`arrangement: ${shown.refusedBecause}`);
+		const at = join(folder, D84_LAYOUT.probes, '01-children');
+		recordApproval(at, { manifestSha256: shown.shown.sha256, words: 'Approved.', approvedAt: 'now' });
+		const devin = fakeDevin('the answer');
+		const failing: ProbeHost = { ...hostOf(), childrenOf: async () => Promise.reject(new Error('the process table could not be read')) };
+		const first = await callProbe(folder, '01-children', failing, devin.exec, { JPWB_D84_PAID: '1' }).catch((e: unknown) => ({ threw: e instanceof Error ? e.message : String(e) }));
+		expect([first, existsSync(join(at, D84_LAYOUT.call)), devin.sent.length], 'arrangement: the listing threw after the paid call, and no call record was written').toEqual([
+			{ threw: 'the process table could not be read' },
+			false,
+			1
+		]);
+
+		const again = await callProbe(folder, '01-children', hostOf(), devin.exec, { JPWB_D84_PAID: '1' }).catch((e: unknown) => ({ threw: e instanceof Error ? e.message : String(e) }));
+
+		expect('refusedBecause' in again ? again.refusedBecause : JSON.stringify(again), 'a probe whose call left no record was called again').toContain(
+			'an attempt was made on this copy and its record was never written: it is not called again here'
+		);
+		expect(devin.sent.length, 'devin ran a second time for one probe').toBe(1);
+	});
+
+	it('⛔ RED FIRST — r2 (`D84R-A01`): a probe holding an attempt and no call record is refused by its attempt before anything of its call is made again — its definition, gone since, never read; devin never run', async () => {
+		const folder = fresh('attempted');
+		const definition = defined(folder, '01-attempted');
+		const shown = await prepareProbe(folder, '01-attempted', hostOf());
+		if ('refusedBecause' in shown) throw new Error(`arrangement: ${shown.refusedBecause}`);
+		const at = join(folder, D84_LAYOUT.probes, '01-attempted');
+		recordApproval(at, { manifestSha256: shown.shown.sha256, words: 'Approved.', approvedAt: 'now' });
+		// ⭑ The attempt a call writes before its program, and no record after it (a kill during the call, staged by the test); its definition gone since.
+		writeOnce(join(at, 'attempt.json'), { manifestSha256: shown.shown.sha256, at: '2026-11-21T20:00:00.000Z' });
+		rmSync(definition, { recursive: true, force: true });
+		const devin = fakeDevin('never');
+
+		const again = await callProbe(folder, '01-attempted', hostOf(), devin.exec, { JPWB_D84_PAID: '1' }).catch((e: unknown) => ({ threw: e instanceof Error ? e.message : String(e) }));
+
+		expect(again, 'a probe holding an attempt was not refused by it first').toEqual({
+			refusedBecause: "the probe 01-attempted: an attempt was made on this copy and its record was never written: it is not called again here (attempt.json, made at 2026-11-21T20:00:00.000Z; the lead's rulings r2, D84R-A01)"
+		});
+		expect(devin.sent.length, 'devin ran for a probe holding an attempt').toBe(0);
+	});
+
+	// ⭐ RESTATED (the lead's rulings r3): ~~'⛔ RED FIRST — r2 (`D84R-A02`): the six-probe count read again at the call — a seventh probe forced into
+	// the folder, its manifest and approval written by the test, is refused at its call, devin never run; ⭑ CONTROL: the sixth is called'~~, whose
+	// first expectation was ~~`{ refusedBecause: 'the probe 07-probe is the 7th of 7 probes shown, and D84 makes at most 6 (REG-D-189 (3)): it is not
+	// called' }`~~. That count was by place among the probes shown, in name order, so a probe forced in by hand with a name before six already
+	// called passed it (d84-facts.md §9.3, reading 2). The probes are counted by what is spent now: each holding an attempt, recorded or not.
+	it('⛔ RED FIRST — r3: the probes counted at a call by what is spent — six called, then a probe forced in by hand and named before them all (`00-early`), its definition, manifest and approval written by the test, refused at its call, naming the six, devin never run and no attempt reserved; ⭑ CONTROL: with five attempted, the sixth is called once', async () => {
+		const folder = fresh('spent');
+		for (let n = 1; n <= 6; n += 1) {
+			defined(folder, `0${n}-probe`);
+			const shown = await prepareProbe(folder, `0${n}-probe`, hostOf());
+			if ('refusedBecause' in shown) throw new Error(`arrangement: ${shown.refusedBecause}`);
+			recordApproval(join(folder, D84_LAYOUT.probes, `0${n}-probe`), { manifestSha256: shown.shown.sha256, words: 'Approved.', approvedAt: 'now' });
+		}
+		const devin = fakeDevin('an answer');
+		for (let n = 1; n <= 5; n += 1) {
+			const called = await callProbe(folder, `0${n}-probe`, hostOf(), devin.exec, { JPWB_D84_PAID: '1' });
+			if (!('called' in called)) throw new Error(`arrangement: the probe 0${n}-probe is called — ${called.refusedBecause}`);
+		}
+		// ⭑ CONTROL: with five attempted, the sixth is called, once — devin run for it one time.
+		const sixth = await callProbe(folder, '06-probe', hostOf(), devin.exec, { JPWB_D84_PAID: '1' }).catch((e: unknown) => ({ threw: e instanceof Error ? e.message : String(e) }));
+		expect(['called' in sixth && sixth.called.outcome, devin.sent.length], '⭑ CONTROL: with five attempted, the sixth probe was not called once').toEqual([{ ran: true }, 6]);
+		// ⭑ The probe forced in by hand: probe 01's definition and what it showed, copied in by name, and an approval of its manifest written by the test.
+		const first = join(folder, D84_LAYOUT.probes, '01-probe');
+		const early = join(folder, D84_LAYOUT.probes, '00-early');
+		mkdirSync(join(early, D84_LAYOUT.definition), { recursive: true });
+		for (const f of ['prompt.txt', 'probe.json']) copyFileSync(join(first, D84_LAYOUT.definition, f), join(early, D84_LAYOUT.definition, f));
+		copyFileSync(join(first, D84_LAYOUT.manifest), join(early, D84_LAYOUT.manifest));
+		writeOnce(join(early, D84_LAYOUT.approval), { ...readJson<Record<string, unknown>>(join(first, D84_LAYOUT.approval)) });
+
+		const refused = await callProbe(folder, '00-early', hostOf(), devin.exec, { JPWB_D84_PAID: '1' }).catch((e: unknown) => ({ threw: e instanceof Error ? e.message : String(e) }));
+
+		expect(refused, 'a probe was called with six attempted already').toEqual({
+			refusedBecause:
+				"the probe 00-early is not called: 6 probes hold an attempt already (01-probe, 02-probe, 03-probe, 04-probe, 05-probe, 06-probe), each a call made or begun, and D84 makes at most 6 (REG-D-189 (3); the lead's rulings r3)"
+		});
+		expect([devin.sent.length, existsSync(join(early, 'attempt.json'))], 'a probe called with six attempted ran devin, or reserved an attempt').toEqual([6, false]);
 	});
 
 	it('⛔ RED FIRST — checked at its seam: a definition changed after its approval refuses the call at the transport, devin never run, the refusal recorded; and a flag not exactly 1 refuses before anything', async () => {

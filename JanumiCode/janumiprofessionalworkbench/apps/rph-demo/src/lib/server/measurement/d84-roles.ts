@@ -39,12 +39,14 @@ import { devinHistorianCall, writeHistorianFolder, type HistorianVersionOf } fro
 import { devinPrint, type DevinExec } from '../tools/devin-reviewer.js';
 import {
 	approvalRefusal,
+	attemptRefusal,
 	D84_LAYOUT,
 	D84_ROLES,
 	manifestDifferences,
 	manifestOf,
 	paidRefusal,
 	readJson,
+	reserveAttempt,
 	roleFolderOf,
 	sha256Of,
 	shownManifestOf,
@@ -370,6 +372,9 @@ export async function callRole(
 	const approval = approvalRefusal(folder);
 	if (approval !== undefined) return { refusedBecause: approval };
 	if (existsSync(join(folder, D84_LAYOUT.call))) return { refusedBecause: `the ${role} has been called (${D84_LAYOUT.call}): a role is called once on a copy (the lead's rulings r1, Q10)` };
+	// ⭐ r2 (`D84R-A01` (a)) — and a role holding an attempt and no call record: a call killed, or thrown out of, between its program and its record.
+	const attempted = attemptRefusal(folder, `the ${role}`);
+	if (attempted !== undefined) return { refusedBecause: attempted };
 	const approved = shownManifestOf(folder)!;
 	// ── Prepared again from the copy, by the same functions, and held to what was approved: nothing is called or recorded where any byte differs.
 	const check = join(folder, D84_LAYOUT.check);
@@ -380,9 +385,13 @@ export async function callRole(
 	const differences = manifestDifferences(approved, again.manifest);
 	if (differences.length > 0)
 		return { refusedBecause: `the ${role} prepared again differs from what was approved, so it is not called: ${differences.join('; ')}` };
+	// ⭐⭐ r2 (`D84R-A01` (a)) — THE ATTEMPT, RESERVED NOW, every check passed and before the part can run the role's program: written exclusively, so a
+	// second launcher fails here, and never deleted, so a call killed or thrown out of before its record is not made again on this copy.
+	const startedAt = new Date().toISOString();
+	const reserved = reserveAttempt(folder, `the ${role}`, { manifestSha256: approved.sha256, at: startedAt });
+	if (reserved !== undefined) return { refusedBecause: reserved };
 	// ── The call, through the stage's own part, its transport checked at its seam.
 	const seen: SeamSeen = { checked: false };
-	const startedAt = new Date().toISOString();
 	const round = roundOf(seamedDeps(role, deps, approved, transports, seen), at);
 	if (role === 'writer') await chapterPart(round, await chapterInputOf(round));
 	else if (role === 'hypothesizer') await diagnosisPart(round, await hypothesizerInputOf(round));
@@ -429,6 +438,9 @@ export async function writeHypothesizerRequest(
 	const folder = roleFolderOf(at.folder, 'hypothesizer');
 	const call = readJson<CallRecord>(join(folder, D84_LAYOUT.call));
 	if (call === undefined) return { refusedBecause: `the Hypothesizer has not been called (${D84_LAYOUT.call}): its full request is read after its call, never before` };
+	// ⭐ r2 ((7)) — written once: by its call step, or by the export step after a call step that could not write it.
+	if (existsSync(join(folder, D84_LAYOUT.after, 'request.json')))
+		return { refusedBecause: `the Hypothesizer’s full request is written already (${D84_LAYOUT.after}/request.json): it is written once` };
 	const exchange = listByType(deps.engine, 'MODEL_EXCHANGE')
 		.filter((x) => x.state.invokerId === HELPER_INVOKER.hypothesizer && x.state.subjectObjectId === at.roundId)
 		.at(-1);

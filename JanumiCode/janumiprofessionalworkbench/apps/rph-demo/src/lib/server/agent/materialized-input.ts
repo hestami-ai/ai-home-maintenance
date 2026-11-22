@@ -30,11 +30,18 @@
 // retention expiry. **Do not wire this to durable storage until the purgeable plane exists.**~~
 // ⭐ RESTATED 2026-11-21 (`REG-F-681`; `JAN-EXEC` Phase 7, design D84): THE CAPTURED REQUEST IS WRITTEN, AS RULED, AND THE
 // WORDS ABOVE OUTLIVED THE RULING. ICP-02 built the record (`REG-F-321`), and `REG-D-050` rules it: *"RULED: a materialized
-// assurance input PARTICIPATES, and is `RETAINED_BY_PARTICIPATION`."* Pi's adapter returns the composite of a turn's last
+// assurance input PARTICIPATES, and is `RETAINED_BY_PARTICIPATION`."* ~~Pi's adapter returns the composite of a turn's last
 // provider request, as this recorder captured it, as the try's `materializedInput` (`tools/pi-executor.ts`), and each try
 // stores it as its exchange's `materializedInputRef` — on the CONTENT plane, never in `domain_events`
-// (`execution/run-model-step.ts`, `assurance/stage-helper-run.ts`, `assurance/exchange-capture.ts`). What this module holds
+// (`execution/run-model-step.ts`, `assurance/stage-helper-run.ts`, `assurance/exchange-capture.ts`).~~ What this module holds
 // itself, its list of captures, it holds for the session alone. No behaviour changed with these words.
+// ⭐ RESTATED AGAIN 2026-11-21 (the lead's rulings r2 on design D84, `D84R-B02`): NOT EVERY TRY SAVES THE COMPOSITE. A try whose
+// turn returns saves it as its exchange's `materializedInputRef`: the composite of the turn's last provider request, as this
+// recorder captured it, which Pi's adapter returns as the try's `materializedInput` (`tools/pi-executor.ts`). A try whose turn
+// throws saves its task text alone, since the adapter reads the composite only after the turn returns
+// (`tools/pi-executor.ts:389-390`): the catches record the task text (`execution/run-model-step.ts`, `prompt: turnText`;
+// `assurance/stage-helper-run.ts`, `materialized ?? run.prompt`), as does a try whose turn returns with nothing captured. Each is
+// stored on the CONTENT plane, never in `domain_events` (`assurance/exchange-capture.ts`). No behaviour changed with these words.
 
 /** The two fields this module reads off Pi's resolved `Model`. Structural so Pi is never imported here. */
 export interface ResolvedModelRef {

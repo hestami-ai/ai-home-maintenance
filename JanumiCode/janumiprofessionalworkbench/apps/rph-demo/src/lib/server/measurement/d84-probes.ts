@@ -9,7 +9,10 @@
 // ⭑ ITS CALL: through `devinHistorianCall`, as the Historian's, so devin's version is read first and the folder removed after; checked at its seam as a
 // role's is; its answer and its export kept with it, never in the copy. A probe that lists its call's children lists them by the call's process id,
 // and stops none of them.
-// ⛔ AT MOST SIX: a seventh is refused before anything of it is made.
+// ⛔ AT MOST SIX: a seventh is refused before anything of it is made, and again at its call (the lead's rulings r2, `D84R-A02`)~~: of the probes shown,
+// in their names' order, only the first six are called~~. ⭐ r3: at its call, by what is spent — where six probes hold an attempt, recorded or not,
+// no other is called (a probe forced in by hand, named before six already called, passed the count by place).
+// ⛔ CALLED ONCE (r2, `D84R-A01` (a)): an attempt is reserved immediately before the call, and a probe holding one is never called again.
 import { execFile } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,12 +21,14 @@ import { devinHistorianCall, HISTORIAN_PROJECT_CONFIG, HISTORIAN_USER_CONFIG, ty
 import type { DevinExec } from '../tools/devin-reviewer.js';
 import {
 	approvalRefusal,
+	attemptRefusal,
 	D84_LAYOUT,
 	D84_MAX_PROBES,
 	manifestDifferences,
 	manifestOf,
 	paidRefusal,
 	readJson,
+	reserveAttempt,
 	sha256Of,
 	shownManifestOf,
 	treeEntries,
@@ -50,6 +55,16 @@ const probeFolderOf = (folder: string, name: string): string => join(probesOf(fo
 function shownProbes(folder: string): string[] {
 	const root = probesOf(folder);
 	return existsSync(root) ? readdirSync(root).filter((n) => existsSync(join(root, n, D84_LAYOUT.manifest))) : [];
+}
+
+/**
+ * ⭐⭐ r3 (the lead's rulings r3, on r2's `D84R-A02`) — THE PROBE CALLS SPENT: each probe holding an attempt, recorded or not, by name, in code-unit order.
+ * Every call reserves its attempt before devin runs, so these are the calls made or begun, whatever became of them. (r2's count by place among the
+ * probes shown is gone: a probe forced in by hand, named before six already called, passed it.)
+ */
+function attemptedProbes(folder: string): string[] {
+	const root = probesOf(folder);
+	return existsSync(root) ? readdirSync(root).filter((n) => existsSync(join(root, n, D84_LAYOUT.attempt))).sort((a, b) => Number(a > b) - Number(a < b)) : [];
 }
 
 const json = (v: unknown): string => `${JSON.stringify(v, null, 2)}\n`;
@@ -228,7 +243,8 @@ function probeRecordOf(
 }
 
 /**
- * ⭐⭐ D84 — CALL ONE PROBE: refused without the flag, without its approval, or a second time; its folder made again and checked at its seam, every byte
+ * ⭐⭐ D84 — CALL ONE PROBE: refused without the flag, without its approval, a second time, after an attempt with no record (r2, `D84R-A01`), or
+ * ~~beyond the sixth shown (r2, `D84R-A02`)~~ where six probes hold an attempt already (r3); its folder made again and checked at its seam, every byte
  * held to what was approved; its answer and export kept beside its record, never in the copy. ⛔ It stops no process: a probe that lists its call's
  * children lists them after the call, by its process id.
  */
@@ -246,12 +262,29 @@ export async function callProbe(
 	const approval = approvalRefusal(at);
 	if (approval !== undefined) return { refusedBecause: approval };
 	if (existsSync(join(at, D84_LAYOUT.call))) return { refusedBecause: `the probe ${name} has been called: a probe is called once` };
+	// ⭐ r2 (`D84R-A01` (a)) — and a probe holding an attempt and no call record: a call killed, or thrown out of, between its program and its record.
+	const attempted = attemptRefusal(at, `the probe ${name}`);
+	if (attempted !== undefined) return { refusedBecause: attempted };
+	// ⭐⭐ r3 — THE PROBES COUNTED BY WHAT IS SPENT, read at the call, under the step's lock: where six hold an attempt already, no other is called.
+	const spent = attemptedProbes(folder);
+	if (spent.length >= D84_MAX_PROBES)
+		return {
+			refusedBecause: `the probe ${name} is not called: ${spent.length} probes hold an attempt already (${spent.join(', ')}), each a call made or begun, and D84 makes at most ${D84_MAX_PROBES} (REG-D-189 (3); the lead's rulings r3)`
+		};
 	const approved = shownManifestOf(at)!;
 	const said = readJson<ProbeDefinition>(join(at, D84_LAYOUT.definition, 'probe.json'))!;
 	const made = probeFolderFrom(join(at, D84_LAYOUT.definition));
 	if ('refusedBecause' in made) return made;
-	const seen: ProbeSeen = { version: '' };
+	// ⭐⭐ r2 (`D84R-A01` (a)) — THE ATTEMPT, RESERVED NOW, every check passed and immediately before the call that runs devin: written exclusively, so a
+	// second launcher fails here — its folder removed, as the call would remove it — and never deleted.
 	const startedAt = new Date().toISOString();
+	const reserved = reserveAttempt(at, `the probe ${name}`, { manifestSha256: approved.sha256, at: startedAt });
+	if (reserved !== undefined) {
+		rmSync(made.folder, { recursive: true, force: true });
+		rmSync(made.host, { recursive: true, force: true });
+		return { refusedBecause: reserved };
+	}
+	const seen: ProbeSeen = { version: '' };
 	const outcome = await devinHistorianCall(
 		{ folder: made, model: said.model ?? host.model, boundMs: said.boundMs },
 		{ versionOf: async () => (seen.version = await host.devinVersion()), exec: checkedProbeExec(approved, exec, seen) }

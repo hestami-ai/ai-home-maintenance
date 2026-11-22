@@ -8,12 +8,18 @@
 //   policy       the copy's Historian policy brought to the seed's form;
 //   prepare      one role (`JPWB_D84_ROLE`) prepared and shown;
 //   approve      the sponsor's approval of what was shown, recorded by the lead (`JPWB_D84_MANIFEST_SHA256`, `JPWB_D84_WORDS`);
-//   call         one role called (`JPWB_D84_PAID=1`), its answer recorded in the copy; the Hypothesizer's full request then written into `after/`;
+//   call         one role called (`JPWB_D84_PAID=1`), its answer recorded in the copy; the Hypothesizer's full request then written into `after/`, the
+//                step not ok where it could not be, its call record standing (the lead's rulings r2 (7));
+//   export       the Hypothesizer's full request written into `after/` alone, where its call step could not write it: no call is made (r2 (7));
 //   probe-prepare, probe-approve, probe-call   one probe (`JPWB_D84_PROBE`), as a role;
 //   report       the report's mechanical part gathered.
 // ⛔ A STEP THAT OPENS THE COPY is refused unless this process is launched as the server is over the copy (`RPH_DEMO_MODE=server`, `JPWB_DEMO_DB` the
 // copy's store), the copy's events counted by a read-only open first and again after the open.
-// ⭑ One function per step, each refused with its reason and never half done: a refused step writes nothing of its own.
+// ⛔ ONE STEP AT A TIME IN A FOLDER (r2, `D84R-A01` (b)): each step takes the folder's lock (`d84.lock`, written exclusively, holding its process id and
+// the time) at its start and removes it at its end, in a `finally`; a lock held, or left by a kill, refuses the step, naming it — never cleared here. A
+// folder not begun, and a begin the folder's rules refuse, are refused before the lock, so nothing is written in a folder that is no measurement folder.
+// ⭑ One function per step, each refused with its reason and never half done: a refused step writes nothing of its own — but the call step whose request
+// could not be written, whose call record stands.
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import type { AssuranceStageDeps } from '../assurance/assurance-stage.js';
@@ -22,13 +28,14 @@ import { caseCheck, namedUnitOf, preparePolicy, seedPolicyForm, type CaseReading
 import {
 	afterOpenRefusal,
 	beginMeasurementFolder,
+	beginRefusal,
 	copyFromArchive,
 	serverStoreRefusal,
 	storeReading,
 	type MeasurementHost,
 	type MeasurementState
 } from './d84-folder.js';
-import { copyStoreOf, D84_LAYOUT, D84_ROLES, readJson, recordApproval, roleFolderOf, writeOnce, type D84Role } from './d84-files.js';
+import { copyStoreOf, D84_LAYOUT, D84_ROLES, readJson, recordApproval, roleFolderOf, takeLock, writeOnce, type D84Role } from './d84-files.js';
 import { callProbe, PROBE_NAME, prepareProbe, type ProbeExec, type ProbeHost } from './d84-probes.js';
 import { writeReport } from './d84-report.js';
 import { callRole, prepareRole, writeHypothesizerRequest, type D84Transports, type RoleAt } from './d84-roles.js';
@@ -90,20 +97,35 @@ function roleOf(env: Env): { readonly role: D84Role } | { readonly refusedBecaus
 	return role === undefined ? { refusedBecause: `JPWB_D84_ROLE names ${JSON.stringify(env.JPWB_D84_ROLE ?? '')}, not one of ${D84_ROLES.join(', ')}` } : { role };
 }
 
-/** `begin` — the folder begun (see the header). */
-function beginStep({ folder, env, host }: StepContext): StepOutcome {
-	const begun = beginMeasurementFolder(
-		folder,
-		{
-			begunAt: host.now(),
-			checkoutHead: host.checkoutHead(),
-			source: env.JPWB_D84_SOURCE ?? '',
-			unitId: env.JPWB_D84_UNIT ?? '',
-			earlierFolders: (env.JPWB_D84_EARLIER ?? '').split(delimiter).filter((f) => f.trim() !== '')
-		},
-		host.folderHost
-	);
-	return 'begun' in begun ? held(`the measurement folder is begun: ${folder}`) : refused(begun.refusedBecause);
+/**
+ * ⭐⭐ r2 (`D84R-A01` (b)) — `run`, THE FOLDER'S LOCK HELD: taken exclusively at its start, holding this process's id and the time, and removed at its
+ * end in a `finally`. ⛔ Refused, naming who holds it, where it is held or a kill left it.
+ */
+async function locked(folder: string, step: string, host: StepHost, run: () => StepOutcome | Promise<StepOutcome>): Promise<StepOutcome> {
+	const lock = takeLock(folder, { pid: process.pid, at: host.now(), step });
+	if ('refusedBecause' in lock) return refused(lock.refusedBecause);
+	try {
+		return await run();
+	} finally {
+		lock.release();
+	}
+}
+
+/** `begin` — the folder begun (see the header): asked first, writing nothing, and asked again under its lock as its record is written. */
+async function beginStep({ folder, env, host }: StepContext): Promise<StepOutcome> {
+	const state: MeasurementState = {
+		begunAt: host.now(),
+		checkoutHead: host.checkoutHead(),
+		source: env.JPWB_D84_SOURCE ?? '',
+		unitId: env.JPWB_D84_UNIT ?? '',
+		earlierFolders: (env.JPWB_D84_EARLIER ?? '').split(delimiter).filter((f) => f.trim() !== '')
+	};
+	const refusal = beginRefusal(folder, state, host.folderHost);
+	if (refusal !== undefined) return refused(refusal);
+	return locked(folder, 'begin', host, () => {
+		const begun = beginMeasurementFolder(folder, state, host.folderHost);
+		return 'begun' in begun ? held(`the measurement folder is begun: ${folder}`) : refused(begun.refusedBecause);
+	});
 }
 
 /** `copy` — the case copied from the source the folder was begun for. */
@@ -171,16 +193,27 @@ async function prepareStep({ host }: StepContext, deps: AssuranceStageDeps, role
 	return 'shown' in shown ? held(`the ${role} is shown: manifest ${shown.shown.sha256}`) : refused(shown.refusedBecause);
 }
 
-/** `call` — one role called; the Hypothesizer's full request then written for the sponsor to read. */
+/**
+ * `call` — one role called; the Hypothesizer's full request then written for the sponsor to read. ⛔ r2 (7): not ok where that request could not be
+ * written — its call record stands, the refusal named, and the export step writes it.
+ */
 async function callStep({ env, host }: StepContext, deps: AssuranceStageDeps, role: D84Role, at: RoleAt): Promise<StepOutcome> {
 	const called = await callRole(role, deps, at, host.transports, env);
 	if ('refusedBecause' in called) return refused(called.refusedBecause);
 	const said = [`the ${role} is called: ${JSON.stringify(called.called.outcome)}`];
-	if (role === 'hypothesizer') {
-		const written = await writeHypothesizerRequest(deps, at);
-		said.push('written' in written ? `its full request is written into ${D84_LAYOUT.after}/: sha256 ${written.written.sha256}` : written.refusedBecause);
-	}
-	return held(...said);
+	if (role !== 'hypothesizer') return held(...said);
+	const written = await writeHypothesizerRequest(deps, at);
+	if ('written' in written) return held(...said, `its full request is written into ${D84_LAYOUT.after}/: sha256 ${written.written.sha256}`);
+	return {
+		ok: false,
+		said: [...said, `its full request is not written into ${D84_LAYOUT.after}/, and its call record stands: ${written.refusedBecause} — the export step writes it`]
+	};
+}
+
+/** `export` — r2 (7): the Hypothesizer's full request written into `after/` alone, no call made; refused before its call record, and where it is written. */
+async function exportStep(deps: AssuranceStageDeps, at: RoleAt): Promise<StepOutcome> {
+	const written = await writeHypothesizerRequest(deps, at);
+	return 'written' in written ? held(`its full request is written into ${D84_LAYOUT.after}/: sha256 ${written.written.sha256}`) : refused(written.refusedBecause);
 }
 
 /** The record a step that opens the copy writes once, and the words of its refusal where it is written already. */
@@ -190,8 +223,8 @@ const WRITTEN_ONCE: Readonly<Record<string, { readonly file: string; readonly al
 };
 
 /**
- * The steps that open the copy, each given its deps once the open is checked: the case, the policy, and a role's showing and call. ⛔ A record written
- * already is refused before the copy is opened.
+ * The steps that open the copy, each given its deps once the open is checked: the case, the policy, a role's showing and call, and the Hypothesizer's
+ * request's export. ⛔ A record written already is refused before the copy is opened.
  */
 async function openedStep(step: string, ctx: StepContext & { readonly state: MeasurementState }): Promise<StepOutcome> {
 	const once = WRITTEN_ONCE[step];
@@ -202,9 +235,10 @@ async function openedStep(step: string, ctx: StepContext & { readonly state: Mea
 	const reading = caseOf(ctx.folder);
 	if (typeof reading === 'string') return refused(reading);
 	if (step === 'policy') return policyStep(ctx, deps);
+	const at: RoleAt = { folder: ctx.folder, unitId: ctx.state.unitId, roundId: reading.roundId };
+	if (step === 'export') return exportStep(deps, at);
 	const named = roleOf(ctx.env);
 	if ('refusedBecause' in named) return refused(named.refusedBecause);
-	const at: RoleAt = { folder: ctx.folder, unitId: ctx.state.unitId, roundId: reading.roundId };
 	return step === 'prepare' ? prepareStep(ctx, deps, named.role, at) : callStep(ctx, deps, named.role, at);
 }
 
@@ -219,20 +253,23 @@ const UNOPENED_STEPS: Readonly<Record<string, (ctx: StepContext & { readonly sta
 };
 
 /** The steps that open the copy. */
-const OPENED_STEPS: ReadonlySet<string> = new Set(['case', 'policy', 'prepare', 'call']);
+const OPENED_STEPS: ReadonlySet<string> = new Set(['case', 'policy', 'prepare', 'call', 'export']);
 
 /**
- * ⭐⭐ D84 — RUN ONE STEP (see the header). ⛔ Each is refused with its reason, never half done: a refused step writes nothing of its own.
+ * ⭐⭐ D84 — RUN ONE STEP (see the header), the folder's lock held. ⛔ Each is refused with its reason, never half done: a refused step writes nothing
+ * of its own.
  */
 export async function runD84Step(env: Env, host: StepHost): Promise<StepOutcome> {
 	const folder = env.JPWB_D84_FOLDER ?? '';
 	if (folder.trim() === '') return refused('JPWB_D84_FOLDER is not set: the measurement folder is named by the operator');
 	const step = env.JPWB_D84_STEP ?? '';
-	const state = readJson<MeasurementState>(join(folder, D84_LAYOUT.state));
-	if (step === 'begin') return beginStep({ folder, state, env, host });
+	if (step === 'begin') return beginStep({ folder, state: undefined, env, host });
 	const unopened = UNOPENED_STEPS[step];
 	if (unopened === undefined && !OPENED_STEPS.has(step)) return refused(`JPWB_D84_STEP names ${JSON.stringify(step)}, not a step of D84's`);
-	if (state === undefined) return refused(`the measurement folder is not begun (${D84_LAYOUT.state}): run the begin step first`);
-	const ctx = { folder, state, env, host };
-	return unopened === undefined ? openedStep(step, ctx) : unopened(ctx);
+	// ⭑ A folder not begun is refused before the lock; its record is read under it, as the begin step writes it under its own.
+	if (!existsSync(join(folder, D84_LAYOUT.state))) return refused(`the measurement folder is not begun (${D84_LAYOUT.state}): run the begin step first`);
+	return locked(folder, step, host, () => {
+		const ctx = { folder, state: readJson<MeasurementState>(join(folder, D84_LAYOUT.state))!, env, host };
+		return unopened === undefined ? openedStep(step, ctx) : unopened(ctx);
+	});
 }

@@ -5,6 +5,8 @@
 // ⭑ THE FOLDER (§3.3 (c); the lead's departure 6, accepted): the live lane's own run-folder rules, whole (`runFolderProblems`) — absolute, existing, a
 // folder, outside every git working tree and the temporary folder, holding no store, no file Pi reads on its path — and D84's own: empty when it is
 // begun; neither it nor any folder above it a run folder (holding `demo.sqlite*` or a `lane` folder); and neither the source nor inside or above it.
+// D84's own asked of each path where it is written and where its links resolve (the lead's rulings r2, `D84R-A04`): the host's `realpath`, as the run
+// folder's own rules resolve it, so a junction cannot carry the folder into the source, the source into it, or it into a run folder.
 // ⭑ THE COPY (§3.3 (b); departure 5, accepted): from the run's final archive (`<RUN>-final/lane/archive/06-final`), in the server's own layout, so
 // the stage's deps resolve as the server's do — the record store and the content store, each copied by its bytes and its sha256 held to the source's
 // and to the archive's own record of it (`checks.json`); the Undertaking's workspace and its process output, each copied as the archive copies a
@@ -54,6 +56,19 @@ function upFrom(start: string): string[] {
 	}
 }
 
+/** Do two paths name one folder? Folded on Windows, as `within` folds. */
+const same = (a: string, b: string, platform: NodeJS.Platform): boolean => within(a, b, platform) && within(b, a, platform);
+
+/**
+ * ⭐ r2 (`D84R-A04`) — A PATH AS D84'S RULES ASK IT: where it is written, and where its links resolve (the host's `realpath`, which gives the path itself,
+ * resolved, where it cannot resolve it), each once — the written path first.
+ */
+function pathsOf(path: string, host: MeasurementHost): string[] {
+	const written = resolve(path);
+	const physical = host.realpath(path);
+	return same(written, physical, host.platform) ? [written] : [written, physical];
+}
+
 /**
  * ⭐⭐ D84 — EVERY REASON `folder` CANNOT BE D84'S MEASUREMENT FOLDER FOR `source`, one line each; none where it can. The run folder's rules first, then
  * D84's own. `begun` false asks it of a folder about to be begun, which must be empty.
@@ -61,17 +76,30 @@ function upFrom(start: string): string[] {
 export function measurementFolderProblems(folder: string, source: string, host: MeasurementHost, begun: boolean): string[] {
 	const problems = runFolderProblems(folder, host);
 	if (folder.trim() === '' || problems.some((p) => p.startsWith('it is not absolute'))) return problems;
-	const names = host.list(folder) ?? [];
+	// ⭑ The begin step's own lock (r2, `D84R-A01` (b)), taken before its record is written, is no name of the folder's.
+	const names = (host.list(folder) ?? []).filter((n) => n !== D84_LAYOUT.lock);
 	if (!begun && names.length > 0) problems.push(`it is not empty (${names.length} name(s) in it): a measurement folder is begun empty, and written once`);
-	for (const at of upFrom(folder)) {
+	// ⭐ r2 (`D84R-A04`) — each folder at or above it, where it is written and where its links resolve, asked once.
+	const folders = pathsOf(folder, host);
+	const asked = new Set<string>();
+	for (const at of folders.flatMap(upFrom)) {
+		const key = host.platform === 'win32' ? at.toLowerCase() : at;
+		if (asked.has(key)) continue;
+		asked.add(key);
 		const here = host.list(at) ?? [];
 		const marks = here.filter((n) => n.toLowerCase().startsWith(RECORD_STORE) || n.toLowerCase() === 'lane');
 		if (marks.length > 0)
-			problems.push(`${at === resolve(folder) ? 'it' : `${at}, a folder above it,`} holds ${marks.join(', ')}: a run folder's marks, and no measurement is kept in a run folder`);
+			problems.push(
+				`${folders.some((f) => same(f, at, host.platform)) ? 'it' : `${at}, a folder above it,`} holds ${marks.join(', ')}: a run folder's marks, and no measurement is kept in a run folder`
+			);
 	}
 	if (source.trim() !== '') {
-		if (within(folder, source, host.platform)) problems.push('it lies inside the source it is to copy, or is it: the source is read and never written');
-		if (within(source, folder, host.platform)) problems.push('the source lies inside it: the copy would be made from a folder it is written in');
+		// ⭐ r2 (`D84R-A04`) — the source's containment both ways, each of its paths against each of the folder's.
+		const sources = pathsOf(source, host);
+		if (folders.some((f) => sources.some((from) => within(f, from, host.platform))))
+			problems.push('it lies inside the source it is to copy, or is it: the source is read and never written');
+		if (sources.some((from) => folders.some((f) => within(from, f, host.platform))))
+			problems.push('the source lies inside it: the copy would be made from a folder it is written in');
 	}
 	return problems;
 }
@@ -90,21 +118,30 @@ export interface MeasurementState {
 }
 
 /**
- * ⭐ D84 — BEGIN THE MEASUREMENT FOLDER: refused where any rule refuses it, or where a folder named as an earlier one is this one or is not a
- * measurement folder begun (it holds no `d84.json`); else its record written, once.
+ * ⭐ D84 — WHY THE MEASUREMENT FOLDER CANNOT BE BEGUN FOR `state`: any rule refuses it, or a folder named as an earlier one is this one or is not a
+ * measurement folder begun (it holds no `d84.json`). `undefined` where it can. ⭑ It writes nothing: the begin step asks it before it takes the folder's
+ * lock (r2, `D84R-A01` (b)), so nothing is written in a folder refused.
  */
-export function beginMeasurementFolder(
-	folder: string,
-	state: MeasurementState,
-	host: MeasurementHost = nodeMeasurementHost()
-): { readonly begun: true } | { readonly refusedBecause: string } {
+export function beginRefusal(folder: string, state: MeasurementState, host: MeasurementHost = nodeMeasurementHost()): string | undefined {
 	const problems = measurementFolderProblems(folder, state.source, host, false);
 	for (const earlier of state.earlierFolders) {
 		if (within(earlier, folder, host.platform) && within(folder, earlier, host.platform)) problems.push(`the earlier measurement folder named, ${earlier}, is this one`);
 		else if (readJson<MeasurementState>(join(earlier, D84_LAYOUT.state)) === undefined)
 			problems.push(`the earlier measurement folder named, ${earlier}, holds no ${D84_LAYOUT.state}: it is not a measurement folder begun`);
 	}
-	if (problems.length > 0) return { refusedBecause: `the measurement folder is refused:\n${problems.map((p) => `  · ${p}`).join('\n')}` };
+	return problems.length > 0 ? `the measurement folder is refused:\n${problems.map((p) => `  · ${p}`).join('\n')}` : undefined;
+}
+
+/**
+ * ⭐ D84 — BEGIN THE MEASUREMENT FOLDER: refused where it cannot be begun (`beginRefusal`); else its record written, once.
+ */
+export function beginMeasurementFolder(
+	folder: string,
+	state: MeasurementState,
+	host: MeasurementHost = nodeMeasurementHost()
+): { readonly begun: true } | { readonly refusedBecause: string } {
+	const refusal = beginRefusal(folder, state, host);
+	if (refusal !== undefined) return { refusedBecause: refusal };
 	writeOnce(join(folder, D84_LAYOUT.state), state);
 	return { begun: true };
 }

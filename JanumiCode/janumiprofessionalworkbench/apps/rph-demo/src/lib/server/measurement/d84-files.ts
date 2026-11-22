@@ -9,7 +9,7 @@
 // is refused without one, and where the manifest it names is not the one the folder holds.
 // ⛔ WRITTEN ONCE: a record of this folder is never written over (`writeOnce`), so what was shown, approved and called stays as it was.
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /** ⭐ D84 (the lead's rulings r1, Q5) — the flag without which no call of D84's is made: exactly `1`, as the paid lane's own (`JPWB_PHASE7_PAID`). */
@@ -38,7 +38,10 @@ export const D84_LAYOUT = {
 	approval: 'approval.json',
 	call: 'call.json',
 	after: 'after',
-	definition: 'definition'
+	definition: 'definition',
+	// ⭐ r2 (`D84R-A01`) — a call's attempt, reserved before its program; and the folder's lock, held by one step at a time.
+	attempt: 'attempt.json',
+	lock: 'd84.lock'
 } as const;
 
 /** One role's folder: `roles/<n>-<role>`, numbered in the stage's order. */
@@ -189,4 +192,86 @@ export function approvalRefusal(folder: string): string | undefined {
 	if (approval.manifestSha256 !== manifest.sha256)
 		return `the approval is of manifest ${approval.manifestSha256}, and what was shown is manifest ${manifest.sha256}: no call runs on what was not approved`;
 	return undefined;
+}
+
+/** ⭐ r2 (`D84R-A01` (a)) — a call's attempt: the manifest approved, and when the call was about to run its program. */
+export interface AttemptRecord {
+	readonly manifestSha256: string;
+	readonly at: string;
+}
+
+/** The words of a call refused for its attempt: one was made on this copy, and its record never written. */
+const attemptWords = (what: string, at: string): string =>
+	`${what}: an attempt was made on this copy and its record was never written: it is not called again here (${D84_LAYOUT.attempt}, made at ${at}; the lead's rulings r2, D84R-A01)`;
+
+/**
+ * ⭐⭐ r2 (`D84R-A01` (a)) — WHY `what`, WHOSE FOLDER IS `folder`, IS NOT CALLED FOR ITS ATTEMPT: it holds an attempt and no call record — a call killed,
+ * or thrown out of, between its program and its record. `undefined` where it holds no attempt. ⛔ Nothing deletes an attempt.
+ */
+export function attemptRefusal(folder: string, what: string): string | undefined {
+	if (!existsSync(join(folder, D84_LAYOUT.attempt))) return undefined;
+	const attempt = readJson<Partial<AttemptRecord>>(join(folder, D84_LAYOUT.attempt));
+	return attemptWords(what, String(attempt?.at ?? 'a time not recorded'));
+}
+
+/**
+ * ⭐⭐ r2 (`D84R-A01` (a)) — THE ATTEMPT, RESERVED IMMEDIATELY BEFORE A CALL'S PROGRAM CAN RUN, after every check: written exclusively, so a second
+ * launcher fails at this write and is refused with the attempt's words. `undefined` where it is reserved.
+ */
+export function reserveAttempt(folder: string, what: string, attempt: AttemptRecord): string | undefined {
+	try {
+		mkdirSync(folder, { recursive: true });
+		writeFileSync(join(folder, D84_LAYOUT.attempt), `${JSON.stringify(attempt, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+		return undefined;
+	} catch (e) {
+		if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+		return attemptWords(what, String(readJson<Partial<AttemptRecord>>(join(folder, D84_LAYOUT.attempt))?.at ?? 'a time not recorded'));
+	}
+}
+
+/** ⭐ r2 (`D84R-A01` (b)) — the folder's lock, as a step holds it: its process, when it began, and which step it is. */
+export interface LockRecord {
+	readonly pid: number;
+	readonly at: string;
+	readonly step: string;
+}
+
+/** The words of a step refused for the folder's lock, and how the lead clears a lock a kill left. */
+function lockWords(held: Partial<LockRecord> | undefined): string {
+	return (
+		`the measurement folder is held by another step (${D84_LAYOUT.lock}: the step ${JSON.stringify(held?.step ?? 'not recorded')}, process ` +
+		`${String(held?.pid ?? 'not recorded')}, since ${String(held?.at ?? 'a time not recorded')}): only one step runs at a time in a measurement folder. ` +
+		`If no driver process runs — look for that process id — the lock was left by a step that was stopped, and the lead may delete ${D84_LAYOUT.lock} ` +
+		"then; the driver never clears it itself (the lead's rulings r2, D84R-A01 (b))"
+	);
+}
+
+/**
+ * ⭐⭐ r2 (`D84R-A01` (b)) — TAKE THE FOLDER'S LOCK for one step: written exclusively, holding this process's id and the time; its `release` removes it,
+ * and only while it is still this step's own. ⛔ A lock held, or left by a kill, refuses, naming it — and is never cleared here.
+ */
+export function takeLock(folder: string, lock: LockRecord): { readonly release: () => void } | { readonly refusedBecause: string } {
+	const path = join(folder, D84_LAYOUT.lock);
+	const text = `${JSON.stringify(lock)}\n`;
+	try {
+		writeFileSync(path, text, { encoding: 'utf8', flag: 'wx' });
+	} catch (e) {
+		const code = (e as NodeJS.ErrnoException).code;
+		if (code === 'EEXIST') {
+			let held: Partial<LockRecord> | undefined;
+			try {
+				held = readJson<Partial<LockRecord>>(path);
+			} catch {
+				held = undefined;
+			}
+			return { refusedBecause: lockWords(held) };
+		}
+		if (code === 'ENOENT') return { refusedBecause: `the measurement folder ${folder} does not exist, so no step can hold it` };
+		throw e;
+	}
+	return {
+		release: () => {
+			if (existsSync(path) && readFileSync(path, 'utf8') === text) rmSync(path, { force: true });
+		}
+	};
 }

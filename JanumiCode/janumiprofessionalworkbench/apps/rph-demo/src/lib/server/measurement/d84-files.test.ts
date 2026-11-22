@@ -2,7 +2,7 @@
 // the record of the sponsor's approval held to a manifest's sha256 (T7), the paid flag (T11), records written once, and the report's mechanical part.
 // ⛔ HERMETIC: every folder is a temporary one this file makes; no program runs.
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -16,8 +16,10 @@ import {
 	paidRefusal,
 	readJson,
 	recordApproval,
+	reserveAttempt,
 	roleFolderOf,
 	sha256Of,
+	takeLock,
 	treeEntries,
 	writeOnce,
 	type Manifest
@@ -55,7 +57,9 @@ describe('⭐ D84 — a manifest: every file and link under a folder by its path
 		// ⚠ A junction: Windows makes one with no privilege; elsewhere `symlinkSync` ignores the type (the run archive's own test does the same).
 		symlinkSync(join(root, 'linked'), join(root, 'link'), 'junction');
 		const entries = treeEntries(root, ['left']);
-		const target = entries.find((e) => e.path === 'link')?.target ?? '';
+		// ⭐ RESTATED (r2, `D84R-B03`): ~~`entries.find((e) => e.path === 'link')?.target ?? ''`~~ — the result under test was its own expectation, so a wrong
+		// target that was not empty passed. The link's target, read by this test from the file system itself.
+		const target = readlinkSync(join(root, 'link'));
 		expect(entries, 'the entries are not each file by its bytes and the link by its target’s text, in code-unit order').toEqual([
 			{ path: 'B.txt', kind: 'file', bytes: 2, sha256: sha256(Buffer.from([0xff, 0x00])) },
 			{ path: 'b/deeper/z.txt', kind: 'file', bytes: 3, sha256: sha256('z\r\n') },
@@ -176,6 +180,82 @@ describe('⭐⭐ D84 (T11; the lead’s rulings r1, Q5) — no call without JPWB
 	});
 });
 
+describe('⭐⭐ D84 (r2, `D84R-A01`) — a role that holds an attempt and no call record is not called again on its copy', () => {
+	it('⛔ RED FIRST — the writer approved, an attempt left with no call record (a kill during the call, staged by the test): its second call refused by the attempt’s words, before its deps are read and with no program run', async () => {
+		const folder = fresh('attempted');
+		writeOnce(join(folder, D84_LAYOUT.case), { reading: { roundId: 'asmt_x' } });
+		writeOnce(join(folder, D84_LAYOUT.policy), { prepared: false });
+		const writer = roleFolderOf(folder, 'writer');
+		mkdirSync(join(writer, D84_LAYOUT.shown), { recursive: true });
+		writeFileSync(join(writer, D84_LAYOUT.shown, 'prompt.txt'), 'the prompt');
+		const manifest = manifestOf(treeEntries(join(writer, D84_LAYOUT.shown)));
+		writeOnce(join(writer, D84_LAYOUT.manifest), manifest);
+		expect(recordApproval(writer, { manifestSha256: manifest.sha256, words: 'Approved.', approvedAt: 'now' })).toHaveProperty('recorded');
+		// ⭑ The attempt a call writes before its program, and no record after it: the call was killed, or threw, in between.
+		writeOnce(join(writer, 'attempt.json'), { manifestSha256: manifest.sha256, at: '2026-11-21T20:00:00.000Z' });
+		let ran = 0;
+		const transports: D84Transports = {
+			devinExec: async () => {
+				ran += 1;
+				return { stdout: '' };
+			},
+			openPi: async () => {
+				ran += 1;
+				throw new Error('Pi was opened');
+			},
+			devinVersion: async () => {
+				ran += 1;
+				return 'devin 3000.11.234';
+			}
+		};
+		const deps = new Proxy({} as AssuranceStageDeps, {
+			get: (_t, property) => {
+				throw new Error(`the call read its deps (${String(property)}) past its attempt`);
+			}
+		});
+		const again = await callRole('writer', deps, { folder, unitId: 'pwu_x', roundId: 'asmt_x' }, transports, { JPWB_D84_PAID: '1' }).catch((e: unknown) => ({
+			threw: e instanceof Error ? e.message : String(e)
+		}));
+		expect('refusedBecause' in again ? again.refusedBecause : JSON.stringify(again), 'a role holding an attempt and no call record was called again').toContain(
+			'an attempt was made on this copy and its record was never written: it is not called again here'
+		);
+		expect([ran, existsSync(join(writer, D84_LAYOUT.call))], 'a program ran, or a call record was written, for a role holding an attempt').toEqual([0, false]);
+	});
+});
+
+describe('⭐⭐ D84 (r2, `D84R-A01`) — the attempt and the lock, each written exclusively, and each step’s lock its own', () => {
+	it('⛔ RED FIRST — an attempt is reserved once: a second reservation on the copy, as a second launcher’s, is refused at its write, naming the first, whose record stays; ⭑ CONTROL: the first is reserved', () => {
+		const folder = fresh('reserved');
+		const first = reserveAttempt(folder, 'the writer', { manifestSha256: 'a'.repeat(64), at: '2026-11-21T20:00:00.000Z' });
+		expect(first, '⭑ CONTROL: the first attempt was not reserved').toBeUndefined();
+
+		const second = reserveAttempt(folder, 'the writer', { manifestSha256: 'b'.repeat(64), at: '2026-11-21T20:00:01.000Z' });
+
+		expect(second, 'a second attempt was reserved on one copy').toBe(
+			"the writer: an attempt was made on this copy and its record was never written: it is not called again here (attempt.json, made at 2026-11-21T20:00:00.000Z; the lead's rulings r2, D84R-A01)"
+		);
+		expect(readJson(join(folder, 'attempt.json')), 'the first attempt’s record was written over').toEqual({ manifestSha256: 'a'.repeat(64), at: '2026-11-21T20:00:00.000Z' });
+	});
+
+	it('⛔ RED FIRST — a step removes only its own lock: one that is not the lock it took — another step’s, taken after its own was cleared — is left where it is; ⭑ CONTROL: its own is removed', () => {
+		const folder = fresh('lock');
+		const mine = takeLock(folder, { pid: 1, at: 'then', step: 'report' });
+		if (!('release' in mine)) throw new Error(`arrangement: ${mine.refusedBecause}`);
+		// ⭑ Its lock cleared by the lead, and another step's taken in its place.
+		rmSync(join(folder, 'd84.lock'));
+		writeFileSync(join(folder, 'd84.lock'), `${JSON.stringify({ pid: 2, at: 'now', step: 'call' })}\n`);
+
+		mine.release();
+
+		expect(existsSync(join(folder, 'd84.lock')), 'a step removed a lock that is not its own').toBe(true);
+		rmSync(join(folder, 'd84.lock'));
+		const own = takeLock(folder, { pid: 3, at: 'now', step: 'copy' });
+		if (!('release' in own)) throw new Error(`arrangement: ${own.refusedBecause}`);
+		own.release();
+		expect(existsSync(join(folder, 'd84.lock')), '⭑ CONTROL: a step’s own lock was not removed').toBe(false);
+	});
+});
+
 describe('⭐ D84 — the report’s mechanical part: what the folder records, every call counted, the probes apart, and the calls already spent on the case', () => {
 	it('⛔ RED FIRST — the roles’ reviewer calls (the writer’s and the Historian’s) and the Hypothesizer’s executor turn counted, the probes apart; an earlier folder’s calls named; the four departures named', () => {
 		const earlier = fresh('earlier');
@@ -184,10 +264,13 @@ describe('⭐ D84 — the report’s mechanical part: what the folder records, e
 		const folder = fresh('report');
 		writeOnce(join(folder, D84_LAYOUT.state), { begunAt: 'now', checkoutHead: 'x', source: 's', unitId: 'u', earlierFolders: [earlier] });
 		for (const role of ['writer', 'hypothesizer'] as const) writeOnce(join(roleFolderOf(folder, role), D84_LAYOUT.call), { role });
+		// ⭐ r2 (`D84R-A01`) — the Historian's attempt, and no record of its call: a call that may have been made, and paid for.
+		writeOnce(join(roleFolderOf(folder, 'historian'), 'attempt.json'), { manifestSha256: 'a'.repeat(64), at: 'then' });
 		writeOnce(join(folder, D84_LAYOUT.probes, '01-tilde', D84_LAYOUT.call), { probe: '01-tilde' });
 		mkdirSync(join(folder, D84_LAYOUT.probes, '02-shown-only'), { recursive: true });
 		const report = gatherReport(folder);
-		expect(report.calls, 'the calls are not counted, the probes apart').toEqual({ reviewer: 1, executor: 1, probes: 1 });
+		expect(report.calls, 'the calls are not counted, the probes apart, an attempt with no record among them').toEqual({ reviewer: 2, executor: 1, probes: 1 });
+		expect(report.unrecorded, 'an attempt with no call record is not named among the calls spent').toEqual(['historian']);
 		expect(report.spentBefore, 'the calls already spent on the case are not named').toEqual([{ folder: earlier, calls: { reviewer: 1, executor: 0, probes: 0 } }]);
 		expect(report.departures, 'the accepted departures are not named').toEqual([...D84_DEPARTURES]);
 		expect(report.stopped, 'a folder not stopped is reported stopped').toBe(false);
