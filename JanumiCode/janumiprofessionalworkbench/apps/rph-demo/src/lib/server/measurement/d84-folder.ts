@@ -6,7 +6,10 @@
 // folder, outside every git working tree and the temporary folder, holding no store, no file Pi reads on its path — and D84's own: empty when it is
 // begun; neither it nor any folder above it a run folder (holding `demo.sqlite*` or a `lane` folder); and neither the source nor inside or above it.
 // D84's own asked of each path where it is written and where its links resolve (the lead's rulings r2, `D84R-A04`): the host's `realpath`, as the run
-// folder's own rules resolve it, so a junction cannot carry the folder into the source, the source into it, or it into a run folder.
+// folder's own rules resolve it, so a junction cannot carry the folder into the source, the source into it, or it into a run folder. ⭐ r4
+// (`D84S-A01`): failing closed — through a realpath of D84's own, which says when it could not resolve, so an existing folder or source whose
+// physical path cannot be told is refused, naming it and why, and never asked as written in its place (the run folder's host keeps its fallback,
+// for its own rules); and a folder at or above either path that cannot be listed is refused, never read as empty.
 // ⭑ THE COPY (§3.3 (b); departure 5, accepted): from the run's final archive (`<RUN>-final/lane/archive/06-final`), in the server's own layout, so
 // the stage's deps resolve as the server's do — the record store and the content store, each copied by its bytes and its sha256 held to the source's
 // and to the archive's own record of it (`checks.json`); the Undertaking's workspace and its process output, each copied as the archive copies a
@@ -16,7 +19,7 @@
 // after the server's open; any that moved is refused, naming it. ⚠ The open writes the store's header as the server's does, to its write-ahead journal
 // (`packages/rph-persistence/src/sql-driver.ts`, `journal_mode = WAL`): that is how the server opens its store, and no record moves with it.
 // ⛔ NO AGENT OPENS A RUN FOLDER: the operator names the source, and the tests copy archives they build.
-import { constants, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync } from 'node:fs';
+import { constants, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { nodeRunFolderHost, runFolderProblems, type RunFolderHost } from '../../../../e2e-live-exec/run-folder.js';
@@ -33,11 +36,26 @@ import { D84_LAYOUT, copyStoreOf, readJson, sha256Of, treeEntries, writeOnce, ty
 const RECORD_STORE = 'demo.sqlite';
 const CONTENT_STORE = 'demo.sqlite.content.sqlite';
 
-/** What the measurement folder's rules read of the host: the run folder's host, and how to list a folder's names. */
-export type MeasurementHost = RunFolderHost;
+/** What the measurement folder's rules read of the host: the run folder's host, and D84's own realpath. */
+export interface MeasurementHost extends RunFolderHost {
+	/**
+	 * ⭐ r4 (`D84S-A01`) — the path with every link resolved, or why it could not be: never the written path in its place, as the run folder's own
+	 * `realpath` gives it for its own rules.
+	 */
+	physical(path: string): { readonly resolved: string } | { readonly unresolved: string };
+}
 
-/** The host as it is (`nodeRunFolderHost`). */
-export const nodeMeasurementHost = (): MeasurementHost => nodeRunFolderHost();
+/** The host as it is (`nodeRunFolderHost`), and D84's own realpath over the file system's (`realpathSync.native`), its failure said. */
+export const nodeMeasurementHost = (): MeasurementHost => ({
+	...nodeRunFolderHost(),
+	physical: (path) => {
+		try {
+			return { resolved: realpathSync.native(path) };
+		} catch (e) {
+			return { unresolved: e instanceof Error ? e.message : String(e) };
+		}
+	}
+});
 
 /** Does `child` lie inside `parent`, or name it? Folded on Windows, as the run folder's own rule folds. */
 function within(child: string, parent: string, platform: NodeJS.Platform): boolean {
@@ -60,13 +78,18 @@ function upFrom(start: string): string[] {
 const same = (a: string, b: string, platform: NodeJS.Platform): boolean => within(a, b, platform) && within(b, a, platform);
 
 /**
- * ⭐ r2 (`D84R-A04`) — A PATH AS D84'S RULES ASK IT: where it is written, and where its links resolve (the host's `realpath`, which gives the path itself,
- * resolved, where it cannot resolve it), each once — the written path first.
+ * ⭐ r2 (`D84R-A04`) — A PATH AS D84'S RULES ASK IT: where it is written, and where its links resolve, each once — the written path first. ⭐ r4
+ * (`D84S-A01`): where its links resolve is D84's own realpath's answer (`physical`). A path that exists and whose physical path cannot be told is a
+ * problem, naming it and why — its rules are never asked of the written path in its place (the written path's own are still asked, so every reason is
+ * named). A path that does not exist has no physical path to tell.
  */
-function pathsOf(path: string, host: MeasurementHost): string[] {
+function pathsOf(path: string, host: MeasurementHost): { readonly paths: readonly string[]; readonly problem?: string } {
 	const written = resolve(path);
-	const physical = host.realpath(path);
-	return same(written, physical, host.platform) ? [written] : [written, physical];
+	if (!host.exists(path)) return { paths: [written] };
+	const physical = host.physical(path);
+	if ('resolved' in physical) return { paths: same(written, physical.resolved, host.platform) ? [written] : [written, physical.resolved] };
+	const problem = `the physical path of ${written}, which exists, cannot be told (${physical.unresolved}): D84's rules are asked of the physical path too, never of the written path in its place (the lead's rulings r4, D84S-A01)`;
+	return { paths: [written], problem };
 }
 
 /**
@@ -80,22 +103,31 @@ export function measurementFolderProblems(folder: string, source: string, host: 
 	const names = (host.list(folder) ?? []).filter((n) => n !== D84_LAYOUT.lock);
 	if (!begun && names.length > 0) problems.push(`it is not empty (${names.length} name(s) in it): a measurement folder is begun empty, and written once`);
 	// ⭐ r2 (`D84R-A04`) — each folder at or above it, where it is written and where its links resolve, asked once.
-	const folders = pathsOf(folder, host);
+	const folderPaths = pathsOf(folder, host);
+	if (folderPaths.problem !== undefined) problems.push(folderPaths.problem);
+	const folders = folderPaths.paths;
 	const asked = new Set<string>();
 	for (const at of folders.flatMap(upFrom)) {
 		const key = host.platform === 'win32' ? at.toLowerCase() : at;
 		if (asked.has(key)) continue;
 		asked.add(key);
-		const here = host.list(at) ?? [];
+		const where = folders.some((f) => same(f, at, host.platform)) ? 'it' : `${at}, a folder above it,`;
+		// ⭐ r4 (`D84S-A01`) — one that exists and cannot be listed refuses it, as the run folder's own rule refuses one on the written path: what it
+		// holds cannot be told, so it is never read as empty.
+		const here = host.exists(at) ? host.list(at) : [];
+		if (here === undefined) {
+			problems.push(`${where} cannot be listed, so whether it holds a run folder's marks cannot be told: refused, not assumed empty (the lead's rulings r4, D84S-A01)`);
+			continue;
+		}
 		const marks = here.filter((n) => n.toLowerCase().startsWith(RECORD_STORE) || n.toLowerCase() === 'lane');
 		if (marks.length > 0)
-			problems.push(
-				`${folders.some((f) => same(f, at, host.platform)) ? 'it' : `${at}, a folder above it,`} holds ${marks.join(', ')}: a run folder's marks, and no measurement is kept in a run folder`
-			);
+			problems.push(`${where} holds ${marks.join(', ')}: a run folder's marks, and no measurement is kept in a run folder`);
 	}
 	if (source.trim() !== '') {
 		// ⭐ r2 (`D84R-A04`) — the source's containment both ways, each of its paths against each of the folder's.
-		const sources = pathsOf(source, host);
+		const sourcePaths = pathsOf(source, host);
+		if (sourcePaths.problem !== undefined) problems.push(sourcePaths.problem);
+		const sources = sourcePaths.paths;
 		if (folders.some((f) => sources.some((from) => within(f, from, host.platform))))
 			problems.push('it lies inside the source it is to copy, or is it: the source is read and never written');
 		if (sources.some((from) => folders.some((f) => within(from, f, host.platform))))

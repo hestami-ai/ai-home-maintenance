@@ -7,7 +7,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CaseReading } from './d84-case.js';
 import type { CopyManifest, MeasurementState } from './d84-folder.js';
-import { D84_LAYOUT, D84_ROLES, readJson, roleFolderOf, writeOnce, type ApprovalRecord, type AttemptRecord, type D84Role, type Manifest } from './d84-files.js';
+import { attemptOf, D84_LAYOUT, D84_ROLES, readJson, roleFolderOf, writeOnce, type ApprovalRecord, type AttemptReading, type D84Role, type Manifest } from './d84-files.js';
 import { D84_STOPPED, type CallRecord } from './d84-roles.js';
 import type { ProbeCallRecord } from './d84-probes.js';
 
@@ -15,8 +15,8 @@ import type { ProbeCallRecord } from './d84-probes.js';
 export interface ShownAndCalled<C> {
 	readonly shown?: { readonly manifestSha256: string; readonly files: number; readonly bytes: number };
 	readonly approval?: ApprovalRecord;
-	/** ⭐ r2 (`D84R-A01`) — the attempt its call reserved before its program. */
-	readonly attempt?: AttemptRecord;
+	/** ⭐ r2 (`D84R-A01`) — the attempt its call reserved before its program. ⭐ r4 (`D84S-A02`): or, where its record was cut short, that it is unreadable. */
+	readonly attempt?: AttemptReading;
 	readonly call?: C;
 }
 
@@ -62,7 +62,8 @@ export interface D84Report {
 function shownAndCalled<C>(at: string): ShownAndCalled<C> {
 	const manifest = readJson<Manifest>(join(at, D84_LAYOUT.manifest));
 	const approval = readJson<ApprovalRecord>(join(at, D84_LAYOUT.approval));
-	const attempt = readJson<AttemptRecord>(join(at, D84_LAYOUT.attempt));
+	// ⭐ r4 (`D84S-A02`) — read as the refusal reads it: by its file's existence alone, its record only where it parses, never thrown on.
+	const attempt = attemptOf(at);
 	const call = readJson<C>(join(at, D84_LAYOUT.call));
 	return {
 		...(manifest === undefined

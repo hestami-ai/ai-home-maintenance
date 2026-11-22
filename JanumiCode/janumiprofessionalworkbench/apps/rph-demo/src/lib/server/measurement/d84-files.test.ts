@@ -223,6 +223,58 @@ describe('⭐⭐ D84 (r2, `D84R-A01`) — a role that holds an attempt and no ca
 	});
 });
 
+describe('⭐⭐ D84 (r4, `D84S-A02`) — an attempt cut short, as by a kill during its own write, is an attempt all the same', () => {
+	it('⛔ RED FIRST — an attempt.json empty, or cut mid-JSON: a second call refused by the attempt’s words, its record named unreadable, before its deps are read and with no program run; and the report counts it and names it, never throwing', async () => {
+		for (const [cut, text] of [
+			['empty', ''],
+			['cut mid-JSON', '{"manifestSha256": "ab'],
+		] as const) {
+			const folder = fresh(`cut-${cut === 'empty' ? 'empty' : 'mid'}`);
+			writeOnce(join(folder, D84_LAYOUT.case), { reading: { roundId: 'asmt_x' } });
+			writeOnce(join(folder, D84_LAYOUT.policy), { prepared: false });
+			const writer = roleFolderOf(folder, 'writer');
+			mkdirSync(join(writer, D84_LAYOUT.shown), { recursive: true });
+			writeFileSync(join(writer, D84_LAYOUT.shown, 'prompt.txt'), 'the prompt');
+			const manifest = manifestOf(treeEntries(join(writer, D84_LAYOUT.shown)));
+			writeOnce(join(writer, D84_LAYOUT.manifest), manifest);
+			expect(recordApproval(writer, { manifestSha256: manifest.sha256, words: 'Approved.', approvedAt: 'now' })).toHaveProperty('recorded');
+			// ⭑ The attempt as a kill during its own write leaves it: the file made, its record not, or not whole.
+			writeFileSync(join(writer, 'attempt.json'), text);
+			let ran = 0;
+			const counted = async () => {
+				ran += 1;
+				throw new Error('a program ran');
+			};
+			const transports: D84Transports = { devinExec: counted, openPi: counted, devinVersion: counted };
+			const deps = new Proxy({} as AssuranceStageDeps, {
+				get: (_t, property) => {
+					throw new Error(`the call read its deps (${String(property)}) past its attempt`);
+				}
+			});
+
+			const again = await callRole('writer', deps, { folder, unitId: 'pwu_x', roundId: 'asmt_x' }, transports, { JPWB_D84_PAID: '1' }).catch((e: unknown) => ({
+				threw: e instanceof Error ? e.message : String(e)
+			}));
+			const report = (() => {
+				try {
+					return gatherReport(folder);
+				} catch (e) {
+					return { threw: e instanceof Error ? e.message : String(e) };
+				}
+			})();
+
+			expect('refusedBecause' in again ? again.refusedBecause : JSON.stringify(again), `a role whose attempt is ${cut} was not refused by it`).toBe(
+				"the writer: an attempt was made on this copy and its record was never written: it is not called again here (attempt.json, its record unreadable; the lead's rulings r2, D84R-A01)"
+			);
+			expect([ran, existsSync(join(writer, D84_LAYOUT.call))], `a program ran, or a call record was written, for a role whose attempt is ${cut}`).toEqual([0, false]);
+			expect(
+				'calls' in report ? [report.calls, report.unrecorded] : report,
+				`the report did not count and name an attempt ${cut}, or threw on it`
+			).toEqual([{ reviewer: 1, executor: 0, probes: 0 }, ['writer']]);
+		}
+	});
+});
+
 describe('⭐⭐ D84 (r2, `D84R-A01`) — the attempt and the lock, each written exclusively, and each step’s lock its own', () => {
 	it('⛔ RED FIRST — an attempt is reserved once: a second reservation on the copy, as a second launcher’s, is refused at its write, naming the first, whose record stays; ⭑ CONTROL: the first is reserved', () => {
 		const folder = fresh('reserved');

@@ -9,7 +9,7 @@
 // is refused without one, and where the manifest it names is not the one the folder holds.
 // ⛔ WRITTEN ONCE: a record of this folder is never written over (`writeOnce`), so what was shown, approved and called stays as it was.
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /** ⭐ D84 (the lead's rulings r1, Q5) — the flag without which no call of D84's is made: exactly `1`, as the paid lane's own (`JPWB_PHASE7_PAID`). */
@@ -200,18 +200,48 @@ export interface AttemptRecord {
 	readonly at: string;
 }
 
-/** The words of a call refused for its attempt: one was made on this copy, and its record never written. */
-const attemptWords = (what: string, at: string): string =>
-	`${what}: an attempt was made on this copy and its record was never written: it is not called again here (${D84_LAYOUT.attempt}, made at ${at}; the lead's rulings r2, D84R-A01)`;
+/**
+ * ⭐ r4 (`D84S-A02`) — an attempt as its folder holds it: its record, or — where its file was cut short, as by a kill during its own write — that its
+ * record is unreadable. An attempt all the same.
+ */
+export type AttemptReading = Partial<AttemptRecord> | { readonly unreadable: true };
+
+const UNREADABLE: AttemptReading = { unreadable: true };
+
+/** An attempt's record, read where its JSON parses to an object; unreadable where it cannot be read or does not parse. */
+function attemptRead(path: string): AttemptReading {
+	try {
+		const value: unknown = JSON.parse(readFileSync(path, 'utf8'));
+		return typeof value === 'object' && value !== null ? (value as Partial<AttemptRecord>) : UNREADABLE;
+	} catch {
+		return UNREADABLE;
+	}
+}
+
+/**
+ * ⭐⭐ r4 (`D84S-A02`) — THE ATTEMPT `folder` HOLDS, by its file's existence alone: `undefined` where there is none; else its record, where its JSON
+ * parses, or that its record is unreadable. ⛔ Never throws on a record cut short: the attempt stands, and refuses, whatever its record says.
+ */
+export function attemptOf(folder: string): AttemptReading | undefined {
+	const path = join(folder, D84_LAYOUT.attempt);
+	if (!existsSync(path)) return undefined;
+	return attemptRead(path);
+}
+
+/** The words of a call refused for its attempt: one was made on this copy, and its record never written — the attempt's time, where it can be read. */
+const attemptWords = (what: string, attempt: AttemptReading): string =>
+	`${what}: an attempt was made on this copy and its record was never written: it is not called again here (${D84_LAYOUT.attempt}, ${
+		'unreadable' in attempt ? 'its record unreadable' : `made at ${String(attempt.at ?? 'a time not recorded')}`
+	}; the lead's rulings r2, D84R-A01)`;
 
 /**
  * ⭐⭐ r2 (`D84R-A01` (a)) — WHY `what`, WHOSE FOLDER IS `folder`, IS NOT CALLED FOR ITS ATTEMPT: it holds an attempt and no call record — a call killed,
- * or thrown out of, between its program and its record. `undefined` where it holds no attempt. ⛔ Nothing deletes an attempt.
+ * or thrown out of, between its program and its record. `undefined` where it holds no attempt. ⛔ Nothing deletes an attempt. ⭐ r4 (`D84S-A02`): by
+ * the attempt's existence alone (`attemptOf`), its time read only where its record parses.
  */
 export function attemptRefusal(folder: string, what: string): string | undefined {
-	if (!existsSync(join(folder, D84_LAYOUT.attempt))) return undefined;
-	const attempt = readJson<Partial<AttemptRecord>>(join(folder, D84_LAYOUT.attempt));
-	return attemptWords(what, String(attempt?.at ?? 'a time not recorded'));
+	const attempt = attemptOf(folder);
+	return attempt === undefined ? undefined : attemptWords(what, attempt);
 }
 
 /**
@@ -225,7 +255,7 @@ export function reserveAttempt(folder: string, what: string, attempt: AttemptRec
 		return undefined;
 	} catch (e) {
 		if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
-		return attemptWords(what, String(readJson<Partial<AttemptRecord>>(join(folder, D84_LAYOUT.attempt))?.at ?? 'a time not recorded'));
+		return attemptWords(what, attemptOf(folder) ?? UNREADABLE);
 	}
 }
 
@@ -246,15 +276,26 @@ function lockWords(held: Partial<LockRecord> | undefined): string {
 	);
 }
 
+/** A lock's text, written into the file its call made (`fd`): the file system's own write, a test's seam in its place. */
+export type LockWrite = (fd: number, text: string) => void;
+
 /**
  * ⭐⭐ r2 (`D84R-A01` (b)) — TAKE THE FOLDER'S LOCK for one step: written exclusively, holding this process's id and the time; its `release` removes it,
  * and only while it is still this step's own. ⛔ A lock held, or left by a kill, refuses, naming it — and is never cleared here.
+ * ⭐ r4 (`D84S-A03`): the file is made exclusively first (`wx`), then written. Once made it is this call's own, so a write or a close that fails removes
+ * it before its error goes on, and no lock no step holds is left. A make that fails makes nothing, so it removes nothing, and another step's lock is
+ * never touched.
  */
-export function takeLock(folder: string, lock: LockRecord): { readonly release: () => void } | { readonly refusedBecause: string } {
+export function takeLock(
+	folder: string,
+	lock: LockRecord,
+	write: LockWrite = (fd, text) => writeFileSync(fd, text, 'utf8')
+): { readonly release: () => void } | { readonly refusedBecause: string } {
 	const path = join(folder, D84_LAYOUT.lock);
 	const text = `${JSON.stringify(lock)}\n`;
+	let fd: number;
 	try {
-		writeFileSync(path, text, { encoding: 'utf8', flag: 'wx' });
+		fd = openSync(path, 'wx');
 	} catch (e) {
 		const code = (e as NodeJS.ErrnoException).code;
 		if (code === 'EEXIST') {
@@ -268,6 +309,22 @@ export function takeLock(folder: string, lock: LockRecord): { readonly release: 
 		}
 		if (code === 'ENOENT') return { refusedBecause: `the measurement folder ${folder} does not exist, so no step can hold it` };
 		throw e;
+	}
+	// ⭐ r4 (`D84S-A03`) — this call's own file from here: each failure kept, the file closed whatever came of the write, and removed where either failed.
+	const failures: unknown[] = [];
+	try {
+		write(fd, text);
+	} catch (e) {
+		failures.push(e);
+	}
+	try {
+		closeSync(fd);
+	} catch (e) {
+		failures.push(e);
+	}
+	if (failures.length > 0) {
+		rmSync(path, { force: true });
+		throw failures[0];
 	}
 	return {
 		release: () => {

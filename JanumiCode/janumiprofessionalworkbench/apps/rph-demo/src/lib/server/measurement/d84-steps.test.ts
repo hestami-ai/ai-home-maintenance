@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { D84_LAYOUT, writeOnce } from './d84-files.js';
+import { D84_LAYOUT, takeLock, writeOnce } from './d84-files.js';
 import { nodeMeasurementHost, type MeasurementHost } from './d84-folder.js';
 import { runD84Step, type StepHost } from './d84-steps.js';
 
@@ -74,6 +74,8 @@ function sandboxHost(root: string): MeasurementHost {
 		exists: (p) => seen(p) && existsSync(p),
 		isDirectory: (p) => seen(p) && statSync(p, { throwIfNoEntry: false })?.isDirectory() === true,
 		realpath: (p) => resolve(p),
+		// ⭐ r4 (`D84S-A01`) — D84's own realpath, which says when it could not resolve: here, every path resolves to itself.
+		physical: (p) => ({ resolved: resolve(p) }),
 		list: (p) => (seen(p) && existsSync(p) ? readdirSync(p) : []),
 		mkdtemp: (prefix) => mkdtempSync(prefix)
 	};
@@ -144,6 +146,27 @@ describe('⭐⭐ D84 (r2, `D84R-A01` (b)) — one step at a time in a measuremen
 		const inTmp = fresh('begin-in-tmp');
 		const begin = await runD84Step(env(inTmp, 'begin', { JPWB_D84_SOURCE: join(TMP, 'nowhere'), JPWB_D84_UNIT: 'pwu_x' }), hostWith());
 		expect([begin.ok, existsSync(join(inTmp, 'd84.lock')), existsSync(join(inTmp, D84_LAYOUT.state))], 'a refused begin locked, or began, its folder').toEqual([false, false, false]);
+	});
+
+	it('⛔ RED FIRST — r4 (`D84S-A03`): a lock this call made and could not write — its file made exclusively, its write failing, as on a full disk — is removed before the error goes on; and the next step is admitted', async () => {
+		const folder = begun();
+		const failing = (): void => {
+			throw Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
+		};
+
+		const thrown = (() => {
+			try {
+				takeLock(folder, { pid: 434344, at: '2026-11-21T20:00:00.000Z', step: 'report' }, failing);
+				return 'it did not throw';
+			} catch (e) {
+				return e instanceof Error ? e.message : String(e);
+			}
+		})();
+
+		expect.soft(thrown, 'arrangement: the lock’s write failed, and its error went on').toBe('ENOSPC: no space left on device, write');
+		expect(existsSync(join(folder, 'd84.lock')), 'a lock this call made and could not write was left').toBe(false);
+		const next = await runD84Step(env(folder, 'report'), hostWith());
+		expect(next.ok, `the next step was refused by a lock no step holds — ${next.said.join('\n')}`).toBe(true);
 	});
 
 	it('⛔ RED FIRST — a step that throws still removes its lock, in its `finally`', async () => {

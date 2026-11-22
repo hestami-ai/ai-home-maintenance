@@ -53,6 +53,8 @@ function sandboxHost(root: string): MeasurementHost {
 		exists: (p) => seen(p) && existsSync(p),
 		isDirectory: (p) => seen(p) && statSync(p, { throwIfNoEntry: false })?.isDirectory() === true,
 		realpath: (p) => resolve(p),
+		// ⭐ r4 (`D84S-A01`) — D84's own realpath, which says when it could not resolve: here, every path resolves to itself.
+		physical: (p) => ({ resolved: resolve(p) }),
 		list: (p) => (seen(p) && existsSync(p) ? readdirSync(p) : []),
 		mkdtemp: (prefix) => mkdtempSync(prefix)
 	};
@@ -207,7 +209,11 @@ describe('⭐⭐ D84 (T4; departure 6) — the measurement folder: the run folde
 			[made('source-alias')]: made('holder', 'inner')
 		};
 		const base = sandboxHost(root);
-		const host: MeasurementHost = { ...base, realpath: (p) => links[resolve(p)] ?? base.realpath(p) };
+		// ⭐ RESTATED (r4, `D84S-A01`): ~~`const host: MeasurementHost = { ...base, realpath: (p) => links[resolve(p)] ?? base.realpath(p) };`~~ — D84 asks
+		// its rules of the physical path through a realpath of its own now (`physical`), which says when it could not resolve; the run folder's rules
+		// keep the host's. So the links are given to both, and every expectation below is as it was.
+		const aliased = (p: string): string => links[resolve(p)] ?? base.realpath(p);
+		const host: MeasurementHost = { ...base, realpath: aliased, physical: (p) => ({ resolved: aliased(p) }) };
 		const problemsOf = (folder: string, from: string = source) => measurementFolderProblems(folder, from, host, false);
 		expect(problemsOf(join(root, 'alias-in-source')), 'a folder whose physical path lies inside the source was admitted').toContain(
 			'it lies inside the source it is to copy, or is it: the source is read and never written'
@@ -220,6 +226,40 @@ describe('⭐⭐ D84 (T4; departure 6) — the measurement folder: the run folde
 			'a folder whose physical path lies in a run folder was admitted'
 		).toBe(true);
 		expect(problemsOf(made('own')), '⭑ CONTROL: a folder whose physical path is its own was refused').toEqual([]);
+	});
+
+	it('⛔ RED FIRST — r4 (`D84S-A01`): failing closed on the physical paths — an ancestor of the physical path that cannot be listed, holding a run folder’s mark; an existing folder whose physical path cannot be resolved; and an existing source whose physical path cannot be resolved: each refused, its words naming it; ⭑ CONTROL: a resolvable, listable folder admitted', () => {
+		const root = fresh('closed');
+		const made = (...parts: string[]): string => {
+			const at = join(root, ...parts);
+			mkdirSync(at, { recursive: true });
+			return at;
+		};
+		const source = made('archive', '06-final');
+		const run = made('runs', 'R');
+		writeFileSync(join(run, 'demo.sqlite'), '');
+		const base = sandboxHost(root);
+		// ⭑ A folder reached by a link, its physical path inside a run folder that cannot be listed: the run folder's mark is there, unseen.
+		const alias = made('alias-in-unlistable');
+		const inRun = made('runs', 'R', 'm');
+		const toRun = (p: string): string => (resolve(p) === alias ? inRun : resolve(p));
+		const unlistable: MeasurementHost = { ...base, realpath: toRun, physical: (p) => ({ resolved: toRun(p) }), list: (p) => (resolve(p) === run ? undefined : base.list(p)) };
+		expect(measurementFolderProblems(alias, source, unlistable, false), 'an ancestor of the physical path that cannot be listed was read as empty').toContain(
+			`${run}, a folder above it, cannot be listed, so whether it holds a run folder's marks cannot be told: refused, not assumed empty (the lead's rulings r4, D84S-A01)`
+		);
+		// ⭑ A path that exists and cannot be resolved: the host's realpath gives the written path in its place, as the run folder's does; D84's own says why.
+		const unresolvable = (at: string): MeasurementHost => ({
+			...base,
+			physical: (p) => (resolve(p) === at ? { unresolved: 'EACCES: permission denied, realpath' } : { resolved: resolve(p) })
+		});
+		const stuck = made('stuck');
+		expect(measurementFolderProblems(stuck, source, unresolvable(stuck), false), 'an existing folder whose physical path cannot be resolved was admitted').toContain(
+			`the physical path of ${stuck}, which exists, cannot be told (EACCES: permission denied, realpath): D84's rules are asked of the physical path too, never of the written path in its place (the lead's rulings r4, D84S-A01)`
+		);
+		expect(measurementFolderProblems(made('fine'), source, unresolvable(source), false), 'an existing source whose physical path cannot be resolved was admitted').toContain(
+			`the physical path of ${source}, which exists, cannot be told (EACCES: permission denied, realpath): D84's rules are asked of the physical path too, never of the written path in its place (the lead's rulings r4, D84S-A01)`
+		);
+		expect(measurementFolderProblems(made('own'), source, base, false), '⭑ CONTROL: a resolvable, listable folder was refused').toEqual([]);
 	});
 
 	it('⛔ RED FIRST — begun once, its record written; a folder named as an earlier one admitted only where it is a measurement folder begun, and never this one', () => {
