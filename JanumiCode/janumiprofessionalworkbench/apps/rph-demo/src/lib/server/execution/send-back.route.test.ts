@@ -52,7 +52,10 @@ const seam = vi.hoisted(() => ({
 	historian: undefined as
 		| undefined
 		| ((call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string }),
-	/** ⭐ L17b2 (D86) — each call devin was given as the Historian: its argv, its working folder and its bound, and what its folder and its user configuration held at the call. */
+	/**
+	 * ⭐ L17b2 (D86) — each call devin was given as the Historian: its argv, its working folder and its bound, and what its folder ~~and its user configuration~~
+	 * held at the call. ⭐ L17b4 (design D93; `REG-D-197`; the lead's §15.5 (f) sweep) — no user configuration is passed, so `userConfig` reads none.
+	 */
 	historianCalls: [] as {
 		readonly args: readonly string[];
 		readonly cwd: string;
@@ -178,7 +181,8 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 
 // ⭐⭐ L17b2 (D86; the lead's rulings 2, 6, 8 and 16) — THE HISTORIAN'S REAL CALL, ITS PROGRAM REPLACED AT THE SEAM, as the floor's devin is above:
 // `devin --version` answered by the case (`seam.historianVersion`), and the session by the case's answer (`seam.historian`), its export written where
-// the argv names it; what the folder and the user configuration held at the call kept (`seam.historianCalls`). Where a case hands the stage a seam of
+// the argv names it; what the folder ~~and the user configuration~~ held at the call kept (`seam.historianCalls`; ⭐ L17b4, D93, the §15.5 (f) sweep:
+// no user configuration is passed, so none is held). Where a case hands the stage a seam of
 // its own (`historianExec`, ruling 6), the call is given that seam (`seam.historianPassThrough`). ⚠ The module is package L17b2's: until it exists
 // nothing imports it, so this factory never runs (vitest gives a mock of an absent module its unresolved id).
 // ⭐ L17b2 (ruling 3; the lead's §13) — `assurance-stage.route.test.ts`'s mock, copied byte for byte, so that the three route files' arrangements are one.

@@ -30,6 +30,11 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
+/** ⭐ L17b4 (design D93; `REG-F-685`; the lead's L4-Q2) — the record of a failed devin call of `kind` (and its names), as the lead worded it. */
+const recordOf = (kind: string): string =>
+	`devin invocation failed (${kind}). Its diagnostic is not recorded (PER-12): execFile's message holds devin's command line, which names the ` +
+	"call's folder, and devin's stderr, which holds its login banner (REG-F-685).";
+
 // ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D46 (`REG-D-145`; design §11.7: *"`devinPrint` recognises "free model rate limit", waits
 // 45 s and makes the same call again, at most three times. Such a refusal did not reach the model. It is no reviewer call and no
 // exchange. State the refusal count in the eventual exchange's tool observation. A fourth refusal fails the call as today."*).
@@ -96,8 +101,10 @@ describe('⭐⭐ Z3 (D46) — devin’s free-tier refusal is waited out and the 
 		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec, wait, now));
 		expect(devin.calls).toHaveLength(4);
 		expect(waits, 'no fourth wait').toEqual([45_000, 45_000, 45_000]);
-		expect((thrown as Error).message).toBe(
-			`devin invocation failed: Command failed: devin --print\nError: ${DEVIN_FREE_TIER_REFUSAL} reached, try again later`
+		// ⭐ RESTATED (L17b4, design D93; REG-F-685): ~~`expect((thrown as Error).message).toBe(`devin invocation failed: Command failed: devin --print\nError:
+		// ${DEVIN_FREE_TIER_REFUSAL} reached, try again later`);`~~ — the refusal's own failure is its kind alone, the free tier's refusal named, never quoted.
+		expect((thrown as Error).message, 'the fourth refusal’s record does not name the free tier’s refusal').toBe(
+			recordOf('exited with code 1; devin refused it for its free tier (D46)')
 		);
 		// ~~`{ count: 3, waitedMs: 135_000 }`~~ ⛔ MOVED (Z3 — the correction): and what came before the last attempt, on the clock.
 		expect(freeTierRefusalsOf(thrown), 'the waits it made, on the failure it throws').toEqual({
@@ -116,7 +123,9 @@ describe('⭐⭐ Z3 (D46) — devin’s free-tier refusal is waited out and the 
 		};
 		const thrown = await thrownBy(devinPrint('Judge the work product.', devin, wait));
 		expect([calls, waits]).toEqual([1, []]);
-		expect((thrown as Error).message).toBe('devin invocation failed: Command failed: devin --print\nError: model not available');
+		// ⭐ RESTATED (L17b4, design D93; REG-F-685): ~~`expect((thrown as Error).message).toBe('devin invocation failed: Command failed: devin --print\nError:
+		// model not available');`~~ — its kind alone, naming no phrase its message does not hold.
+		expect((thrown as Error).message).toBe(recordOf('exited with code 1'));
 		expect(freeTierRefusalsOf(thrown)).toBeUndefined();
 	});
 

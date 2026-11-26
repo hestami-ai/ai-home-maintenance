@@ -176,6 +176,14 @@ const CLEAN_SATISFIED = JSON.stringify({
 /** What devin's program throws when it fails at the transport, with no reply. */
 const transportFailure = () => new Error('devin exited with code 1: connection reset by peer');
 
+/**
+ * ⭐ L17b4 (design D93; `REG-F-685`; the lead's L4-Q2) — what `devinPrint` records of that failure: its kind alone. The throw above carries no exit
+ * code, signal or error code, so it is that kind; its words are never recorded.
+ */
+const TRANSPORT_FAILURE_RECORD =
+	"devin invocation failed (failed with no exit code, signal or error code). Its diagnostic is not recorded (PER-12): execFile's message holds " +
+	"devin's command line, which names the call's folder, and devin's stderr, which holds its login banner (REG-F-685).";
+
 /** One command the host ran to completion and retained, marked with `n` in its argv and its output. */
 const aRun = (
 	n: number,
@@ -317,12 +325,16 @@ describe('⭐ K1 (REG-F-511; R-1, REG-D-104 (1)) — a model-run unit whose revi
 
 		const stopped = await beginExecute(pwuId);
 
+		// ⭐ RESTATED (L17b4, design D93; REG-F-685): ~~`.toMatch(/^The model ran, its work product was reviewed over 1 try, and the assurance floor is NOT
+		// satisfied: VALIDATOR_EXECUTION_FAILED: reasoning-review backing tool invocation failed: devin invocation failed: devin exited with code 1:
+		// connection reset by peer /)`~~ — the failure's kind alone reaches the page, never the words it was thrown with.
 		expect(
-			stopped.data?.error ?? '',
-			'arrangement: the review did not fail at the transport'
-		).toMatch(
-			/^The model ran, its work product was reviewed over 1 try, and the assurance floor is NOT satisfied: VALIDATOR_EXECUTION_FAILED: reasoning-review backing tool invocation failed: devin invocation failed: devin exited with code 1: connection reset by peer /
-		);
+			(stopped.data?.error ?? '').startsWith(
+				'The model ran, its work product was reviewed over 1 try, and the assurance floor is NOT satisfied: VALIDATOR_EXECUTION_FAILED: ' +
+					`reasoning-review backing tool invocation failed: ${TRANSPORT_FAILURE_RECORD} `
+			),
+			`arrangement: the review did not fail at the transport, recorded by its kind alone: ${stopped.data?.error ?? ''}`
+		).toBe(true);
 		expect(stopped.data?.error).toContain('(RETRY_OR_CONFIGURE_REVIEWER)');
 		expect(workProductFloor(pwuId), 'arrangement: the review did not end INCONCLUSIVE').toEqual(
 			REVIEW_INCONCLUSIVE
@@ -591,8 +603,8 @@ describe('⭐ P7-2b at the route (REG-D-102 (2)) — a reviewer that throws once
 			'the retry does not name the call it repeats'
 		).toBe(review[0]!.id);
 		expect(review[0]!.state.subjectObjectId).toBe(review[1]!.state.subjectObjectId);
-		expect(String((review[0]!.state.parseOutcome as { detail: string }).detail)).toContain(
-			'devin invocation failed: devin exited with code 1: connection reset by peer'
-		);
+		// ⭐ RESTATED (L17b4, design D93; REG-F-685): ~~`.toContain('devin invocation failed: devin exited with code 1: connection reset by peer')`~~ — the
+		// failed call's record holds its kind alone.
+		expect(String((review[0]!.state.parseOutcome as { detail: string }).detail)).toContain(TRANSPORT_FAILURE_RECORD);
 	});
 });

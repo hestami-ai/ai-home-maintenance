@@ -113,11 +113,16 @@ import {
 // ⭐⭐ `JAN-EXEC` Phase 7, package L17b2 — the lead's ruling 6 (C), with rulings 2 (A) and 16 — THE HISTORIAN'S TWO RULES, BY THE PRODUCT'S OWN READERS: its
 // time bound's setting and reader, and devin's version's reader — so the paid boot never words either rule a second time, and the lane's press bounds read
 // the bound the boot recorded.
+// ⭐ L17b4 — design D93 widened to the boot (the lead's §15.5 (a), (b); `REG-D-198`) — ~~`historianVersionRefusal`~~: the version's one reading
+// (`devinVersionIn`) and the rule's one wording from what was read (`historianVersionRefusalOf`), so the boot keeps the version alone, never the reply.
 import {
 	HISTORIAN_CALL_MS_VARIABLE,
+	devinVersionIn,
 	historianCallBound,
-	historianVersionRefusal
+	historianVersionRefusalOf
 } from '../src/lib/server/tools/devin-historian.js';
+// ⭐ L17b4 (§15.5 (a); `REG-D-198`) — the one definition a failed readiness call is recorded by: its kind and names, never devin's words.
+import { devinFailureKindAndNames } from '../src/lib/server/tools/devin-reviewer.js';
 
 // ── THE BOUNDS THE LANE'S OWN ACTS WAIT ──────────────────────────────────────────────────────────────────────────────
 // ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ ~~85~~ ~~103~~ ~~108.7~~ ~~116.6~~ ⭐ 424.2 hours
@@ -229,13 +234,19 @@ export function priorReviewerCalls(
 	);
 }
 
-/** One program run: its exit code, or null when it never exited by itself, with why. */
+/**
+ * One program run: its exit code, or null when it never exited by itself, ~~with why~~ and what its run threw. ⛔ L17b4 (design D93 widened to the boot;
+ * the lead's §15.5 (a); `REG-D-198`): held in memory for the readiness to read, NEVER kept — the boot record keeps what the readiness decides by alone
+ * (`ReadinessCall`).
+ */
 export interface ProgramRun {
 	readonly exitCode: number | null;
 	readonly stdout: string;
 	readonly stderr: string;
-	/** Why it has no exit code: it could not start, or it outlasted its bound and was killed. */
-	readonly failure: string | null;
+	// ~~/** Why it has no exit code: it could not start, or it outlasted its bound and was killed. */~~ ~~`readonly failure: string | null;`~~, its words
+	// execFile's own where it could not start — the program's path, and devin's stderr after it.
+	/** What its run threw (execFile's error) where it did not exit 0, read by its kind alone (`devinFailureKindAndNames`); null where it exited 0. */
+	readonly error: unknown;
 }
 
 /** Runs `program` with `args`, bounded by `timeoutMs`. Injected, so verif drives the readiness check with no devin. */
@@ -257,18 +268,15 @@ export const execFileRunner: ProgramRunner = (program, args, timeoutMs) =>
 			{ timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
 			(error, stdout, stderr) => {
 				const ran = { stdout: String(stdout), stderr: String(stderr) };
-				if (error === null) return resolve({ exitCode: 0, ...ran, failure: null });
+				// ~~`if (error === null) return resolve({ exitCode: 0, ...ran, failure: null });`~~
+				if (error === null) return resolve({ exitCode: 0, ...ran, error: null });
 				// A program that exited carries its exit code; one that never started, or was killed, carries none.
 				const code = (error as { code?: unknown }).code;
-				if (typeof code === 'number') return resolve({ exitCode: code, ...ran, failure: null });
-				const killed = (error as { killed?: boolean }).killed === true;
-				resolve({
-					exitCode: null,
-					...ran,
-					failure: killed
-						? `killed after ${timeoutMs} ms: it did not finish within its bound`
-						: error.message
-				});
+				// ⭐ L17b4 (§15.5 (a); `REG-D-198`) — ~~`if (typeof code === 'number') return resolve({ exitCode: code, ...ran, failure: null });`~~ ~~`const killed =
+				// (error as { killed?: boolean }).killed === true;`~~ ~~`resolve({ exitCode: null, ...ran, failure: killed ? `killed after ${timeoutMs} ms: it did
+				// not finish within its bound` : error.message });`~~ — execFile's message names the program's own path and holds its stderr: what the run threw
+				// is handed on whole, and read by its kind alone.
+				resolve({ exitCode: typeof code === 'number' ? code : null, ...ran, error });
 			}
 		);
 	});
@@ -294,9 +302,41 @@ export function modelListed(listing: string, model: string): boolean {
 		.includes(id);
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b4 — design D93 widened to the lane's boot (the lead's §15.5 (a); `L4C-A01`; `REG-D-198`, the sponsor's "Mend in
+ * L17b4") — ONE READINESS CALL, AS THE BOOT RECORD KEEPS IT: what the readiness check decides by, and NO WORD OF devin's OUTPUT. ⛔ Before, the record kept
+ * each call's whole stdout and stderr, on success too: `devin --version` and `devin models list`, unmeasured here, may print devin's login banner, which
+ * names the user's e-mail address.
+ */
+export interface ReadinessCall {
+	/** Its exit code; null where it never exited by itself. */
+	readonly exitCode: number | null;
+	/** For a call that did not exit 0: its kind and names, by the one definition (`devinFailureKindAndNames`), at the readiness call's own bound. */
+	readonly failure: string | null;
+	/** The length of each output, in characters: so an empty listing can be told from one that was read. */
+	readonly stdoutLength: number;
+	readonly stderrLength: number;
+}
+
+/**
+ * ⭐ D3 — devin's readiness, as the boot record keeps it. ⭐ L17b4 (§15.5 (a)) — ~~`readonly devinVersion: ProgramRun;`~~ ~~`readonly modelsList: ProgramRun &
+ * { … }`~~: each call as `ReadinessCall` keeps it, with the version read (its `<n>.<n>.<n>`, by the one reading, `devinVersionIn`, or none) and whether the
+ * configured model is listed.
+ */
 export interface Readiness {
-	readonly devinVersion: ProgramRun;
-	readonly modelsList: ProgramRun & { readonly configuredModel: string; readonly listed: boolean };
+	readonly devinVersion: ReadinessCall & { readonly version: string | null };
+	readonly modelsList: ReadinessCall & { readonly configuredModel: string; readonly listed: boolean };
+}
+
+/** ⭐ L17b4 (§15.5 (a)) — one readiness call as the record keeps it: its exit code, a failure's kind and names at the call's own bound, its outputs' lengths. */
+function readinessCallOf(p: ProgramRun): ReadinessCall {
+	return {
+		exitCode: p.exitCode,
+		// Where a runner hands no error, its exit code is the error's own, as execFile's error carries it.
+		failure: p.exitCode === 0 ? null : devinFailureKindAndNames(p.error ?? { code: p.exitCode }, READINESS_CALL_MS),
+		stdoutLength: p.stdout.length,
+		stderrLength: p.stderr.length
+	};
 }
 
 /** ⭐ D3 — devin's readiness: its version, and the model list holding the configured model. No model is called. */
@@ -306,20 +346,30 @@ export async function reviewerReadiness(
 ): Promise<Readiness> {
 	const devinVersion = await run(DEVIN_PROGRAM, ['--version'], READINESS_CALL_MS);
 	const list = await run(DEVIN_PROGRAM, ['models', 'list'], READINESS_CALL_MS);
+	// ⭐ L17b4 (§15.5 (a); `REG-D-198`) — ~~`devinVersion,`~~ ~~`modelsList: { ...list, configuredModel: model, listed: … }`~~: each output read here, in
+	// memory, and kept as what it decides by alone.
 	return {
-		devinVersion,
+		devinVersion: {
+			...readinessCallOf(devinVersion),
+			version: devinVersion.exitCode === 0 ? (devinVersionIn(devinVersion.stdout) ?? null) : null
+		},
 		modelsList: {
-			...list,
+			...readinessCallOf(list),
 			configuredModel: model,
 			listed: list.exitCode === 0 && modelListed(list.stdout, model)
 		}
 	};
 }
 
+/** ⭐ L17b4 (§15.5 (a)) — where the operator is sent to see what the boot record does not keep: the call itself, run by hand. */
+const runItYourself = (what: string, of: string): string => `(lane/boot.json keeps no word of ${of}: run \`${what}\` yourself to see it)`;
+
 /** Why the readiness check refuses the run, one line each; none when devin is ready. */
 export function readinessRefusals(r: Readiness): string[] {
-	const ran = (what: string, p: ProgramRun) =>
-		p.exitCode === 0 ? [] : [`\`${what}\` ${p.failure ?? 'exited ' + String(p.exitCode)}`];
+	// ⭐ L17b4 (§15.5 (a); `REG-D-198`) — ~~``p.exitCode === 0 ? [] : [`\`${what}\` ${p.failure ?? 'exited ' + String(p.exitCode)}`]``~~: a failed call is
+	// refused by its kind and names alone, the operator told to run it to see its words.
+	const ran = (what: string, p: ReadinessCall) =>
+		p.exitCode === 0 ? [] : [`\`${what}\` ${p.failure ?? `exited ${String(p.exitCode)}`} ${runItYourself(what, 'its output')}`];
 	return [
 		...ran(`${DEVIN_PROGRAM} --version`, r.devinVersion),
 		...ran(`${DEVIN_PROGRAM} models list`, r.modelsList),
@@ -327,7 +377,8 @@ export function readinessRefusals(r: Readiness): string[] {
 			? [
 					`\`${DEVIN_PROGRAM} models list\` does not list ${JSON.stringify(r.modelsList.configuredModel)}, the ` +
 						`model ${REVIEWER_MODEL_VARIABLE.devin} configures: the account offers no such model, or it is ` +
-						'spelt otherwise (its output is in lane/boot.json)'
+						// ⭐ L17b4 (§15.5 (a)) — ~~`'spelt otherwise (its output is in lane/boot.json)'`~~: the record keeps no word of the listing.
+						`spelt otherwise ${runItYourself(`${DEVIN_PROGRAM} models list`, 'the listing')}`
 				]
 			: [])
 	];
@@ -419,8 +470,9 @@ function allowanceRefusal(
  *   · its time bound as the server was handed it (the overlay's `JPWB_HISTORIAN_CALL_MS`, required, with no default) not one the product takes
  *     (`historianCallBound`: unset — `HISTORIAN_BOUND_UNSET`, "its time bound is not set: design D84 measures it" — not a positive whole number of
  *     milliseconds, or above Node's largest timer);
- *   · devin's version, as the readiness read it, not the one whose tools were measured (`historianVersionRefusal`, naming both) — read only where
- *     `devin --version` exited 0: one that failed is refused once, by the readiness, naming that failure, never a second time (§18 (6)).
+ *   · devin's version, as the readiness read it, not the one whose tools were measured (~~`historianVersionRefusal`~~ ⭐ `historianVersionRefusalOf`, L17b4
+ *     §15.5 (b), from the version the record keeps and the reply's length — naming both versions, or the reply's length where it holds none) — read only
+ *     where `devin --version` exited 0: one that failed is refused once, by the readiness, naming that failure, never a second time (§18 (6)).
  * ⚠ A reviewer that is not devin is refused at every boot already (`reviewerUnderTest`). A dry run is refused for none of these: it makes no paid call.
  */
 function historianRefusals(paid: boolean, overlay: Overlay, readiness: Readiness | null): string[] {
@@ -429,8 +481,12 @@ function historianRefusals(paid: boolean, overlay: Overlay, readiness: Readiness
 	const bound = historianCallBound({ [HISTORIAN_CALL_MS_VARIABLE]: handed ?? undefined });
 	// ⛔ §18 (6) — read only where `devin --version` ran: one that failed is refused once, by the readiness, naming that failure — never a second time, for
 	// a version it never read.
+	// ⭐ L17b4 (the lead's §15.5 (a), (b); `REG-D-198`) — ~~`historianVersionRefusal(readiness.devinVersion.stdout)`~~: the record keeps no reply, so the rule is
+	// worded from what it keeps — the version read, and the reply's length — by the one wording the Historian's call words it by.
 	const version =
-		readiness === null || readiness.devinVersion.exitCode !== 0 ? undefined : historianVersionRefusal(readiness.devinVersion.stdout);
+		readiness === null || readiness.devinVersion.exitCode !== 0
+			? undefined
+			: historianVersionRefusalOf({ version: readiness.devinVersion.version ?? undefined, length: readiness.devinVersion.stdoutLength });
 	const cannot = 'the Historian could not run in this paid run, so a unit its declared reviews reject could not be judged (L17b2 ruling 6 (C)): ';
 	const handedAs = handed === null ? `no ${HISTORIAN_CALL_MS_VARIABLE}` : `${HISTORIAN_CALL_MS_VARIABLE}=${JSON.stringify(handed)}`;
 	return [

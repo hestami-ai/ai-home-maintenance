@@ -168,9 +168,18 @@ function recordedRetryReply(): string {
 	return call.reply.answer;
 }
 
-/** What a transport failure looks like when it leaves `devinPrint` (`tools/devin-reviewer.ts`): no reply, a cause. */
+/**
+ * What a transport failure looks like when it leaves `devinPrint` (`tools/devin-reviewer.ts`): no reply, a cause. ⭐ L17b4 (design D93; the lead's
+ * L4-Q7) — the form before D93, kept as it is: the run archives hold it, and the validator must still read it. `devinPrint` itself now records the
+ * failure's kind alone (`recordOf`, below).
+ */
 const TRANSPORT =
 	'devin invocation failed: Command failed: devin --print — upstream connection reset by peer';
+
+/** ⭐ L17b4 (design D93; `REG-F-685`; the lead's L4-Q2) — the record of a failed devin call of `kind` (and its names), as the lead worded it. */
+const recordOf = (kind: string): string =>
+	`devin invocation failed (${kind}). Its diagnostic is not recorded (PER-12): execFile's message holds devin's command line, which names the ` +
+	"call's folder, and devin's stderr, which holds its login banner (REG-F-685).";
 
 const T0 = Date.parse('2026-10-09T12:00:00.000Z');
 
@@ -942,9 +951,10 @@ describe('⭐ P7-2b — where the rule applies: the product’s own reviewers, a
 			'initial:no-response',
 			'retry:accepted'
 		]);
-		expect(records[0]!.parseOutcome.detail).toContain(
-			'devin invocation failed: devin exited with code 1: upstream connection reset by peer'
-		);
+		// ⭐ RESTATED (L17b4, design D93; REG-F-685): ~~`expect(records[0]!.parseOutcome.detail).toContain('devin invocation failed: devin exited with code 1:
+		// upstream connection reset by peer');`~~ — the cause is the failure's kind alone, never the words it was thrown with: a throw with no exit code,
+		// signal or error code is that kind.
+		expect(records[0]!.parseOutcome.detail).toContain(recordOf('failed with no exit code, signal or error code'));
 		expect(records[0]!.parseOutcome.detail).toContain(
 			`short of the tool’s ${REVIEWER_CALL_BOUND_MS.devin} ms bound`
 		);
@@ -991,9 +1001,63 @@ describe('⭐ P7-2b — where the rule applies: the product’s own reviewers, a
 			'What the tool left when it was killed: killed by SIGTERM, 13 characters printed on stdout before the kill, its export ' +
 				'written, whose last agent step counted output_tokens 812, finish_reason not reported. '
 		);
+		// ⭐ RESTATED (L17b4, design D93; REG-F-685): ~~`expect(records[0]!.parseOutcome.detail).toContain('What the tool reported, sanitised: reasoning-review
+		// backing tool invocation failed: devin invocation failed: Command failed: devin --print');`~~ — the kill's kind, at the bound execFile killed it at.
 		expect(records[0]!.parseOutcome.detail).toContain(
-			'What the tool reported, sanitised: reasoning-review backing tool invocation failed: devin invocation failed: Command failed: devin --print'
+			`What the tool reported, sanitised: reasoning-review backing tool invocation failed: ${recordOf(`killed by SIGTERM, at its time bound of ${REVIEWER_CALL_BOUND_MS.devin} ms`)}`
 		);
+	});
+
+	// ⭐⭐ L17b4 — design D93 (`REG-F-685`; the lead's L4-Q2) — THE PRODUCT'S DEVIN BRANCH, ITS PROGRAM FAILING TWICE WITH AN ERROR THAT HOLDS ITS COMMAND
+	// LINE AND ITS LOGIN BANNER: what the record keeps is the failure's kind, in each failed call's E-5 detail and in the floor's statement, and nothing of
+	// devin's own words — no `Command failed`, no folder under the home folder, no e-mail address.
+	it('⛔ RED FIRST — L17b4 (D93; REG-F-685) — the product’s devin branch: devin’s program fails twice, its error holding a command line under a home folder and a login banner: INCONCLUSIVE, and each failed call’s E-5 detail and the floor’s VALIDATOR_EXECUTION_FAILED statement hold its kind and no Command failed, no home folder and no e-mail address', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-devin-model');
+		const home = ['C:', 'Users', 'fixture'].join('\\');
+		const folder = [home, 'AppData', 'Local', 'Temp', 'jpwb-devin-fixture'].join('\\');
+		const stderr = ' ✓ Logged in as fixture@example.invalid.\n ✓ Organization: Your Organization\nError: the session ended\n';
+		const rejection = () =>
+			Object.assign(new Error(`Command failed: devin --print --model fixture-devin-model --prompt-file ${folder}\\prompt.txt --export ${folder}\\export.json\n${stderr}`), {
+				code: 1,
+				killed: false,
+				signal: null,
+				stdout: '',
+				stderr
+			});
+		const email = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+		expect([rejection().message.includes('Command failed'), rejection().message.includes(home), email.test(rejection().message)], 'arrangement: the error holds all three').toEqual([
+			true,
+			true,
+			true
+		]);
+		const calls: string[][] = [];
+		const exec = async (_file: string, args: readonly string[]) => {
+			calls.push([...args]);
+			throw rejection();
+		};
+		const exchanges = createExchangeSink();
+		const registry = createFloorRegistry({ testMode: false, devinExec: exec, exchanges });
+		const plan = await runFloorAndPlanRecording(SUBJECT, CTX, registry);
+		const review = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+
+		expect(calls, 'arrangement: devin’s program run, and run once more').toHaveLength(2);
+		expect(review?.disposition, 'arrangement: the review did not conclude').toBe('INCONCLUSIVE');
+		const records = exchanges.drain();
+		expect(records.map((r) => `${r.exchangeRole}:${r.disposition}`)).toEqual(['initial:no-response', 'retry:no-response']);
+		const statements = (review?.observations ?? []).filter((o) => o.code === 'VALIDATOR_EXECUTION_FAILED').map((o) => o.statement);
+		expect(statements, 'arrangement: the floor records the failure').toHaveLength(1);
+		const texts: readonly (readonly [string, string])[] = [
+			['the first call’s E-5 detail', records[0]!.parseOutcome.detail],
+			['the retry’s E-5 detail', records[1]!.parseOutcome.detail],
+			['the floor’s statement', statements[0] ?? '']
+		];
+		for (const [what, text] of texts) {
+			expect.soft(text, `${what} does not hold the failure’s kind`).toContain(recordOf('exited with code 1'));
+			expect.soft(text, `${what} holds execFile’s words`).not.toContain('Command failed');
+			expect.soft(text, `${what} holds the home folder`).not.toContain(home);
+			expect.soft(text, `${what} holds an e-mail address`).not.toMatch(email);
+		}
 	});
 
 	// ⭐⭐ `JAN-EXEC` Phase 7, package X-2 — D36 (`REG-D-141` (2), *"Yes, once (Recommended)"*; design §10.5, revision 5: *"New pins

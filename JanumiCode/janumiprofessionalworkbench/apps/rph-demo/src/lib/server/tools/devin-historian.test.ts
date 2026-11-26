@@ -2,13 +2,18 @@
 // HISTORIAN IS A DEVIN SESSION WITH READ-ONLY TOOLS, IN A FRESH FOLDER OF COPIES.
 //
 // ⭑ ITS TOOLS, AT DEVIN 3000.11.234 (ruling 2): allowed `read`, `grep`, `find_file_by_name` — this version's read-only finder, in devin's own
-// read-only group — and `glob` as D86 names it; every other name devin lists at that version, and MH-0a's names it does not offer, disabled in
-// the user configuration passed as `--config` AND denied by name in the folder's project configuration, beside `Fetch(*)` and `mcp__*`;
-// `subagents_enabled: false`; the seven `read_config_from` false. ⭑ The lists are true of ONE version: before the call devin's version is read,
+// read-only group — and `glob` as D86 names it; every other name devin lists at that version, and MH-0a's names it does not offer,
+// ~~disabled in the user configuration passed as `--config` AND denied by name in the folder's project configuration, beside `Fetch(*)` and
+// `mcp__*`; `subagents_enabled: false`; the seven `read_config_from` false~~ ⭐ (L17b4, design D93; `REG-F-684`, `REG-D-197`: any `--config`
+// file stalls devin 3000.11.234, so none is passed) denied by name in the folder's project configuration, beside `Fetch(*)` and `mcp__*`, and
+// audited in the export. ⭑ The lists are true of ONE version: before the call devin's version is read,
 // and any other is not run (ruling 2 (A)). The 25 names below are that version's own listing (`agent.tool_definitions` of an export it wrote:
 // all 673 exports on disk outside the run folders list the same 25 — L17b2 facts §2.4).
 // ⭑ ITS FOLDER (ruling 8): `prompt.txt`, `.devin/config.json`, `records/` with `records/INDEX.md`, `workspace/` (a copy of the shared
-// workspace); beside it a host folder with the `--config` file and the export, outside what it may read; both removed after the call.
+// workspace); beside it a host folder with ~~the `--config` file and~~ ⭐ (L17b4, D93) the export alone, outside what it may read; both removed
+// after the call.
+// ⭑ ⭐ L17b4 (D93; `REG-F-685`) — A CALL THAT FAILS IS RECORDED BY ITS KIND ALONE, the reviewer's one definition (`devinFailureRecord`):
+// never devin's own words, which hold its command line and its login banner; and its export is read on failure as on success.
 // ⭑ ITS EXPORT (rulings 2 (B), 17): each tool call read for its name and its paths; a read outside the folder, and a tool not allowed, are
 // findings on the assessment; an export whose calls cannot be read is a finding too, never a clean bill. ⚠ The shape read —
 // `steps[].tool_calls[].function_name` and `arguments` — is the multi-harness design's reading of ATIF; no export on disk records a call at
@@ -28,17 +33,20 @@ import {
 	HISTORIAN_CALL_MS_VARIABLE,
 	HISTORIAN_DISABLED_TOOLS,
 	HISTORIAN_PROJECT_CONFIG,
-	HISTORIAN_USER_CONFIG,
+	// ⭐ L17b4 (design D93; the lead's L4-Q1) — ~~`HISTORIAN_USER_CONFIG,`~~: no user configuration is passed (REG-D-197).
 	HistorianCopyRefusal,
 	NOT_TEXT_NOT_COPIED,
 	devinHistorianCall,
 	historianCallBound,
 	historianToolCallsOf,
+	// ⭐ L17b4 (the lead's §15.5 (b)) — the one wording of the version rule, held where a reply names a version.
+	historianVersionRefusal,
 	historianWorkspaceFiles,
 	recordNameClash,
 	workspaceCopyClash,
 	writeHistorianFolder
 } from './devin-historian.js';
+import { DEVIN_FREE_TIER_REFUSAL, DEVIN_OUTPUT_LIMIT } from './devin-reviewer.js';
 
 /** devin 3000.11.234's own tool listing, as an export it wrote holds it (the fixture ruling 2 (A) names). */
 const EXPORT_TOOL_NAMES_3000_11_234 = [
@@ -48,7 +56,9 @@ const EXPORT_TOOL_NAMES_3000_11_234 = [
 ] as const;
 /** MH-0a's `disabled_tools` names that 3000.11.234 does not offer the selected model (DESIGN-multi-harness-executor.md §4.1). */
 const MH0A_NOT_OFFERED = ['code_search', 'apply_patch', 'shell_command', 'view_image'] as const;
-const READ_CONFIG_FROM = ['cursor', 'windsurf', 'claude', 'opencode', 'zed', 'copilot', 'agents_standard'] as const;
+// ⭐ L17b4 (design D93; the lead's L4-Q1) — ~~`const READ_CONFIG_FROM = ['cursor', 'windsurf', 'claude', 'opencode', 'zed', 'copilot', 'agents_standard'] as const;`~~:
+// no user configuration is passed, so no read_config_from switch is set (REG-D-197); what devin reads of other agents' configuration is measured by
+// D93's probes P4a and P4b, not assumed.
 
 const sorted = (xs: Iterable<string>): string[] => [...xs].sort();
 const dirs: string[] = [];
@@ -56,36 +66,84 @@ afterAll(() => {
 	for (const d of dirs) rmSync(d, { recursive: true, force: true });
 });
 
-describe('⭐⭐ L17b2 (D86; ruling 2) — the Historian’s two configurations, at devin 3000.11.234', () => {
-	it('⛔ RED FIRST — every tool that version names is allowed, or both disabled and denied; the allowed are the three D86 names with this version’s finder', () => {
+// ⭐⭐ L17b4 (design D93; `REG-F-685`; the lead's L4-Q2) — A FAILED CALL'S RECORD: its kind alone, and each known phrase by its name, in the lead's words.
+/** The record of a failed devin call of `kind` (and its names), as the lead worded it. */
+const recordOf = (kind: string): string =>
+	`devin invocation failed (${kind}). Its diagnostic is not recorded (PER-12): execFile's message holds devin's command line, which names the ` +
+	"call's folder, and devin's stderr, which holds its login banner (REG-F-685).";
+/** A home folder named `fixture`, its parts joined here, so that no line of this file holds an absolute path. */
+const FIXTURE_HOME = ['C:', 'Users', 'fixture'].join('\\');
+/** What devin's stderr opens with: its login banner, with a made-up address at example.invalid. */
+const BANNER = ' ✓ Logged in as fixture@example.invalid.\n ✓ Organization: Your Organization\n';
+/** Text shaped as an e-mail address. */
+const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+/** What node's `execFile` rejects with when devin fails: the command line, its folder under the home folder, then devin's stderr, in its message. */
+function devinRejection(o: { readonly code?: unknown; readonly signal?: unknown; readonly killed?: boolean; readonly syscall?: string; readonly stderr?: string }): Error {
+	const folder = [FIXTURE_HOME, 'AppData', 'Local', 'Temp', 'jpwb-historian-fixture'].join('\\');
+	const cmd = `devin --print --model swe-2-max --prompt-file ${folder}\\prompt.txt --export ${folder}.host\\export.json --respect-workspace-trust false`;
+	const stderr = `${BANNER}${o.stderr ?? ''}`;
+	return Object.assign(new Error(`Command failed: ${cmd}\n${stderr}`), {
+		code: o.code ?? null,
+		killed: o.killed ?? false,
+		signal: o.signal ?? null,
+		cmd,
+		stdout: '',
+		stderr,
+		...(o.syscall === undefined ? {} : { syscall: o.syscall })
+	});
+}
+/** The three a record must never hold: execFile's own words, the home folder, and text shaped as an e-mail address. */
+function holdsNoneOfTheThree(text: string, what: string): void {
+	expect.soft(text, `${what} holds execFile's words`).not.toContain('Command failed');
+	expect.soft(text, `${what} holds the home folder`).not.toContain(FIXTURE_HOME);
+	expect.soft(text, `${what} holds an e-mail address`).not.toMatch(EMAIL);
+}
+
+// ⭐ RESTATED (L17b4, design D93; the lead's L4-Q1, L4-Q10): ~~'⭐⭐ L17b2 (D86; ruling 2) — the Historian’s two configurations, at devin 3000.11.234'~~
+// — it is given one configuration now, its folder's, as no user configuration is passed (REG-D-197).
+describe('⭐⭐ L17b2 (D86; ruling 2) — the Historian’s project configuration, at devin 3000.11.234 (L17b4: no user configuration, D93)', () => {
+	// ⭐ RESTATED (L17b4, design D93; the lead's L4-Q1, L4-Q10): ~~'⛔ RED FIRST — every tool that version names is allowed, or both disabled and
+	// denied; the allowed are the three D86 names with this version’s finder'~~ — no user configuration is passed (REG-D-197), so a tool that is not
+	// allowed is held by the folder's project configuration alone, denied by name, and by the audit of the export.
+	it('⛔ RED FIRST — every tool that version names is allowed, or denied by name in the project configuration; the allowed are the three D86 names with this version’s finder', () => {
 		expect(DEVIN_HISTORIAN_MEASURED_VERSION).toBe('3000.11.234');
 		expect.soft(sorted(HISTORIAN_ALLOWED_TOOLS), 'the allowed tools').toEqual(sorted(['read', 'grep', 'find_file_by_name', 'glob']));
-		const user = JSON.parse(HISTORIAN_USER_CONFIG) as { disabled_tools?: string[] };
+		// ⭐ L17b4 — ~~`const user = JSON.parse(HISTORIAN_USER_CONFIG) as { disabled_tools?: string[] };`~~ (REG-D-197).
 		const project = JSON.parse(HISTORIAN_PROJECT_CONFIG) as { permissions?: { deny?: string[] } };
-		const disabled = new Set(user.disabled_tools ?? []);
+		// ⭐ L17b4 — ~~`const disabled = new Set(user.disabled_tools ?? []);`~~
 		const denied = new Set(project.permissions?.deny ?? []);
 		for (const name of EXPORT_TOOL_NAMES_3000_11_234) {
 			const allowed = HISTORIAN_ALLOWED_TOOLS.includes(name);
-			expect.soft(allowed || (disabled.has(name) && denied.has(name)), `${name} is neither allowed nor both disabled and denied`).toBe(true);
-			if (allowed) expect.soft(disabled.has(name) || denied.has(name), `${name} is allowed and still disabled or denied`).toBe(false);
+			// ⭐ L17b4 — ~~`expect.soft(allowed || (disabled.has(name) && denied.has(name)), `${name} is neither allowed nor both disabled and denied`).toBe(true);`~~
+			expect.soft(allowed || denied.has(name), `${name} is neither allowed nor denied by name`).toBe(true);
+			// ⭐ L17b4 — ~~`if (allowed) expect.soft(disabled.has(name) || denied.has(name), `${name} is allowed and still disabled or denied`).toBe(false);`~~
+			if (allowed) expect.soft(denied.has(name), `${name} is allowed and still denied`).toBe(false);
 		}
 		const expectedDisabled = [...EXPORT_TOOL_NAMES_3000_11_234.filter((n) => !HISTORIAN_ALLOWED_TOOLS.includes(n)), ...MH0A_NOT_OFFERED];
 		expect.soft(sorted(HISTORIAN_DISABLED_TOOLS), 'the 26 disabled names').toEqual(sorted(expectedDisabled));
-		expect.soft(sorted(disabled), 'the user configuration’s disabled_tools').toEqual(sorted(expectedDisabled));
+		// ⭐ L17b4 — ~~`expect.soft(sorted(disabled), 'the user configuration’s disabled_tools').toEqual(sorted(expectedDisabled));`~~
 		expect.soft(sorted(denied), 'the project configuration’s deny list').toEqual(sorted([...expectedDisabled, 'Fetch(*)', 'mcp__*']));
 	});
 
-	it('⛔ RED FIRST — the user configuration: subagents off, the seven read_config_from off; both files two-space JSON with a closing line break', () => {
-		const user = JSON.parse(HISTORIAN_USER_CONFIG) as { subagents_enabled?: unknown; read_config_from?: Record<string, unknown> };
-		expect.soft(user.subagents_enabled).toBe(false);
-		expect.soft(user.read_config_from).toEqual(Object.fromEntries(READ_CONFIG_FROM.map((k) => [k, false])));
-		for (const [name, text] of [['user', HISTORIAN_USER_CONFIG], ['project', HISTORIAN_PROJECT_CONFIG]] as const)
+	// ⭐ RESTATED (L17b4, design D93; the lead's L4-Q1, L4-Q10): ~~'⛔ RED FIRST — the user configuration: subagents off, the seven read_config_from
+	// off; both files two-space JSON with a closing line break'~~ — its user configuration's checks are struck under REG-D-197, as P6X-L17B2-M17 is
+	// abolished: no user configuration is passed. Subagents are held by the deny list above, `run_subagent` and `read_subagent` denied by name; the
+	// project configuration's form stays.
+	it('⛔ RED FIRST — the project configuration: two-space JSON with a closing line break (its user configuration’s checks struck under REG-D-197)', () => {
+		// ⭐ L17b4 — ~~`const user = JSON.parse(HISTORIAN_USER_CONFIG) as { subagents_enabled?: unknown; read_config_from?: Record<string, unknown> };`~~
+		// ~~`expect.soft(user.subagents_enabled).toBe(false);`~~
+		// ~~`expect.soft(user.read_config_from).toEqual(Object.fromEntries(READ_CONFIG_FROM.map((k) => [k, false])));`~~
+		// ~~`for (const [name, text] of [['user', HISTORIAN_USER_CONFIG], ['project', HISTORIAN_PROJECT_CONFIG]] as const)`~~
+		for (const [name, text] of [['project', HISTORIAN_PROJECT_CONFIG]] as const)
 			expect.soft(text, `the ${name} configuration’s form`).toBe(`${JSON.stringify(JSON.parse(text), null, 2)}\n`);
 	});
 });
 
 describe('⭐⭐ L17b2 (D86; rulings 8, 9) — the Historian’s folder', () => {
-	it('⛔ RED FIRST — a fresh folder holding the prompt, its project configuration, its records with their index, and a copy of the workspace; its configuration and export in a host folder beside it', async () => {
+	// ⭐ RESTATED (L17b4, design D93; the lead's L4-Q1, L4-Q10): ~~'⛔ RED FIRST — a fresh folder holding the prompt, its project configuration, its
+	// records with their index, and a copy of the workspace; its configuration and export in a host folder beside it'~~ — no user configuration is
+	// written (REG-D-197): the host folder holds the export alone, which devin writes, and nothing before the call.
+	it('⛔ RED FIRST — a fresh folder holding the prompt, its project configuration, its records with their index, and a copy of the workspace; beside it a host folder for its export, empty before the call', async () => {
 		// ⭐ §7 (Q1) — RESTATED: ~~a directory made for the case, `src/wordfreq.ts` in it, handed in as `workspaceDir`~~ the shared workspace's files as
 		// the port gives them (`historianWorkspaceFiles`, below), handed in as `workspaceFiles`: the folder writer copies what it is handed, path for path.
 		const records = [
@@ -102,8 +160,11 @@ describe('⭐⭐ L17b2 (D86; rulings 8, 9) — the Historian’s folder', () => 
 		for (const r of records) expect.soft(index, `the index does not name ${r.file}`).toContain(`${r.file} — ${r.what}`);
 		expect.soft(readFileSync(join(f.folder, 'workspace', 'src', 'wordfreq.ts'), 'utf8')).toBe('export const reader = 1;\n');
 		expect.soft(sorted(readdirSync(f.folder)), 'the folder holds only these').toEqual(sorted(['.devin', 'prompt.txt', 'records', 'workspace']));
-		expect.soft(readFileSync(f.userConfigPath, 'utf8')).toBe(HISTORIAN_USER_CONFIG);
-		expect.soft(f.userConfigPath.startsWith(f.host) && f.exportPath.startsWith(f.host), 'the configuration and the export are not in the host folder').toBe(true);
+		// ⭐ L17b4 (D93; REG-D-197) — ~~`expect.soft(readFileSync(f.userConfigPath, 'utf8')).toBe(HISTORIAN_USER_CONFIG);`~~
+		// ~~`expect.soft(f.userConfigPath.startsWith(f.host) && f.exportPath.startsWith(f.host), 'the configuration and the export are not in the host folder').toBe(true);`~~
+		expect.soft(readdirSync(f.host), 'the host folder holds nothing before the call').toEqual([]);
+		expect.soft('userConfigPath' in f, 'the folder names a user configuration').toBe(false);
+		expect.soft(f.exportPath.startsWith(f.host), 'the export is not in the host folder').toBe(true);
 		expect.soft(f.host.startsWith(f.folder + '/') || f.host.startsWith(f.folder + '\\'), 'the host folder is inside what the Historian may read').toBe(false);
 	});
 
@@ -399,7 +460,10 @@ describe('⭐⭐ L17b2 (D86; rulings 2 (A), 6, 16) — the call', () => {
 		return f;
 	};
 
-	it('⛔ RED FIRST — devin is called in the folder, its prompt, export and configuration named, at the time bound, and the export read before the folder and its host are removed', async () => {
+	// ⭐ RESTATED (L17b4, design D93; the lead's L4-Q10): ~~'⛔ RED FIRST — devin is called in the folder, its prompt, export and configuration named,
+	// at the time bound, and the export read before the folder and its host are removed'~~ — any `--config` file stalls devin 3000.11.234 on this host
+	// (REG-F-684), so the Historian is launched without one, in the reviewer's form, its export kept outside the folder (REG-D-197).
+	it('⛔ RED FIRST — devin is called in the folder, its prompt and export named and no --config, at the time bound, and the export read before the folder and its host are removed', async () => {
 		const f = await aFolder();
 		const seen: { file: string; args: readonly string[]; cwd: string; timeout: number }[] = [];
 		const exec: HistorianExec = async (file, args, options) => {
@@ -409,8 +473,10 @@ describe('⭐⭐ L17b2 (D86; rulings 2 (A), 6, 16) — the call', () => {
 		};
 		const out = await devinHistorianCall({ folder: f, model: 'swe-2-max', boundMs: 600_000 }, { exec, versionOf: async () => 'devin 3000.11.234 (92c83011d113)' });
 		expect.soft(seen.map((s) => s.args), 'the argv').toEqual([
-			['--print', '--model', 'swe-2-max', '--prompt-file', f.promptPath, '--export', f.exportPath, '--respect-workspace-trust', 'false', '--config', f.userConfigPath]
+			// ⭐ L17b4 (D93) — ~~`['--print', '--model', 'swe-2-max', '--prompt-file', f.promptPath, '--export', f.exportPath, '--respect-workspace-trust', 'false', '--config', f.userConfigPath]`~~
+			['--print', '--model', 'swe-2-max', '--prompt-file', f.promptPath, '--export', f.exportPath, '--respect-workspace-trust', 'false']
 		]);
+		expect.soft(seen[0]?.args ?? [], 'devin is named a --config file').not.toContain('--config');
 		expect.soft(seen[0]?.cwd, 'devin’s working folder').toBe(f.folder);
 		expect.soft(seen[0]?.timeout, 'the time bound').toBe(600_000);
 		expect.soft(out).toMatchObject({ ran: true, stdout: '{"findings":[]}', sessionExport: '{"schema_version":"ATIF-v1.7","steps":[]}' });
@@ -438,7 +504,10 @@ describe('⭐⭐ L17b2 (D86; rulings 2 (A), 6, 16) — the call', () => {
 			{ folder: f, model: 'swe-2-max', boundMs: 600_000 },
 			{ exec: async () => { throw new Error('devin exited 2'); }, versionOf: async () => 'devin 3000.11.234 (92c83011d113)' }
 		);
-		expect.soft(out.ran && out.failure).toContain('devin exited 2');
+		// ⭐ RESTATED (L17b4, design D93; REG-F-685): ~~`expect.soft(out.ran && out.failure).toContain('devin exited 2');`~~ — the call's failure is
+		// named by its kind alone, never by the words it was thrown with: a throw with no exit code, signal or error code is that kind.
+		expect.soft(out.ran && out.failure, 'the failure is not named by its kind alone').toBe(recordOf('failed with no exit code, signal or error code'));
+		expect.soft(out.ran && out.failure, 'the call’s own words are recorded').not.toContain('devin exited 2');
 		expect.soft(existsSync(f.folder) || existsSync(f.host), 'a folder was kept').toBe(false);
 	});
 
@@ -496,10 +565,227 @@ describe('⭐⭐ L17b2 (D86; rulings 2 (A), 6, 16) — the call', () => {
 		expect.soft(called, 'devin was called though its version could not be read').toBe(false);
 		expect.soft(out.ran, 'the Historian ran though its version could not be read').toBe(false);
 		const why = out.ran ? '' : out.why;
+		// ⭐ RESTATED (L17b4, design D93; the lead's §13.3 (a)): ~~`[why.includes('version could not be read (devin --version: '), why.includes('spawn devin
+		// ENOENT'), why.includes(DEVIN_HISTORIAN_MEASURED_VERSION)],`~~ … ~~`).toEqual([true, true, true]);`~~ — the read's failure is recorded by its kind
+		// alone (REG-F-685), so the words it was thrown with are no longer in why: a plain Error is none of the kinds, and says so.
 		expect.soft(
-			[why.includes('version could not be read (devin --version: '), why.includes('spawn devin ENOENT'), why.includes(DEVIN_HISTORIAN_MEASURED_VERSION)],
+			[
+				why.includes(
+					"version could not be read (devin --version: failed with no exit code, signal or error code; devin's own words are not recorded, REG-F-685)"
+				),
+				why.includes('spawn devin ENOENT'),
+				why.includes(DEVIN_HISTORIAN_MEASURED_VERSION)
+			],
 			`why it is not run does not say that its version could not be read, why, and the version its tools were measured at: ${why}`
-		).toEqual([true, true, true]);
+		).toEqual([true, false, true]);
+		expect.soft(existsSync(f.folder) || existsSync(f.host), 'a folder was kept').toBe(false);
+	});
+});
+
+// ⭐⭐ L17b4 — design D93 (`REG-F-685`; the lead's L4-Q2, L4-Q3) — THE HISTORIAN'S FAILED CALL IS RECORDED BY ITS KIND ALONE, by the one definition the
+// reviewer's adapter holds (`devinFailureRecord`): an exit by its code, a kill by its signal (and its bound only where execFile made the kill), a
+// start that failed by the spawn's code; and devin's two fixed phrases by their names — never devin's own words, whose command line names the call's
+// folder under the home folder and whose stderr holds its login banner. ⭑ And its export is still read on failure, as on success (a control).
+describe('⭐⭐ L17b4 (D93; REG-F-685) — the Historian’s failed call records its kind alone; its export is read on failure as on success', () => {
+	const VERSION = 'devin 3000.11.234 (92c83011d113)';
+	/** A fresh folder to call over. */
+	const aFolder = async () => {
+		const f = await writeHistorianFolder({ prompt: 'P', records: [], workspaceFiles: [] });
+		dirs.push(f.folder, f.host);
+		return f;
+	};
+	/** What the call's outcome records when its program throws `thrown`, at the call's bound of 600,000 ms. */
+	const failedWith = async (thrown: unknown): Promise<string> => {
+		const f = await aFolder();
+		const out = await devinHistorianCall(
+			{ folder: f, model: 'swe-2-max', boundMs: 600_000 },
+			{
+				exec: async () => {
+					throw thrown;
+				},
+				versionOf: async () => VERSION
+			}
+		);
+		return out.ran ? (out.failure ?? '(no failure recorded)') : `(not run: ${out.why})`;
+	};
+
+	it('⛔ RED FIRST — L17b4 (D93; REG-F-685): a call devin exits from, is killed during at its own bound, or could not start records its kind alone — no command line, no home folder, no e-mail address', async () => {
+		const exit = devinRejection({ code: 1, stderr: 'Error: the session ended\n' });
+		expect([exit.message.includes('Command failed'), exit.message.includes(FIXTURE_HOME), EMAIL.test(exit.message)], 'arrangement: the rejection holds all three').toEqual([
+			true,
+			true,
+			true
+		]);
+		const spawn = Object.assign(new Error('spawn devin ENOENT'), { code: 'ENOENT', errno: -4058, syscall: 'spawn devin', path: 'devin', spawnargs: exit.message.split(' ') });
+		const cases: readonly (readonly [string, unknown, string])[] = [
+			['an exit', exit, recordOf('exited with code 1')],
+			['a kill at its bound', devinRejection({ killed: true, signal: 'SIGTERM' }), recordOf('killed by SIGTERM, at its time bound of 600000 ms')],
+			['a start that failed', spawn, recordOf('could not start: ENOENT')]
+		];
+		for (const [what, thrown, record] of cases) {
+			const failure = await failedWith(thrown);
+			expect.soft(failure, `${what}: its record is not its kind alone`).toBe(record);
+			holdsNoneOfTheThree(failure, `${what}'s record`);
+		}
+	});
+
+	it('⛔ RED FIRST — L17b4 (D93; the lead’s L4-Q2, its departure): the two fixed phrases are named on the Historian’s path too, never quoted', async () => {
+		const refused = await failedWith(devinRejection({ code: 1, stderr: `Error: Agent error: Reached ${DEVIN_FREE_TIER_REFUSAL}. Try again later.\n` }));
+		expect.soft(refused, 'the free tier’s refusal is not named').toBe(recordOf('exited with code 1; devin refused it for its free tier (D46)'));
+		const cut = await failedWith(devinRejection({ code: 1, stderr: `Error: ${DEVIN_OUTPUT_LIMIT}. The output above is incomplete.\n` }));
+		expect.soft(cut, 'the output limit is not named').toBe(recordOf("exited with code 1; its reply reached the model's output limit"));
+		for (const [what, text] of [['the refusal', refused], ['the cut', cut]] as const) {
+			expect.soft(text, `${what}'s phrase is quoted`).not.toContain(what === 'the refusal' ? DEVIN_FREE_TIER_REFUSAL : DEVIN_OUTPUT_LIMIT);
+			holdsNoneOfTheThree(text, `${what}'s record`);
+		}
+	});
+
+	// ⭐⭐ L17b4 — design D93 (`REG-F-685`; the lead's §13.3 (a)) — A THIRD DEVIN PATH: THE VERSION READ. Its failure is recorded by its kind alone, by the
+	// one definition (`devinFailureKindAndNames`), at the read's own bound of 30 s — never execFile's message, which names the program's own path (under
+	// the home folder where its override sets it, or a start fails) and holds devin's stderr.
+	/** The program a version read runs, at a made-up path under the fixture's home folder. */
+	const VERSION_PROGRAM = [FIXTURE_HOME, 'tools', 'devin.exe'].join('\\');
+	/** What execFile rejects with when `devin --version` fails: its command line, the program's path in it, then devin's stderr, its login banner first. */
+	const versionRejection = (o: { readonly code?: unknown; readonly signal?: unknown; readonly killed?: boolean; readonly stderr?: string }): Error => {
+		const cmd = `${VERSION_PROGRAM} --version`;
+		const stderr = `${BANNER}${o.stderr ?? ''}`;
+		return Object.assign(new Error(`Command failed: ${cmd}\n${stderr}`), {
+			code: o.code ?? null,
+			killed: o.killed ?? false,
+			signal: o.signal ?? null,
+			cmd,
+			stdout: '',
+			stderr
+		});
+	};
+	/** Why the Historian is not run when its version read fails with `kind`, in the lead's words (§13.3 (a)). */
+	const versionWhy = (kind: string): string =>
+		`devin's version could not be read (devin --version: ${kind}; devin's own words are not recorded, REG-F-685), and the Historian's two tool ` +
+		`lists are true of the version they were measured at, ${DEVIN_HISTORIAN_MEASURED_VERSION}: so it is not run (L17b2 ruling 2 (A))`;
+
+	it('⛔ RED FIRST — L17b4 (D93; the lead’s §13.3 (a)): a `devin --version` read that fails, its error holding a command line under a home folder and a login banner, records its kind alone, a kill at the read’s own bound of 30 s — the Historian is not run, and why holds none of the three', async () => {
+		const exit = versionRejection({ code: 1, stderr: 'Error: the version could not be printed\n' });
+		expect([exit.message.includes('Command failed'), exit.message.includes(FIXTURE_HOME), EMAIL.test(exit.message)], 'arrangement: the rejection holds all three').toEqual([
+			true,
+			true,
+			true
+		]);
+		const spawn = Object.assign(new Error(`spawn ${VERSION_PROGRAM} ENOENT`), {
+			code: 'ENOENT',
+			errno: -4058,
+			syscall: `spawn ${VERSION_PROGRAM}`,
+			path: VERSION_PROGRAM,
+			spawnargs: ['--version']
+		});
+		const cases: readonly (readonly [string, unknown, string])[] = [
+			['an exit', exit, versionWhy('exited with code 1')],
+			['a kill at its bound', versionRejection({ killed: true, signal: 'SIGTERM' }), versionWhy('killed by SIGTERM, at its time bound of 30000 ms')],
+			['a start that failed', spawn, versionWhy('could not start: ENOENT')]
+		];
+		for (const [what, thrown, why] of cases) {
+			const f = await aFolder();
+			let called = false;
+			const out = await devinHistorianCall(
+				{ folder: f, model: 'swe-2-max', boundMs: 600_000 },
+				{
+					exec: async () => ((called = true), { stdout: '' }),
+					versionOf: async () => {
+						throw thrown;
+					}
+				}
+			);
+			expect.soft(called, `${what}: devin was called though its version could not be read`).toBe(false);
+			const said = out.ran ? '(it ran)' : out.why;
+			expect.soft(said, `${what}: the version read’s failure is not recorded by its kind alone`).toBe(why);
+			holdsNoneOfTheThree(said, `${what}’s reason`);
+		}
+	});
+
+	// ⭐⭐ L17b4 — design D93 (the lead's §15.5 (b); the review's question, confirmed) — A `devin --version` REPLY THAT HOLDS NO VERSION IS NAMED BY ITS
+	// LENGTH, NEVER ITS WORDS: the reply is devin's, unmeasured, and may open with its login banner. ⭑ A reply that names another version is named by that
+	// version, as before (a control).
+	it('⛔ RED FIRST — L17b4 (§15.5 (b)): a `devin --version` reply that holds no version leaves the Historian not run, naming the reply’s length and never its words', async () => {
+		const reply = `${BANNER}update available\n`;
+		const f = await aFolder();
+		let called = false;
+		const out = await devinHistorianCall(
+			{ folder: f, model: 'swe-2-max', boundMs: 600_000 },
+			{ exec: async () => ((called = true), { stdout: '' }), versionOf: async () => reply }
+		);
+		expect.soft(called, 'devin was called though its reply held no version').toBe(false);
+		const why = out.ran ? '(it ran)' : out.why;
+		expect.soft(why, 'a reply that holds no version is not named by its length alone').toBe(
+			`devin's reply to \`devin --version\` holds no version (${reply.length} characters; devin's own words are not recorded, REG-F-685), and the ` +
+				"Historian's two tool lists were measured at 3000.11.234: they are true of that version alone, so it is not run (L17b2 ruling 2 (A))"
+		);
+		holdsNoneOfTheThree(why, 'the reason');
+		expect.soft(historianVersionRefusal('devin 3000.6.14\n'), '⭑ CONTROL — a reply naming another version is not named by that version, as before').toBe(
+			"devin is at version 3000.6.14, and the Historian's two tool lists were measured at 3000.11.234: they are true of that version alone, so it is not run " +
+				'(L17b2 ruling 2 (A))'
+		);
+	});
+
+	// ⭐⭐ L17b4 — design D93 (the lead's §15.5 (c); `L4C-A02`) — THE HISTORIAN'S CATCHES READ THE THROWN VALUE ONLY THROUGH THE ONE DEFINITION, every read
+	// guarded: a value one of whose properties throws when read — its message, code, signal, stdout, `killed` or `syscall` — is recorded by its safe record,
+	// and nothing the read throws escapes the call, which never throws. ⭑ A CONTROL: the Historian's two catches read nothing else of the thrown value.
+	it('⭑ CONTROL — L17b4 (§15.5 (c); L4C-A02): the Historian’s call and its version read, given a value one of whose properties throws when read, record the safe record alone, and nothing escapes', async () => {
+		const secret = devinRejection({ code: 1 }).message;
+		/** execFile's error `o`, its `key` read through a getter that throws `secret`. */
+		const throwingAt = (key: string, o: Parameters<typeof devinRejection>[0]): Error => {
+			const e = devinRejection(o);
+			Object.defineProperty(e, key, {
+				get: () => {
+					throw new Error(secret);
+				},
+				configurable: true
+			});
+			return e;
+		};
+		const cases: readonly (readonly [string, Error, string])[] = [
+			['message', throwingAt('message', { code: 1 }), 'exited with code 1'],
+			['code', throwingAt('code', { code: 1 }), 'failed with no exit code, signal or error code'],
+			['signal', throwingAt('signal', { killed: true, signal: 'SIGTERM' }), 'failed with no exit code, signal or error code'],
+			['stdout', throwingAt('stdout', { killed: true, signal: 'SIGTERM' }), 'killed by SIGTERM, at its time bound of 600000 ms'],
+			['killed', throwingAt('killed', { signal: 'SIGTERM' }), 'killed by SIGTERM'],
+			['syscall', throwingAt('syscall', { code: 'ENOENT' }), 'failed with code ENOENT']
+		];
+		for (const [key, thrown, kind] of cases) {
+			const failure = await failedWith(thrown);
+			expect.soft(failure, `a value whose ${key} throws when read: the call's record is not the safe record alone`).toBe(recordOf(kind));
+			holdsNoneOfTheThree(failure, `the call's record of a value whose ${key} throws`);
+			const f = await aFolder();
+			const read = await devinHistorianCall(
+				{ folder: f, model: 'swe-2-max', boundMs: 600_000 },
+				{
+					exec: async () => ({ stdout: '' }),
+					versionOf: async () => {
+						throw thrown;
+					}
+				}
+			);
+			const why = read.ran ? '(it ran)' : read.why;
+			expect.soft(why, `a value whose ${key} throws when read: the version read's reason is not its safe kind alone`).toContain(
+				`(devin --version: ${kind.replace('600000 ms', '30000 ms')}; devin's own words are not recorded, REG-F-685)`
+			);
+			holdsNoneOfTheThree(why, `the version read's reason for a value whose ${key} throws`);
+		}
+	});
+
+	it('⭑ CONTROL — L17b4 (D93): the export is read on failure as on success — a program that writes its export and then fails: the outcome carries it, and both folders are removed', async () => {
+		const f = await aFolder();
+		const EXPORT = '{"schema_version":"ATIF-v1.7","steps":[]}';
+		const out = await devinHistorianCall(
+			{ folder: f, model: 'swe-2-max', boundMs: 600_000 },
+			{
+				exec: async (_file, args) => {
+					writeFileSync(args[args.indexOf('--export') + 1]!, EXPORT);
+					throw devinRejection({ code: 1 });
+				},
+				versionOf: async () => VERSION
+			}
+		);
+		expect.soft(out.ran && out.failure !== undefined, 'arrangement: the call failed').toBe(true);
+		expect.soft(out.ran ? out.sessionExport : undefined, 'the export written before the failure is not carried').toBe(EXPORT);
 		expect.soft(existsSync(f.folder) || existsSync(f.host), 'a folder was kept').toBe(false);
 	});
 });

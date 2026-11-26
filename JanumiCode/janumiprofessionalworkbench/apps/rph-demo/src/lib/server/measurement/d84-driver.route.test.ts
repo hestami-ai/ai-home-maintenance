@@ -150,7 +150,7 @@ vi.mock('../execution/loop-rule.js', async (importOriginal) => {
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import { getObject, listByType, listPwus } from '@janumipwb/rph-engine';
@@ -515,21 +515,31 @@ function driverDeps(o: Partial<AssuranceStageDeps> = {}): { readonly deps: Assur
 	return { deps, shared: dir };
 }
 
-/** What one devin call was sent, read by this test: its program's argv (folders held), its folder's files, and its user configuration. */
+/**
+ * What one devin call was sent, read by this test: its program's argv (folders held), its folder's files, ~~and its user configuration~~ ⭐ and whether
+ * it is the Historian's call (L17b4, design D93: the Historian is given no user configuration, REG-D-197).
+ */
 interface DevinSent {
 	readonly argv: { readonly program: string; readonly args: readonly string[]; readonly timeout: number; readonly maxBuffer: number; readonly windowsHide: boolean };
 	readonly folder: Map<string, Buffer>;
-	readonly userConfig?: Buffer;
+	// ⭐ L17b4 (D93) — ~~`readonly userConfig?: Buffer;`~~
+	readonly historian: boolean;
 }
-/** What devin is sent at a call: the writer's, its folder held; the Historian's, its host and its folder held, and its user configuration. */
+/**
+ * What devin is sent at a call: the writer's, its folder held; the Historian's, its host and its folder held ~~, and its user configuration~~.
+ * ⭐ L17b4 (design D93) — the Historian's call is told by its export, which D93 keeps outside its folder, in `<folder>.host`; the writer's export is in
+ * the writer's own folder. ⛔ It was told by `--config`, which the Historian is no longer launched with.
+ */
 function devinSent(file: string, args: readonly string[], options: { readonly cwd: string; readonly timeout: number; readonly maxBuffer: number; readonly windowsHide: boolean }): DevinSent {
-	const historian = args.includes('--config');
+	// ⭐ L17b4 (D93) — ~~`const historian = args.includes('--config');`~~
+	const historian = dirname(flagOf(args, '--export')) === `${options.cwd}.host`;
 	const folder = options.cwd;
 	const paths: (readonly [string, string])[] = historian ? [[`${folder}.host`, '<host>'], [folder, '<folder>']] : [[folder, '<folder>']];
 	return {
 		argv: { program: file, args: held(args, paths), timeout: options.timeout, maxBuffer: options.maxBuffer, windowsHide: options.windowsHide },
 		folder: tree(folder),
-		...(historian ? { userConfig: readFileSync(flagOf(args, '--config')) } : {})
+		// ⭐ L17b4 (D93) — ~~`...(historian ? { userConfig: readFileSync(flagOf(args, '--config')) } : {})`~~
+		historian
 	};
 }
 /** What Pi is sent at a turn, read by this test: the copy it is opened in, the turn's text, its model and its session's place. */
@@ -571,7 +581,8 @@ function fakeTransports(o: { readonly historian: () => string; readonly diagnosi
 	const sent = { writer: [] as DevinSent[], historian: [] as DevinSent[], pi: [] as PiSent[], requests: [] as string[], versions: 0, opens: 0 };
 	const devinExec: DevinExec = async (file, args, options) => {
 		const call = devinSent(file, args, options);
-		const historian = call.userConfig !== undefined;
+		// ⭐ L17b4 (design D93) — ~~`const historian = call.userConfig !== undefined;`~~: the Historian's call told by its export's folder (`devinSent`).
+		const historian = call.historian;
 		(historian ? sent.historian : sent.writer).push(call);
 		if (historian) {
 			writeFileSync(flagOf(args, '--export'), JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [] }));
@@ -668,7 +679,11 @@ afterEach(() => {
 });
 
 describe('⭐⭐ D84 (T1) — one definition: what the driver prepares at each role’s seam is what the stage sends there', () => {
-	it('⛔ RED FIRST — at each seam of a press of the stage itself, the driver’s preparation, made at that moment, is the bytes the stage sends: the writer’s folder and argv; the Hypothesizer’s copy, task text and executor; the Historian’s folder, user configuration, argv and devin’s version — each manifest the sha256 of what it shows; ⭑ CONTROL (T9): that press, its Historian recording a recurrence, runs the Unsticking Agent', async () => {
+	// ⭐ RESTATED (L17b4, design D93; the lead's L4-Q10): ~~'⛔ RED FIRST — at each seam of a press of the stage itself, the driver’s preparation, made
+	// at that moment, is the bytes the stage sends: the writer’s folder and argv; the Hypothesizer’s copy, task text and executor; the Historian’s
+	// folder, user configuration, argv and devin’s version — each manifest the sha256 of what it shows; ⭑ CONTROL (T9): that press, its Historian
+	// recording a recurrence, runs the Unsticking Agent'~~ — the Historian is given no user configuration (REG-D-197), so none is shown.
+	it('⛔ RED FIRST — at each seam of a press of the stage itself, the driver’s preparation, made at that moment, is the bytes the stage sends: the writer’s folder and argv; the Hypothesizer’s copy, task text and executor; the Historian’s folder, argv and devin’s version, and no user configuration — each manifest the sha256 of what it shows; ⭑ CONTROL (T9): that press, its Historian recording a recurrence, runs the Unsticking Agent', async () => {
 		const c = await ninthRunCase();
 		const offer = assuranceStageOffer(getEngine(), c.ids.verification);
 		if ('refusedBecause' in offer) throw new Error(`arrangement: the stage is offered — ${offer.refusedBecause}`);
@@ -750,17 +765,23 @@ describe('⭐⭐ D84 (T1) — one definition: what the driver prepares at each r
 			'task.txt'
 		]);
 		expect(hypothesizer.prepared.manifest, 'the Hypothesizer’s manifest is not the sha256 of what it shows').toEqual(manifestOfTree(hypothesizer.shown));
-		// ── The Historian: its folder byte for byte, its user configuration, its argv and the version devin reported.
+		// ── The Historian: its folder byte for byte, ~~its user configuration,~~ its argv and the version devin reported. ⭐ L17b4 (design D93; `REG-D-197`;
+		// `L4C-B03`): no user configuration is passed, so none is shown.
 		const historian = seen.historian;
 		expect(historian, 'the stage never reached the Historian’s seam').toBeDefined();
 		if (historian === undefined || 'refusedBecause' in historian.prepared) throw new Error(`the driver could not prepare the Historian: ${JSON.stringify(historian?.prepared)}`);
 		const historianSent = historian.sent as DevinSent;
 		expect(hexOf(under(historian.shown, 'folder/')), 'the Historian’s shown folder is not, byte for byte, the folder the stage’s devin starts in').toEqual(hexOf(historianSent.folder));
-		expect(historian.shown.get('host/config.json')?.toString('hex'), 'the Historian’s shown user configuration is not the one the stage’s devin is given').toBe(
-			historianSent.userConfig?.toString('hex')
-		);
+		// ⭐ RESTATED (L17b4, design D93; REG-D-197): ~~`expect(historian.shown.get('host/config.json')?.toString('hex'), 'the Historian’s shown user
+		// configuration is not the one the stage’s devin is given').toBe(historianSent.userConfig?.toString('hex'));`~~ — it is given none, and none is shown.
+		expect.soft(historian.shown.has('host/config.json'), 'the Historian is shown a user configuration').toBe(false);
+		expect.soft(historianSent.argv.args, 'the stage’s devin is named a --config file').not.toContain('--config');
 		expect(JSON.parse(historian.shown.get('argv.json')?.toString('utf8') ?? 'null'), 'the Historian’s shown argv is not the stage’s').toEqual(historianSent.argv);
-		expect(historian.shown.get('devin-version.txt')?.toString('utf8'), 'the Historian’s shown version is not the one devin reported').toBe(VERSION);
+		// ⭐ RESTATED (L17b4 round 4, the lead's §18 on `l17b4-facts.md`; `L4D-01`): ~~`expect(historian.shown.get('devin-version.txt')?.toString('utf8'), 'the
+		// Historian’s shown version is not the one devin reported').toBe(VERSION);`~~ — devin's version reply is shown by its parts alone, never its words.
+		expect(historian.shown.get('devin-version.txt')?.toString('utf8'), 'the Historian’s shown version is not the one devin reported, by its parts alone').toBe(
+			'devin --version, by its parts alone (REG-F-685): version 3000.11.234; build 92c83011d113; 32 characters\n'
+		);
 		expect(historian.prepared.manifest, 'the Historian’s manifest is not the sha256 of what it shows').toEqual(manifestOfTree(historian.shown));
 	});
 });
@@ -805,9 +826,10 @@ describe('⭐⭐ D84 (T2, T13, T9, T10) — the driver’s steps over the ninth 
 		const historianShown = tree(join(roleFolderOf(folder, 'historian'), D84_LAYOUT.shown));
 		expect(fake.sent.historian.length, 'the Historian’s devin was not called once').toBe(1);
 		expect(hexOf(under(historianShown, 'folder/')), 'T2: the Historian’s call did not send the folder it showed').toEqual(hexOf(fake.sent.historian[0]!.folder));
-		expect(historianShown.get('host/config.json')?.toString('hex'), 'T2: the Historian’s call did not send the user configuration it showed').toBe(
-			fake.sent.historian[0]!.userConfig?.toString('hex')
-		);
+		// ⭐ RESTATED (L17b4, design D93; REG-D-197): ~~`expect(historianShown.get('host/config.json')?.toString('hex'), 'T2: the Historian’s call did not send
+		// the user configuration it showed').toBe(fake.sent.historian[0]!.userConfig?.toString('hex'));`~~ — none is shown, and none is sent.
+		expect.soft(historianShown.has('host/config.json'), 'T2: the Historian is shown a user configuration').toBe(false);
+		expect.soft(fake.sent.historian[0]!.argv.args, 'T2: the Historian’s call names a --config file').not.toContain('--config');
 		expect(JSON.parse(historianShown.get('argv.json')!.toString('utf8')), 'T2: the Historian’s call did not send the argv it showed').toEqual(fake.sent.historian[0]!.argv);
 		expect(
 			[...historianShown.entries()].some(([p, b]) => p.startsWith('folder/records/') && b.includes('Source’s reader treats a pipe as a file.')),
@@ -1242,13 +1264,21 @@ describe('⭐⭐ D84 (T7, T8; the lead’s rulings r1, Q10) — nothing is calle
 		const refusing = seamedDeps('writer', s.deps, otherwise, transports, seen);
 		const prompt = readFileSync(join(roleFolderOf(s.folder, 'writer'), D84_LAYOUT.shown, 'prompt.txt'), 'utf8');
 		const writerPrompt = prompt.slice(prompt.indexOf(WRITER_PROMPT));
-		// ⭑ As `devinPrint` throws any failure of its program: its diagnostic after "devin invocation failed: ".
+		// ⭑ As `devinPrint` throws any failure of its program: ~~its diagnostic after "devin invocation failed: "~~ ⭐ (L17b4, design D93; REG-F-685) its
+		// kind alone — the seam's refusal is a throw with no exit code, signal or error code — and the seam's own words kept where D84's call record takes
+		// them from (`seen.refusedBecause`, its `seamRefusal`; the lead's L4-Q5).
 		const thrown = await refusing.writerPrint!(writerPrompt).then(
 			() => 'it sent',
 			(e: unknown) => (e instanceof Error ? e.message : String(e))
 		);
-		expect(thrown, 'the writer’s seam sent what was not approved').toMatch(
-			/^devin invocation failed: D84 refused the call at its transport \(the writer's prompt file\): what it would send differs from what was approved — prompt\.txt: its bytes differ/
+		// ⭐ L17b4 — ~~`expect(thrown, 'the writer’s seam sent what was not approved').toMatch(/^devin invocation failed: D84 refused the call at its transport
+		// \(the writer's prompt file\): what it would send differs from what was approved — prompt\.txt: its bytes differ/);`~~
+		expect(thrown, 'the writer’s seam sent what was not approved, or its failure is not recorded by its kind alone').toBe(
+			"devin invocation failed (failed with no exit code, signal or error code). Its diagnostic is not recorded (PER-12): execFile's message holds " +
+				"devin's command line, which names the call's folder, and devin's stderr, which holds its login banner (REG-F-685)."
+		);
+		expect(seen.refusedBecause ?? '', 'the seam’s own words are not kept for the call record').toMatch(
+			/^D84 refused the call at its transport \(the writer's prompt file\): what it would send differs from what was approved — prompt\.txt: its bytes differ/
 		);
 		expect([program.mock.calls.length, seen.checked, seen.refusedBecause !== undefined], 'the writer’s program was reached past its seam’s refusal').toEqual([0, false, true]);
 		const sending: SeamSeen = { checked: false };
@@ -1331,5 +1361,109 @@ describe('⭐⭐ D84 (T7, T8; the lead’s rulings r1, Q10) — nothing is calle
 			refusedBecause: "the hypothesizer has been called (call.json): a role is called once on a copy (the lead's rulings r1, Q10)"
 		});
 		expect(await prepareRole('historian', deps, s.at, s.fake.transports.devinVersion), 'the Historian is not shown after a Hypothesizer that failed').toHaveProperty('shown');
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b4 — round 4 (the lead's §18 on `l17b4-facts.md`; `L4D-01`; `REG-F-685`) — DEVIN'S VERSION REPLY IN D84'S DRIVER IS
+// SHOWN, CHECKED AND KEPT BY ITS PARTS ALONE: its version (`<n>.<n>.<n>`), the build in the parentheses after it (hex digits) and the reply's length, a
+// part not found named so. devin's own words — which may hold its login banner and paths under the home folder — are never shown or kept. ⛔ Before, the
+// Historian's `devin-version.txt` and its call record kept the reply whole, and a reply that held the measured version among other words was kept so.
+describe('⭐⭐ L17b4 (round 4; L4D-01) — devin’s version reply in D84’s driver: shown, checked and kept by its parts alone', () => {
+	const paid = { JPWB_D84_PAID: '1' };
+	/** A home folder named `fixture`, its parts joined here, so that no line of this file holds an absolute path. */
+	const HOME = ['C:', 'Users', 'fixture'].join('\\');
+	/** Text shaped as an e-mail address. */
+	const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+	/** What devin may print at `--version`: its version and build, then words of its own — its login banner, with a made-up address at example.invalid,
+	 * and a path under the home folder. */
+	const WORDY = `${VERSION}\n ✓ Logged in as fixture@example.invalid.\n cache: ${HOME}\\.devin\n`;
+	/** A reply that holds no version: devin's own words alone. */
+	const NO_VERSION = ' ✓ Logged in as fixture@example.invalid.\n update available\n';
+	/** devin's version reply by its parts, as D84 shows it (the lead's §18), written out here in the ruling's words. */
+	const partsShown = (version: string, build: string, length: number): string =>
+		`devin --version, by its parts alone (REG-F-685): version ${version}; build ${build}; ${length} characters\n`;
+	/** The ninth run's case, its case and policy steps held, the writer and the Hypothesizer called, and the Historian shown: devin's n-th version read
+	 * answered by `reply(n)`. */
+	async function historianShown(reply: (n: number) => string) {
+		const c = await ninthRunCase();
+		const { deps } = driverDeps();
+		const folder = measurementFolderFor(c.ids.verification);
+		const fake = fakeTransports({ historian: () => recurringHistorian('none'), diagnosis: diagnosisNaming(c.ids.source) });
+		let reads = 0;
+		const transports: D84Transports = {
+			...fake.transports,
+			devinVersion: async () => {
+				reads += 1;
+				return reply(reads);
+			}
+		};
+		const step = stepper(folder, hostOver(deps, transports));
+		expect((await step('case')).ok && (await step('policy')).ok, 'arrangement: the case and the policy').toBe(true);
+		await prepareApproveCall(step, folder, 'writer');
+		await prepareApproveCall(step, folder, 'hypothesizer');
+		const shown = await step('prepare', { JPWB_D84_ROLE: 'historian' });
+		expect(shown.ok, `arrangement: the Historian is shown — ${shown.said.join('\n')}`).toBe(true);
+		const roundId = readJson<{ reading: { roundId: string } }>(join(folder, D84_LAYOUT.case))!.reading.roundId;
+		// ⭐ L17b4 round 5 (§20) — ~~`return { deps, folder, step, transports, reads: () => reads, at: … };`~~: and the fake, so a test can count devin's runs.
+		return { deps, folder, fake, step, transports, reads: () => reads, at: { folder, unitId: c.ids.verification, roundId } };
+	}
+	/** The Historian shown, approved by its shown manifest's sha256, and called with the flag set: its call record, and the record as it is kept. */
+	async function historianCalled(s: Awaited<ReturnType<typeof historianShown>>) {
+		const approved = await s.step('approve', { JPWB_D84_ROLE: 'historian', JPWB_D84_MANIFEST_SHA256: shownOf(s.folder, 'historian').sha256, JPWB_D84_WORDS: 'Approved as shown.' });
+		expect(approved.ok, 'arrangement: the Historian is approved').toBe(true);
+		const called = await callRole('historian', s.deps, s.at, s.transports, paid);
+		if ('refusedBecause' in called) throw new Error(`the call was refused before its part: ${called.refusedBecause}`);
+		return { record: called.called, kept: readFileSync(join(roleFolderOf(s.folder, 'historian'), D84_LAYOUT.call), 'utf8') };
+	}
+
+	it('⛔ RED FIRST — L17b4 (§18; L4D-01): the Historian is shown devin’s version reply by its parts alone — its version, its build and its length — and none of its words, its login banner and a home folder among them', async () => {
+		const s = await historianShown(() => WORDY);
+		const shownText = readFileSync(join(roleFolderOf(s.folder, 'historian'), D84_LAYOUT.shown, 'devin-version.txt'), 'utf8');
+		const want = partsShown('3000.11.234', '92c83011d113', WORDY.length);
+		expect.soft(shownText, 'the Historian’s shown version is not devin’s reply by its parts alone').toBe(want);
+		expect.soft(shownText, 'the Historian’s shown version holds devin’s login banner').not.toMatch(EMAIL);
+		expect.soft(shownText, 'the Historian’s shown version holds the home folder').not.toContain(HOME);
+		expect
+			.soft(shownOf(s.folder, 'historian').entries.find((e) => e.path === 'devin-version.txt'), 'its manifest entry is not of what it shows')
+			.toEqual({ path: 'devin-version.txt', kind: 'file', bytes: Buffer.byteLength(want, 'utf8'), sha256: sha256(want) });
+	});
+
+	it('⛔ RED FIRST — L17b4 (§18; L4D-01): the Historian’s call record keeps devin’s version reply by its parts alone, and none of its words', async () => {
+		const s = await historianShown(() => WORDY);
+		const { record, kept } = await historianCalled(s);
+		expect(s.reads(), 'arrangement: devin’s version was read at the showing, at the check and at the call').toBe(3);
+		expect(record.checkedAtSeam, 'arrangement: the call passed its seam').toBe(true);
+		expect
+			.soft(record.devinVersion, 'the call record does not keep devin’s version reply by its parts alone')
+			.toEqual({ version: '3000.11.234', build: '92c83011d113', replyLength: WORDY.length });
+		expect.soft(kept, 'the kept call record holds devin’s login banner').not.toMatch(EMAIL);
+		expect.soft(kept, 'the kept call record holds the home folder').not.toContain(JSON.stringify(HOME).slice(1, -1));
+	});
+
+	it('⛔ RED FIRST — L17b4 (§18; L4D-01): a reply at the Historian’s call that holds no version, after a showing and a check that read one, is kept as not found by its length — its words never kept', async () => {
+		const s = await historianShown((n) => (n <= 2 ? VERSION : NO_VERSION));
+		const { record, kept } = await historianCalled(s);
+		expect(s.reads(), 'arrangement: devin’s version was read at the showing, at the check and at the call').toBe(3);
+		expect(record.outcome?.status, 'arrangement: the Historian’s part, refused for a reply with no version, was recorded as run').not.toBe('recorded');
+		expect
+			.soft(record.devinVersion, 'a reply with no version is not kept as not found, by its length alone')
+			.toEqual({ version: 'not found', build: 'not found', replyLength: NO_VERSION.length });
+		expect.soft(kept, 'the kept call record holds devin’s login banner').not.toMatch(EMAIL);
+	});
+
+	// ⭐⭐ L17b4 — round 5 (the lead's §20 on `l17b4-facts.md`; `L4E-01`) — THE BUILD IS READ WHOLE, with no upper bound, and compared exactly. ⛔ Before, a
+	// build of more than 64 hex digits read as "not found", so a call at another such build, of the same length, passed the Historian's seam.
+	it('⛔ RED FIRST — L17b4 (§20; L4E-01): the Historian is shown a build of more than 64 hex digits whole, and at its call devin at another build of the same length is refused at its transport, devin never run', async () => {
+		/** devin's version reply with a build of 65 of one hex digit: 85 characters. */
+		const long = (digit: string): string => `devin 3000.11.234 (${digit.repeat(65)})`;
+		const s = await historianShown((n) => (n <= 2 ? long('a') : long('b')));
+		const shownText = readFileSync(join(roleFolderOf(s.folder, 'historian'), D84_LAYOUT.shown, 'devin-version.txt'), 'utf8');
+		expect.soft(shownText, 'the Historian’s shown build of more than 64 hex digits is not shown whole').toBe(partsShown('3000.11.234', 'a'.repeat(65), long('a').length));
+		const { record } = await historianCalled(s);
+		expect(s.reads(), 'arrangement: devin’s version was read at the showing, at the check and at the call').toBe(3);
+		expect.soft(s.fake.sent.historian.length, 'devin ran at another build of more than 64 hex digits than the one shown').toBe(0);
+		expect
+			.soft([record.checkedAtSeam, record.seamRefusal?.startsWith("D84 refused the call at its transport (the Historian's folder)")], 'the call record does not say the seam refused')
+			.toEqual([false, true]);
 	});
 });

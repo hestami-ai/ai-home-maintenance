@@ -382,7 +382,12 @@ export async function chapterInputOf(round: RoundContext): Promise<ChapterInput>
 export async function chapterPart(round: RoundContext, input: ChapterInput): Promise<void> {
 	const { deps, store, roundId, roundVersion, parts, record } = round;
 	const { number, records, previous, prompt } = input;
+	// ⭐⭐ L17b4 — design D93 (`REG-F-686`) — THE WRITER'S EXCHANGE TIMED AROUND ITS CALL, as the helpers' (`stage-helper-run.ts`) and the Historian's
+	// (`historian-part.ts`) are: its request stamped before `writeChapter`, its response after it. ⛔ Both were stamped after it (below), so its record gave
+	// no time: in D84's copy it was the only exchange of 2,577 whose two times were equal, though its call ran 69.6 s.
+	const requestedAt = deps.now();
 	const written = await writeChapter(prompt, () => standInChapter(number, records, previous?.id ?? null), deps);
+	const respondedAt = deps.now();
 	if (!written.ran) parts.push(await record(STAGE_PART.CHAPTER, 'not-run', JSON.stringify({ notRun: written.why }), [written.why]));
 	else {
 		if (written.recorded) {
@@ -400,8 +405,9 @@ export async function chapterPart(round: RoundContext, input: ChapterInput): Pro
 				rawOutput: written.raw,
 				disposition: arrived ? 'accepted' : 'no-response',
 				attemptOrdinal: 1,
-				requestedAt: deps.now(),
-				respondedAt: deps.now(),
+				// ⭐ L17b4 (D93; REG-F-686) — ~~`requestedAt: deps.now(),`~~ ~~`respondedAt: deps.now(),`~~, both taken after the call: the two stamps above.
+				requestedAt,
+				respondedAt,
 				parseOutcome: arrived
 					? { outcome: checked.failures.length === 0 ? 'PARSED' : 'JSON_PARSE_FAILED', detail: checked.failures.join('; ') || 'the chapter passed its check' }
 					: { outcome: written.failure ? 'NOT_ATTEMPTED' : 'EMPTY_RESPONSE', detail: written.failure ?? 'the writer returned no answer' },

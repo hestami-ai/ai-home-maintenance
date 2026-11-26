@@ -8,8 +8,10 @@
 //   · the Hypothesizer — its task text (`task.txt`), its executor and session (`executor.json`) and every file of its copy (`copy/`), made by the helper's
 //     own copy (`helperCopyOf`). Its full request, which Pi assembles at the send, is not shown before: it is recorded as every Pi try records it, its
 //     sha256 taken from the turn's result, and written for the sponsor into `after/` once the call record exists (the lead's rulings r1, Q1, Q3);
-//   · the Historian — its whole folder (`folder/`: `prompt.txt`, `.devin/config.json`, `records/` with its index, `workspace/`), the user configuration
-//     (`host/config.json`), the argv and devin's version, made by `writeHistorianFolder` and `devinHistorianCall` themselves, with a program that copies.
+//   · the Historian — its whole folder (`folder/`: `prompt.txt`, `.devin/config.json`, `records/` with its index, `workspace/`), ~~the user configuration
+//     (`host/config.json`),~~ the argv and devin's version, made by `writeHistorianFolder` and `devinHistorianCall` themselves, with a program that copies.
+//     ⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`): the Historian is launched with no `--config`, so no user configuration is shown; the host folder
+//     holds the export alone, which devin writes after the call, and the argv names it by its placeholder.
 // ⭑ THE CALL (§3.6): refused without `JPWB_D84_PAID=1`, without an approval of the manifest shown, out of the stage's order, or a second time; then the
 // role prepared again into `check/` and every byte held to what was approved; then the part run with the transport checked once more at its seam —
 // the prompt file, the copy, the turn's text, the folder — a difference there thrown inside the part, which the stage records failing (Q10).
@@ -35,7 +37,16 @@ import { helperCopyOf } from '../assurance/stage-helper-run.js';
 import type { ExecutorSessionPlace, ProducerSession, ProducerSessionContext } from '../execution/producer-session.js';
 import { verifiedBytes } from '../execution/verified-bytes.js';
 import { isToolInvocationResult } from '../tools/backing-tool.js';
-import { devinHistorianCall, writeHistorianFolder, type HistorianVersionOf } from '../tools/devin-historian.js';
+// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`import { devinHistorianCall, writeHistorianFolder, type HistorianVersionOf } from
+// '../tools/devin-historian.js';`~~: and devin's version reply by its parts, read once and shown once (`devinVersionParts`, `devinVersionShown`).
+import {
+	devinHistorianCall,
+	devinVersionParts,
+	devinVersionShown,
+	writeHistorianFolder,
+	type DevinVersionParts,
+	type HistorianVersionOf
+} from '../tools/devin-historian.js';
 import { devinPrint, type DevinExec } from '../tools/devin-reviewer.js';
 import {
 	approvalRefusal,
@@ -96,21 +107,25 @@ function writerFiles(program: string, args: readonly string[], options: Paramete
 	];
 }
 
-/** ⭐ D84 — the files of the Historian's call, as shown and as checked: its folder, its user configuration, its argv, and devin's version. */
+/**
+ * ⭐ D84 — the files of the Historian's call, as shown and as checked: its folder, ~~its user configuration,~~ its argv, and devin's version. ⭐ L17b4 —
+ * design D93 (`REG-D-197`): it is given no user configuration, so none is shown — ~~`const config = args[args.indexOf('--config') + 1] ?? '';`~~ and
+ * ~~`{ path: 'host/config.json', bytes: readFileSync(config) },`~~, which, with no `--config` in the argv, would read the argv's first word as a file.
+ * ⭐ L17b4 round 4 (the lead's §18; `L4D-01`; `REG-F-685`) — ~~`version: string`~~ and ~~`{ path: 'devin-version.txt', bytes: Buffer.from(version,
+ * 'utf8') }`~~, devin's reply whole: devin's version by its parts alone (`devinVersionShown`), as shown and as checked, never its words.
+ */
 function historianFiles(
 	program: string,
 	args: readonly string[],
 	options: Parameters<DevinExec>[2],
-	version: string
+	version: DevinVersionParts
 ): { readonly path: string; readonly bytes: Buffer }[] {
 	const folder = options.cwd;
 	const host = `${folder}.host`;
-	const config = args[args.indexOf('--config') + 1] ?? '';
 	return [
 		...treeEntries(folder).map((e) => ({ path: `folder/${e.path}`, bytes: readFileSync(join(folder, e.path)) })),
-		{ path: 'host/config.json', bytes: readFileSync(config) },
 		{ path: 'argv.json', bytes: Buffer.from(argvShown(program, args, options, [[host, '<host>'], [folder, '<folder>']]), 'utf8') },
-		{ path: 'devin-version.txt', bytes: Buffer.from(version, 'utf8') }
+		{ path: 'devin-version.txt', bytes: devinVersionShown(version) }
 	];
 }
 
@@ -187,12 +202,18 @@ async function prepareHistorian(round: RoundContext, into: string, devinVersion:
 	const input = await historianInputOf(ctx);
 	if (!input.ok) return { refusedBecause: input.why };
 	const folder = await writeHistorianFolder({ prompt: input.prompt, records: input.records.files, workspaceFiles: input.copied.files });
-	let version = '';
+	// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`let version = '';`~~ ~~`versionOf: async () => (version = await devinVersion()),`~~: the reply read by
+	// its parts alone, and handed whole to the Historian's own version check, which reads it and keeps none of it.
+	let version = devinVersionParts('');
 	let files: { readonly path: string; readonly bytes: Buffer }[] | undefined;
 	const outcome = await devinHistorianCall(
 		{ folder, model: input.runner.model, boundMs: input.bound.ms },
 		{
-			versionOf: async () => (version = await devinVersion()),
+			versionOf: async () => {
+				const reply = await devinVersion();
+				version = devinVersionParts(reply);
+				return reply;
+			},
 			exec: async (file, args, options) => {
 				files = historianFiles(file, args, options, version);
 				return { stdout: '' };
@@ -269,7 +290,8 @@ export interface SeamSeen {
 	refusedBecause?: string;
 	callMs?: number;
 	requestSha256?: string;
-	version?: string;
+	// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`version?: string;`~~, devin's reply whole: its parts alone (`devinVersionParts`).
+	version?: DevinVersionParts;
 }
 
 /** ⭐ D84 — why a seam refuses: what it would send differs from what was approved, each difference named. */
@@ -296,10 +318,11 @@ function checkedWriterExec(approved: Manifest, exec: DevinExec, seen: SeamSeen):
 	};
 }
 
-/** ⭐ D84 — the Historian's program, checked at its seam: its folder, its user configuration, its argv and devin's version, then devin run. */
+/** ⭐ D84 — the Historian's program, checked at its seam: its folder, ~~its user configuration,~~ its argv and devin's version, then devin run (L17b4, D93). */
 function checkedHistorianExec(approved: Manifest, exec: DevinExec, seen: SeamSeen): DevinExec {
 	return async (file, args, options) => {
-		const differences = manifestDifferences(approved, manifestOfFiles(historianFiles(file, args, options, seen.version ?? '')));
+		// ⭐ L17b4 round 4 (§18) — ~~`seen.version ?? ''`~~: the parts the call's version read gave, compared as they were shown.
+		const differences = manifestDifferences(approved, manifestOfFiles(historianFiles(file, args, options, seen.version ?? devinVersionParts(''))));
 		if (differences.length > 0) throw new Error((seen.refusedBecause = seamRefusal("the Historian's folder", differences)));
 		seen.checked = true;
 		return timed(seen, () => exec(file, args, options));
@@ -349,7 +372,9 @@ export interface CallRecord {
 	readonly callMs?: number;
 	readonly outcome: StagePartOutcome | undefined;
 	readonly requestSha256?: string;
-	readonly devinVersion?: string;
+	// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`; `REG-F-685`) — ~~`readonly devinVersion?: string;`~~, devin's reply whole, which a reply holding the
+	// measured version among other words put on the record: its parts alone — its version, its build and its length, a part not found named so.
+	readonly devinVersion?: DevinVersionParts;
 	readonly childEnvironmentNames: readonly string[];
 }
 
@@ -422,7 +447,13 @@ export function seamedDeps(role: D84Role, deps: AssuranceStageDeps, approved: Ma
 	return {
 		...deps,
 		historianExec: checkedHistorianExec(approved, transports.devinExec, seen),
-		historianVersionOf: async () => (seen.version = await transports.devinVersion())
+		// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`historianVersionOf: async () => (seen.version = await transports.devinVersion())`~~: the call's
+		// version read kept by its parts alone, for its seam and its record; the reply handed whole to the Historian's own version check alone.
+		historianVersionOf: async () => {
+			const reply = await transports.devinVersion();
+			seen.version = devinVersionParts(reply);
+			return reply;
+		}
 	};
 }
 

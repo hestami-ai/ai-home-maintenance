@@ -2,13 +2,20 @@
 // 16 and 17 on L17b2's Stage 0, §7 (Q1) and §9) — THE HISTORIAN IS A DEVIN SESSION WITH READ-ONLY TOOLS, IN A FRESH FOLDER OF COPIES.
 //
 // ⭑ ITS TOOLS, AT DEVIN 3000.11.234 (ruling 2): `read`, `grep`, `find_file_by_name` — this version's read-only finder, in devin's own read-only group —
-// and `glob`, as D86 names it, allowed; every other name devin lists at that version, and MH-0a's names it does not offer, disabled in the user
-// configuration passed as `--config` (`HISTORIAN_USER_CONFIG`) AND denied by name in the folder's project configuration (`HISTORIAN_PROJECT_CONFIG`),
-// beside `Fetch(*)` and `mcp__*`; `subagents_enabled: false`; the seven `read_config_from` false. ⛔ The lists are true of ONE version: before the call,
-// `devin --version` is read, and any version but the one whose tools were measured is not run, naming both (ruling 2 (A)).
+// and `glob`, as D86 names it, allowed; every other name devin lists at that version, and MH-0a's names it does not offer, ~~disabled in the user
+// configuration passed as `--config` (`HISTORIAN_USER_CONFIG`) AND~~ denied by name in the folder's project configuration (`HISTORIAN_PROJECT_CONFIG`),
+// beside `Fetch(*)` and `mcp__*`~~; `subagents_enabled: false`; the seven `read_config_from` false~~. ⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`):
+// any `--config` file stalls devin 3000.11.234 on this host, so none is passed. The tools are held by the deny list and the export's audit (ruling 2 (B)),
+// the subagents by `run_subagent` and `read_subagent` denied by name; what devin reads of other agents' configuration is measured (D93's probes P4a
+// and P4b), not assumed. ⛔ The lists are true of ONE version: before the call, `devin --version` is read, and any version but the one whose tools were
+// measured is not run, naming both (ruling 2 (A)).
 // ⭑ ITS FOLDER (ruling 8; `writeHistorianFolder`): `prompt.txt`; `.devin/config.json`, its own; `records/`, the round's records as files, each named by
 // its record's id, with `records/INDEX.md`; and `workspace/`, a copy of the shared workspace READ THROUGH THE PORT (§7, Q1: `historianWorkspaceFiles` —
-// whole, or not at all). Beside it, a host folder holding the `--config` file and the export, outside what it may read. Both removed after the call.
+// whole, or not at all). Beside it, a host folder holding ~~the `--config` file and~~ the export alone, outside what it may read. Both removed after the
+// call.
+// ⭑ ⭐ L17b4 — design D93 (`REG-F-685`) — A CALL THAT FAILS IS RECORDED BY ITS KIND ALONE (`devinFailureRecord`, the reviewer's one definition): never
+// devin's own words, whose command line names the call's folder under the home folder and whose stderr holds its login banner. Its export is still
+// read on failure, as on success.
 // ⭑ ITS EXPORT (rulings 2 (B), 17; `historianToolCallsOf`): each tool call read for its name and its paths; a read outside the folder, and a tool not
 // allowed, are each a MATERIAL finding on the assessment; an export whose calls cannot be read is a finding too, never a clean bill. ⚠ The shape read —
 // `steps[].tool_calls[].function_name` and `arguments` — is the multi-harness design's reading of ATIF; no export on disk records a call at this version
@@ -23,13 +30,19 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Workspace } from '@janumipwb/rph-ports';
 import { describedThrow } from '../described-throw.js';
-import { DEVIN_BIN_OVERRIDE } from './devin-reviewer.js';
-import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
+// ⭐ L17b4 — design D93 (the lead's L4-Q2, L4-Q3) — the one definition of a failed call's record, beside the program override; ~~`import {
+// diagnosticCarriesPrompt } from './diagnostic-safety.js';`~~, which leaves this path with the read of the prompt only it used.
+// ⭐ L17b4 (the lead's §13.3 (a)) — and the part of that record between its parentheses, which the version read records alone.
+import { DEVIN_BIN_OVERRIDE, devinFailureKindAndNames, devinFailureRecord } from './devin-reviewer.js';
 
 const run = promisify(execFile);
 const DEVIN_BIN = DEVIN_BIN_OVERRIDE ?? 'devin';
 
-/** ⭐ Ruling 2 (A) — the devin version whose tool listing the two configurations below were measured against (L17b2 facts §2.4). */
+/**
+ * ⭐ Ruling 2 (A) — the devin version whose tool listing ~~the two configurations below were~~ ⭐ (L17b4, D93; `L4C-B03`) the tool lists below — the
+ * allowed, and the denied that the folder's project configuration names — were measured against (L17b2 facts §2.4). No user configuration is passed
+ * (`REG-D-197`), so the project configuration is the Historian's one.
+ */
 export const DEVIN_HISTORIAN_MEASURED_VERSION = '3000.11.234';
 
 /** ⭐ D86, ruling 2 — the tools the Historian may use: D86's three, and this version's read-only finder. */
@@ -68,21 +81,19 @@ export const HISTORIAN_DISABLED_TOOLS: readonly string[] = [
 	'view_image'
 ];
 
-/** ⭐ D86 — the seven places devin reads other agents' configuration from, each turned off (MH-0a). */
-const READ_CONFIG_FROM = ['cursor', 'windsurf', 'claude', 'opencode', 'zed', 'copilot', 'agents_standard'] as const;
+// ⭐⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`; the lead's L4-Q1 on Stage 0) — THE USER CONFIGURATION IS GONE, and the seven places with it: any
+// `--config` file stalls devin 3000.11.234 on this host (D84's measurement: the Historian's own file, the same file, and `{}`, 3 of 3 calls), so the
+// Historian is passed none, and its tools rest on the project configuration below and the export's audit. Struck, its words kept:
+// ~~`/** ⭐ D86 — the seven places devin reads other agents' configuration from, each turned off (MH-0a). */`~~
+// ~~`const READ_CONFIG_FROM = ['cursor', 'windsurf', 'claude', 'opencode', 'zed', 'copilot', 'agents_standard'] as const;`~~
+// ~~`/** ⭐ D86, ruling 2 — the user configuration, passed as `--config`: the 26 disabled, subagents off, no other agent's configuration read. */`~~
+// ~~`export const HISTORIAN_USER_CONFIG = `${JSON.stringify({ disabled_tools: [...HISTORIAN_DISABLED_TOOLS], subagents_enabled: false,
+// read_config_from: Object.fromEntries(READ_CONFIG_FROM.map((k) => [k, false])) }, null, 2)}\n`;`~~
 
-/** ⭐ D86, ruling 2 — the user configuration, passed as `--config`: the 26 disabled, subagents off, no other agent's configuration read. */
-export const HISTORIAN_USER_CONFIG = `${JSON.stringify(
-	{
-		disabled_tools: [...HISTORIAN_DISABLED_TOOLS],
-		subagents_enabled: false,
-		read_config_from: Object.fromEntries(READ_CONFIG_FROM.map((k) => [k, false]))
-	},
-	null,
-	2
-)}\n`;
-
-/** ⭐ D86, ruling 2 — the second guard, the folder's project configuration: the 26 denied by name, with `Fetch(*)` and `mcp__*`. */
+/**
+ * ⭐ D86, ruling 2 — ~~the second guard,~~ ⭐ (L17b4, D93: the guard, as no user configuration is passed) the folder's project configuration: the 26
+ * denied by name, with `Fetch(*)` and `mcp__*`.
+ */
 export const HISTORIAN_PROJECT_CONFIG = `${JSON.stringify({ permissions: { deny: [...HISTORIAN_DISABLED_TOOLS, 'Fetch(*)', 'mcp__*'] } }, null, 2)}\n`;
 
 /** ⭐ Ruling 16 — the Historian's time bound's setting: required, with no default. */
@@ -184,13 +195,13 @@ export interface HistorianRecordFile {
 	readonly text: string;
 }
 
-/** ⭐ Ruling 8 — the folder a call runs in, and its host folder beside it, outside what it may read. */
+/** ⭐ Ruling 8 — the folder a call runs in, and its host folder beside it, outside what it may read: ⭐ (L17b4, D93) its export's, and nothing else. */
 export interface HistorianFolder {
 	readonly folder: string;
 	readonly host: string;
 	readonly promptPath: string;
 	readonly exportPath: string;
-	readonly userConfigPath: string;
+	// ⭐ L17b4 — design D93 (`REG-D-197`) — ~~`readonly userConfigPath: string;`~~: no user configuration is written or passed.
 }
 
 /** A record's file name: one name, no path in it, and not the index's. */
@@ -354,8 +365,9 @@ async function removeFolders(folder: string, host: string): Promise<string | und
 
 /**
  * ⭐⭐ Ruling 8 — WRITE THE HISTORIAN'S FOLDER (see the header): a fresh `jpwb-historian-` folder holding `prompt.txt`, `.devin/config.json`, `records/`
- * with its index, and `workspace/` with each file copied at its path; beside it, `<folder>.host/` holding the user configuration and, after the call, the
- * export. ⛔ A write that fails removes both and throws: the caller records the Historian ~~not run~~ failing, with why ⭐ [CORRECTED 2026-11-21, the
+ * with its index, and `workspace/` with each file copied at its path; beside it, `<folder>.host/` holding ~~the user configuration and,~~ ⭐ (L17b4, D93:
+ * no user configuration) nothing until, after the call, the export. ⛔ A write that fails removes both and throws: the caller records the Historian
+ * ~~not run~~ failing, with why ⭐ [CORRECTED 2026-11-21, the
  * lead's r27a: the part records a throw from here failing; its not-run cases are its checks before the folder is made] — and, since r27a (A), not run
  * for a `HistorianCopyRefusal`, each workspace file being created and never written over (r27). ⭐ L17b2 addendum (the lead's §27,
  * item 7) — two record files of one name (`recordNameClash`) are refused before any folder is made: none is written. ⭐ L17b2 (Codex's L17B2C-A02; the
@@ -391,9 +403,11 @@ export async function writeHistorianFolder(input: {
 			// ⭐ r27 — ~~`await writeFile(at, f.text, 'utf8');`~~, which wrote over a name the volume already held: created, never written over.
 			await writeWorkspaceFile(at, f.path, f.text);
 		}
-		const userConfigPath = join(host, 'config.json');
-		await writeFile(userConfigPath, HISTORIAN_USER_CONFIG, 'utf8');
-		return { folder, host, promptPath, exportPath: join(host, 'export.json'), userConfigPath };
+		// ⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`) — ~~`const userConfigPath = join(host, 'config.json');`~~
+		// ~~`await writeFile(userConfigPath, HISTORIAN_USER_CONFIG, 'utf8');`~~
+		// ~~`return { folder, host, promptPath, exportPath: join(host, 'export.json'), userConfigPath };`~~ — no user configuration: the host folder holds
+		// the export alone, which devin writes.
+		return { folder, host, promptPath, exportPath: join(host, 'export.json') };
 	} catch (e) {
 		await removeFolders(folder, host);
 		throw e;
@@ -423,17 +437,99 @@ export type HistorianCallOutcome = (
  * any paid call (`e2e-live-exec/phase7-operator.ts`, `bootOf`; L17b2 ruling 6 (C)), so the two can never word the rule, or read it, apart.
  */
 export function historianVersionRefusal(reported: string): string | undefined {
-	const version = /\b(\d+\.\d+\.\d+)\b/.exec(reported)?.[1];
-	if (version === DEVIN_HISTORIAN_MEASURED_VERSION) return undefined;
+	// ⭐ L17b4 (the lead's §15.5 (b)) — ~~`const version = /\b(\d+\.\d+\.\d+)\b/.exec(reported)?.[1];`~~ and the rule worded here: the version read by the one
+	// reading (`devinVersionIn`), and the rule worded by the one definition (`historianVersionRefusalOf`), which the paid boot words it by from its record.
+	return historianVersionRefusalOf({ version: devinVersionIn(reported), length: reported.length });
+}
+
+/** ⭐ L17b4 round 4 (the lead's §18) — the one shape of devin's version in its reply: the first `<n>.<n>.<n>`, read by `devinVersionIn` and `devinVersionParts`. */
+const DEVIN_VERSION_SHAPE = /\b(\d+\.\d+\.\d+)\b/;
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b4 — design D93 (the lead's §15.5 (b), `l17b4-facts.md`) — THE ONE READING OF `devin --version`'s WORDS: the first
+ * `<n>.<n>.<n>` they hold, or undefined where they hold none. The Historian's call and the paid boot's readiness both read the version by it; the boot
+ * keeps only what it reads (`e2e-live-exec/phase7-operator.ts`, `reviewerReadiness`).
+ */
+export function devinVersionIn(reported: string): string | undefined {
+	// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`return /\b(\d+\.\d+\.\d+)\b/.exec(reported)?.[1];`~~: by the one shape, which the reply's parts are
+	// read by too (`devinVersionParts`).
+	return DEVIN_VERSION_SHAPE.exec(reported)?.[1];
+}
+
+/**
+ * ⭐ L17b4 round 4 (the lead's §18) — the build devin prints in the parentheses right after its version, held to a shape: hex digits ~~, at most 64~~.
+ * ⭐ L17b4 round 5 (the lead's §20; `L4E-01`) — ~~`{1,64}`~~: a build of more than 64 hex digits read as not found, so two such builds of the same length
+ * showed one line and passed the seam. Read whole now, with no upper bound, and so compared exactly; parentheses that hold anything else, or nothing,
+ * still give not found.
+ */
+const DEVIN_BUILD_AFTER_VERSION = /^[ \t]*\(([0-9a-f]+)\)/i;
+
+/** ⭐ L17b4 round 4 (the lead's §18) — a part of devin's version reply that is not in it, named so. */
+export const DEVIN_VERSION_PART_NOT_FOUND = 'not found';
+
+/** ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — devin's version reply by its parts, and never its words. */
+export interface DevinVersionParts {
+	/** Its version: the first `<n>.<n>.<n>` it holds, by the one reading, or `not found`. */
+	readonly version: string;
+	/** The build in the parentheses right after the version, hex digits alone, or `not found`. */
+	readonly build: string;
+	/** The reply's length, in characters. */
+	readonly replyLength: number;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b4 — round 4 (the lead's §18 on `l17b4-facts.md`; `L4D-01`; `REG-F-685`) — devin's VERSION REPLY BY ITS PARTS, the one
+ * reading D84's driver shows, checks and keeps it by: its version (`DEVIN_VERSION_SHAPE`, as `devinVersionIn` reads it), the build in the parentheses
+ * right after it held to hex digits, and the reply's length; a part not found is named so. ⛔ NEVER ITS WORDS: the reply is devin's, unmeasured, and may
+ * hold its login banner and paths under the home folder. The reply itself is handed to the Historian's own version check alone, and kept nowhere.
+ */
+export function devinVersionParts(reported: string): DevinVersionParts {
+	const found = DEVIN_VERSION_SHAPE.exec(reported);
+	const build = found === null ? undefined : DEVIN_BUILD_AFTER_VERSION.exec(reported.slice(found.index + found[0].length))?.[1];
+	return { version: found?.[1] ?? DEVIN_VERSION_PART_NOT_FOUND, build: build ?? DEVIN_VERSION_PART_NOT_FOUND, replyLength: reported.length };
+}
+
+/**
+ * ⭐⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — devin's VERSION REPLY AS D84 SHOWS IT, AND AS THE CHECK AT THE CALL COMPARES IT: its parts alone, in one
+ * line — the `devin-version.txt` of a role's showing and of a probe's (`measurement/d84-roles.ts`, `measurement/d84-probes.ts`). Two replies of the same
+ * parts show the same line, and another build than the one shown, or another length, shows another.
+ */
+export function devinVersionShown(parts: DevinVersionParts): Buffer {
+	return Buffer.from(
+		`devin --version, by its parts alone (REG-F-685): version ${parts.version}; build ${parts.build}; ${parts.replyLength} characters\n`,
+		'utf8'
+	);
+}
+
+/**
+ * ⭐⭐ L17b4 — design D93 (`REG-F-685`; the lead's §15.5 (b); the review's question, confirmed) — THE VERSION RULE, WORDED ONCE, from what was read of the
+ * reply: its version (the one reading, `devinVersionIn`) and its length. ⛔ A reply that holds no version is named by its length, never its words:
+ * ~~`devin is at version ${version ?? JSON.stringify(reported.trim())}, …`~~ quoted devin's reply whole, which is unmeasured and may open with its login
+ * banner. undefined at the version the tools were measured at.
+ */
+export function historianVersionRefusalOf(read: { readonly version: string | undefined; readonly length: number }): string | undefined {
+	if (read.version === DEVIN_HISTORIAN_MEASURED_VERSION) return undefined;
+	const found =
+		read.version === undefined
+			? `devin's reply to \`devin --version\` holds no version (${read.length} characters; devin's own words are not recorded, REG-F-685)`
+			: `devin is at version ${read.version}`;
 	return (
-		`devin is at version ${version ?? JSON.stringify(reported.trim())}, and the Historian's two tool lists were measured at ` +
+		`${found}, and the Historian's two tool lists were measured at ` +
 		`${DEVIN_HISTORIAN_MEASURED_VERSION}: they are true of that version alone, so it is not run (L17b2 ruling 2 (A))`
 	);
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b4 — design D93 (`REG-F-685`; the lead's §13.3 (a), `l17b4-facts.md`) — THE TIME BOUND OF devin's VERSION READ,
+ * ONCE: the Historian's read (`devinVersion`), D84's driver's read of the same (`measurement/d84.drive.ts`), and the read's failure, which is recorded
+ * at it (`callIn`), so the record states the bound the kill was made at. ⭐ It was the literal at each read, `30_000`.
+ */
+export const DEVIN_VERSION_BOUND_MS = 30_000;
+
 /** `devin --version`, run with no session and no model. */
 async function devinVersion(): Promise<string> {
-	const { stdout } = await run(DEVIN_BIN, ['--version'], { timeout: 30_000, windowsHide: true });
+	// ⭐ L17b4 (§13.3 (a)) — ~~`const { stdout } = await run(DEVIN_BIN, ['--version'], { timeout: 30_000, windowsHide: true });`~~: the same 30 s, named once.
+	const { stdout } = await run(DEVIN_BIN, ['--version'], { timeout: DEVIN_VERSION_BOUND_MS, windowsHide: true });
 	return String(stdout);
 }
 
@@ -448,17 +544,21 @@ async function callIn(
 	try {
 		reported = await versionOf();
 	} catch (e) {
+		// ⭐ L17b4 — design D93 (`REG-F-685`; the lead's §13.3 (a)) — ~~`devin's version could not be read (devin --version: ${describedThrow(e)}), and the
+		// Historian's two tool lists are true of the version they ` +`~~: execFile's message names the program's own path, under the home folder where its
+		// override sets it or a start fails, and holds devin's stderr. So the read is recorded by its kind alone, by the one definition, at its own bound.
 		return {
 			ran: false,
 			why:
-				`devin's version could not be read (devin --version: ${describedThrow(e)}), and the Historian's two tool lists are true of the version they ` +
+				`devin's version could not be read (devin --version: ${devinFailureKindAndNames(e, DEVIN_VERSION_BOUND_MS)}; devin's own words are not recorded, REG-F-685), and the Historian's two tool lists are true of the version they ` +
 				`were measured at, ${DEVIN_HISTORIAN_MEASURED_VERSION}: so it is not run (L17b2 ruling 2 (A))`
 		};
 	}
 	// ⭐ L17b2 (2c) — the one reading of the version, which the live lane's paid boot shares (`historianVersionRefusal`): its words as they were here.
 	const versionRefused = historianVersionRefusal(reported);
 	if (versionRefused !== undefined) return { ran: false, why: versionRefused };
-	const prompt = await readFile(folder.promptPath, 'utf8').catch(() => '');
+	// ⭐ L17b4 — design D93 (the lead's L4-Q3) — ~~`const prompt = await readFile(folder.promptPath, 'utf8').catch(() => '');`~~: read only for the check
+	// that measured the prompt out of the failure's words, which has left this path, since the record holds none of them.
 	try {
 		const { stdout } = await exec(
 			DEVIN_BIN,
@@ -472,21 +572,24 @@ async function callIn(
 				folder.exportPath,
 				// A fresh folder is untrusted by construction; the control is isolation, as the reviewer's (`devinPrint`).
 				'--respect-workspace-trust',
-				'false',
-				// ⭐ D86 — its own user configuration, never the user's or the project's.
-				'--config',
-				folder.userConfigPath
+				'false'
+				// ⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`) — ~~`'--config', folder.userConfigPath`~~, under D86's ~~"its own user configuration, never
+				// the user's or the project's"~~: any `--config` file stalls devin 3000.11.234 on this host, so none is passed — the reviewer's form, the export
+				// kept outside the folder. devin then reads the machine user's own configuration, as every reviewer call does: the tools it could add are
+				// held by the folder's deny list and the export's audit (D86, ruling 2 (B)).
 			],
 			{ cwd: folder.folder, timeout: call.boundMs, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
 		);
 		const sessionExport = await readFile(folder.exportPath, 'utf8').catch(() => undefined);
 		return { ran: true, stdout: String(stdout), ...(sessionExport === undefined ? {} : { sessionExport }) };
 	} catch (e) {
-		const raw = describedThrow(e);
-		// ⭑ As `devinPrint`: a diagnostic measured to carry the prompt is withheld, never projected (PER-12).
-		const failure = diagnosticCarriesPrompt(raw, prompt)
-			? 'devin invocation failed. Its diagnostic is WITHHELD: it was measured to contain the prompt, which may not reach the record plane (PER-12).'
-			: `devin invocation failed: ${raw}`;
+		// ~~`const raw = describedThrow(e);`~~
+		// ~~⭑ As `devinPrint`: a diagnostic measured to carry the prompt is withheld, never projected (PER-12).~~
+		// ~~`const failure = diagnosticCarriesPrompt(raw, prompt) ? 'devin invocation failed. Its diagnostic is WITHHELD: …' : `devin invocation failed: ${raw}`;`~~
+		// ⭐⭐ STRUCK BY L17b4 — design D93 (`REG-F-685`; the lead's L4-Q2, L4-Q3) — THE RECORD IS THE FAILURE'S KIND ALONE, as `devinPrint`'s is, by the one
+		// definition (`devinFailureRecord`), its bound this call's own; each known phrase by its name (the lead's departure: read on this path too). The
+		// raw words held devin's command line, naming this folder under the home folder, and its login banner, naming the user's e-mail address.
+		const failure = devinFailureRecord(e, call.boundMs);
 		const sessionExport = await readFile(folder.exportPath, 'utf8').catch(() => undefined);
 		return { ran: true, failure, ...(sessionExport === undefined ? {} : { sessionExport }) };
 	}
@@ -494,7 +597,8 @@ async function callIn(
 
 /**
  * ⭐⭐ D86, rulings 2 (A), 6, 8 — ONE CALL OF THE HISTORIAN: devin's version read and held to the one measured; then `devin --print` in the folder, its
- * prompt, export and configuration named, at the time bound handed in; its export read; and the folder and its host removed after, whatever came of it.
+ * prompt ~~, export and configuration~~ ⭐ and export (L17b4, D93: no `--config`) named, at the time bound handed in; its export read, on success and on
+ * failure; ⭐ a failure recorded by its kind alone (`devinFailureRecord`); and the folder and its host removed after, whatever came of it.
  * `given` is the stage's seam (`historianExec`, `historianVersionOf`): absent, the real program.
  */
 export async function devinHistorianCall(

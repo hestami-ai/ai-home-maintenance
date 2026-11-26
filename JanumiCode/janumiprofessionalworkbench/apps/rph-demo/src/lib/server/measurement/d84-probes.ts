@@ -2,10 +2,13 @@
 // six small devin calls, each a test prompt in a folder of the Historian's form, prepared, shown, approved and checked as a role's is, and counted
 // apart from the roles' calls. They measure what the three role calls cannot show (whether devin expands `~`, whether `--config` replaces the user's
 // configuration or adds to it, and what becomes of a timed-out call's children); each probe's prompt is the lead's, shown to the sponsor first.
+// ⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`): `--config` replaces the user's configuration and, at devin 3000.11.234 on this host, stalls the call
+// (measured by D84's first probes), so the Historian is launched without one, and each probe with it, in the Historian's form.
 //
-// ⭑ A PROBE'S DEFINITION, the lead's (`probes/<NN>-<name>/definition/`): `prompt.txt`; and, optional, `project-config.json` and `user-config.json`, the
-// folder's two configurations (absent, the Historian's own); `files/`, planted in the folder; and `probe.json` — its bound in milliseconds, and whether
-// the children of its call are to be listed after it.
+// ⭑ A PROBE'S DEFINITION, the lead's (`probes/<NN>-<name>/definition/`): `prompt.txt`; and, optional, `project-config.json` ~~and `user-config.json`, the
+// folder's two configurations~~ ⭐ (L17b4, D93), the folder's configuration (absent, the Historian's own); `files/`, planted in the folder; and
+// `probe.json` — its bound in milliseconds, and whether the children of its call are to be listed after it. ⭐ A definition that holds `user-config.json`
+// is refused, naming the file, before any folder is made (the lead's L4-Q6): no user configuration is passed, so it would mean nothing.
 // ⭑ ITS CALL: through `devinHistorianCall`, as the Historian's, so devin's version is read first and the folder removed after; checked at its seam as a
 // role's is; its answer and its export kept with it, never in the copy. A probe that lists its call's children lists them by the call's process id,
 // and stops none of them.
@@ -14,10 +17,22 @@
 // no other is called (a probe forced in by hand, named before six already called, passed the count by place).
 // ⛔ CALLED ONCE (r2, `D84R-A01` (a)): an attempt is reserved immediately before the call, and a probe holding one is never called again.
 import { execFile } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+// ⭐ L17b4 (the lead's §15.5 (e)) — ~~`import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from
+// 'node:fs';`~~: and `lstatSync`, which a definition's `user-config.json` is found by.
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { devinHistorianCall, HISTORIAN_PROJECT_CONFIG, HISTORIAN_USER_CONFIG, type HistorianVersionOf } from '../tools/devin-historian.js';
+// ⭐ L17b4 (D93; `REG-D-197`) — ~~`HISTORIAN_USER_CONFIG`~~ no longer imported: no user configuration is passed.
+// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`import { devinHistorianCall, HISTORIAN_PROJECT_CONFIG, type HistorianVersionOf } from
+// '../tools/devin-historian.js';`~~: and devin's version reply by its parts, read once and shown once (`devinVersionParts`, `devinVersionShown`).
+import {
+	devinHistorianCall,
+	devinVersionParts,
+	devinVersionShown,
+	HISTORIAN_PROJECT_CONFIG,
+	type DevinVersionParts,
+	type HistorianVersionOf
+} from '../tools/devin-historian.js';
 import type { DevinExec } from '../tools/devin-reviewer.js';
 import {
 	approvalRefusal,
@@ -69,15 +84,20 @@ function attemptedProbes(folder: string): string[] {
 
 const json = (v: unknown): string => `${JSON.stringify(v, null, 2)}\n`;
 
-/** The files a probe's call is shown and checked as: its folder, its user configuration, and its program and argv, each path of its folders held. */
-function probeFiles(program: string, args: readonly string[], options: Parameters<DevinExec>[2]): { readonly path: string; readonly bytes: Buffer }[] {
+/**
+ * The files a probe's call is shown and checked as: its folder, ~~its user configuration,~~ and its program and argv, each path of its folders held.
+ * ⭐ L17b4 — design D93 (`REG-D-197`): a probe, as the Historian, is given no user configuration, so none is shown — ~~`const config =
+ * args[args.indexOf('--config') + 1] ?? '';`~~ and ~~`{ path: 'host/config.json', bytes: readFileSync(config) },`~~, which, with no `--config` in the
+ * argv, would read the argv's first word as a file.
+ */
+function probeFiles(program: string, args: readonly string[], options: Parameters<DevinExec>[2]): ProbeFile[] {
 	const folder = options.cwd;
 	const host = `${folder}.host`;
-	const config = args[args.indexOf('--config') + 1] ?? '';
 	const held = args.map((a) => a.split(host).join('<host>').split(folder).join('<folder>'));
 	return [
-		...treeEntries(folder).map((e) => ({ path: `folder/${e.path}`, bytes: readFileSync(join(folder, e.path)) })),
-		{ path: 'host/config.json', bytes: readFileSync(config) },
+		// ⭐ L17b4 (the lead's §15.5 (d); `L4C-A03`) — ~~`...treeEntries(folder).map((e) => ({ path: `folder/${e.path}`, bytes: readFileSync(join(folder,
+		// e.path)) })),`~~, which read a link's file through it and showed it as that file: the folder's entries as `folderEntries` reads them.
+		...folderEntries(folder),
 		{
 			path: 'argv.json',
 			bytes: Buffer.from(json({ program, args: held, timeout: options.timeout, maxBuffer: options.maxBuffer, windowsHide: options.windowsHide }), 'utf8')
@@ -85,18 +105,115 @@ function probeFiles(program: string, args: readonly string[], options: Parameter
 	];
 }
 
-const manifestOfFiles = (files: readonly { readonly path: string; readonly bytes: Buffer }[]): Manifest =>
-	manifestOf(files.map((f): ManifestEntry => ({ path: f.path, kind: 'file', bytes: f.bytes.length, sha256: sha256Of(f.bytes) })));
+/**
+ * ⭐ L17b4 (the lead's §15.5 (d); `L4C-A03`) — one shown file: its bytes; and, for a LINK, its target, its bytes the target's text, as a manifest holds a
+ * link (`d84-files.ts`, `treeEntries`) — its shown copy a file holding that text, its manifest entry a link by its kind and its target.
+ */
+type ProbeFile = { readonly path: string; readonly bytes: Buffer; readonly target?: string };
 
-/** A probe's folder, as the Historian's is laid out (`writeHistorianFolder`): a fresh folder, and its host beside it. */
-type ProbeFolder = { readonly folder: string; readonly host: string; readonly promptPath: string; readonly exportPath: string; readonly userConfigPath: string };
+/**
+ * ⭐⭐ L17b4 — the lead's §15.5 (d) (`L4C-A03`, older than this package: D84's driver) — A PROBE FOLDER'S ENTRIES, EACH AS IT IS: a file by its bytes, and a
+ * planted link as a LINK, by its kind and its target, never by the bytes it points to (`treeEntries` follows no link). So a link swapped for a file, or
+ * for another link, after the approval is a change the check sees.
+ */
+function folderEntries(folder: string): ProbeFile[] {
+	return treeEntries(folder).map((e): ProbeFile =>
+		e.kind === 'link'
+			? { path: `folder/${e.path}`, bytes: Buffer.from(e.target ?? '', 'utf8'), target: e.target ?? '' }
+			: { path: `folder/${e.path}`, bytes: readFileSync(join(folder, e.path)) }
+	);
+}
+
+// ⭐ L17b4 (§15.5 (d)) — ~~`manifestOf(files.map((f): ManifestEntry => ({ path: f.path, kind: 'file', bytes: f.bytes.length, sha256: sha256Of(f.bytes) })));`~~
+// — every entry called a file: a link is entered as a link, by its kind and its target.
+const manifestOfFiles = (files: readonly ProbeFile[]): Manifest =>
+	manifestOf(
+		files.map((f): ManifestEntry =>
+			f.target === undefined
+				? { path: f.path, kind: 'file', bytes: f.bytes.length, sha256: sha256Of(f.bytes) }
+				: { path: f.path, kind: 'link', bytes: f.bytes.length, sha256: sha256Of(f.bytes), target: f.target }
+		)
+	);
+
+/**
+ * ⭐⭐ L17b4 — the lead's §15.5 (d) (`L4C-A03`) — EACH PLANTED LINK OF A PROBE FOLDER MADE AGAIN FOR ITS CALL, AGAINST WHAT WAS APPROVED: a link approved and
+ * not the same link now — gone, a file or a folder now, or a link to another target — and a link now where none was approved. Read before the attempt
+ * is reserved, so a probe whose link changed is refused before devin runs and spends no call. ⭑ Files are held at the call's seam, as before.
+ */
+function plantedLinkDifferences(approved: Manifest, folder: string): string[] {
+	const now = new Map(folderEntries(folder).map((f) => [f.path, f] as const));
+	const out: string[] = [];
+	for (const a of approved.entries.filter((e) => e.kind === 'link' && e.path.startsWith('folder/'))) {
+		const b = now.get(a.path);
+		if (b === undefined) out.push(`${a.path}: approved as a link to ${a.target ?? ''}, and not there now`);
+		else if (b.target === undefined) out.push(`${a.path}: approved as a link to ${a.target ?? ''}, and a file now`);
+		else if (b.target !== a.target) out.push(`${a.path}: approved as a link to ${a.target ?? ''}, and a link to ${b.target} now`);
+	}
+	for (const b of now.values()) {
+		if (b.target === undefined) continue;
+		const a = approved.entries.find((e) => e.path === b.path);
+		if (a === undefined || a.kind !== 'link') out.push(`${b.path}: a link to ${b.target} now, and ${a === undefined ? 'not in what was approved' : 'approved as a file'}`);
+	}
+	return out;
+}
+
+/**
+ * A probe's folder, as the Historian's is laid out (`writeHistorianFolder`): a fresh folder, and its host beside it. ⭐ L17b4 (D93) — ~~`readonly
+ * userConfigPath: string`~~: its host holds the export alone.
+ */
+type ProbeFolder = { readonly folder: string; readonly host: string; readonly promptPath: string; readonly exportPath: string };
+
+/** ⭐ L17b4 — design D93 (the lead's L4-Q6) — the definition's file that would name a user configuration, which no probe is given. */
+const PROBE_USER_CONFIG = 'user-config.json';
+
+/** ⭐ L17b4 (§15.5 (e)) — how an error's code may look to be named in a refusal: a name, bounded, never free text. */
+const ERROR_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+/**
+ * ⭐⭐ L17b4 — the lead's §15.5 (e) (`L4C-A04`) — WHETHER A PROBE'S DEFINITION HOLDS AN ENTRY NAMED `user-config.json` — a file, a folder or a link, dangling
+ * or not — found by `lstat`, which follows no link: true where it is there; false where it is not (`ENOENT`); and, where the lookup failed otherwise, its
+ * code, in `ERROR_CODE`'s shape, or that it gave none. ⛔ It cannot throw: an error whose code cannot be read is a failed lookup.
+ */
+function userConfigLookup(definition: string): boolean | { readonly failed: string } {
+	try {
+		lstatSync(join(definition, PROBE_USER_CONFIG));
+		return true;
+	} catch (e) {
+		let code: unknown;
+		try {
+			code = (e as { readonly code?: unknown } | null)?.code;
+		} catch {
+			code = undefined;
+		}
+		if (code === 'ENOENT') return false;
+		return { failed: typeof code === 'string' && ERROR_CODE.test(code) ? code : 'an error with no code' };
+	}
+}
 
 /**
  * A probe's folder, made from its definition: its prompt, its project configuration (the Historian's, absent its own), each planted file or folder
- * copied in by name, links kept as links; its user configuration in its host (the Historian's, absent its own). ⛔ A planted name the folder holds
+ * copied in by name, links kept as links ~~; its user configuration in its host (the Historian's, absent its own)~~. ⛔ A planted name the folder holds
  * already (`prompt.txt`, `.devin`) is refused, never written over: both folders are removed, and why is returned.
+ * ⭐⭐ L17b4 — design D93 (`REG-D-197`; the lead's L4-Q6) — A DEFINITION THAT HOLDS `user-config.json` IS REFUSED AS MEANINGLESS, naming the file, before
+ * any folder is made: a probe runs as the Historian's call runs, which passes no user configuration. Both `prepareProbe` and `callProbe` make their
+ * folder here, the call before its attempt is reserved, so a refused definition is never shown and spends no call.
  */
 function probeFolderFrom(definition: string): ProbeFolder | { readonly refusedBecause: string } {
+	// ⭐ L17b4 (the lead's §15.5 (e); `L4C-A04`) — ~~`if (existsSync(join(definition, PROBE_USER_CONFIG)))`~~, which follows a link, so a dangling link of that
+	// name was taken for no file: found by `lstat` (`userConfigLookup`), and a lookup that fails for any reason but absence refuses too.
+	const lookup = userConfigLookup(definition);
+	if (lookup === true)
+		return {
+			refusedBecause:
+				`the probe's definition holds ${PROBE_USER_CONFIG}, and a probe runs as the Historian's call runs, which passes no user configuration ` +
+				'(design D93; REG-D-197): the file would mean nothing, so the probe is refused'
+		};
+	if (lookup !== false)
+		return {
+			refusedBecause:
+				`the probe's definition could not be looked up for ${PROBE_USER_CONFIG} (${lookup.failed}), and a probe runs as the Historian's call runs, ` +
+				'which passes no user configuration (design D93; REG-D-197): a definition that may hold the file is refused, as one that holds it is'
+		};
 	const folder = mkdtempSync(join(tmpdir(), 'jpwb-d84-probe-'));
 	const host = `${folder}.host`;
 	try {
@@ -109,10 +226,10 @@ function probeFolderFrom(definition: string): ProbeFolder | { readonly refusedBe
 		const planted = join(definition, 'files');
 		for (const name of existsSync(planted) ? readdirSync(planted) : [])
 			cpSync(join(planted, name), join(folder, name), { recursive: true, verbatimSymlinks: true, errorOnExist: true, force: false });
-		const userConfigPath = join(host, 'config.json');
-		const user = join(definition, 'user-config.json');
-		writeFileSync(userConfigPath, existsSync(user) ? readFileSync(user) : HISTORIAN_USER_CONFIG);
-		return { folder, host, promptPath, exportPath: join(host, 'export.json'), userConfigPath };
+		// ⭐ L17b4 — design D93 (`REG-D-197`) — ~~`const userConfigPath = join(host, 'config.json');`~~ ~~`const user = join(definition, 'user-config.json');`~~
+		// ~~`writeFileSync(userConfigPath, existsSync(user) ? readFileSync(user) : HISTORIAN_USER_CONFIG);`~~
+		// ~~`return { folder, host, promptPath, exportPath: join(host, 'export.json'), userConfigPath };`~~ — no user configuration is passed.
+		return { folder, host, promptPath, exportPath: join(host, 'export.json') };
 	} catch (e) {
 		rmSync(folder, { recursive: true, force: true });
 		rmSync(host, { recursive: true, force: true });
@@ -143,12 +260,19 @@ export async function prepareProbe(folder: string, name: string, host: Pick<Prob
 		return { refusedBecause: `the probe ${name}'s definition needs prompt.txt and a probe.json with a positive whole boundMs` };
 	const made = probeFolderFrom(definition);
 	if ('refusedBecause' in made) return made;
-	let files: { readonly path: string; readonly bytes: Buffer }[] | undefined;
-	let version = '';
+	// ⭐ L17b4 (§15.5 (d)) — ~~`let files: { readonly path: string; readonly bytes: Buffer }[] | undefined;`~~: a planted link with its target.
+	let files: ProbeFile[] | undefined;
+	// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`let version = '';`~~ ~~`versionOf: async () => (version = await host.devinVersion()),`~~: the reply
+	// read by its parts alone, and handed whole to the Historian's own version check, which reads it and keeps none of it.
+	let version = devinVersionParts('');
 	const outcome = await devinHistorianCall(
 		{ folder: made, model: said.model ?? host.model, boundMs: said.boundMs },
 		{
-			versionOf: async () => (version = await host.devinVersion()),
+			versionOf: async () => {
+				const reply = await host.devinVersion();
+				version = devinVersionParts(reply);
+				return reply;
+			},
 			exec: async (file, args, options) => {
 				files = probeFiles(file, args, options);
 				return { stdout: '' };
@@ -157,7 +281,8 @@ export async function prepareProbe(folder: string, name: string, host: Pick<Prob
 	);
 	if (!outcome.ran) return { refusedBecause: outcome.why };
 	if (files === undefined) return { refusedBecause: 'devinHistorianCall ran no program, so there is no folder to show' };
-	const all = [...files, { path: 'devin-version.txt', bytes: Buffer.from(version, 'utf8') }];
+	// ⭐ L17b4 round 4 (§18; `REG-F-685`) — ~~`{ path: 'devin-version.txt', bytes: Buffer.from(version, 'utf8') }`~~, devin's reply whole: its parts alone.
+	const all = [...files, { path: 'devin-version.txt', bytes: devinVersionShown(version) }];
 	for (const f of all) {
 		mkdirSync(dirname(join(at, D84_LAYOUT.shown, f.path)), { recursive: true });
 		writeFileSync(join(at, D84_LAYOUT.shown, f.path), f.bytes, { flag: 'wx' });
@@ -197,16 +322,19 @@ export const realProbeExec: ProbeExec = (file, args, options, started) =>
 
 /** What a probe's call saw at its seam: devin's version, the process id of what it started, how long the program ran, and why the seam refused. */
 interface ProbeSeen {
-	version: string;
+	// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`version: string;`~~, devin's reply whole: its parts alone (`devinVersionParts`).
+	version: DevinVersionParts;
 	pid?: number;
 	callMs?: number;
 	refused?: string;
 }
 
-/** ⭐ D84 — a probe's program, checked at its seam: its folder, its user configuration, its argv and devin's version held to what was approved, then run. */
+/** ⭐ D84 — a probe's program, checked at its seam: its folder, ~~its user configuration,~~ its argv and devin's version held to what was approved, then run. */
 function checkedProbeExec(approved: Manifest, exec: ProbeExec, seen: ProbeSeen): DevinExec {
 	return async (file, args, options) => {
-		const now = manifestOfFiles([...probeFiles(file, args, options), { path: 'devin-version.txt', bytes: Buffer.from(seen.version, 'utf8') }]);
+		// ⭐ L17b4 round 4 (§18) — ~~`{ path: 'devin-version.txt', bytes: Buffer.from(seen.version, 'utf8') }`~~: the call's version by its parts, compared as
+		// they were shown, so another build than the one shown is refused here.
+		const now = manifestOfFiles([...probeFiles(file, args, options), { path: 'devin-version.txt', bytes: devinVersionShown(seen.version) }]);
 		const differences = manifestDifferences(approved, now);
 		if (differences.length > 0) throw new Error((seen.refused = `D84 refused the probe at its transport: ${differences.join('; ')}`));
 		const began = performance.now();
@@ -275,6 +403,16 @@ export async function callProbe(
 	const said = readJson<ProbeDefinition>(join(at, D84_LAYOUT.definition, 'probe.json'))!;
 	const made = probeFolderFrom(join(at, D84_LAYOUT.definition));
 	if ('refusedBecause' in made) return made;
+	// ⭐⭐ L17b4 — the lead's §15.5 (d) (`L4C-A03`) — A PLANTED LINK WHOSE KIND OR TARGET CHANGED SINCE THE APPROVAL IS REFUSED HERE, before the attempt is
+	// reserved and before devin runs: the folder made again is removed, and the call spends nothing.
+	const linksChanged = plantedLinkDifferences(approved, made.folder);
+	if (linksChanged.length > 0) {
+		rmSync(made.folder, { recursive: true, force: true });
+		rmSync(made.host, { recursive: true, force: true });
+		return {
+			refusedBecause: `the probe ${name} is not called: its planted links are not what was approved — ${linksChanged.join('; ')} (the lead's §15.5 (d), L4C-A03): refused before devin runs, and no attempt is reserved`
+		};
+	}
 	// ⭐⭐ r2 (`D84R-A01` (a)) — THE ATTEMPT, RESERVED NOW, every check passed and immediately before the call that runs devin: written exclusively, so a
 	// second launcher fails here — its folder removed, as the call would remove it — and never deleted.
 	const startedAt = new Date().toISOString();
@@ -284,10 +422,19 @@ export async function callProbe(
 		rmSync(made.host, { recursive: true, force: true });
 		return { refusedBecause: reserved };
 	}
-	const seen: ProbeSeen = { version: '' };
+	// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`const seen: ProbeSeen = { version: '' };`~~ ~~`{ versionOf: async () => (seen.version = await
+	// host.devinVersion()), exec: checkedProbeExec(approved, exec, seen) }`~~: the call's version read kept by its parts alone, for its seam.
+	const seen: ProbeSeen = { version: devinVersionParts('') };
 	const outcome = await devinHistorianCall(
 		{ folder: made, model: said.model ?? host.model, boundMs: said.boundMs },
-		{ versionOf: async () => (seen.version = await host.devinVersion()), exec: checkedProbeExec(approved, exec, seen) }
+		{
+			versionOf: async () => {
+				const reply = await host.devinVersion();
+				seen.version = devinVersionParts(reply);
+				return reply;
+			},
+			exec: checkedProbeExec(approved, exec, seen)
+		}
 	);
 	const childrenAfter = said.listChildren === true && seen.pid !== undefined ? await host.childrenOf(seen.pid) : undefined;
 	const answer = outcome.ran && outcome.failure === undefined ? outcome.stdout : undefined;

@@ -1284,7 +1284,8 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 			// ⭐ L17b2 (ruling 6 (C); §16) — ~~`'devin 3000\n'`~~: a paid boot is refused on another devin version than the one whose tools were measured.
 			stdout: args[0] === 'models' ? 'glm-5-3-flash-max\n' : 'devin 3000.11.234 (92c83011d113)\n',
 			stderr: '',
-			failure: null
+			// ⭐ L17b4 (design D93 widened to the boot; the lead's §15.5 (a); `REG-D-198`) — ~~`failure: null`~~: a runner hands on what its run threw, none here.
+			error: null
 		});
 		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D26) — ~~`serverEnv: { JPWB_DEMO_DB: store }` for half B~~: the config
 		// hands a paid half-B run's server the authoring review's allowance (`phase7AuthoringReviewAllowanceEnv`), and the boot now
@@ -1324,7 +1325,8 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 			// ⭐ L17b2 (ruling 6 (C); §16) — ~~`'devin 3000\n'`~~: a paid boot is refused on another devin version than the one whose tools were measured.
 			stdout: args[0] === 'models' ? 'glm-5-3-flash-max\n' : 'devin 3000.11.234 (92c83011d113)\n',
 			stderr: '',
-			failure: null
+			// ⭐ L17b4 (§15.5 (a); `REG-D-198`) — ~~`failure: null`~~: a runner hands on what its run threw, none here.
+			error: null
 		});
 		const handed = (allowance: string | undefined) =>
 			bootOf({

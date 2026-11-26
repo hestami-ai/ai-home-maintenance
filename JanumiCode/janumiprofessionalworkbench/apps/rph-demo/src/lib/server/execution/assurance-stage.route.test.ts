@@ -122,12 +122,17 @@ const seam = vi.hoisted(() => ({
 	openThrows: undefined as undefined | { readonly value: unknown },
 	/**
 	 * ⭐ L17b2 (D73, D86) — what devin answers as the Historian, given its prompt: its answer's text, the session export it writes, or a failure of the
-	 * call; undefined, a clean answer — every criterion met, nothing recurring, nothing recommended — and an export with no step.
+	 * call; undefined, a clean answer — every criterion met, nothing recurring, nothing recommended — and an export with no step. ⭐ L17b4 (D93) — or the
+	 * very value its program is to throw (`rejects`), an error in execFile's shape, where a case needs the failure's code, signal and words.
 	 */
 	historian: undefined as
 		| undefined
-		| ((call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string }),
-	/** ⭐ L17b2 (D86) — each call devin was given as the Historian: its argv, its working folder and its bound, and what its folder and its user configuration held at the call. */
+		| ((call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string; readonly rejects?: unknown }),
+	/**
+	 * ⭐ L17b2 (D86) — each call devin was given as the Historian: its argv, its working folder and its bound, and what its folder ~~and its user configuration~~
+	 * held at the call. ⭐ L17b4 (design D93; `REG-D-197`; `L4C-B03`) — no user configuration is passed, so `userConfig` reads none: the argv names no
+	 * `--config`, and it is '' whatever the call.
+	 */
 	historianCalls: [] as {
 		readonly args: readonly string[];
 		readonly cwd: string;
@@ -490,7 +495,8 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 
 // ⭐⭐ L17b2 (D86; the lead's rulings 2, 6, 8 and 16) — THE HISTORIAN'S REAL CALL, ITS PROGRAM REPLACED AT THE SEAM, as the floor's devin is above:
 // `devin --version` answered by the case (`seam.historianVersion`), and the session by the case's answer (`seam.historian`), its export written where
-// the argv names it; what the folder and the user configuration held at the call kept (`seam.historianCalls`). Where a case hands the stage a seam of
+// the argv names it; what the folder ~~and the user configuration~~ held at the call kept (`seam.historianCalls`; ⭐ L17b4, D93, `L4C-B03`: no user
+// configuration is passed, so none is held). Where a case hands the stage a seam of
 // its own (`historianExec`, ruling 6), the call is given that seam (`seam.historianPassThrough`). ⚠ The module is package L17b2's: until it exists
 // nothing imports it, so this factory never runs (vitest gives a mock of an absent module its unresolved id).
 vi.mock('../tools/devin-historian.js', async (importOriginal) => {
@@ -542,6 +548,8 @@ vi.mock('../tools/devin-historian.js', async (importOriginal) => {
 								});
 								const answered = seam.historian?.({ prompt: fs.readFileSync(after('--prompt-file'), 'utf8') }) ?? {};
 								if (answered.fails !== undefined) throw new Error(answered.fails);
+								// ⭐ L17b4 (D93) — a case's own rejection, thrown as it is, as execFile's would be.
+								if (answered.rejects !== undefined) throw answered.rejects;
 								fs.writeFileSync(after('--export'), answered.export ?? JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [] }));
 								return { stdout: answered.stdout ?? clean };
 							}
@@ -579,7 +587,7 @@ vi.mock('../assurance/decision-model.js', async (importOriginal) => {
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import { getObject, listByType, listPwus } from '@janumipwb/rph-engine';
 import { createInMemoryWorkspace, type Workspace } from '@janumipwb/rph-ports';
@@ -4162,7 +4170,8 @@ const DIAGNOSIS_NONE = JSON.stringify({ hypotheses: [], named: null, confidence:
 async function pressWithHistorian(
 	r: Awaited<ReturnType<typeof verificationRejected>>,
 	named: string | null,
-	historian?: (call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string },
+	// ⭐ L17b4 (D93) — and `rejects`, a case's own rejection, thrown as it is (the seam above).
+	historian?: (call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string; readonly rejects?: unknown },
 	/** ⭐ L17b2 (item 4) — a diagnosis of the case's own, in place of the one naming `named`. */
 	diagnosis?: string
 ) {
@@ -4257,7 +4266,14 @@ describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — 
 		expect.soft(pi.asked[1]?.prompt ?? '', 'the Unsticking Agent was not shown the Historian’s recurrence').toContain(`- [${recurrences[0]?.id ?? '(none)'}] ${statement}`);
 	});
 
-	it('⛔ RED FIRST — its call: devin in a fresh folder of copies — the prompt (the rubric in the policy’s words, this sign-off’s failed criteria, the narrative so far, the folder’s layout, its index first), its project configuration, `records/` named by their ids with `INDEX.md` (each rejecting verdict, the chapter, the diagnosis, each candidate, and the recorded conversations — the Hypothesizer’s very bytes), and `workspace/`, a copy of the shared workspace; its user configuration beside it, outside what it may read; the selected reviewer’s model, the time bound set; both folders removed after the call', async () => {
+	// ⭐ RESTATED (L17b4, design D93; §11's rule for titles; ⭐ the whole old title kept, `L4C-B01`, where ~~'… and `workspace/`, …'~~ kept its end alone):
+	// ~~'⛔ RED FIRST — its call: devin in a fresh folder of copies — the prompt (the rubric in the policy’s words, this sign-off’s failed criteria, the
+	// narrative so far, the folder’s layout, its index first), its project configuration, `records/` named by their ids with `INDEX.md` (each rejecting
+	// verdict, the chapter, the diagnosis, each candidate, and the recorded conversations — the Hypothesizer’s very bytes), and `workspace/`, a copy of the
+	// shared workspace; its user configuration beside it, outside what it may read; the selected reviewer’s model, the time bound set; both folders removed
+	// after the call'~~ — no user configuration is
+	// passed (REG-D-197): the host folder beside it holds the export alone, and devin is named no `--config`.
+	it('⛔ RED FIRST — its call: devin in a fresh folder of copies — the prompt (the rubric in the policy’s words, this sign-off’s failed criteria, the narrative so far, the folder’s layout, its index first), its project configuration, `records/` named by their ids with `INDEX.md` (each rejecting verdict, the chapter, the diagnosis, each candidate, and the recorded conversations — the Hypothesizer’s very bytes), and `workspace/`, a copy of the shared workspace; its export beside it, outside what it may read, and no --config; the selected reviewer’s model, the time bound set; both folders removed after the call', async () => {
 		const r = await verificationRejected();
 		const roundId = r.verdicts[0]!.assessmentId;
 		const { pi } = await pressWithHistorian(r, r.ids.source);
@@ -4292,12 +4308,16 @@ describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — 
 		expect.soft(call.files['workspace/src/reader.ts'], 'its workspace is not a copy of the shared workspace').toBe('export const read = () => "";\n');
 		const tool = await import('../tools/devin-historian.js');
 		expect.soft(call.files['.devin/config.json'], 'its project configuration is not its own').toBe(tool.HISTORIAN_PROJECT_CONFIG);
-		expect.soft(call.userConfig, 'its user configuration is not its own').toBe(tool.HISTORIAN_USER_CONFIG);
-		const configPath = call.args[call.args.indexOf('--config') + 1] ?? '';
-		expect.soft(configPath !== '' && !configPath.startsWith(`${call.cwd}/`) && !configPath.startsWith(`${call.cwd}\\`), 'its user configuration is inside what it may read').toBe(true);
+		// ⭐ L17b4 (D93; REG-D-197) — ~~`expect.soft(call.userConfig, 'its user configuration is not its own').toBe(tool.HISTORIAN_USER_CONFIG);`~~
+		// ~~`const configPath = call.args[call.args.indexOf('--config') + 1] ?? '';`~~
+		// ~~`expect.soft(configPath !== '' && !configPath.startsWith(`${call.cwd}/`) && !configPath.startsWith(`${call.cwd}\\`), 'its user configuration is inside what it may read').toBe(true);`~~
+		expect.soft(call.args, 'it is named a --config file').not.toContain('--config');
+		const exportPath = call.args[call.args.indexOf('--export') + 1] ?? '';
+		expect.soft(exportPath !== '' && !exportPath.startsWith(`${call.cwd}/`) && !exportPath.startsWith(`${call.cwd}\\`), 'its export is inside what it may read').toBe(true);
 		expect.soft(call.args[call.args.indexOf('--model') + 1], 'it is not called with the selected reviewer’s model').toBe('fixture-assurance-model');
 		expect.soft(call.timeout, 'it is not called with the time bound set').toBe(600_000);
-		expect.soft([existsSync(call.cwd), existsSync(configPath)], 'its folder, or its host folder, was kept after the call').toEqual([false, false]);
+		// ⭐ L17b4 — ~~`expect.soft([existsSync(call.cwd), existsSync(configPath)], 'its folder, or its host folder, was kept after the call').toEqual([false, false]);`~~
+		expect.soft([existsSync(call.cwd), existsSync(dirname(exportPath))], 'its folder, or its host folder, was kept after the call').toEqual([false, false]);
 	});
 
 	it('⛔ RED FIRST — its exchange: its role’s own, on the ASSURANCE plane under pol_historical_consistency over the round, one the recording leaves out as the stage’s; its tool observation says it could not watch the session and points at where its tool calls and its export are kept; and its stage record holds its answer, its tool calls with their paths, its exchange and its assessment (ruling 11)', async () => {
@@ -5295,6 +5315,111 @@ function shortNameOpens(long: string, short: string): { readonly made: boolean; 
 		rmSync(probe, { recursive: true, force: true });
 	}
 }
+
+// ⭐⭐ L17b4 — design D93 (`REG-F-685`, `REG-F-686`; the lead's L4-Q9) — THROUGH THE STAGE: a failed devin call is recorded by its kind alone in each
+// record the stage keeps of it — from a fake devin whose error holds a command line under a home folder and devin's login banner — and the writer's
+// exchange is timed around its call, as the helpers' and the Historian's are.
+describe('⭐⭐ L17b4 (D93; REG-F-685, REG-F-686) — through the stage: a failed devin call recorded by its kind alone; the writer’s exchange timed around its call', () => {
+	/** A home folder named `fixture`, its parts joined here, so that no line of this file holds an absolute path. */
+	const home = ['C:', 'Users', 'fixture'].join('\\');
+	const email = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+	const stderr = ' ✓ Logged in as fixture@example.invalid.\n ✓ Organization: Your Organization\nError: the session ended\n';
+	/** execFile's rejection of a devin call that exited 1: its command line, under the home folder, and devin's stderr, its banner first, in its message. */
+	const rejection = (folderName: string): Error => {
+		const folder = [home, 'AppData', 'Local', 'Temp', folderName].join('\\');
+		return Object.assign(
+			new Error(`Command failed: devin --print --model fixture-assurance-model --prompt-file ${folder}\\prompt.txt --export ${folder}\\export.json\n${stderr}`),
+			{ code: 1, killed: false, signal: null, stdout: '', stderr }
+		);
+	};
+	/** What `devinPrint` and the Historian's call record of that failure: its kind alone, in the lead's words. */
+	const RECORD =
+		"devin invocation failed (exited with code 1). Its diagnostic is not recorded (PER-12): execFile's message holds devin's command line, which names " +
+		"the call's folder, and devin's stderr, which holds its login banner (REG-F-685).";
+	/** Each text holds the failure's kind, and none of the three. */
+	const holdsTheKindAlone = (texts: readonly (readonly [string, string])[]): void => {
+		for (const [what, text] of texts) {
+			expect.soft(text, `${what} does not hold the failure’s kind`).toContain(RECORD);
+			expect.soft(text, `${what} holds execFile’s words`).not.toContain('Command failed');
+			expect.soft(text, `${what} holds the home folder`).not.toContain(home);
+			expect.soft(text, `${what} holds an e-mail address`).not.toMatch(email);
+		}
+	};
+	/** The writer's exchange's span, in milliseconds, on a stage clock its writer advances by `takesMs` as it answers. */
+	const writerSpanOver = async (r: Awaited<ReturnType<typeof verificationRejected>>, takesMs: number): Promise<number> => {
+		let ms = Date.parse('2026-11-16T12:00:00.000Z');
+		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+		const done = await runAssuranceStage(r.ids.verification, {
+			...pi.deps,
+			now: () => new Date(ms).toISOString(),
+			writerPrint: async (prompt: string) => {
+				ms += takesMs;
+				return chapterAnswering(prompt) ?? '';
+			}
+		});
+		expect('parts' in done, `arrangement: the stage ran — ${'refusedBecause' in done ? done.refusedBecause : ''}`).toBe(true);
+		const writer = listByType(getEngine(), 'MODEL_EXCHANGE').filter((x) => x.state.invokerId === NARRATIVE_WRITER_INVOKER);
+		expect(writer.length, 'arrangement: the writer’s exchange is recorded, once').toBe(1);
+		return Date.parse(String(writer[0]!.state.respondedAt)) - Date.parse(String(writer[0]!.state.requestedAt));
+	};
+
+	it('⛔ RED FIRST — L17b4 (D93; REG-F-685; the lead’s L4-Q9): the writer’s devin fails, its error holding a command line under a home folder and a login banner: the chapter’s outcome, its exchange’s parse detail and its evidence’s limitations hold its kind, and no Command failed, no home folder and no e-mail address', async () => {
+		const r = await verificationRejected();
+		const thrown = rejection('jpwb-devin-fixture');
+		expect([thrown.message.includes('Command failed'), thrown.message.includes(home), email.test(thrown.message)], 'arrangement: the error holds all three').toEqual([true, true, true]);
+		const pi = onPi({ diagnosis: DIAGNOSIS.replaceAll('SOURCE', r.ids.source), stepBack: STEP_BACK });
+		// ⭑ The writer's call is the stage's only devin call through `devinPrint`: its program throws the rejection.
+		seam.review = () => {
+			throw thrown;
+		};
+
+		const done = await runAssuranceStage(r.ids.verification, pi.deps);
+
+		const chapter = 'parts' in done ? done.parts.find((p) => p.part === 'narrative-chapter') : undefined;
+		expect(chapter?.status, 'arrangement: the chapter is recorded failing').toBe('failing');
+		const writer = listByType(getEngine(), 'MODEL_EXCHANGE').filter((x) => x.state.invokerId === NARRATIVE_WRITER_INVOKER);
+		expect(writer.length, 'arrangement: the writer’s exchange is recorded, once').toBe(1);
+		const evidence = stageEvidenceOf('narrative-chapter');
+		holdsTheKindAlone([
+			['the chapter’s outcome', chapter?.why ?? ''],
+			['its exchange’s parse detail', String((writer[0]?.state.parseOutcome as { detail?: unknown } | undefined)?.detail ?? '')],
+			['its evidence’s limitations', ((evidence[0]?.state.limitations ?? []) as string[]).join(' | ')]
+		]);
+	});
+
+	it('⛔ RED FIRST — L17b4 (D93; REG-F-685; the lead’s L4-Q9): the Historian’s devin fails, its error holding a command line under a home folder and a login banner: its record’s bytes, its outcome’s why, its evidence’s limitations and its exchange’s parse detail hold its kind, and no Command failed, no home folder and no e-mail address', async () => {
+		const r = await verificationRejected();
+		const thrown = rejection('jpwb-historian-fixture');
+		expect([thrown.message.includes('Command failed'), thrown.message.includes(home), email.test(thrown.message)], 'arrangement: the error holds all three').toEqual([true, true, true]);
+
+		const { done } = await pressWithHistorian(r, r.ids.source, () => ({ rejects: thrown }));
+
+		const part = 'parts' in done ? done.parts.find((p) => p.part === HISTORIAN_PART) : undefined;
+		expect(part?.status, 'arrangement: the Historian’s part is recorded failing').toBe('failing');
+		const evidence = stageEvidenceOf(HISTORIAN_PART);
+		expect(evidence.length, 'arrangement: its stage record is recorded, once').toBe(1);
+		const artifact = getObject(getEngine(), String((evidence[0]?.state.contentReference as { artifactId?: string } | undefined)?.artifactId ?? '')) ?? {};
+		const held = JSON.parse((await getArtifactStore().get(String(artifact.storageKey ?? ''))) ?? '{}') as { failed?: unknown };
+		const exchanges = historianExchanges();
+		expect(exchanges.length, 'arrangement: its exchange is recorded, once').toBe(1);
+		holdsTheKindAlone([
+			['its record’s bytes', String(held.failed ?? '')],
+			['its outcome’s why', part?.why ?? ''],
+			['its evidence’s limitations', ((evidence[0]?.state.limitations ?? []) as string[]).join(' | ')],
+			['its exchange’s parse detail', String((exchanges[0]?.state.parseOutcome as { detail?: unknown } | undefined)?.detail ?? '')]
+		]);
+	});
+
+	it('⛔ RED FIRST — L17b4 (D93; REG-F-686): the writer’s exchange is timed around its call — its respondedAt follows its requestedAt by the time the writer took, on the stage’s clock', async () => {
+		const r = await verificationRejected();
+		expect(await writerSpanOver(r, 69_600), 'the writer’s exchange is not timed around its call').toBe(69_600);
+	});
+
+	it('⭑ CONTROL — L17b4 (D93; REG-F-686): a writer that takes no time shows 0 ms between its request and its response', async () => {
+		const r = await verificationRejected();
+		expect(await writerSpanOver(r, 0), 'the writer’s exchange shows a time the writer did not take').toBe(0);
+	});
+});
 
 beforeEach(() => {
 	resetEngine('reference');

@@ -80,6 +80,9 @@ import { mintIdsFor, toRecordModelExchange } from '../apps/rph-demo/src/lib/serv
 // ⭐ P5 package A (F1) — the detail the validator writes on a reply the tool ended at the model's output-token limit;
 // ⭐ (the X-2 fix) and the class the adapter throws for one, which the D34 cases' `print` throws to make such a record.
 import { outputLimitDetail, OutputLimitReached } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
+// ⭐ L17b4 (design D93; the lead's §13.3 (b)) — the record a failed devin call is given, and devin's own words for a cut, so the truncation class is held
+// to the name that record holds, end to end.
+import { DEVIN_OUTPUT_LIMIT, devinFailureRecord } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 // ⭐ P5 package B's check (finding 2) — the builder of a declared review's input, whose prompts the report's reader reads.
 import { declaredPolicyReviewInput } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import {
@@ -4744,6 +4747,23 @@ describe('⭐⭐ P5 package B — the report reads a run as P5 went', () => {
 		expect(classes, 'a transport failure is still offered').not.toContain('transport failure (REG-F-499)');
 		expect(classes.filter((c) => c.includes('"model hit max output token limit"')), 'no class names the truncation').toHaveLength(1);
 		expect(renderMarkdown(reportOf(aRun()).report)).toContain('model hit max output token limit');
+	});
+
+	// ⭐⭐ L17b4 — design D93 (`REG-F-685`; the lead's §13.3 (b)) — THE TRUNCATION CLASS NAMES ITS RECORDED FAILURE IN EITHER FORM: devin's own words, which
+	// a record made before D93 holds, and the name a record made from D93 on gives them, which holds no word of devin's. ⭑ The name is read end to end,
+	// from the record the one definition writes for a cut (`devinFailureRecord`), so the class and the record cannot word it apart.
+	it('⛔ RED FIRST — L17b4 (D93; the lead’s §13.3 (b)): the truncation class keeps its opening and names its recorded failure in either form — devin’s own words before design D93, and the name a record gives them from it', () => {
+		const { classes } = reportOf(aRun()).report.adjudication;
+		const truncation = classes.filter((c) => c.startsWith('output-token truncation: '));
+		expect.soft(truncation, 'the truncation class does not name its recorded failure in either form').toEqual([
+			'output-token truncation: the reviewer’s reply ended at its output-token limit, its recorded failure reading "model hit max output token limit" ' +
+				`(before design D93) or "its reply reached the model's output limit" (from it)`
+		]);
+		const cut = devinFailureRecord(Object.assign(new Error(`Command failed: devin --print\nError: ${DEVIN_OUTPUT_LIMIT}. The output above is incomplete.\n`), { code: 1 }), 480_000);
+		const name = /; ([^;)]+)\)\. /.exec(cut)?.[1] ?? '(no name)';
+		expect(name, 'arrangement: the record of a cut names it').toContain('output limit');
+		expect.soft(truncation[0] ?? '', 'the class does not name the words a record made from D93 on holds').toContain(`"${name}" (from it)`);
+		expect.soft(renderMarkdown(reportOf(aRun()).report), 'report.md does not offer the class in either form').toContain(`(before design D93) or "${name}" (from it)`);
 	});
 
 	// ⭐⭐ `JAN-EXEC` Phase 7 P6, package L (F2; `REG-D-120` Q17) — THE MALFORMED-REPLY CLASS NAMES `REG-F-566`, beside `REG-F-489`,

@@ -49,8 +49,9 @@ import {
 	PHASE7_UNIT_REVIEWER_CALLS
 } from '../../apps/rph-demo/e2e-live-exec/lane-config.js';
 // ⭐ P5 package A (F1) — the one reading of a reply the tool ended at the model's output-token limit, from a stored
-// record. Pure: it loads no reviewer.
-import { outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
+// record. Pure: it loads no reviewer. ⭐ L17b4 — design D93 (the lead's §13.3 (b)) — and the name a failed devin call's record gives such a cut
+// (`OUTPUT_LIMIT_NAME`), which the truncation class quotes: ~~`import { outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';`~~
+import { OUTPUT_LIMIT_NAME, outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
 // ⭐⭐ Package Z2a — D51 — the decision model's requests, known by their identity. ⚠ A pure module.
 import { isDecisionModelExchange } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
 // ⭐⭐ Package L9 — D64 — the variant sentence, the product's own text, and the cut's own sentence rule. ⚠ Pure modules.
@@ -510,6 +511,8 @@ export function unitPurposeCaveat(
 /**
  * ⭐ P5 package B (F7) — THE WORDS A REVIEW'S RECORDED FAILURE CARRIES when the reviewer's reply ended at its output-token limit:
  * devin's own, in every one of P5's seven reviews recorded with no response, and in every such review of the runs before it.
+ * ⭐ L17b4 — design D93 (`REG-F-685`; the lead's §13.3 (b)) — in a record made before D93. A record made from it holds no word of devin's, and names
+ * the cut `OUTPUT_LIMIT_NAME` (`tools/output-limit.ts`); the truncation class below names both.
  */
 export const REVIEWER_OUTPUT_LIMIT_TEXT = 'model hit max output token limit';
 
@@ -524,7 +527,10 @@ export const ADJUDICATION_CLASSES = [
 	'reviewer right',
 	'reviewer wrong',
 	'join defect (REG-F-485, REG-F-486)',
-	`output-token truncation: the reviewer’s reply ended at its output-token limit, its recorded failure reading "${REVIEWER_OUTPUT_LIMIT_TEXT}"`,
+	// ⭐ L17b4 — design D93 (`REG-F-685`; the lead's §13.3 (b)) — ~~`output-token truncation: the reviewer’s reply ended at its output-token limit, its
+	// recorded failure reading "${REVIEWER_OUTPUT_LIMIT_TEXT}"`~~: a record made from D93 on holds no word of devin's and names the cut by its name, the one
+	// definition the record's names read too (`OUTPUT_LIMIT_NAME`); so the class keeps its opening and names its recorded failure in either form.
+	`output-token truncation: the reviewer’s reply ended at its output-token limit, its recorded failure reading "${REVIEWER_OUTPUT_LIMIT_TEXT}" (before design D93) or "${OUTPUT_LIMIT_NAME}" (from it)`,
 	'malformed reply (REG-F-489, REG-F-428, REG-F-479, REG-F-566)'
 ] as const;
 

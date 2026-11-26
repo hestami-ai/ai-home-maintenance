@@ -18,6 +18,14 @@ import type { AdapterToolObservation, ToolInvocationResult } from './backing-too
  */
 export const OUTPUT_LIMIT = 'OUTPUT_LIMIT: the reply ended at the model’s output-token limit.';
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b4 — design D93 (`REG-F-685`; the lead's §13.3 (b), `l17b4-facts.md`) — THE NAME A FAILED devin CALL'S RECORD
+ * GIVES A CUT AT THE MODEL'S OUTPUT LIMIT, in place of devin's own words (`DEVIN_OUTPUT_LIMIT`, which the record never quotes). One definition, read
+ * by the record's names (`devin-reviewer.ts`, `failureNames`) and by the run report's truncation class (`run-report-core.ts`, `ADJUDICATION_CLASSES`),
+ * so the class names what a record made from D93 on holds. ⭑ A string alone: this module stays pure, as the run report and the recorder need it.
+ */
+export const OUTPUT_LIMIT_NAME = "its reply reached the model's output limit";
+
 /** How a finish reason may look to be carried onto the record: a tool-written token, bounded, never free text. */
 export const FINISH_REASON_SHAPE = /^[A-Za-z_]{1,40}$/;
 
@@ -35,8 +43,9 @@ export interface OutputLimitFacts {
 /**
  * ⭐ THE CLASS, AS THE ADAPTER THROWS IT: a call that failed — the tool exited non-zero — whose reply the tool ended at
  * the model's output-token limit. ⛔ `message` is the adapter's diagnostic, exactly what it throws for every other failure
- * (the prompt measured out of it, `diagnosticCarriesPrompt`): the validator's seam sanitises it as it sanitises every
- * throw. The partial reply rides BESIDE it, never in it, and is kept on the content plane only.
+ * ~~(the prompt measured out of it, `diagnosticCarriesPrompt`)~~ ⭐ (L17b4, design D93; the lead's §15.5 (f) sweep: its record, the failure's kind and
+ * names alone, `devinFailureRecord`, which holds no word of devin's, so no prompt is measured out of it): the validator's seam sanitises it as it
+ * sanitises every throw. The partial reply rides BESIDE it, never in it, and is kept on the content plane only.
  */
 export class OutputLimitReached extends Error {
 	readonly facts: OutputLimitFacts;

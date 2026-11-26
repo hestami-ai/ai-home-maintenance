@@ -11,10 +11,13 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
+// ⭐ L17b4 — design D93 (the lead's L4-Q3 on Stage 0) — ~~`import { diagnosticCarriesPrompt } from './diagnostic-safety.js';`~~: the check leaves this
+// path, since the record holds no word of devin's (`devinFailureRecord`, below); it stays at the validator's seam (`sanitiseToolFailure`).
 import { answerFromText } from './backing-tool.js';
 import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
-import { FINISH_REASON_SHAPE, OutputLimitReached, type OutputLimitFacts } from './output-limit.js';
+// ⭐ L17b4 — design D93 (the lead's §13.3 (b)) — and the cut's one name on a failure's record (`OUTPUT_LIMIT_NAME`), which the run report's class quotes:
+// ~~`import { FINISH_REASON_SHAPE, OutputLimitReached, type OutputLimitFacts } from './output-limit.js';`~~
+import { FINISH_REASON_SHAPE, OUTPUT_LIMIT_NAME, OutputLimitReached, type OutputLimitFacts } from './output-limit.js';
 // ⭐⭐ Package X — D34 (`REG-F-590`) — the class a call killed during its run is thrown as, with what the kill left.
 import { SIGNAL_SHAPE, ToolCallKilled, type KilledCallFacts } from './killed-call.js';
 // ⭐ Z3 — D46 — the refusals a call was waited out through, carried on its answer or on the failure it throws.
@@ -150,8 +153,112 @@ export const DEVIN_FREE_TIER_RETRIES = 3;
  * phrase (a review of this very adapter would), and that call reached the model, so waiting it out would pay for it again.
  */
 function isFreeTierRefusal(e: unknown): boolean {
-	const message = (e as { message?: unknown } | null)?.message;
+	// ⭐ L17b4 (the lead's §15.5 (c); `L4C-A02`) — ~~`const message = (e as { message?: unknown } | null)?.message;`~~: read guarded (`thrownProperty`), so a
+	// message that throws when read is no refusal, and its throw never leaves the retry loop in the failure's place.
+	const message = thrownProperty(e, 'message');
 	return typeof message === 'string' && message.includes(DEVIN_FREE_TIER_REFUSAL);
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b4 — design D93 (`REG-F-685`; the lead's L4-Q2 on Stage 0, `l17b4-facts.md` §11.1) — THE TIME BOUND `devinPrint`
+ * HANDS ITS PROGRAM, ONCE: the kill (`once`, in `devinPrint`) and the failure's record, which names it where execFile made the kill. ⭐ It was the
+ * literal at the kill, `480_000` (package X, D35); every copy of it is still held to it at the exec seam, as the comment at the kill says.
+ */
+const DEVIN_PRINT_BOUND_MS = 480_000;
+
+/** ⭐ L17b4 — D93 (the lead's L4-Q2) — how a string error code may look to be carried onto the record: a name, bounded, never free text. */
+const ERROR_CODE_SHAPE = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+/** ⭐ L17b4 — D93 — the record's fixed close, in the lead's words: why devin's own words are not in it (PER-12; `REG-F-685`). */
+const FAILURE_RECORD_CLOSE =
+	"Its diagnostic is not recorded (PER-12): execFile's message holds devin's command line, which names the call's folder, and devin's stderr, which " +
+	'holds its login banner (REG-F-685).';
+
+/** One property of a thrown value, read so that nothing the value holds can throw in the failure's place: `undefined` where it cannot be read. */
+function thrownProperty(e: unknown, key: string): unknown {
+	try {
+		return typeof e === 'object' && e !== null ? (e as Record<string, unknown>)[key] : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * ⭐ L17b4 (the lead's §15.5 (c); `L4C-A02`) — a thrown value's message, as `devinPrint`'s readers of devin's words read it (an Error's message, any other
+ * value as a string), read so that nothing it holds can throw in the failure's place: '' where it cannot be read, or is not a string.
+ */
+function thrownMessage(e: unknown): string {
+	try {
+		if (e instanceof Error) return typeof e.message === 'string' ? e.message : '';
+		return String(e);
+	} catch {
+		return '';
+	}
+}
+
+/** Whether a failure is a start that failed: node's spawn error names its call, `spawn <file>`, as its `syscall`. */
+function isSpawnFailure(e: unknown): boolean {
+	const syscall = thrownProperty(e, 'syscall');
+	return typeof syscall === 'string' && syscall.startsWith('spawn');
+}
+
+/** The bound a kill is recorded at: only a kill execFile made itself (`killed`) is at the call's time bound, since a signal is not a bound. */
+function boundOfKill(e: unknown, boundMs: number): string {
+	return thrownProperty(e, 'killed') === true ? `, at its time bound of ${boundMs} ms` : '';
+}
+
+/** A failure's kind, from what execFile reports beside its message (see `devinFailureRecord`), each in its shape. */
+function failureKind(e: unknown, boundMs: number): string {
+	const code = thrownProperty(e, 'code');
+	if (typeof code === 'number' && Number.isSafeInteger(code)) return `exited with code ${code}`;
+	const signal = thrownProperty(e, 'signal');
+	if (typeof signal === 'string' && SIGNAL_SHAPE.test(signal)) return `killed by ${signal}${boundOfKill(e, boundMs)}`;
+	if (typeof code === 'string' && ERROR_CODE_SHAPE.test(code)) return isSpawnFailure(e) ? `could not start: ${code}` : `failed with code ${code}`;
+	return 'failed with no exit code, signal or error code';
+}
+
+/** The known phrases a failure's message holds, each by its name and in this order, never quoted. */
+function failureNames(e: unknown): string[] {
+	const message = thrownProperty(e, 'message');
+	const said = typeof message === 'string' ? message : '';
+	return [
+		...(said.includes(DEVIN_FREE_TIER_REFUSAL) ? ['devin refused it for its free tier (D46)'] : []),
+		// ⭐ L17b4 (the lead's §13.3 (b)) — the cut's name, by its one definition (`tools/output-limit.ts`), which the run report's truncation class quotes.
+		...(said.includes(DEVIN_OUTPUT_LIMIT) ? [OUTPUT_LIMIT_NAME] : [])
+	];
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b4 — design D93 (`REG-F-685`; `REG-D-197`; the lead's L4-Q2 and L4-Q3 on Stage 0, `l17b4-facts.md` §11.1) — WHAT A
+ * FAILED devin CALL RECORDS: its kind alone, and each known phrase by its name. The one definition `devinPrint` and the Historian's call
+ * (`devin-historian.ts`, `callIn`) both record a failure by, once their readers of devin's words have read them.
+ * ⛔ NEVER devin's words. execFile's message is `Command failed:`, then devin's command line — which names the call's folder under the home folder, and
+ * so the account — then devin's stderr, which opens with its login banner and the user's e-mail address (`REG-F-685`). So the message is read for the
+ * two fixed phrases alone, by their presence, and nothing of it is carried: the raw text is never recorded, as the diagnostic that carried the prompt
+ * already was not (PER-12).
+ * ⭑ THE KIND, in this order (`failureKind`): an exit, by its whole-number code; a kill, by its signal (in `SIGNAL_SHAPE`), and at its time bound only
+ * where execFile made the kill itself (`killed`); a start that failed, by the spawn's code (its `syscall` the spawn's); any other string code, as itself
+ * (an output that overran `maxBuffer` among them, after the program had started); else none of these — a code or a signal of the wrong shape among it.
+ * A string code is carried only in `ERROR_CODE_SHAPE`, and a signal only in `SIGNAL_SHAPE`.
+ * ⭑ THE NAMES (`failureNames`), each after `; `: the free tier's refusal (D46), where the message holds `DEVIN_FREE_TIER_REFUSAL`; the output limit, where
+ * it holds `DEVIN_OUTPUT_LIMIT`. ⚠ A DEPARTURE, NAMED (§11.1): they are read on both paths, where D93 said "a path already reads"; the Historian's path
+ * read neither before. Reading the two fixed phrases there costs nothing, and loses less.
+ * ⛔ IT CANNOT THROW, whatever value is thrown (`thrownProperty`): it is made in a catch, in the failure's place. ⭑ It reads no setting when it loads:
+ * the reviewer fingerprint loads this module (`scripts/reviewer-qual/fingerprint.ts`).
+ * ⭐ L17b4 (the lead's §13.3 (a)) — the part between its parentheses is `devinFailureKindAndNames`, which a third devin path records alone: the
+ * Historian's version read (`devin-historian.ts`, `callIn`).
+ */
+export function devinFailureRecord(e: unknown, boundMs: number): string {
+	return `devin invocation failed (${devinFailureKindAndNames(e, boundMs)}). ${FAILURE_RECORD_CLOSE}`;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b4 — design D93 (`REG-F-685`; the lead's §13.3 (a), `l17b4-facts.md`) — A FAILED devin CALL'S KIND, THEN EACH KNOWN
+ * NAME AFTER `; `: the part of its record between the parentheses, one function, which `devinFailureRecord` itself uses. ⭑ Exported for the third
+ * devin path, the version read, which records its kind in its own sentence (`devin-historian.ts`, `callIn`). It cannot throw, as the record cannot.
+ */
+export function devinFailureKindAndNames(e: unknown, boundMs: number): string {
+	return [failureKind(e, boundMs), ...failureNames(e)].join('; ');
 }
 
 /**
@@ -211,16 +318,21 @@ async function devinOutputLimit(
 	raw: string,
 	exportPath: string
 ): Promise<ConstructorParameters<typeof OutputLimitReached>[1] | undefined> {
-	const failed = (e ?? {}) as { code?: unknown; stdout?: unknown };
-	if (typeof failed.code !== 'number' || failed.code === 0) return undefined;
+	// ⭐ L17b4 (the lead's §15.5 (c); `L4C-A02`) — ~~`const failed = (e ?? {}) as { code?: unknown; stdout?: unknown };`~~: each read of the thrown value
+	// guarded (`thrownProperty`), its safe default `undefined` — a code that cannot be read is no exit, and stdout that cannot be read no partial reply.
+	const code = thrownProperty(e, 'code');
+	// ~~`if (typeof failed.code !== 'number' || failed.code === 0) return undefined;`~~
+	if (typeof code !== 'number' || code === 0) return undefined;
 	const exported = await readFile(exportPath, 'utf8').catch(() => undefined);
 	const facts = exportFacts(exported);
 	const said = raw.includes(DEVIN_OUTPUT_LIMIT);
 	if (!said && facts.finishReason !== 'max_tokens') return undefined;
 	const reported = await readReportedModel(exportPath);
+	const stdout = thrownProperty(e, 'stdout');
 	return {
 		facts,
-		partialReply: typeof failed.stdout === 'string' ? failed.stdout : '',
+		// ~~`partialReply: typeof failed.stdout === 'string' ? failed.stdout : '',`~~
+		partialReply: typeof stdout === 'string' ? stdout : '',
 		...(reported ? { producer: { agentId: 'devin', modelId: reported, providerId: 'devin' } } : {}),
 		observedToolCalls: DEVIN_TOOL_OBSERVATION,
 		...(exported === undefined ? {} : { sessionExport: exported })
@@ -239,13 +351,20 @@ async function devinOutputLimit(
  * kill is untested (design D34): a kill that left nothing says so — no export written, no character printed.
  */
 async function devinKilled(e: unknown, exportPath: string): Promise<KilledCallFacts | undefined> {
-	const failed = (e ?? {}) as { code?: unknown; signal?: unknown; stdout?: unknown };
-	if (typeof failed.code === 'number' || typeof failed.signal !== 'string' || !SIGNAL_SHAPE.test(failed.signal))
+	// ⭐ L17b4 (the lead's §15.5 (c); `L4C-A02`) — ~~`const failed = (e ?? {}) as { code?: unknown; signal?: unknown; stdout?: unknown };`~~: each read of the
+	// thrown value guarded (`thrownProperty`), its safe default `undefined` — a signal that cannot be read is no kill, and stdout that cannot be read none
+	// printed.
+	const code = thrownProperty(e, 'code');
+	const signal = thrownProperty(e, 'signal');
+	// ~~`if (typeof failed.code === 'number' || typeof failed.signal !== 'string' || !SIGNAL_SHAPE.test(failed.signal))`~~
+	if (typeof code === 'number' || typeof signal !== 'string' || !SIGNAL_SHAPE.test(signal))
 		return undefined;
 	const written = await readFile(exportPath, 'utf8').catch(() => undefined);
+	const stdout = thrownProperty(e, 'stdout');
 	return {
-		signal: failed.signal,
-		printedChars: typeof failed.stdout === 'string' ? failed.stdout.length : 0,
+		// ~~`signal: failed.signal,`~~ ~~`printedChars: typeof failed.stdout === 'string' ? failed.stdout.length : 0,`~~
+		signal,
+		printedChars: typeof stdout === 'string' ? stdout.length : 0,
 		exportWritten: written !== undefined,
 		lastStep: exportFacts(written)
 	};
@@ -274,11 +393,16 @@ export type DevinExec = (
  * `agyPrint` must DESTROY its failure diagnostic because `execFile` rejects with `Command failed: <full argv>`
  * and agy's argv carries the entire prompt — a string that would otherwise be written verbatim into a projected
  * `VALIDATOR_EXECUTION_FAILED` observation (finding #60). With `--prompt-file` the argv holds a path, so the
- * diagnostic is safe to retain and there is no command-line length ceiling to budget against either.
+ * ~~diagnostic is safe to retain~~ ⭐ (L17b4, design D93) prompt is never in it, and there is no command-line length ceiling to budget against either.
  *
- * ⛔ AND SAFETY IS STILL MEASURED, NOT ASSUMED. The catch below CHECKS the outgoing diagnostic for the prompt
+ * ~~⛔ AND SAFETY IS STILL MEASURED, NOT ASSUMED. The catch below CHECKS the outgoing diagnostic for the prompt
  * rather than trusting the `PROMPT_FREE` declaration. A declaration that is wrong then fails safe, which is the
- * difference between a claim and a control.
+ * difference between a claim and a control.~~
+ * ⭐⭐ STRUCK BY `JAN-EXEC` Phase 7, package L17b4 (design D93; `REG-F-685`; the lead's L4-Q2 and L4-Q3): ⛔ THE DIAGNOSTIC WAS NOT SAFE TO RETAIN.
+ * Measured on D84's copy, a failing call's message held devin's command line, which names the call's folder under the home folder and so the
+ * account, and devin's login banner, which names the user's e-mail address. The catch below records the failure's kind alone, and each known
+ * phrase by its name (`devinFailureRecord`), so no word of devin's, the prompt among them, can reach a record. The check that measured the prompt
+ * out of the diagnostic has left this path, and stays at the validator's seam, where it measures every adapter's throw (`sanitiseToolFailure`).
  *
  * ~~⚠ NO `--respect-workspace-trust false`. Print mode fails in an untrusted directory and that flag is a trust
  * BYPASS. It proved unnecessary — the probe succeeded without it — so an untrusted-directory failure surfaces
@@ -345,8 +469,10 @@ export async function devinPrint(
 				};
 	try {
 		// ⭐ P7-6 I4 — the no-tools preamble FIRST, then the prompt, in the one file devin reads (`DEVIN_REVIEWER_PREAMBLE`).
-		// ⚠ The diagnostic check below still measures against `prompt`, the caller's: the preamble is this file's own
-		// fixed text, and a diagnostic that echoed only it would leak nothing of the review.
+		// ~~⚠ The diagnostic check below still measures against `prompt`, the caller's: the preamble is this file's own
+		// fixed text, and a diagnostic that echoed only it would leak nothing of the review.~~ ⭐ L17b4 (design D93; the lead's L4-Q3; `L4C-B04`) — no
+		// check measures the failure's words any more: a failed call records its kind alone (`devinFailureRecord`, in the catch below), which holds no word
+		// of devin's, so neither the prompt nor the preamble can reach it.
 		await writeFile(promptPath, `${DEVIN_REVIEWER_PREAMBLE}${prompt}`, 'utf8');
 		// ⭐ P7-6 I1 — the deny-all project config, in the folder devin runs in; nothing else is put there.
 		await mkdir(join(dir, '.devin'));
@@ -373,7 +499,9 @@ export async function devinPrint(
 			// HELD TO THIS ONE, measured at the exec seam: `REVIEWER_CALL_BOUND_MS.devin` (`thrown-reviewer-call.test.ts`), the lane's
 			// `LANE_BUDGET.reviewerCallMsByTool.devin` (`verif/live-exec-lane-config.test.ts`) and the qualification's `DEVIN_KILL_MS`
 			// (`verif/reviewer-qualification-transports.test.ts`); the recorder's `RECORDED_CALL_BOUND_MS` to the validator's.
-			{ cwd: dir, timeout: 480_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
+			// ⭐ L17b4 (design D93) — ~~`{ cwd: dir, timeout: 480_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }`~~: the same 480 s, now named once
+			// (`DEVIN_PRINT_BOUND_MS`), since the failure's record states it where execFile made the kill (`devinFailureRecord`).
+			{ cwd: dir, timeout: DEVIN_PRINT_BOUND_MS, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
 		);
 		let answered: { stdout: string } | undefined;
 		while (answered === undefined)
@@ -460,23 +588,30 @@ export async function devinPrint(
 			...(refusals === undefined ? {} : { freeTierRefusals: refusals })
 		};
 	} catch (e) {
-		const raw = e instanceof Error ? e.message : String(e);
-		// ⭑ THE MEASUREMENT. If the prompt somehow reached the diagnostic anyway, withhold it — PER-12 forbids
-		// projecting it and this codebase has no redaction. Otherwise the diagnostic is genuinely useful and
-		// destroying it would repeat agy's disclosed loss for no reason.
-		const diagnostic = diagnosticCarriesPrompt(raw, prompt)
-			? 'devin invocation failed. Its diagnostic is WITHHELD: it was measured to contain the prompt, ' +
-				'which may not reach the record plane (PER-12), and no redaction exists here.'
-			: `devin invocation failed: ${raw}`;
+		// ⭑ devin's own words, read here and nowhere recorded: the output limit's reader takes them below (`devinOutputLimit`), as D46's took each
+		// refused attempt's above (`isFreeTierRefusal`).
+		// ⭐ L17b4 (the lead's §15.5 (c); `L4C-A02`) — ~~`const raw = e instanceof Error ? e.message : String(e);`~~: read guarded (`thrownMessage`), its safe
+		// default '' — a message that throws when read holds no sentence of devin's to read, and its throw never escapes in the failure's place.
+		const raw = thrownMessage(e);
+		// ~~⭑ THE MEASUREMENT. If the prompt somehow reached the diagnostic anyway, withhold it — PER-12 forbids projecting it and this codebase has no
+		// redaction. Otherwise the diagnostic is genuinely useful and destroying it would repeat agy's disclosed loss for no reason.~~
+		// ~~`const diagnostic = diagnosticCarriesPrompt(raw, prompt) ? 'devin invocation failed. Its diagnostic is WITHHELD: …' : `devin invocation failed: ${raw}`;`~~
+		// ⭐⭐ STRUCK BY `JAN-EXEC` Phase 7, package L17b4 (design D93; `REG-F-685`; the lead's L4-Q2, L4-Q3) — THE RECORD IS THE FAILURE'S KIND ALONE, and
+		// each known phrase by its name (`devinFailureRecord`): the diagnostic was not "genuinely useful" alone — it held devin's command line, naming the
+		// call's folder under the home folder, and devin's login banner, naming the user's e-mail address. Every class below is thrown with this record.
+		const diagnostic = devinFailureRecord(e, DEVIN_PRINT_BOUND_MS);
 		// ⭐⭐ P5 package A (F1) — A REPLY DEVIN ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT IS THROWN AS ITS OWN CLASS, the same
 		// diagnostic its message, its partial reply, what the export counted and the export itself beside it
 		// (`devinOutputLimit`). Every other failure is thrown as before.
-		const cut = await devinOutputLimit(e, raw, exportPath);
+		// ⭐ L17b4 (§15.5 (c)) — ~~`const cut = await devinOutputLimit(e, raw, exportPath);`~~: and a reader that throws for any other reason falls back to its
+		// safe default, no cut, so whatever is thrown carries the safe record alone.
+		const cut = await devinOutputLimit(e, raw, exportPath).catch(() => undefined);
 		// ⭐⭐ Package X — D34 (`REG-F-590`) — A CALL KILLED DURING ITS RUN IS THROWN AS ITS OWN CLASS, the same diagnostic its
 		// message and what the kill left beside it (`devinKilled`), read before the `finally` removes the folder. ⛔ Before X a
 		// kill was thrown with its diagnostic alone: the record could not tell a call that was answering from one that printed
 		// nothing.
-		const killed = cut === undefined ? await devinKilled(e, exportPath) : undefined;
+		// ⭐ L17b4 (§15.5 (c)) — ~~`const killed = cut === undefined ? await devinKilled(e, exportPath) : undefined;`~~: likewise, no kill.
+		const killed = cut === undefined ? await devinKilled(e, exportPath).catch(() => undefined) : undefined;
 		// ⭐ Z3 — D46 — whatever is thrown carries the refusals waited out before it, off its message (`freeTierRefusalsOf`).
 		const carry = <E extends Error>(thrown: E): E => withFreeTierRefusals(thrown, waited());
 		if (killed !== undefined) throw carry(new ToolCallKilled(diagnostic, killed));

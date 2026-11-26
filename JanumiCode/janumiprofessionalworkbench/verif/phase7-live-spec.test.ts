@@ -27,6 +27,8 @@ import { errors, type Locator, type Page } from '@playwright/test';
 import ts from 'typescript';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { EngineSnapshot } from '../apps/rph-demo/e2e/support/harness.js';
+// ⭐ L17b4 (design D93 widened to the boot; the lead's §15.5 (a)) — the one definition a failed readiness call is read by, its kind and names.
+import { devinFailureKindAndNames } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 import {
 	AUTHORING_REVIEW_ALLOWANCE_VARIABLE,
 	LANE_BUDGET,
@@ -1085,9 +1087,15 @@ describe('⭐ D3 — the boot record', () => {
 	});
 });
 
-/** A runner that answers each program call from `answers`, by its arguments, and records each call. */
+/**
+ * A runner that answers each program call from `answers`, by its arguments, and records each call.
+ * ⭐ RESTATED (L17b4, design D93 widened to the boot; the lead's §15.5 (a); `REG-D-198`): ~~`answers: Record<string, { exitCode: number | null; stdout?:
+ * string; failure?: string }>`~~ and ~~`stderr: '', failure: a.failure ?? null`~~ — the runner hands on what its program printed and what its run threw,
+ * never a failure in words: a call that did not exit 0 throws execFile's error, which the readiness reads by its kind alone. Where an answer gives no
+ * error, its exit code is the error's own, as execFile's error carries it.
+ */
 function scripted(
-	answers: Record<string, { exitCode: number | null; stdout?: string; failure?: string }>
+	answers: Record<string, { exitCode: number | null; stdout?: string; stderr?: string; error?: unknown }>
 ) {
 	const calls: [string, readonly string[], number][] = [];
 	const run: ProgramRunner = async (program, args, timeoutMs) => {
@@ -1096,11 +1104,30 @@ function scripted(
 		return {
 			exitCode: a.exitCode,
 			stdout: a.stdout ?? '',
-			stderr: '',
-			failure: a.failure ?? null
+			stderr: a.stderr ?? '',
+			error: a.error ?? (a.exitCode === 0 ? null : { code: a.exitCode })
 		};
 	};
 	return { run, calls };
+}
+/** ⭐ L17b4 (§15.5 (a)) — a home folder named `fixture`, its parts joined here, so that no line of this file holds an absolute path. */
+const FIXTURE_HOME = ['C:', 'Users', 'fixture'].join('\\');
+/** ⭐ L17b4 (§15.5 (a)) — what devin prints first: its login banner, with a made-up address at example.invalid. */
+const BANNER = ' ✓ Logged in as fixture@example.invalid.\n ✓ Organization: Your Organization\n';
+/** ⭐ L17b4 (§15.5 (a)) — text shaped as an e-mail address. */
+const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+/** ⭐ L17b4 (§15.5 (a)) — what execFile rejects with when a readiness call fails: its command line, the program under the home folder, then its stderr. */
+function readinessRejection(args: string, o: { readonly code?: unknown; readonly signal?: unknown; readonly killed?: boolean; readonly syscall?: string }): Error {
+	const cmd = `${[FIXTURE_HOME, 'tools', 'devin.exe'].join('\\')} ${args}`;
+	return Object.assign(new Error(`Command failed: ${cmd}\n${BANNER}Error: it could not finish\n`), {
+		code: o.code ?? null,
+		killed: o.killed ?? false,
+		signal: o.signal ?? null,
+		cmd,
+		stdout: '',
+		stderr: BANNER,
+		...(o.syscall === undefined ? {} : { syscall: o.syscall })
+	});
 }
 const READY = {
 	'--version': { exitCode: 0, stdout: 'devin 3000.6.14\n' },
@@ -1129,18 +1156,25 @@ describe('⭐ D3 — devin’s readiness: its version and its model list, the co
 		});
 		expect(readinessRefusals(await reviewerReadiness('glm-5-3-flash-max', r.run))).toEqual([
 			`\`devin models list\` does not list "glm-5-3-flash-max", the model ${REVIEWER_MODEL_VARIABLE.devin} ` +
-				'configures: the account offers no such model, or it is spelt otherwise (its output is in lane/boot.json)'
+				// ⭐ RESTATED (L17b4, §15.5 (a); `REG-D-198`): ~~`'configures: the account offers no such model, or it is spelt otherwise (its output is in
+				// lane/boot.json)'`~~ — the boot record keeps no word of the listing, so the operator is told to run it.
+				'configures: the account offers no such model, or it is spelt otherwise (lane/boot.json keeps no word of the listing: run `devin models list` ' +
+				'yourself to see it)'
 		]);
 	});
 
-	it('⭐ a devin that cannot start, or exits otherwise, is refused in its own words', async () => {
+	// ⭐ RESTATED (L17b4, design D93 widened to the boot; the lead's §15.5 (a); `REG-D-198`): ~~'⭐ a devin that cannot start, or exits otherwise, is refused
+	// in its own words'~~ — a failed readiness call is refused by its kind and names, by the one definition at the call's own bound, and never its words.
+	it('⭐ a devin that cannot start, or exits otherwise, is refused by its kind alone, never its own words, and the operator told to run it to see them', async () => {
 		const r = scripted({
-			'--version': { exitCode: null, failure: 'spawn devin ENOENT' },
-			'models list': { exitCode: 2, stdout: 'glm-5-3-flash-max' }
+			// ⭐ L17b4 — ~~`'--version': { exitCode: null, failure: 'spawn devin ENOENT' },`~~ ~~`'models list': { exitCode: 2, stdout: 'glm-5-3-flash-max' }`~~
+			'--version': { exitCode: null, error: readinessRejection('--version', { code: 'ENOENT', syscall: 'spawn devin' }) },
+			'models list': { exitCode: 2, stdout: 'glm-5-3-flash-max', error: readinessRejection('models list', { code: 2 }) }
 		});
 		expect(readinessRefusals(await reviewerReadiness('glm-5-3-flash-max', r.run))).toEqual([
-			'`devin --version` spawn devin ENOENT',
-			'`devin models list` exited 2'
+			// ⭐ L17b4 — ~~`'`devin --version` spawn devin ENOENT',`~~ ~~`'`devin models list` exited 2'`~~
+			'`devin --version` could not start: ENOENT (lane/boot.json keeps no word of its output: run `devin --version` yourself to see it)',
+			'`devin models list` exited with code 2 (lane/boot.json keeps no word of its output: run `devin models list` yourself to see it)'
 		]);
 	});
 
@@ -1161,15 +1195,16 @@ describe('⭐ D3 — devin’s readiness: its version and its model list, the co
 			['-e', 'process.stdout.write("out"); process.exit(3)'],
 			30_000
 		);
-		expect(exited).toEqual({ exitCode: 3, stdout: 'out', stderr: '', failure: null });
+		// ⭐ RESTATED (L17b4, §15.5 (a); `REG-D-198`): ~~`expect(exited).toEqual({ exitCode: 3, stdout: 'out', stderr: '', failure: null });`~~ — the runner hands
+		// on what the run threw (execFile's error), which the readiness reads by its kind alone (`devinFailureKindAndNames`), never a failure in words.
+		expect([exited.exitCode, exited.stdout, exited.stderr, devinFailureKindAndNames(exited.error, 30_000)]).toEqual([3, 'out', '', 'exited with code 3']);
 		const missing = await execFileRunner(join(ROOT, 'no-such-program'), [], 30_000);
-		expect([missing.exitCode, missing.failure]).toEqual([null, expect.stringContaining('ENOENT')]);
+		// ⭐ L17b4 — ~~`expect([missing.exitCode, missing.failure]).toEqual([null, expect.stringContaining('ENOENT')]);`~~
+		expect([missing.exitCode, devinFailureKindAndNames(missing.error, 30_000)]).toEqual([null, 'could not start: ENOENT']);
 		const started = Date.now();
 		const slow = await execFileRunner(process.execPath, ['-e', 'setTimeout(() => {}, 20000)'], 300);
-		expect([slow.exitCode, slow.failure]).toEqual([
-			null,
-			'killed after 300 ms: it did not finish within its bound'
-		]);
+		// ⭐ L17b4 — ~~`expect([slow.exitCode, slow.failure]).toEqual([null, 'killed after 300 ms: it did not finish within its bound']);`~~
+		expect([slow.exitCode, devinFailureKindAndNames(slow.error, 300)]).toEqual([null, 'killed by SIGTERM, at its time bound of 300 ms']);
 		expect(Date.now() - started).toBeLessThan(15_000);
 	});
 });
@@ -1223,11 +1258,12 @@ describe('⭐ D3 — the boot: what the run starts from, and EVERY reason it may
 			// unread here (`--version` failed), which the readiness refuses already: no second refusal for it (a reading for Stage 2).
 			serverEnv: { JPWB_DEMO_DB: 'D:/elsewhere/demo.sqlite', JPWB_HISTORIAN_CALL_MS: '600000' },
 			store,
-			run: scripted({ ...READY, '--version': { exitCode: null, failure: 'spawn devin ENOENT' } })
-				.run
+			// ⭐ RESTATED (L17b4, §15.5 (a); `REG-D-198`): ~~`run: scripted({ ...READY, '--version': { exitCode: null, failure: 'spawn devin ENOENT' } }).run`~~ and
+			// ~~`'`devin --version` spawn devin ENOENT',`~~ — the call that could not start throws execFile's error, refused by its kind alone.
+			run: scripted({ ...READY, '--version': { exitCode: null, error: readinessRejection('--version', { code: 'ENOENT', syscall: 'spawn devin' }) } }).run
 		});
 		expect(boot.refusals).toEqual([
-			'`devin --version` spawn devin ENOENT',
+			'`devin --version` could not start: ENOENT (lane/boot.json keeps no word of its output: run `devin --version` yourself to see it)',
 			priorReviewerCalls({}),
 			`the server keeps its store at D:/elsewhere/demo.sqlite, not in the run folder, at ${store}`,
 			`${store} does not exist: the server made no store in the run folder`
@@ -1295,6 +1331,98 @@ describe('⭐ D3 — the boot: what the run starts from, and EVERY reason it may
 				.toBe(1);
 		}
 		expect.soft(bounds((await boot('2147483647')).refusals), '⭑ CONTROL — the largest bound the product takes was refused').toEqual([]);
+	});
+
+	// ⭐⭐ L17b4 — design D93 widened to the lane's boot (the lead's §15.5 (a); `L4C-A01`; `REG-D-198`, the sponsor's "Mend in L17b4") — THE BOOT RECORD KEEPS
+	// WHAT THE READINESS CHECK DECIDES BY, AND NO WORD OF devin's OUTPUT: the version read (its `<n>.<n>.<n>`, or none); whether the configured model is
+	// listed; each call's exit code, and a failed call's kind and names by the one definition at the readiness call's own bound; and each output's length,
+	// so an empty listing can be told from one that was read. Driven by its injected runner: no devin is run.
+	it('⛔ RED FIRST — L17b4 (§15.5 (a); REG-D-198): the boot record keeps the version read, whether the model is listed, each call’s exit code and kind of failure and each output’s length — and no word of devin’s output, its login banner and a home folder among it', async () => {
+		const store = join(folder('boot-words'), 'demo.sqlite');
+		writeFileSync(store, '');
+		const version = `devin 3000.11.234 (92c83011d113)\n${BANNER}`;
+		const listing = `${BANNER}GLM-5.3 Flash High   glm-5-3-flash-high\nGPT 5   gpt-5\n`;
+		const boot = (answers: Parameters<typeof scripted>[0]) =>
+			bootOf({
+				paid: true,
+				env: { ...keys, [PHASE7_PRIOR_CALLS_VARIABLE]: '3' },
+				serverEnv: { RPH_DEMO_MODE: 'server', JPWB_HARNESS: '1', JPWB_SEED: 'empty', JPWB_DEMO_DB: store, JPWB_HISTORIAN_CALL_MS: '600000' },
+				store,
+				run: scripted(answers).run
+			});
+		const ready = await boot({ '--version': { exitCode: 0, stdout: version, stderr: BANNER }, 'models list': { exitCode: 0, stdout: listing } });
+		expect(ready.refusals, 'arrangement: the boot is ready').toEqual([]);
+		expect.soft(ready.record.readiness, 'the ready boot’s record does not keep what the readiness decides by, and that alone').toEqual({
+			devinVersion: { exitCode: 0, failure: null, stdoutLength: version.length, stderrLength: BANNER.length, version: '3000.11.234' },
+			modelsList: { exitCode: 0, failure: null, stdoutLength: listing.length, stderrLength: 0, configuredModel: 'glm-5-3-flash-high', listed: true }
+		});
+		const failing = await boot({
+			'--version': { exitCode: 1, stdout: '', stderr: BANNER, error: readinessRejection('--version', { code: 1 }) },
+			'models list': { exitCode: null, stdout: listing, stderr: BANNER, error: readinessRejection('models list', { killed: true, signal: 'SIGTERM' }) }
+		});
+		expect.soft(failing.record.readiness, 'the record of a devin not ready does not keep each call’s kind and lengths alone').toEqual({
+			devinVersion: { exitCode: 1, failure: 'exited with code 1', stdoutLength: 0, stderrLength: BANNER.length, version: null },
+			modelsList: {
+				exitCode: null,
+				failure: `killed by SIGTERM, at its time bound of ${READINESS_CALL_MS} ms`,
+				stdoutLength: listing.length,
+				stderrLength: BANNER.length,
+				configuredModel: 'glm-5-3-flash-high',
+				listed: false
+			}
+		});
+		const unstarted = await boot({
+			'--version': { exitCode: null, error: readinessRejection('--version', { code: 'ENOENT', syscall: 'spawn devin' }) },
+			'models list': { exitCode: 0, stdout: `${BANNER}GPT 5   gpt-5\n` }
+		});
+		expect.soft(unstarted.record.readiness?.devinVersion.failure, 'a readiness call that could not start is not recorded by its kind alone').toBe('could not start: ENOENT');
+		for (const [what, b] of [
+			['the ready boot', ready],
+			['the boot of a devin not ready', failing],
+			['the boot of a devin that could not start', unstarted]
+		] as const) {
+			const text = JSON.stringify(b.record);
+			expect.soft(text, `${what}’s record holds devin’s login banner`).not.toMatch(EMAIL);
+			expect.soft(text, `${what}’s record holds the home folder`).not.toContain(JSON.stringify(FIXTURE_HOME).slice(1, -1));
+			expect.soft(text, `${what}’s record holds execFile’s words`).not.toContain('Command failed');
+			expect.soft(text, `${what}’s record holds the listing’s words`).not.toContain('GPT 5');
+		}
+	});
+
+	// ⭐⭐ L17b4 — design D93 (the lead's §15.5 (b)) — A PAID BOOT WHOSE `devin --version` HOLDS NO VERSION is refused for the Historian, naming its reply's
+	// length, never its words: the version is read by the one reading (`devinVersionIn`), and the rule worded by the one definition, which the Historian's
+	// own call words it by too.
+	it('⛔ RED FIRST — L17b4 (§15.5 (b)): a paid boot whose `devin --version` reply holds no version is refused for the Historian by the reply’s length, never its words', async () => {
+		const store = join(folder('boot-no-version'), 'demo.sqlite');
+		writeFileSync(store, '');
+		const reply = `${BANNER}update available\n`;
+		const b = await bootOf({
+			paid: true,
+			env: { ...keys, [PHASE7_PRIOR_CALLS_VARIABLE]: '3' },
+			serverEnv: { RPH_DEMO_MODE: 'server', JPWB_HARNESS: '1', JPWB_SEED: 'empty', JPWB_DEMO_DB: store, JPWB_HISTORIAN_CALL_MS: '600000' },
+			store,
+			run: scripted({ ...READY, '--version': { exitCode: 0, stdout: reply } }).run
+		});
+		expect.soft(b.refusals, 'the boot is not refused for the Historian by the reply’s length alone').toEqual([
+			'the Historian could not run in this paid run, so a unit its declared reviews reject could not be judged (L17b2 ruling 6 (C)): ' +
+				`devin's reply to \`devin --version\` holds no version (${reply.length} characters; devin's own words are not recorded, REG-F-685), and the ` +
+				"Historian's two tool lists were measured at 3000.11.234: they are true of that version alone, so it is not run (L17b2 ruling 2 (A))"
+		]);
+		expect.soft(JSON.stringify(b.record), 'the boot record holds devin’s login banner').not.toMatch(EMAIL);
+	});
+
+	// ⭐⭐ L17b4 — design D93 widened to the boot (the lead's §15.5 (a); round 3, l17b4-facts.md §16.6) — A RUNNER THAT HANDS NO ERROR FOR A CALL THAT DID
+	// NOT EXIT 0 is read by the exit code it gave, as execFile's error carries it (`readinessCallOf`): its kind is that exit, never none of the kinds.
+	it('⛔ RED FIRST — L17b4 (§15.5 (a)): a runner that hands no error for a call that did not exit 0 is recorded, and refused, by the exit code it gave', async () => {
+		const run: ProgramRunner = async (_program, args) =>
+			args[0] === '--version'
+				? { exitCode: 2, stdout: '', stderr: '', error: null }
+				: { exitCode: 0, stdout: 'GLM-5.3 Flash Max   glm-5-3-flash-max\n', stderr: '', error: null };
+		const r = await reviewerReadiness('glm-5-3-flash-max', run);
+		expect.soft(r.devinVersion.failure, 'a failed call with no error is not recorded by the exit it gave').toBe('exited with code 2');
+		expect.soft(readinessRefusals(r), 'a failed call with no error is not refused by the exit it gave').toEqual([
+			'`devin --version` exited with code 2 (lane/boot.json keeps no word of its output: run `devin --version` yourself to see it)'
+		]);
 	});
 });
 
