@@ -6,7 +6,9 @@
 // ~~disabled in the user configuration passed as `--config` AND denied by name in the folder's project configuration, beside `Fetch(*)` and
 // `mcp__*`; `subagents_enabled: false`; the seven `read_config_from` false~~ ⭐ (L17b4, design D93; `REG-F-684`, `REG-D-197`: any `--config`
 // file stalls devin 3000.11.234, so none is passed) denied by name in the folder's project configuration, beside `Fetch(*)` and `mcp__*`, and
-// audited in the export. ⭑ The lists are true of ONE version: before the call devin's version is read,
+// audited in the export. ⭐ L17b5 (`REG-D-199`; `REG-F-688`; D93's probe P4b) — and the seven `read_config_from` false come back, in the folder's
+// project configuration beside its deny list, where P4b measured them stopping devin giving the call other agents' rules files and the user's
+// always-on rule. ⭑ The lists are true of ONE version: before the call devin's version is read,
 // and any other is not run (ruling 2 (A)). The 25 names below are that version's own listing (`agent.tool_definitions` of an export it wrote:
 // all 673 exports on disk outside the run folders list the same 25 — L17b2 facts §2.4).
 // ⭑ ITS FOLDER (ruling 8): `prompt.txt`, `.devin/config.json`, `records/` with `records/INDEX.md`, `workspace/` (a copy of the shared
@@ -57,8 +59,14 @@ const EXPORT_TOOL_NAMES_3000_11_234 = [
 /** MH-0a's `disabled_tools` names that 3000.11.234 does not offer the selected model (DESIGN-multi-harness-executor.md §4.1). */
 const MH0A_NOT_OFFERED = ['code_search', 'apply_patch', 'shell_command', 'view_image'] as const;
 // ⭐ L17b4 (design D93; the lead's L4-Q1) — ~~`const READ_CONFIG_FROM = ['cursor', 'windsurf', 'claude', 'opencode', 'zed', 'copilot', 'agents_standard'] as const;`~~:
-// no user configuration is passed, so no read_config_from switch is set (REG-D-197); what devin reads of other agents' configuration is measured by
-// D93's probes P4a and P4b, not assumed.
+// no user configuration is passed, ~~so no read_config_from switch is set (REG-D-197)~~; ~~what devin reads of other agents' configuration is measured by
+// D93's probes P4a and P4b, not assumed~~. ⭐ L17b5 (`REG-D-199`; `REG-F-688`; D93's probe P4b) — measured, and acted on: P4a found devin given other
+// agents' rules files at its folder's top and the machine user's always-on rule, and P4b that the seven switches, each false, in the folder's project
+// configuration stop both. So they are set there now (`HISTORIAN_PROJECT_CONFIG`), held by the test below to P4b's measured file.
+/** ⭐ L17b5 (D93's probe P4b; `l17b4/l17b4-facts.md` §24, §25; `REG-D-199`) — the project configuration P4b measured holding: its length, and its sha256. */
+const P4B_PROJECT_CONFIG = { length: 830, sha256: '40746e5c4d1e21146b4a558d1d51578a75a1e6fc6e2c0f370074b0e5b7624551' } as const;
+/** ⭐ L17b5 — D86's seven places devin reads other agents' configuration from, in D86's order (MH-0a), each to be false. */
+const D86_READ_CONFIG_FROM = ['cursor', 'windsurf', 'claude', 'opencode', 'zed', 'copilot', 'agents_standard'] as const;
 
 const sorted = (xs: Iterable<string>): string[] => [...xs].sort();
 const dirs: string[] = [];
@@ -129,6 +137,9 @@ describe('⭐⭐ L17b2 (D86; ruling 2) — the Historian’s project configurati
 	// off; both files two-space JSON with a closing line break'~~ — its user configuration's checks are struck under REG-D-197, as P6X-L17B2-M17 is
 	// abolished: no user configuration is passed. Subagents are held by the deny list above, `run_subagent` and `read_subagent` denied by name; the
 	// project configuration's form stays.
+	// ⭐ L17b5 (`REG-D-199`; `REG-F-688`; D93's probe P4b) — and the `read_config_from` check comes back, in the folder's project configuration, where
+	// P4b measured it holding: the test after this one, which holds the configuration to P4b's measured file. P6X-L17B2-M17 stays abolished; the new
+	// entries guard what it guarded.
 	it('⛔ RED FIRST — the project configuration: two-space JSON with a closing line break (its user configuration’s checks struck under REG-D-197)', () => {
 		// ⭐ L17b4 — ~~`const user = JSON.parse(HISTORIAN_USER_CONFIG) as { subagents_enabled?: unknown; read_config_from?: Record<string, unknown> };`~~
 		// ~~`expect.soft(user.subagents_enabled).toBe(false);`~~
@@ -136,6 +147,23 @@ describe('⭐⭐ L17b2 (D86; ruling 2) — the Historian’s project configurati
 		// ~~`for (const [name, text] of [['user', HISTORIAN_USER_CONFIG], ['project', HISTORIAN_PROJECT_CONFIG]] as const)`~~
 		for (const [name, text] of [['project', HISTORIAN_PROJECT_CONFIG]] as const)
 			expect.soft(text, `the ${name} configuration’s form`).toBe(`${JSON.stringify(JSON.parse(text), null, 2)}\n`);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L17b5 — design D93 as amended (`REG-D-199`; `REG-F-688`; `l17b4/l17b4-facts.md` §24, §25) — THE GUARD RESTORED: the
+	// folder's project configuration holds `read_config_from`, D86's seven keys in D86's order, each false, beside its deny list, unchanged. D93's probe
+	// P4b measured that they stop devin giving the call other agents' rules files at its folder's top and the machine user's always-on rule. So the
+	// configuration is held to P4b's measured file, byte for byte, by its length and its sha256 (`P4B_PROJECT_CONFIG`).
+	it('⛔ RED FIRST — L17b5 (REG-D-199; REG-F-688): the project configuration is P4b’s measured file byte for byte, its read_config_from D86’s seven keys in their order, each false', () => {
+		expect
+			.soft(
+				[Buffer.byteLength(HISTORIAN_PROJECT_CONFIG, 'utf8'), createHash('sha256').update(HISTORIAN_PROJECT_CONFIG, 'utf8').digest('hex')],
+				'the project configuration is not P4b’s measured file, byte for byte'
+			)
+			.toEqual([P4B_PROJECT_CONFIG.length, P4B_PROJECT_CONFIG.sha256]);
+		const project = JSON.parse(HISTORIAN_PROJECT_CONFIG) as { read_config_from?: Record<string, unknown> };
+		expect
+			.soft(Object.entries(project.read_config_from ?? {}), 'its read_config_from is not D86’s seven keys, in their order, each false')
+			.toEqual(D86_READ_CONFIG_FROM.map((k) => [k, false]));
 	});
 });
 

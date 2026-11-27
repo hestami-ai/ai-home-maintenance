@@ -6,9 +6,11 @@
 // configuration passed as `--config` (`HISTORIAN_USER_CONFIG`) AND~~ denied by name in the folder's project configuration (`HISTORIAN_PROJECT_CONFIG`),
 // beside `Fetch(*)` and `mcp__*`~~; `subagents_enabled: false`; the seven `read_config_from` false~~. ⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`):
 // any `--config` file stalls devin 3000.11.234 on this host, so none is passed. The tools are held by the deny list and the export's audit (ruling 2 (B)),
-// the subagents by `run_subagent` and `read_subagent` denied by name; what devin reads of other agents' configuration is measured (D93's probes P4a
-// and P4b), not assumed. ⛔ The lists are true of ONE version: before the call, `devin --version` is read, and any version but the one whose tools were
-// measured is not run, naming both (ruling 2 (A)).
+// the subagents by `run_subagent` and `read_subagent` denied by name; ~~what devin reads of other agents' configuration is measured (D93's probes P4a
+// and P4b), not assumed~~. ⭐ L17b5 (`REG-D-199`; `REG-F-688`; D93's probe P4b) — measured, and acted on: P4a found devin given other agents' rules
+// files at its folder's top and the machine user's always-on rule, and P4b that the seven `read_config_from` keys, each false, stop both. So the seven
+// are back, in the folder's project configuration beside its deny list (`READ_CONFIG_FROM`, `HISTORIAN_PROJECT_CONFIG`). ⛔ The lists are true of ONE
+// version: before the call, `devin --version` is read, and any version but the one whose tools were measured is not run, naming both (ruling 2 (A)).
 // ⭑ ITS FOLDER (ruling 8; `writeHistorianFolder`): `prompt.txt`; `.devin/config.json`, its own; `records/`, the round's records as files, each named by
 // its record's id, with `records/INDEX.md`; and `workspace/`, a copy of the shared workspace READ THROUGH THE PORT (§7, Q1: `historianWorkspaceFiles` —
 // whole, or not at all). Beside it, a host folder holding ~~the `--config` file and~~ the export alone, outside what it may read. Both removed after the
@@ -81,7 +83,7 @@ export const HISTORIAN_DISABLED_TOOLS: readonly string[] = [
 	'view_image'
 ];
 
-// ⭐⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`; the lead's L4-Q1 on Stage 0) — THE USER CONFIGURATION IS GONE, and the seven places with it: any
+// ⭐⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`; the lead's L4-Q1 on Stage 0) — THE USER CONFIGURATION IS GONE~~, and the seven places with it~~: any
 // `--config` file stalls devin 3000.11.234 on this host (D84's measurement: the Historian's own file, the same file, and `{}`, 3 of 3 calls), so the
 // Historian is passed none, and its tools rest on the project configuration below and the export's audit. Struck, its words kept:
 // ~~`/** ⭐ D86 — the seven places devin reads other agents' configuration from, each turned off (MH-0a). */`~~
@@ -89,12 +91,25 @@ export const HISTORIAN_DISABLED_TOOLS: readonly string[] = [
 // ~~`/** ⭐ D86, ruling 2 — the user configuration, passed as `--config`: the 26 disabled, subagents off, no other agent's configuration read. */`~~
 // ~~`export const HISTORIAN_USER_CONFIG = `${JSON.stringify({ disabled_tools: [...HISTORIAN_DISABLED_TOOLS], subagents_enabled: false,
 // read_config_from: Object.fromEntries(READ_CONFIG_FROM.map((k) => [k, false])) }, null, 2)}\n`;`~~
+// ⭐ L17b5 (`REG-D-199`; `REG-F-688`; D93's probe P4b) — the seven places come back, in the folder's project configuration: the line below.
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b5 — design D93 as amended (`REG-D-199`, the sponsor's "Restore the guard first"; `REG-F-688`) — THE SEVEN PLACES
+ * DEVIN READS OTHER AGENTS' CONFIGURATION FROM, in D86's order (MH-0a), each turned off: back from L17b4, which removed them with the `--config` file.
+ * They go in the folder's project configuration, where D93's probe P4b measured them holding: with all seven false, devin gives the call none of other
+ * agents' rules files at the folder's top, and not the machine user's always-on rule (`l17b4/l17b4-facts.md` §24, §25).
+ */
+const READ_CONFIG_FROM = ['cursor', 'windsurf', 'claude', 'opencode', 'zed', 'copilot', 'agents_standard'] as const;
 
 /**
  * ⭐ D86, ruling 2 — ~~the second guard,~~ ⭐ (L17b4, D93: the guard, as no user configuration is passed) the folder's project configuration: the 26
- * denied by name, with `Fetch(*)` and `mcp__*`.
+ * denied by name, with `Fetch(*)` and `mcp__*`~~.~~ ⭐ (L17b5: `REG-D-199`; `REG-F-688`; D93's probe P4b), and `read_config_from` after them, the seven
+ * places of `READ_CONFIG_FROM`, each false. Its bytes are P4b's measured file byte for byte: 830 bytes, LF, sha256 `40746e5c…`
+ * (`l17b4/probes/p4b-project-config.json`), as its test holds them.
  */
-export const HISTORIAN_PROJECT_CONFIG = `${JSON.stringify({ permissions: { deny: [...HISTORIAN_DISABLED_TOOLS, 'Fetch(*)', 'mcp__*'] } }, null, 2)}\n`;
+// ⭐ L17b5 — ~~`export const HISTORIAN_PROJECT_CONFIG = `${JSON.stringify({ permissions: { deny: [...HISTORIAN_DISABLED_TOOLS, 'Fetch(*)', 'mcp__*'] } },
+// null, 2)}\n`;`~~, the deny list alone (644 bytes): and the seven `read_config_from` keys now, each false.
+export const HISTORIAN_PROJECT_CONFIG = `${JSON.stringify({ permissions: { deny: [...HISTORIAN_DISABLED_TOOLS, 'Fetch(*)', 'mcp__*'] }, read_config_from: Object.fromEntries(READ_CONFIG_FROM.map((k) => [k, false])) }, null, 2)}\n`;
 
 /** ⭐ Ruling 16 — the Historian's time bound's setting: required, with no default. */
 export const HISTORIAN_CALL_MS_VARIABLE = 'JPWB_HISTORIAN_CALL_MS';
