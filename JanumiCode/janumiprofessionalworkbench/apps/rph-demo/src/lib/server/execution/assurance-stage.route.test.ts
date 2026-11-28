@@ -125,9 +125,18 @@ const seam = vi.hoisted(() => ({
 	 * call; undefined, a clean answer — every criterion met, nothing recurring, nothing recommended — and an export with no step. ⭐ L17b4 (D93) — or the
 	 * very value its program is to throw (`rejects`), an error in execFile's shape, where a case needs the failure's code, signal and words.
 	 */
+	// ⭐ L17b6 round 5 (the lead's §47.7, items 9 and 10) — ~~`readonly rejects?: unknown }),`~~ last: and `script`, the fake's other options for the case
+	// (`assurance/devin-acp-fake.testing.ts`), its turn aside; absent, every option at its default, as before.
 	historian: undefined as
 		| undefined
-		| ((call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string; readonly rejects?: unknown }),
+		| ((call: { readonly prompt: string }) => {
+				readonly stdout?: string;
+				readonly toolCalls?: readonly Record<string, unknown>[];
+				readonly turn?: readonly unknown[];
+				readonly fails?: string;
+				readonly rejects?: unknown;
+				readonly script?: Readonly<Record<string, unknown>>;
+		  }),
 	/**
 	 * ⭐ L17b2 (D86) — each call devin was given as the Historian: its argv, its working folder and its bound, and what its folder ~~and its user configuration~~
 	 * held at the call. ⭐ L17b4 (design D93; `REG-D-197`; `L4C-B03`) — no user configuration is passed, so `userConfig` reads none: the argv names no
@@ -142,8 +151,10 @@ const seam = vi.hoisted(() => ({
 	}[],
 	/** ⭐ L17b2 (ruling 2 (A)) — what `devin --version` answers the Historian's check: the version whose tools were measured, unless a case says another. */
 	historianVersion: 'devin 3000.11.234 (92c83011d113)',
-	/** ⭐ L17b2 (ruling 6) — set, the Historian's call is given the seams the stage handed it (`historianExec`), not this file's program. */
+	/** ⭐ L17b2 (ruling 6) — set, the Historian's call is given the seams the stage handed it (~~`historianExec`~~ ⭐ `historianSpawn`, L17b6), not this file's program. */
 	historianPassThrough: false,
+	/** ⭐ L17b6 round 5 (the lead's §47.7, item 10) — set, the waits after the Historian's bound the call is given (its seam's `waits`); unset, the named ones. */
+	historianWaits: undefined as undefined | { readonly cancelGraceMs?: number; readonly deleteWaitMs?: number; readonly stopWaitMs?: number },
 	/** ⭐ L17b2 addendum (the lead's §27, item 7) — set, the records the Historian part's clash check is given, from those the part hands it: the REAL
 	 *  check (`recordNameClash`) runs on what this returns. */
 	historianRecordsChecked: undefined as undefined | ((records: readonly { readonly file: string; readonly what: string; readonly text: string }[]) => readonly { readonly file: string; readonly what: string; readonly text: string }[]),
@@ -497,12 +508,14 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 // `devin --version` answered by the case (`seam.historianVersion`), and the session by the case's answer (`seam.historian`), its export written where
 // the argv names it; what the folder ~~and the user configuration~~ held at the call kept (`seam.historianCalls`; ⭐ L17b4, D93, `L4C-B03`: no user
 // configuration is passed, so none is held). Where a case hands the stage a seam of
-// its own (`historianExec`, ruling 6), the call is given that seam (`seam.historianPassThrough`). ⚠ The module is package L17b2's: until it exists
+// its own (~~`historianExec`~~ ⭐ `historianSpawn`, L17b6; ruling 6), the call is given that seam (`seam.historianPassThrough`). ⚠ The module is package L17b2's: until it exists
 // nothing imports it, so this factory never runs (vitest gives a mock of an absent module its unresolved id).
 vi.mock('../tools/devin-historian.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../tools/devin-historian.js')>();
 	const fs = await import('node:fs');
 	const path = await import('node:path');
+	// ⭐ L17b6 (D94) — the fake of devin’s ACP server, the Historian’s program now.
+	const acpFake = await import('../assurance/devin-acp-fake.testing.js');
 	/** Every file under `root`, by its path relative to it, `/`-separated, with its text. */
 	const tree = (root: string): Record<string, string> => {
 		const out: Record<string, string> = {};
@@ -537,21 +550,22 @@ vi.mock('../tools/devin-historian.js', async (importOriginal) => {
 					? actual.devinHistorianCall(call, given)
 					: actual.devinHistorianCall(call, {
 							versionOf: async () => seam.historianVersion,
-							exec: async (_file: string, args: readonly string[], options: { readonly cwd: string; readonly timeout: number }) => {
-								const after = (flag: string): string => args[args.indexOf(flag) + 1] ?? '';
-								seam.historianCalls.push({
-									args: [...args],
-									cwd: options.cwd,
-									timeout: options.timeout,
-									files: tree(options.cwd),
-									userConfig: fs.existsSync(after('--config')) ? fs.readFileSync(after('--config'), 'utf8') : ''
-								});
-								const answered = seam.historian?.({ prompt: fs.readFileSync(after('--prompt-file'), 'utf8') }) ?? {};
-								if (answered.fails !== undefined) throw new Error(answered.fails);
-								// ⭐ L17b4 (D93) — a case's own rejection, thrown as it is, as execFile's would be.
+							// ⭐ L17b6 round 5 (§47.7, item 10) — and the waits after the bound, where the case sets them.
+							...(seam.historianWaits === undefined ? {} : { waits: seam.historianWaits }),
+							// ⭐ L17b6 (D94) — ~~`exec: async (_file, args, options) => { … the argv’s prompt file read, the call kept, its export written, `{ stdout }` … }`~~:
+							// devin’s ACP server, the fake (`assurance/devin-acp-fake.testing.ts`): the call kept from its launch; the case’s whole turn where it gives
+							// one, else its tool-call notices, then its answer as the last message, then `end_turn`; a case that fails, an exit before its answer; a
+							// case’s rejection thrown by the spawn as it is.
+							spawn: (launch: import('../tools/devin-historian.js').HistorianLaunch) => {
+								seam.historianCalls.push({ args: [...launch.args], cwd: launch.cwd, timeout: launch.boundMs, files: tree(launch.cwd), userConfig: '' });
+								const answered = seam.historian?.({ prompt: fs.readFileSync(path.join(launch.cwd, 'prompt.txt'), 'utf8') }) ?? {};
 								if (answered.rejects !== undefined) throw answered.rejects;
-								fs.writeFileSync(after('--export'), answered.export ?? JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [] }));
-								return { stdout: answered.stdout ?? clean };
+								const notices = (answered.toolCalls ?? []).map((notice) => ({ notice }));
+								const ending = answered.fails === undefined ? [{ message: answered.stdout ?? clean }, { end: 'end_turn' }] : [{ exit: 1 }];
+								const turn = (answered.turn ?? [...notices, ...ending]) as import('../assurance/devin-acp-fake.testing.js').FakeAcpEvent[];
+								// ⭐ L17b6 round 5 (§47.7, items 9 and 10) — ~~`acpFake.fakeAcp({ turn })`~~ alone: and the case's other options, where it gives any.
+								const options = (answered.script ?? {}) as Omit<import('../assurance/devin-acp-fake.testing.js').FakeAcpScript, 'turn'>;
+								return acpFake.fakeAcp({ ...options, turn }).spawn(launch);
 							}
 						})
 		)
@@ -587,11 +601,14 @@ vi.mock('../assurance/decision-model.js', async (importOriginal) => {
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+// ⭐ L17b6 (D94) — ~~`import { dirname, join } from 'node:path';`~~: no export path is read now, so its folder is not either.
+import { join } from 'node:path';
 import type { RecordModelExchangePayload } from '@janumipwb/rph-contracts';
 import { getObject, listByType, listPwus } from '@janumipwb/rph-engine';
 import { createInMemoryWorkspace, type Workspace } from '@janumipwb/rph-ports';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+// ⭐ L17b6 (D94) — the fake of devin’s ACP server, for the case that hands the stage its own Historian seam.
+import { fakeAcp } from '../assurance/devin-acp-fake.testing.js';
 import { actions as undertakings } from '../../../routes/undertakings/+page.server.js';
 import { actions as unitPage, load as unitLoad } from '../../../routes/undertakings/[id]/+page.server.js';
 import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
@@ -4170,12 +4187,23 @@ const DIAGNOSIS_NONE = JSON.stringify({ hypotheses: [], named: null, confidence:
 async function pressWithHistorian(
 	r: Awaited<ReturnType<typeof verificationRejected>>,
 	named: string | null,
-	// ⭐ L17b4 (D93) — and `rejects`, a case's own rejection, thrown as it is (the seam above).
-	historian?: (call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string; readonly rejects?: unknown },
+	// ⭐ L17b4 (D93) — and `rejects`, a case's own rejection, thrown as it is (the seam above). ⭐ L17b6 round 5 (§47.7) — and `script`, the fake's other
+	// options (the seam above).
+	historian?: (call: { readonly prompt: string }) => {
+		readonly stdout?: string;
+		readonly toolCalls?: readonly Record<string, unknown>[];
+		readonly turn?: readonly unknown[];
+		readonly fails?: string;
+		readonly rejects?: unknown;
+		readonly script?: Readonly<Record<string, unknown>>;
+	},
 	/** ⭐ L17b2 (item 4) — a diagnosis of the case's own, in place of the one naming `named`. */
-	diagnosis?: string
+	diagnosis?: string,
+	/** ⭐ L17b6 round 5 (the lead's §47.7, item 10) — the Historian's time bound, in place of the set one, where a case holds the call to it. */
+	boundMs?: string
 ) {
 	historianBoundSet();
+	if (boundMs !== undefined) vi.stubEnv('JPWB_HISTORIAN_CALL_MS', boundMs);
 	seam.review = chapterAnswering;
 	seam.historian = historian;
 	const pi = onPi({ diagnosis: diagnosis ?? (named === null ? DIAGNOSIS_NONE : DIAGNOSIS.replaceAll('SOURCE', named)), stepBack: STEP_BACK });
@@ -4273,7 +4301,10 @@ describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — 
 	// shared workspace; its user configuration beside it, outside what it may read; the selected reviewer’s model, the time bound set; both folders removed
 	// after the call'~~ — no user configuration is
 	// passed (REG-D-197): the host folder beside it holds the export alone, and devin is named no `--config`.
-	it('⛔ RED FIRST — its call: devin in a fresh folder of copies — the prompt (the rubric in the policy’s words, this sign-off’s failed criteria, the narrative so far, the folder’s layout, its index first), its project configuration, `records/` named by their ids with `INDEX.md` (each rejecting verdict, the chapter, the diagnosis, each candidate, and the recorded conversations — the Hypothesizer’s very bytes), and `workspace/`, a copy of the shared workspace; its export beside it, outside what it may read, and no --config; the selected reviewer’s model, the time bound set; both folders removed after the call', async () => {
+	// ⭐ RESTATED (L17b6, design D94; the lead's §39): ~~'… and `workspace/`, a copy of the shared workspace; its export beside it, outside what it may read,
+	// and no --config; the selected reviewer’s model, the time bound set; both folders removed after the call'~~ (the whole old title as it stood above, its
+	// head unchanged) — devin acp writes no export: its session is deleted after its turn.
+	it('⛔ RED FIRST — its call: devin in a fresh folder of copies — the prompt (the rubric in the policy’s words, this sign-off’s failed criteria, the narrative so far, the folder’s layout, its index first), its project configuration, `records/` named by their ids with `INDEX.md` (each rejecting verdict, the chapter, the diagnosis, each candidate, and the recorded conversations — the Hypothesizer’s very bytes), and `workspace/`, a copy of the shared workspace; no export, and no --config; the selected reviewer’s model, the time bound set; its session deleted; both folders removed after the call', async () => {
 		const r = await verificationRejected();
 		const roundId = r.verdicts[0]!.assessmentId;
 		const { pi } = await pressWithHistorian(r, r.ids.source);
@@ -4312,23 +4343,28 @@ describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — 
 		// ~~`const configPath = call.args[call.args.indexOf('--config') + 1] ?? '';`~~
 		// ~~`expect.soft(configPath !== '' && !configPath.startsWith(`${call.cwd}/`) && !configPath.startsWith(`${call.cwd}\\`), 'its user configuration is inside what it may read').toBe(true);`~~
 		expect.soft(call.args, 'it is named a --config file').not.toContain('--config');
-		const exportPath = call.args[call.args.indexOf('--export') + 1] ?? '';
-		expect.soft(exportPath !== '' && !exportPath.startsWith(`${call.cwd}/`) && !exportPath.startsWith(`${call.cwd}\\`), 'its export is inside what it may read').toBe(true);
+		// ⭐ L17b6 (D94) — ~~`const exportPath = call.args[call.args.indexOf('--export') + 1] ?? '';`~~ ~~`expect.soft(exportPath !== '' && … , 'its export is
+		// inside what it may read').toBe(true);`~~: no export is named, written or read; and `devin acp` is the program's first word.
+		expect.soft([call.args[0], call.args.includes('--export')], 'it is not devin acp, or it names an export').toEqual(['acp', false]);
 		expect.soft(call.args[call.args.indexOf('--model') + 1], 'it is not called with the selected reviewer’s model').toBe('fixture-assurance-model');
 		expect.soft(call.timeout, 'it is not called with the time bound set').toBe(600_000);
 		// ⭐ L17b4 — ~~`expect.soft([existsSync(call.cwd), existsSync(configPath)], 'its folder, or its host folder, was kept after the call').toEqual([false, false]);`~~
-		expect.soft([existsSync(call.cwd), existsSync(dirname(exportPath))], 'its folder, or its host folder, was kept after the call').toEqual([false, false]);
+		// ⭐ L17b6 — ~~`existsSync(dirname(exportPath))`~~: the host folder by its name beside the folder.
+		expect.soft([existsSync(call.cwd), existsSync(`${call.cwd}.host`)], 'its folder, or its host folder, was kept after the call').toEqual([false, false]);
 	});
 
-	it('⛔ RED FIRST — its exchange: its role’s own, on the ASSURANCE plane under pol_historical_consistency over the round, one the recording leaves out as the stage’s; its tool observation says it could not watch the session and points at where its tool calls and its export are kept; and its stage record holds its answer, its tool calls with their paths, its exchange and its assessment (ruling 11)', async () => {
+	// ⭐ RESTATED (L17b6, design D94; the lead's §39, Q3, Q11): ~~'⛔ RED FIRST — its exchange: its role’s own, on the ASSURANCE plane under
+	// pol_historical_consistency over the round, one the recording leaves out as the stage’s; its tool observation says it could not watch the session and
+	// points at where its tool calls and its export are kept; and its stage record holds its answer, its tool calls with their paths, its exchange and its
+	// assessment (ruling 11)'~~ — the adapter reads each call from devin's own notices now, and nothing is stored in the export's place.
+	it('⛔ RED FIRST — its exchange: its role’s own, on the ASSURANCE plane under pol_historical_consistency over the round, one the recording leaves out as the stage’s; its tool observation says it reads the calls from devin’s own notices and where they are kept, and points at no export; and its stage record holds its answer, its tool calls with their kinds and paths, its exchange and its assessment (ruling 11; D94)', async () => {
 		const r = await verificationRejected();
 		const roundId = r.verdicts[0]!.assessmentId;
 		const answer = historianAnswer();
-		const exported = JSON.stringify({
-			schema_version: 'ATIF-v1.7',
-			steps: [{ step_id: 1, source: 'agent', tool_calls: [{ tool_call_id: 'call_0', function_name: 'read', arguments: { file_path: 'records/INDEX.md' } }] }]
-		});
-		await pressWithHistorian(r, r.ids.source, () => ({ stdout: answer, export: exported }));
+		// ⭐ L17b6 — ~~`const exported = JSON.stringify({ … tool_calls: [{ tool_call_id: 'call_0', function_name: 'read', arguments: { file_path:
+		// 'records/INDEX.md' } }] … });`~~: the call's notice, as acp-06 line 30 gives one.
+		const read = { sessionUpdate: 'tool_call', toolCallId: 'call_0', title: 'Read file', kind: 'read', rawInput: { file_path: 'records/INDEX.md' }, _meta: { 'cognition.ai/inferenceToolName': 'read' } };
+		await pressWithHistorian(r, r.ids.source, () => ({ stdout: answer, toolCalls: [read] }));
 		const exchanges = historianExchanges();
 		expect(exchanges.length, 'the Historian’s exchange is not recorded under its role').toBe(1);
 		const x = exchanges[0]!;
@@ -4339,14 +4375,18 @@ describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — 
 		expect.soft(isAssuranceStageExchange(x.state), 'the recording would not leave its exchange out as the stage’s').toBe(true);
 		const reason = String((x.state.observedToolCalls as { reason?: unknown } | undefined)?.reason ?? '');
 		expect.soft(reason, 'its tool observation does not say where its tool calls are kept').toContain(`${HISTORIAN_PART} record of the round`);
-		expect.soft(reason, 'its tool observation does not point at its export').toContain("The backing tool's own export of this session");
+		// ⭐ L17b6 (D94; §39, Q11) — ~~`expect.soft(reason, 'its tool observation does not point at its export').toContain("The backing tool's own export of
+		// this session");`~~: it says the calls are read from devin's notices, and it points at no export, since nothing is stored in the export's place.
+		expect.soft(reason, 'its tool observation does not say the calls are read from devin’s own notices').toContain('reads each tool call from devin’s own notices');
+		expect.soft(reason, 'its tool observation points at an export').not.toContain("The backing tool's own export of this session");
 		const rec = stageEvidenceOf(HISTORIAN_PART);
 		expect.soft(rec.length, 'its stage record is not recorded once').toBe(1);
 		const artifact = getObject(getEngine(), String((rec[0]?.state.contentReference as { artifactId?: string } | undefined)?.artifactId ?? '')) ?? {};
 		const held = JSON.parse((await getArtifactStore().get(String(artifact.storageKey ?? ''))) ?? '{}') as Record<string, unknown>;
 		expect.soft(held.answer, 'its stage record does not hold its answer').toBe(answer);
+		// ⭐ L17b6 — ~~`{ name: 'read', paths: ['records/INDEX.md'], inside: true, allowed: true }`~~: and its toolCallId and its kind.
 		expect.soft(held.toolCalls, 'its stage record does not hold its tool calls with their paths').toEqual([
-			{ name: 'read', paths: ['records/INDEX.md'], inside: true, allowed: true }
+			{ toolCallId: 'call_0', name: 'read', kind: 'read', paths: ['records/INDEX.md'], inside: true, allowed: true }
 		]);
 		expect.soft([held.exchangeId, held.assessmentId], 'its stage record does not name its exchange and its assessment').toEqual([
 			x.id,
@@ -4354,27 +4394,138 @@ describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — 
 		]);
 	});
 
-	it('⛔ RED FIRST — a read outside its folder, and a tool not allowed, are each a MATERIAL finding on its assessment, naming the path or the tool, and lower its verdict; an export whose calls cannot be read is a finding too, never a clean bill (rulings 2 (B), 17)', async () => {
+	// ⭐⭐ L17b6 (D94; REG-D-204; the lead's §39, Q3) — T12: THE RECORD OF THE CALL, THROUGH THE STAGE.
+	it('⛔ RED FIRST — L17b6 (D94): through the stage, the Historian’s record holds each call by its name, its kind, its paths and whether each is inside, each request the workbench refused, the words around its answer and its working remarks; a refused call of another kind is a MATERIAL finding on its assessment', async () => {
+		const r = await verificationRejected();
+		const answer = historianAnswer();
+		const LEAD_IN = 'I have read the records. Here is my judgment.\n';
+		const exec = { sessionUpdate: 'tool_call', toolCallId: 'call_x', title: 'Ran ls', kind: 'execute', rawInput: { command: 'ls' }, _meta: { 'cognition.ai/inferenceToolName': 'exec' } };
+		await pressWithHistorian(r, r.ids.source, () => ({
+			turn: [{ message: 'I’ll read the index first.' }, { notice: exec }, { ask: { toolCallId: 'call_x' } }, { message: LEAD_IN }, { message: answer }, { end: 'end_turn' }]
+		}));
+		const rec = stageEvidenceOf(HISTORIAN_PART);
+		const artifact = getObject(getEngine(), String((rec[0]?.state.contentReference as { artifactId?: string } | undefined)?.artifactId ?? '')) ?? {};
+		const held = JSON.parse((await getArtifactStore().get(String(artifact.storageKey ?? ''))) ?? '{}') as Record<string, unknown>;
+		expect(held.toolCalls, 'its stage record does not hold each call by its kind').toEqual([
+			{ toolCallId: 'call_x', name: 'exec', kind: 'execute', paths: [], inside: true, allowed: false }
+		]);
+		expect.soft(held.requests, 'its stage record does not hold each request the workbench refused').toEqual([{ toolCallId: 'call_x', name: 'exec', kind: 'execute', answer: 'reject_once' }]);
+		expect.soft([held.answer, held.aroundAnswer], 'its stage record does not hold its answer and the words around it').toEqual([answer, { before: LEAD_IN, after: '' }]);
+		expect.soft(held.workingRemarks, 'its stage record does not hold its working remarks').toEqual(['I’ll read the index first.']);
+		expect.soft((held.session as { deleted?: unknown } | undefined)?.deleted, 'its stage record does not say its session was deleted').toBe(true);
+		const made = historianAssessmentsOf(r.ids.verification)[0];
+		const findings = listByType(getEngine(), 'ASSURANCE_OBSERVATION').filter((o) => made !== undefined && o.state.assessmentId === made.id);
+		expect.soft(findings.map((o) => [o.state.findingCode, o.state.severity]), 'a refused call of another kind is not a MATERIAL finding on its assessment').toEqual([
+			['HISTORIAN_TOOL_NOT_ALLOWED', 'MATERIAL']
+		]);
+		// ⭑ CONTROL (§39, item 10) — no raw devin message is stored: its initialize named a path under the home folder.
+		expect.soft(JSON.stringify(held), '⭑ CONTROL — the record holds devin’s initialize’s home-folder path').not.toContain('mcp_config.json');
+	});
+
+	// ⭐⭐ L17b6 round 4 — the lead's §45.3 — A LINE THAT IS NOT JSON, THROUGH THE STAGE: the record's audit is given the session's count, by the audit's one
+	// definition (`historianToolCallsOf`), so the record's toolCalls agree with the session's calls, and the assessment carries the finding.
+	it('⛔ RED FIRST — L17b6 round 4 (the lead’s §45.3): through the stage, a Historian session whose output held a line that is not JSON gives its assessment ONE HISTORIAN_TOOL_CALLS_UNREADABLE finding (MATERIAL), naming the count, and its record no tool call', async () => {
+		const r = await verificationRejected();
+		const read = { sessionUpdate: 'tool_call', toolCallId: 'call_u', title: 'Read file', kind: 'read', rawInput: { file_path: 'records/INDEX.md' }, _meta: { 'cognition.ai/inferenceToolName': 'read' } };
+		await pressWithHistorian(r, r.ids.source, () => ({ turn: [{ notice: read }, { line: 'not json at all' }, { message: historianAnswer() }, { end: 'end_turn' }] }));
+		const rec = stageEvidenceOf(HISTORIAN_PART);
+		const artifact = getObject(getEngine(), String((rec[0]?.state.contentReference as { artifactId?: string } | undefined)?.artifactId ?? '')) ?? {};
+		const held = JSON.parse((await getArtifactStore().get(String(artifact.storageKey ?? ''))) ?? '{}') as Record<string, unknown>;
+		const made = historianAssessmentsOf(r.ids.verification)[0];
+		const findings = listByType(getEngine(), 'ASSURANCE_OBSERVATION').filter((o) => made !== undefined && o.state.assessmentId === made.id);
+		expect(findings.map((o) => [o.state.findingCode, o.state.severity]), 'a line that is not JSON is not one MATERIAL finding on its assessment').toEqual([
+			['HISTORIAN_TOOL_CALLS_UNREADABLE', 'MATERIAL']
+		]);
+		expect.soft(String(findings[0]?.state.statement ?? ''), 'the finding does not name the count').toContain('devin wrote 1 line that could not be read as a message');
+		expect.soft([held.toolCalls, (held.session as { unreadLines?: unknown } | undefined)?.unreadLines], 'its record holds a tool call, or does not count the line').toEqual([[], 1]);
+	});
+
+	// ⭐⭐ L17b6 round 5 — the lead's §47.7, items 8 to 10 — RULED BEHAVIOURS NO STAGE TEST REACHED, through the stage. The code already holds each, so each
+	// test is green at the staged code, and its red is its mutant's, observed.
+	/** The Historian's stage record a press makes: the one its part records that the press finds not there before it. */
+	const historianRecordOf = async (press: () => Promise<unknown>): Promise<Record<string, unknown>> => {
+		const before = new Set(stageEvidenceOf(HISTORIAN_PART).map((e) => e.id));
+		await press();
+		const rec = stageEvidenceOf(HISTORIAN_PART).filter((e) => !before.has(e.id));
+		expect(rec.length, 'arrangement: the press made not one Historian record').toBe(1);
+		const artifact = getObject(getEngine(), String((rec[0]?.state.contentReference as { artifactId?: string } | undefined)?.artifactId ?? '')) ?? {};
+		return JSON.parse((await getArtifactStore().get(String(artifact.storageKey ?? ''))) ?? '{}') as Record<string, unknown>;
+	};
+
+	// Item 8 (§39, Q2's named departure; `exchange-capture.ts` `spanOf`, `historian-part.ts` `spanInReply`) — THE HISTORIAN'S EXCHANGE KEEPS ITS ANSWER, THE
+	// ONE OBJECT, AS ITS ANSWER SPAN, and its working remarks and the words around the answer as its volunteered reasoning. Here its remarks hold braces,
+	// where `splitAnswerSpan` alone (the first `{` to the last `}`) would take them into the answer.
+	it('⛔ RED FIRST — L17b6 round 5 (the lead’s §47.7, item 8; §39, Q2): through the stage, the Historian’s exchange keeps its answer, the one object, as its answer span, and its working remarks and the words around its answer as its volunteered reasoning — braces in its remarks, where splitAnswerSpan alone would split otherwise', async () => {
+		const r = await verificationRejected();
+		const answer = historianAnswer();
+		const REMARKS = 'I’ll read {records/INDEX.md} first, then {prompt.txt}.';
+		const LEAD_IN = 'I have read the records. Here is my judgment.\n';
+		const read = { sessionUpdate: 'tool_call', toolCallId: 'call_s', title: 'Read file', kind: 'read', rawInput: { file_path: 'records/INDEX.md' }, _meta: { 'cognition.ai/inferenceToolName': 'read' } };
+		await pressWithHistorian(r, r.ids.source, () => ({ turn: [{ message: REMARKS }, { notice: read }, { message: LEAD_IN }, { message: answer }, { end: 'end_turn' }] }));
+		const x = historianExchanges().find((e) => e.state.subjectObjectId === r.verdicts[0]!.assessmentId);
+		const bytesOf = async (ref: unknown): Promise<string | undefined> =>
+			(await getArtifactStore().get(String((ref as { storageKey?: unknown } | undefined)?.storageKey ?? ''))) ?? undefined;
+		expect(await bytesOf(x?.state.answerSpanRef), 'its answer span is not its answer, the one object').toBe(answer);
+		expect.soft(await bytesOf(x?.state.volunteeredReasoningRef), 'its volunteered reasoning is not its working remarks and the words around its answer').toBe(REMARKS + LEAD_IN);
+	});
+
+	// Item 9 (§39, Q12; `historian-part.ts`'s model) — THE ASSESSMENT, ITS EXCHANGE AND ITS EVALUATOR NAME THE LABEL devin RAN THE TURN UNDER (the fake's
+	// `agent_stopped`, as acp-06's names `SWE-2 Max`), AND THE SELECTED REVIEWER'S MODEL WHERE devin GIVES NONE (constructed: every log gives one).
+	it('⛔ RED FIRST — L17b6 round 5 (the lead’s §47.7, item 9; §39, Q12): through the stage, the Historian’s assessment, its exchange and its evaluator name the label devin ran the turn under, SWE-2 Max — and the selected reviewer’s model where devin gives no label', async () => {
+		const named = async (script: Readonly<Record<string, unknown>>): Promise<unknown[]> => {
+			const r = await verificationRejected();
+			await pressWithHistorian(r, r.ids.source, () => ({ stdout: historianAnswer(), script }));
+			const made = historianAssessmentsOf(r.ids.verification)[0];
+			const evaluator = made?.state.evaluator as { modelId?: unknown; displayName?: unknown } | undefined;
+			const x = historianExchanges().find((e) => e.state.subjectObjectId === r.verdicts[0]!.assessmentId);
+			return [evaluator?.modelId, evaluator?.displayName, (x?.state.resolvedModel as { value?: unknown } | undefined)?.value];
+		};
+		expect(await named({}), 'its assessment’s evaluator, or its exchange, does not name the label devin ran the turn under').toEqual(['SWE-2 Max', 'devin (SWE-2 Max)', 'SWE-2 Max']);
+		expect.soft(await named({ modelLabel: null }), 'where devin gives no label, they do not name the selected reviewer’s model').toEqual([
+			'fixture-assurance-model',
+			'devin (fixture-assurance-model)',
+			'fixture-assurance-model'
+		]);
+	});
+
+	// Item 10 (§39, Q3, Q4; `historian-part.ts`'s session facts) — A HISTORIAN CALL HELD TO ITS BOUND, THROUGH THE STAGE: its record holds the cancel, and
+	// whether its turn ended after it — ended, as devin ends it at the cancel, and not, where devin ignores the cancel (the waits after the bound a few
+	// milliseconds, through the seam).
+	it('⛔ RED FIRST — L17b6 round 5 (the lead’s §47.7, item 10; §39, Q3, Q4): through the stage, a Historian call held to its bound fails, its record holding the cancel and whether its turn ended after it — it did, where devin ends the turn at the cancel, and it did not, where devin ignores the cancel', async () => {
+		seam.historianWaits = { cancelGraceMs: 50, deleteWaitMs: 50, stopWaitMs: 20 };
+		const heldTo = async (script: Readonly<Record<string, unknown>>): Promise<unknown[]> => {
+			const r = await verificationRejected();
+			const held = await historianRecordOf(() => pressWithHistorian(r, r.ids.source, () => ({ turn: [{ message: 'Reading.' }, { hold: true }], script }), undefined, '300'));
+			const s = held.session as { cancelled?: unknown; turnEndedAfterCancel?: unknown } | undefined;
+			return [String(held.failed ?? '').includes('at its time bound of 300 ms'), s?.cancelled, s?.turnEndedAfterCancel];
+		};
+		expect(await heldTo({}), 'its record does not hold the cancel, and that its turn ended after it').toEqual([true, true, true]);
+		expect.soft(await heldTo({ onCancel: 'ignore' }), 'its record does not hold the cancel, and that its turn did not end after it').toEqual([true, true, false]);
+	});
+
+	// ⭐ RESTATED (L17b6, design D94; the lead's §39, Q9): ~~'⛔ RED FIRST — a read outside its folder, and a tool not allowed, are each a MATERIAL finding on
+	// its assessment, naming the path or the tool, and lower its verdict; an export whose calls cannot be read is a finding too, never a clean bill (rulings
+	// 2 (B), 17)'~~ — read from the session's notices: a call of a kind other than read or search, and a notice whose call cannot be read.
+	it('⛔ RED FIRST — a read outside its folder, and a call of a kind other than read or search, are each a MATERIAL finding on its assessment, naming the path or the call, and lower its verdict; a notice whose call cannot be read is a finding too, never a clean bill (rulings 2 (B), 17; D94)', async () => {
 		const seen: { codes: unknown[]; statements: string; verdict: unknown }[] = [];
-		for (const exported of [
-			JSON.stringify({
-				schema_version: 'ATIF-v1.7',
-				steps: [
-					{
-						step_id: 1,
-						source: 'agent',
-						tool_calls: [
-							{ tool_call_id: 'c0', function_name: 'read', arguments: { file_path: 'records/INDEX.md' } },
-							{ tool_call_id: 'c1', function_name: 'read', arguments: { file_path: '../outside.txt' } },
-							{ tool_call_id: 'c2', function_name: 'exec', arguments: { command: 'ls' } }
-						]
-					}
-				]
-			}),
-			'not json'
+		const notice = (toolCallId: string, name: string, kind: string, rawInput: Record<string, unknown>) => ({
+			sessionUpdate: 'tool_call',
+			toolCallId,
+			kind,
+			rawInput,
+			_meta: { 'cognition.ai/inferenceToolName': name }
+		});
+		// ⭐ L17b6 — ~~`for (const exported of [JSON.stringify({ … tool_calls: [c0 read records/INDEX.md, c1 read ../outside.txt, c2 exec ls] … }), 'not json'])`~~
+		for (const toolCalls of [
+			[
+				notice('c0', 'read', 'read', { file_path: 'records/INDEX.md' }),
+				notice('c1', 'read', 'read', { file_path: '../outside.txt' }),
+				notice('c2', 'exec', 'execute', { command: 'ls' })
+			],
+			[{ sessionUpdate: 'tool_call', toolCallId: 'c9', kind: 'read' }]
 		]) {
 			const r = await verificationRejected();
-			await pressWithHistorian(r, r.ids.source, () => ({ stdout: historianAnswer(), export: exported }));
+			await pressWithHistorian(r, r.ids.source, () => ({ stdout: historianAnswer(), toolCalls }));
 			const made = historianAssessmentsOf(r.ids.verification)[0];
 			const findings = listByType(getEngine(), 'ASSURANCE_OBSERVATION').filter((o) => made !== undefined && o.state.assessmentId === made.id);
 			seen.push({
@@ -4395,7 +4546,8 @@ describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — 
 		]);
 		expect.soft(seen[0]?.statements ?? '', 'the read outside its folder does not name its path').toContain('../outside.txt');
 		expect.soft(seen[0]?.statements ?? '', 'the tool not allowed is not named').toContain('exec');
-		expect.soft(seen[1]?.statements ?? '', 'an unreadable export is not said').toContain('its tool calls could not be read from its export');
+		// ⭐ L17b6 — ~~`'its tool calls could not be read from its export'`~~
+		expect.soft(seen[1]?.statements ?? '', 'an unreadable export is not said').toContain('its tool calls could not be read from its notices');
 		expect.soft(seen.map((s) => s.verdict), 'a finding did not lower its verdict, every criterion met').toEqual(['CONDITIONALLY_SATISFIED', 'CONDITIONALLY_SATISFIED']);
 	});
 
@@ -4472,10 +4624,10 @@ describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — 
 			vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-assurance-model');
 			historianBoundSet();
 		};
-		const historianExec = async (_file: string, args: readonly string[]) => {
-			writeFileSync(args[args.indexOf('--export') + 1] ?? join(TMP, 'stray-export.json'), JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [] }));
-			return { stdout: historianAnswer() };
-		};
+		// ⭐ L17b6 (D94) — ~~`const historianExec = async (_file, args) => { writeFileSync(args[args.indexOf('--export') + 1] ?? …); return { stdout:
+		// historianAnswer() }; };`~~: the case’s own seam is a spawn of devin’s ACP server, the fake, answering it.
+		const historianSpawn = (launch: import('../tools/devin-historian.js').HistorianLaunch) =>
+			fakeAcp({ turn: [{ message: historianAnswer() }, { end: 'end_turn' }] }).spawn(launch);
 		const GIVEN = 'the stand-in, a Historian given';
 		// ⭐ §7 (Q1) — the shared workspace in memory, holding two files, for the three cases that read one: whole; a file it lists but cannot read; a
 		// listing that fails.
@@ -4530,7 +4682,7 @@ describe('⭐⭐ L17b2 (D73, D86; rulings 2, 5, 6, 8 to 11, 16, 17, 19, 22) — 
 				// ⭐ §7 (Q1) — ~~`name === 'no directory to copy' ? { sandboxOf: () => ({ workspace: createInMemoryWorkspace(…) }) } : {}`~~ the case's shared
 				// workspace in memory, where it reads one.
 				...(inMemory === undefined ? {} : { sandboxOf: () => ({ workspace: inMemory }) as never }),
-				...(name === GIVEN ? { historianExec, historianVersionOf: async () => 'devin 3000.11.234 (92c83011d113)' } : {})
+				...(name === GIVEN ? { historianSpawn, historianVersionOf: async () => 'devin 3000.11.234 (92c83011d113)' } : {})
 			});
 			const part = partOf(done, HISTORIAN_PART);
 			seen.push([name, part?.status, why === '' || (part?.why ?? '').includes(why)]);
@@ -5336,10 +5488,15 @@ describe('⭐⭐ L17b4 (D93; REG-F-685, REG-F-686) — through the stage: a fail
 	const RECORD =
 		"devin invocation failed (exited with code 1). Its diagnostic is not recorded (PER-12): execFile's message holds devin's command line, which names " +
 		"the call's folder, and devin's stderr, which holds its login banner (REG-F-685).";
-	/** Each text holds the failure's kind, and none of the three. */
-	const holdsTheKindAlone = (texts: readonly (readonly [string, string])[]): void => {
+	/** ⭐ L17b6 (D94; §39, Q10) — what the Historian's call records of that failure, thrown by its spawn: the ACP call's own record, its kind alone. */
+	const HISTORIAN_RECORD =
+		'devin acp failed (its program could not be started: exited with code 1). Its words are not recorded (PER-12): devin’s messages name its ' +
+		'configuration’s path under the home folder, and its errors may hold its login banner (REG-F-685); its standard error is never read (REG-Q-066).';
+	/** Each text holds the failure's kind, and none of the three. ⭐ L17b6 (D94) — ~~`(texts)`~~: and the record it is to hold, the writer's by
+	 * default; the Historian's is the ACP call's own (§39, Q10). */
+	const holdsTheKindAlone = (texts: readonly (readonly [string, string])[], record: string = RECORD): void => {
 		for (const [what, text] of texts) {
-			expect.soft(text, `${what} does not hold the failure’s kind`).toContain(RECORD);
+			expect.soft(text, `${what} does not hold the failure’s kind`).toContain(record);
 			expect.soft(text, `${what} holds execFile’s words`).not.toContain('Command failed');
 			expect.soft(text, `${what} holds the home folder`).not.toContain(home);
 			expect.soft(text, `${what} holds an e-mail address`).not.toMatch(email);
@@ -5407,7 +5564,9 @@ describe('⭐⭐ L17b4 (D93; REG-F-685, REG-F-686) — through the stage: a fail
 			['its outcome’s why', part?.why ?? ''],
 			['its evidence’s limitations', ((evidence[0]?.state.limitations ?? []) as string[]).join(' | ')],
 			['its exchange’s parse detail', String((exchanges[0]?.state.parseOutcome as { detail?: unknown } | undefined)?.detail ?? '')]
-		]);
+			// ⭐ L17b6 (D94; §39, Q10) — ~~`]);`~~ against the writer's `RECORD`: the Historian's failure is the ACP call's own record, the error thrown by its
+			// spawn named by its kind alone.
+		], HISTORIAN_RECORD);
 	});
 
 	it('⛔ RED FIRST — L17b4 (D93; REG-F-686): the writer’s exchange is timed around its call — its respondedAt follows its requestedAt by the time the writer took, on the stage’s clock', async () => {
@@ -5468,6 +5627,8 @@ beforeEach(() => {
 	seam.historianCalls.length = 0;
 	seam.historianVersion = 'devin 3000.11.234 (92c83011d113)';
 	seam.historianPassThrough = false;
+	// ⭐ L17b6 round 5 (§47.7, item 10) — the waits after the bound, the named ones again.
+	seam.historianWaits = undefined;
 	seam.historianRecordsChecked = undefined;
 	seam.sharedOnDisk = false;
 	seam.answer = (policyId) => answerOf(policyId);

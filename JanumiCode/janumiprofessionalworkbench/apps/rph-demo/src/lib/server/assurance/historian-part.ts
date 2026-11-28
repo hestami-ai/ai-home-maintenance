@@ -3,7 +3,7 @@
 // §7 (Q1) and §9) — THE HISTORIAN'S PART OF THE ASSURANCE STAGE: third in the stage, and again where it is asked once more (ruling 7).
 //
 // ⭑ WHEN IT CANNOT RUN (ruling 6, 16; §7): recorded `not-run`, with why, and nothing called or recorded of it — the selected reviewer refused, a replay,
-// agy, or the stand-in with no `historianExec` (a test's seam, as `writerPrint` is the writer's); its time bound unset; the shared workspace unresolved,
+// agy, or the stand-in with no ~~`historianExec`~~ ⭐ `historianSpawn` (L17b6, D94: a test's seam, as `writerPrint` is the writer's); its time bound unset; the shared workspace unresolved,
 // or not read whole through the port; devin at a version other than the one its tools were measured at; ⭐ (the lead's §27, item 7) two of its record
 // files of one name, its folder then not written; ⭐ (r26 (2); r27, r27a) two of its workspace files that land on one name in its copy — case not told
 // apart, before its folder is made, or as the volume reads names, at the copy's write (`HistorianCopyRefusal`).
@@ -13,14 +13,17 @@
 // conversations of the rejected unit and of each candidate — the Hypothesizer's very files (D89); `records/INDEX.md`; and `workspace/`, the shared
 // workspace read through the port.
 // ⭑ WHAT IS RECORDED (D73; rulings 5, 10, 11, 17, 19, 22): its exchange — the ASSURANCE plane, its role's own (`HISTORIAN_INVOKER`), the policy, over the
-// round — its session export stored and pointed at from its tool observation; then, its answer read, ONE batch: the §30 drive with its reviewer as
+// round — ~~its session export stored and pointed at from its tool observation~~ ⭐ (L17b6, D94; the lead's §39, Q2, Q11) its reply joined as its raw
+// output, the answer's span handed in as REG-D-204's rule finds it, its tool observation `NOT_OBSERVABLE` saying where the calls read from devin's
+// notices are kept, and nothing stored in the export's place; then, its answer read from its last message, ONE batch: the §30 drive with its reviewer as
 // evaluator, one `RecordCriterionResult` per criterion of the stored rubric, an observation per failed criterion at the policy's severity, the recurrence
 // as `KNOWN_FAILURE_RECURRENCE` citing the earlier records it names in `evidenceIds`, each cited record it was not given (`HISTORIAN_RECORD_NOT_GIVEN`)
-// and each finding of its export (`historianToolCallsOf`) MATERIAL, and the completion under `HISTORIAN_VALIDATOR_ID` with the verdict computed from those
+// and each finding of ~~its export~~ ⭐ its notices (`historianToolCallsOf`) MATERIAL, and the completion under `HISTORIAN_VALIDATOR_ID` with the verdict computed from those
 // rows and findings as every declared review's is (`declaredVerdict`; never the reviewer's recommendation, `REG-F-523`), its recommended action in
 // `recommendedControlActions` (Gate B holds it to the policy's list), and the rejected unit's executor as `producer`, so `DIFFERENT_AGENT` is checked.
 // One batch: refused anywhere — Gate B's words among the reasons — nothing of the assessment is left (ruling 5; §5). Then its stage record,
-// `historical-assessment`: its answer, its tool calls with their paths, its exchange and its assessment; `recorded`, or `failing` where its call failed,
+// `historical-assessment`: its answer ⭐ (L17b6, §39, Q3: and the words around it, its working remarks, its requests and its session's facts), its tool
+// calls with their paths, its exchange and its assessment; `recorded`, or `failing` where its call failed,
 // its answer was not read, or its assessment was refused. ⛔ It is never folded into the unit's own assurance: no hop is made, and the kernel's index
 // leaves out an assessment completed under its validator id (ruling 18).
 // ⛔ IT NEVER THROWS: whatever it throws, whatever the value, is its part's failure, said through the one describer (`describedThrow`).
@@ -43,8 +46,9 @@ import {
 	workspaceCopyClash,
 	writeHistorianFolder,
 	type HistorianCallOutcome,
-	type HistorianExec,
+	// ⭐ L17b6 (D94) — ~~`type HistorianExec,`~~: the Historian's program is its ACP child's spawn.
 	type HistorianRecordFile,
+	type HistorianSpawn,
 	type HistorianVersionOf
 } from '../tools/devin-historian.js';
 import {
@@ -82,8 +86,11 @@ export interface HistorianPartDeps {
 	readonly runReviewerSteps?: (steps: readonly StageStep[]) => string | null;
 	readonly dispatchExchange: (payload: RecordModelExchangePayload, aggregateId: string) => { status: string };
 	readonly testMode: boolean;
-	/** ⭐ Ruling 6 — a test's seam: the Historian's program, as `writerPrint` is the writer's transport; never over a refused selection or a replay. */
-	readonly historianExec?: HistorianExec;
+	/**
+	 * ⭐ Ruling 6 — a test's seam: the Historian's program, as `writerPrint` is the writer's transport; never over a refused selection or a replay. ⭐ L17b6
+	 * (D94) — ~~`readonly historianExec?: HistorianExec;`~~: its ACP child's spawn.
+	 */
+	readonly historianSpawn?: HistorianSpawn;
 	readonly historianVersionOf?: HistorianVersionOf;
 }
 
@@ -169,17 +176,18 @@ function storedPolicyOf(engine: EngineHandle): StoredPolicy | undefined {
 function historianRunnerOf(
 	deps: HistorianPartDeps
 ):
-	| { readonly ok: true; readonly model: string; readonly providerId: string; readonly given: { readonly exec?: HistorianExec; readonly versionOf?: HistorianVersionOf } }
+	| { readonly ok: true; readonly model: string; readonly providerId: string; readonly given: { readonly spawn?: HistorianSpawn; readonly versionOf?: HistorianVersionOf } }
 	| { readonly ok: false; readonly why: string } {
 	const selected = selectReviewer({ testMode: deps.testMode });
 	if (selected.kind === 'REFUSED') return { ok: false, why: `the Historian runs on the selected reviewer, and none can run: ${refusalMessage(selected)}` };
 	if (selected.kind === 'REPLAY') return { ok: false, why: REPLAY_RUNS_NO_STAGE };
-	if (deps.historianExec !== undefined)
+	// ⭐ L17b6 (D94) — ~~`deps.historianExec`~~ and ~~`given: { exec: deps.historianExec, … }`~~: the seam is the ACP child's spawn.
+	if (deps.historianSpawn !== undefined)
 		return {
 			ok: true,
 			model: selected.kind === 'DEVIN' ? selected.modelId : 'injected-historian',
 			providerId: selected.kind === 'DEVIN' ? 'devin' : 'test',
-			given: { exec: deps.historianExec, ...(deps.historianVersionOf === undefined ? {} : { versionOf: deps.historianVersionOf }) }
+			given: { spawn: deps.historianSpawn, ...(deps.historianVersionOf === undefined ? {} : { versionOf: deps.historianVersionOf }) }
 		};
 	if (selected.kind === 'DEVIN') return { ok: true, model: selected.modelId, providerId: 'devin', given: {} };
 	return {
@@ -377,24 +385,49 @@ async function stageRecordFile(store: ArtifactStore, r: StageRecord, titleOf: (i
 	};
 }
 
-/** The model devin reported in its export (`steps[].extra.generation_model`, the last), or undefined. */
-function reportedModelOf(exportText: string | undefined): string | undefined {
-	try {
-		const steps = (JSON.parse(exportText ?? '') as { steps?: { extra?: { generation_model?: unknown } }[] }).steps;
-		return (Array.isArray(steps) ? steps : [])
-			.map((s) => s?.extra?.generation_model)
-			.filter((m): m is string => typeof m === 'string' && m.length > 0)
-			.at(-1);
-	} catch {
-		return undefined;
-	}
+// ⭐ L17b6 (D94; the lead's §39, Q12) — ~~`function reportedModelOf(exportText: string | undefined): string | undefined { … steps[].extra.generation_model …
+// }`~~, the model devin reported in its export: no export is written over ACP. The model is the label devin's session ran the turn under
+// (`HistorianSession.modelLabel`), its model and thought level recorded beside.
+
+/**
+ * ⭐ Ruling 11 — what the Historian's adapter can see of its tool calls as they are made: ~~nothing; and where what its export shows of them is kept~~ ⭐
+ * (L17b6, D94; the lead's §39, Q11) only what devin's own notices say of them; and where they are kept. Still `NOT_OBSERVABLE`: devin's tools are not the
+ * workbench's, and nothing is stored in the export's place. ⭐ ~~'The Historian’s devin session runs to completion with read-only tools, and this
+ * adapter watches no session, so it cannot observe its tool calls as they are made. Each tool call its session export records — …'~~
+ */
+const historianToolObservation = (roundId: string): string =>
+	'The Historian’s devin session runs over devin’s ACP server, and this adapter reads each tool call from devin’s own notices as the session gives ' +
+	'them; it mints none of devin’s tools, so it cannot vouch for what a tool did. Each call devin announced — its name, its kind, its paths, whether ' +
+	'each is inside the Historian’s folder, whether it is allowed and its last status — and each permission request the workbench answered is kept ' +
+	`in the historical-assessment record of the round (${roundId}). A reader must not read this record as evidence that no tool ran.`;
+
+/**
+ * ⭐ L17b6 (D94; the lead's §39, Q2) — the answer's span in the whole reply: the last message ends the reply, and the answer sits in it after the words
+ * before it. Everything before the answer is the prefix (the working remarks and those words), everything after it the suffix. Undefined where the reply
+ * does not end with the last message, so the capture splits as it does for every other caller.
+ */
+function spanInReply(reply: string, lastMessage: string, before: string, answer: string): { prefix: string; answer: string; suffix: string } | undefined {
+	if (!reply.endsWith(lastMessage)) return undefined;
+	const start = reply.length - lastMessage.length + before.length;
+	if (reply.slice(start, start + answer.length) !== answer) return undefined;
+	return { prefix: reply.slice(0, start), answer, suffix: reply.slice(start + answer.length) };
 }
 
-/** ⭐ Ruling 11 — what the Historian's adapter can see of its tool calls as they are made: nothing; and where what its export shows of them is kept. */
-const historianToolObservation = (roundId: string): string =>
-	'The Historian’s devin session runs to completion with read-only tools, and this adapter watches no session, so it cannot observe its tool calls ' +
-	'as they are made. Each tool call its session export records — its name, its paths, whether each is inside the Historian’s folder and whether ' +
-	`the tool is allowed — is kept in the historical-assessment record of the round (${roundId}). A reader must not read this record as evidence that no tool ran.`;
+/** ⭐ L17b6 (D94; the lead's §39, Q3) — the session's facts the record keeps: its model and thought level, its stop, the cancel, the delete, the stop. */
+function sessionFactsOf(s: Extract<HistorianCallOutcome, { readonly ran: true }>['session']): Record<string, unknown> {
+	return {
+		...(s.model === undefined ? {} : { model: s.model }),
+		...(s.thoughtLevel === undefined ? {} : { thoughtLevel: s.thoughtLevel }),
+		...(s.modelLabel === undefined ? {} : { modelLabel: s.modelLabel }),
+		...(s.stopReason === undefined ? {} : { stopReason: s.stopReason }),
+		cancelled: s.cancelled,
+		...(s.turnEndedAfterCancel === undefined ? {} : { turnEndedAfterCancel: s.turnEndedAfterCancel }),
+		deleted: s.deleted,
+		stoppedBy: s.stoppedBy,
+		unknownRequests: s.unknownRequests,
+		unreadLines: s.unreadLines
+	};
+}
 
 /** ⭐ Ruling 11 — record the Historian's one exchange; its aggregate id, or why it could not be recorded. */
 async function recordHistorianExchange(
@@ -411,8 +444,12 @@ async function recordHistorianExchange(
 ): Promise<{ readonly exchangeId: string | null; readonly failure?: string }> {
 	const { deps } = ctx;
 	const sink = createExchangeSink();
-	const raw = x.call.failure === undefined ? x.call.stdout : '';
+	// ⭐ L17b6 (D94) — ~~`x.call.stdout`~~: the reply joined, every message chunk in order, as print mode printed it.
+	const raw = x.call.failure === undefined ? x.call.session.reply : '';
 	const arrived = raw.trim() !== '';
+	// ⭐ L17b6 (D94; the lead's §39, Q2) — the answer's span as REG-D-204's rule found it in the last message, which ends the reply: handed to the capture.
+	const answerSpan =
+		x.call.failure === undefined && x.read?.ok === true ? spanInReply(raw, x.call.lastMessage, x.read.aroundAnswer.before, x.read.answerText) : undefined;
 	let parseOutcome: { readonly outcome: 'PARSED' | 'JSON_PARSE_FAILED' | 'NOT_ATTEMPTED' | 'EMPTY_RESPONSE'; readonly detail: string };
 	if (x.call.failure !== undefined) parseOutcome = { outcome: 'NOT_ATTEMPTED', detail: x.call.failure };
 	else if (!arrived) parseOutcome = { outcome: 'EMPTY_RESPONSE', detail: 'the Historian returned no answer' };
@@ -434,8 +471,9 @@ async function recordHistorianExchange(
 		parseOutcome,
 		workProductDerivation: { relation: 'NO_WORK_PRODUCT_EXPECTED', reason: 'The Historian’s assessment of the loop (design D73): a judgment of the record, never work product.' },
 		observedToolCalls: governedToolCallReport({ canObserve: false, reason: historianToolObservation(ctx.roundId) }),
-		// ⭐ Ruling 11 — its export kept, as `exchange-capture.ts` keeps one: stored where the observation's reason points at it.
-		...(x.call.sessionExport === undefined ? {} : { toolSessionExport: x.call.sessionExport })
+		// ⭐ Ruling 11 — ~~its export kept, as `exchange-capture.ts` keeps one: stored where the observation's reason points at it.~~
+		// ~~`...(x.call.sessionExport === undefined ? {} : { toolSessionExport: x.call.sessionExport })`~~ ⭐ L17b6 (§39, Q11): nothing in the export's place.
+		...(answerSpan === undefined ? {} : { answerSpan })
 	});
 	const mex = deps.newId('mex');
 	const recorded = recordExchanges(deps.dispatchExchange, sink.drain(), {
@@ -627,9 +665,14 @@ async function historianAsk(ctx: HistorianPartContext): Promise<HistorianPartOut
 		const why = call.why;
 		return ctx.record(STAGE_PART.HISTORIAN, 'not-run', JSON.stringify({ notRun: why }), [why, ...kept]);
 	}
-	const read = call.failure === undefined ? readHistorianAnswer(call.stdout, { criteria: policy.criteria, givenRecordIds: records.givenIds }) : undefined;
-	const tools = historianToolCallsOf(call.sessionExport, folder.folder);
-	const modelId = reportedModelOf(call.sessionExport) ?? runner.model;
+	// ⭐ L17b6 (D94; `REG-D-204`) — ~~`readHistorianAnswer(call.stdout, …)`~~: the answer is read from the last message, the text after the last tool call.
+	const read = call.failure === undefined ? readHistorianAnswer(call.lastMessage, { criteria: policy.criteria, givenRecordIds: records.givenIds }) : undefined;
+	// ⭐ L17b6 — ~~`historianToolCallsOf(call.sessionExport, folder.folder)`~~: each call read from devin's notices; the export is not read.
+	// ⭐ L17b6 round 4 (the lead's §45.3) — ~~`historianToolCallsOf(call.session.notices, folder.folder)`~~: and the count of devin's lines that were not
+	// JSON objects, as the session's own calls are read (`sessionOf`), so the record's toolCalls and the session's calls agree.
+	const tools = historianToolCallsOf(call.session.notices, folder.folder, call.session.unreadLines);
+	// ⭐ L17b6 (§39, Q12) — ~~`reportedModelOf(call.sessionExport) ?? runner.model`~~: the label devin's session ran the turn under.
+	const modelId = call.session.modelLabel ?? runner.model;
 	const runToken = deps.newId('stagerun');
 
 	// ── Its exchange (ruling 11).
@@ -644,11 +687,26 @@ async function historianAsk(ctx: HistorianPartContext): Promise<HistorianPartOut
 	});
 	const notes = [...kept, ...(exchange.failure === undefined ? [] : [`its exchange could not be recorded: ${exchange.failure}`])];
 	const historian: ActorReference = { actorId: `model:${modelId}`, actorType: 'AGENT', displayName: 'Historian' };
+	// ⭐ L17b6 (D94; the lead's §39, Q3) — what the record keeps of the call besides its answer: its working remarks, each request the workbench answered,
+	// and the session's facts it read — never devin's raw messages (§39, item 10).
+	const callFacts = {
+		workingRemarks: call.session.workingRemarks,
+		requests: call.session.requests,
+		session: sessionFactsOf(call.session)
+	};
 	const failing = (why: string): Promise<HistorianPartOutcome> =>
 		ctx.record(
 			STAGE_PART.HISTORIAN,
 			'failing',
-			JSON.stringify({ failed: why, answer: call.failure === undefined ? call.stdout : '', toolCalls: tools.calls, exchangeId: exchange.exchangeId, assessmentId: null }),
+			// ⭐ L17b6 (§39, Q3) — ~~`answer: call.failure === undefined ? call.stdout : ''`~~: the last message whole, in the answer's place.
+			JSON.stringify({
+				failed: why,
+				lastMessage: call.failure === undefined ? call.lastMessage : '',
+				toolCalls: tools.calls,
+				...callFacts,
+				exchangeId: exchange.exchangeId,
+				assessmentId: null
+			}),
 			[why, ...notes]
 		);
 	if (call.failure !== undefined) return failing(`the Historian's call failed: ${call.failure}`);
@@ -712,7 +770,9 @@ async function historianAsk(ctx: HistorianPartContext): Promise<HistorianPartOut
 	return ctx.record(
 		STAGE_PART.HISTORIAN,
 		'recorded',
-		JSON.stringify({ answer: call.stdout, toolCalls: tools.calls, exchangeId: exchange.exchangeId, assessmentId }),
+		// ⭐ L17b6 (D94; §39, Q3) — ~~`{ answer: call.stdout, toolCalls: tools.calls, exchangeId: exchange.exchangeId, assessmentId }`~~: its answer, the one
+		// object as it stood, and the words around it beside it; its working remarks; each request; the session's facts.
+		JSON.stringify({ answer: read.answerText, aroundAnswer: read.aroundAnswer, toolCalls: tools.calls, ...callFacts, exchangeId: exchange.exchangeId, assessmentId }),
 		[
 			...notes,
 			...(producer === undefined

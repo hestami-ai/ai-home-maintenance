@@ -155,6 +155,11 @@ describe('⭐⭐ D84 (T11; the lead’s rulings r1, Q5) — no call without JPWB
 				ran += 1;
 				return { stdout: '' };
 			},
+			// ⭐ L17b6 (D94) — the Historian’s seam, counted as the writer’s is.
+			historianSpawn: () => {
+				ran += 1;
+				throw new Error('the Historian was started');
+			},
 			openPi: async () => {
 				ran += 1;
 				throw new Error('Pi was opened');
@@ -198,6 +203,11 @@ describe('⭐⭐ D84 (r2, `D84R-A01`) — a role that holds an attempt and no ca
 			devinExec: async () => {
 				ran += 1;
 				return { stdout: '' };
+			},
+			// ⭐ L17b6 (D94) — the Historian’s seam, counted as the writer’s is.
+			historianSpawn: () => {
+				ran += 1;
+				throw new Error('the Historian was started');
 			},
 			openPi: async () => {
 				ran += 1;
@@ -245,7 +255,13 @@ describe('⭐⭐ D84 (r4, `D84S-A02`) — an attempt cut short, as by a kill dur
 				ran += 1;
 				throw new Error('a program ran');
 			};
-			const transports: D84Transports = { devinExec: counted, openPi: counted, devinVersion: counted };
+			// ⭐ L17b6 (D94) — ~~`{ devinExec: counted, openPi: counted, devinVersion: counted }`~~: and the Historian’s seam, counted.
+			/** ⭐ L17b6 (D94) — the Historian’s spawn, counted as the others are: a spawn returns its child, so it throws where they reject. */
+			const countedSpawn = (): never => {
+				ran += 1;
+				throw new Error('a program ran');
+			};
+			const transports: D84Transports = { devinExec: counted, historianSpawn: countedSpawn, openPi: counted, devinVersion: counted };
 			const deps = new Proxy({} as AssuranceStageDeps, {
 				get: (_t, property) => {
 					throw new Error(`the call read its deps (${String(property)}) past its attempt`);

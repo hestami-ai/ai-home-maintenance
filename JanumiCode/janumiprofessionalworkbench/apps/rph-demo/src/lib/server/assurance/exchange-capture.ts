@@ -142,6 +142,21 @@ export interface CaptureTryInput {
 	 * joins (`RecordPlaneProseSchema`, 4,096 characters; devin's reason and the pointer are under 1,000).
 	 */
 	readonly toolSessionExport?: string;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L17b6 — design D94 (`REG-D-204`; the lead's §39, Q2) — A NAMED DEPARTURE: THE ANSWER SPAN, WHERE THE CALLER LOCATED IT
+	 * BY ITS OWN RULE. The Historian's answer is the one JSON object in its last message (`theOneJsonObjectIn`), which `splitAnswerSpan` — the first
+	 * fence, or the first `{` to the last `}` — can take otherwise: so the retained answer span is the Historian's answer, and its working remarks and
+	 * the words around the answer are the volunteered reasoning. ⛔ Used only where its three parts rebuild `rawOutput` exactly (`REG-F-339`'s identity);
+	 * else, and for every other caller, which hands none, `splitAnswerSpan` as before.
+	 */
+	readonly answerSpan?: { readonly prefix: string; readonly answer: string; readonly suffix: string };
+}
+
+/** ⭐ L17b6 (D94; §39, Q2) — the span the capture splits by: the caller's, where it rebuilds the raw output exactly; else `splitAnswerSpan`'s. */
+function spanOf(input: CaptureTryInput): AnswerSpan {
+	const given = input.answerSpan;
+	if (given !== undefined && given.prefix + given.answer + given.suffix === input.rawOutput) return { ...given, located: true };
+	return splitAnswerSpan(input.rawOutput);
 }
 
 /** A disclosed absence, which PER-9 permits — as distinct from the silent one it forbids. */
@@ -253,7 +268,9 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 	//
 	// ⚠ SO THE WHOLE BLOB IS STORED ONLY WHEN THERE IS NOTHING TO SEPARATE. When reasoning arrives inline the
 	// spans carry it and the whole-blob ref says so — that is not a block, it is the §9.7 representation.
-	const span = splitAnswerSpan(input.rawOutput);
+	// ⭐ L17b6 (D94; the lead's §39, Q2) — ~~`const span = splitAnswerSpan(input.rawOutput);`~~: the caller's span where it located the answer by a rule of
+	// its own (`answerSpan`), and it rebuilds the raw output exactly; else, as for every other caller, `splitAnswerSpan`.
+	const span = spanOf(input);
 	const volunteered = span.located ? span.prefix + span.suffix : '';
 
 	let answerSpanRef: ContentRef;

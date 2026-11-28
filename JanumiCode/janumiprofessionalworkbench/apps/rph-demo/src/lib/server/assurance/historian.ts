@@ -6,14 +6,15 @@
 // failed criteria and each earlier round's; the narrative memory so far; the folder's layout, `records/INDEX.md` first (D86); the request to check each
 // claim against the copies, citing the file; and the answer's form, the policy's permitted actions named from the policy itself. ⛔ Not the reviewer's
 // NO-TOOLS preamble: the Historian has read-only tools (D86).
-// ⭑ ITS READER (`readHistorianAnswer`): the declared review's parse first, unchanged — `extractJson`, then `coerceJudgement` — and then the Historian's
-// two fields (ruling 19): `recurrence` `{ recurs, statement, earlierRecords }`, read only where `recurs` is `true`, its earlier records held to the ids
+// ⭑ ITS READER (`readHistorianAnswer`): ~~the declared review's parse first, unchanged — `extractJson`, then `coerceJudgement` —~~ ⭐ (L17b6, design D94;
+// `REG-D-204`; the lead's §39, Q1) the one JSON object in the Historian's last message (`theOneJsonObjectIn`), the words around it kept beside it, then
+// the declared parse's `coerceJudgement`, unchanged — and then the Historian's two fields (ruling 19): `recurrence` `{ recurs, statement, earlierRecords }`, read only where `recurs` is `true`, its earlier records held to the ids
 // the Historian was given — one outside them left out and named (ruling 10); and `recommendedControlAction` `{ action, reason } | null`, passed through
 // as given — an action that is not a string as its JSON — so Gate B, not this reader, refuses an action outside the policy's list (ruling 22).
 // ⛔ THE VERDICT IS NOT THE READER'S: the stage records each criterion's result and computes the verdict from them, as every declared review's is, never
 // from the reviewer's recommendation (`REG-F-523`; `declaredVerdict`).
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
-import { extractJson } from './agy-cli.js';
+// ⭐ L17b6 (D94; `REG-D-204`) — ~~`import { extractJson } from './agy-cli.js';`~~: the answer is found by `theOneJsonObjectIn`, below.
 import { coerceJudgement, type CoercedJudgement } from './reasoning-review-validator.js';
 
 /** ⭐ Ruling 18 — the validator id the Historian's assessments complete under: the kernel's one definition, whose index leaves them out. */
@@ -179,23 +180,150 @@ function recommendationOf(v: unknown): HistorianRecommendation | null {
 	return { action: asText(o.action), reason: typeof o.reason === 'string' ? o.reason : '' };
 }
 
+/** ⭐ L17b6 — one top-level span of a text: where it starts and ends, and whether it closed. */
+interface TopLevelSpan {
+	readonly start: number;
+	readonly end: number;
+	readonly closed: boolean;
+}
+
 /**
- * ⭐⭐ D73 + ruling 19 — READ THE HISTORIAN'S ANSWER (see the header): `{ ok: false, why }` where the text does not parse as JSON; otherwise the declared
- * judgement as `coerceJudgement` reads it, byte for byte the declared reader's, and the two fields.
+ * ⭐ L17b6 — the span a `{` or `[` at `start` opens: JSON's strings honoured inside it, its openers and closers counted by type. ⭐ L17b6 round 3 (the
+ * lead's §43.3, rule H) — where a strict JSON value that starts there would end: in JSON's strings and brackets a value starting at `start` closes at
+ * its span's end, so `JSON.parse` of the span decides whether one does (`theOneJsonObjectIn`).
+ */
+function spanFrom(text: string, start: number): TopLevelSpan {
+	const stack: string[] = [];
+	let inString = false;
+	let escaped = false;
+	for (let j = start; j < text.length; j++) {
+		const c = text[j]!;
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (c === '\\') escaped = true;
+			else if (c === '"') inString = false;
+		} else if (c === '"') inString = true;
+		else if (c === '{' || c === '[') stack.push(c);
+		else if (c === '}' || c === ']') {
+			// A closer of the wrong type ends the span, unclosed: words.
+			if (stack.at(-1) !== (c === '}' ? '{' : '[')) return { start, end: j + 1, closed: false };
+			stack.pop();
+			if (stack.length === 0) return { start, end: j + 1, closed: true };
+		}
+	}
+	return { start, end: text.length, closed: false };
+}
+
+// ⭐ L17b6 round 3 (the lead's §43.3, rule H) — ~~`/** ⭐ L17b6 — a span's text as a JSON object, or undefined where it is not one. */ function
+// objectOf(text: string): Record<string, unknown> | undefined {`~~ … ~~`return typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as
+// Record<string, unknown>) : undefined;`~~ … ~~`}`~~: a list that parses is a value too, whose brackets are no words, so a span is read as any JSON value
+// (`jsonOf`), and the object among them told apart after.
+/** ⭐ L17b6 round 3 — what a span is where `JSON.parse` refuses it. */
+const NOT_JSON = Symbol('not JSON');
+
+/** ⭐ L17b6 round 3 (rule H) — a span's text as the JSON value `JSON.parse` reads, of any kind, or `NOT_JSON` where it refuses the text. */
+function jsonOf(text: string): unknown {
+	try {
+		return JSON.parse(text) as unknown;
+	} catch {
+		return NOT_JSON;
+	}
+}
+
+/** ⭐ L17b6 round 3 — the why of a bracket of the words that does not close: rule H's cost (the lead's §43.3; the sponsor's answer, §43.11). */
+const STRAY_BRACKET_COST = 'and a bracket in its words that does not close gets the answer refused (REG-D-204)';
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b6 — design D94 (`REG-D-204`, the sponsor's *"Last message's one JSON"*, kept after `REG-F-690`'s correction; the
+ * lead's §39, Q1) — THE ONE JSON OBJECT IN A TEXT, AND THE WORDS AROUND IT. ~~The text is scanned once: · outside any span, a `{` or `[` opens one; a
+ * `"` is a word there, and a `}` or `]` closes nothing; · inside a span, JSON's strings are honoured (`\` escapes), and openers and closers are counted
+ * by type; it ends where its depth is 0; · the answer is the one top-level span that parses as an object; the text before it and after it are the words
+ * around it. So nothing nested is ever a candidate: an object inside a list, or inside a brace text that does not parse, is no object.~~ ⭐ RESTATED
+ * (L17b6 round 3; the lead's §43.3, finding 1 — rule H, the sponsor's answer, §43.11): round 2's scan went on at the end of a span that did not parse,
+ * so a `[` that never closed hid what followed it, and a span opened at a quoted `{` read the answer out of step and picked a fragment of it. Now:
+ *   · THE VALUES: the text is scanned from its start; at each `{` or `[` outside a value already found, one strict JSON value is tried from there (what
+ *     `JSON.parse` accepts, over the span `spanFrom` finds). Where one parses, it is a value, and the scan goes on after it; where none does, the scan
+ *     goes on at the next character, never at the span's end;
+ *   · THE WORDS: the text outside the values. Their brackets are counted by type, and quotes are not read there. A `{` or `[` of theirs that never closes,
+ *     or a `}` or `]` that closes nothing they opened, means the text is not read;
+ *   · ENCLOSED: an object value that stands inside brackets of the words is not read, nor the text: it is inside a text that is not JSON;
+ *   · THE ONE OBJECT: the answer is the one value that is an object, and the words before and after it are recorded beside it. None, or more than one,
+ *     is not read, as before; each refusal says which.
+ * ⚠ ITS KNOWN COST, NAMED: ~~(the lead's §39, Q1): a span that never closes runs to the end of the text, so a lone `{` in the words before the answer
+ * swallows it, and the answer is not read~~ ⭐ (§43.3; told to the sponsor, §43.11) a bracket of the words that does not close — a stray `{`, `[`, `}`
+ * or `]`, before the answer or after it — gets the answer refused (held by `historian.test.ts`). ⚠ A try that fails may scan to the text's end, so the
+ * time grows with the words' unclosed brackets times the text's length: a last message is a model's reply (probe 3's, 5,087 characters). ⛔ Not
+ * `oneJsonObject` (`assurance-stage-records.ts`), the helpers' rule — the whole answer, a whole-answer fence allowed — which stays unchanged.
+ */
+export function theOneJsonObjectIn(
+	text: string
+): { readonly ok: true; readonly before: string; readonly answer: string; readonly after: string; readonly value: Record<string, unknown> } | { readonly ok: false; readonly why: string } {
+	// ⭐ L17b6 round 3 (rule H) — ~~`const objects: { readonly span: TopLevelSpan; readonly value: Record<string, unknown> }[] = [];`~~ ~~`let i = 0;`~~
+	// ~~`while (i < text.length) {`~~ ~~`if (text[i] !== '{' && text[i] !== '[') {`~~ ~~`i += 1;`~~ ~~`continue;`~~ ~~`}`~~ ~~`const span = spanFrom(text,
+	// i);`~~ ~~`const value = span.closed ? objectOf(text.slice(span.start, span.end)) : undefined;`~~ ~~`if (value !== undefined) objects.push({ span,
+	// value });`~~ ~~`i = span.end;`~~ ~~`}`~~: one scan of the values and the words, as above.
+	const opened: string[] = [];
+	const objects: { readonly start: number; readonly end: number; readonly value: Record<string, unknown>; readonly enclosed: boolean }[] = [];
+	for (let i = 0; i < text.length; ) {
+		const c = text[i]!;
+		if (c === '{' || c === '[') {
+			const span = spanFrom(text, i);
+			const value = span.closed ? jsonOf(text.slice(i, span.end)) : NOT_JSON;
+			if (value !== NOT_JSON) {
+				if (typeof value === 'object' && value !== null && !Array.isArray(value))
+					objects.push({ start: i, end: span.end, value: value as Record<string, unknown>, enclosed: opened.length > 0 });
+				i = span.end;
+				continue;
+			}
+			// No value starts here: the bracket is the words', and the scan goes on at the next character.
+			opened.push(c);
+		} else if (c === '}' || c === ']') {
+			if (opened.pop() !== (c === '}' ? '{' : '[')) return { ok: false, why: `the answer’s words hold a ${c} that closes nothing they opened, ${STRAY_BRACKET_COST}` };
+		}
+		i += 1;
+	}
+	if (opened.length > 0) return { ok: false, why: `the answer’s words hold a ${opened.at(-1)!} that never closes, ${STRAY_BRACKET_COST}` };
+	if (objects.some((o) => o.enclosed)) return { ok: false, why: 'the answer’s JSON object stands inside brackets of its words, a text that is not JSON, so it is not read (REG-D-204)' };
+	if (objects.length !== 1)
+		return {
+			ok: false,
+			why:
+				objects.length === 0
+					? 'the answer holds no JSON object, and the Historian answers with one (REG-D-204)'
+					: `the answer holds ${objects.length} JSON objects, and the Historian answers with one alone (REG-D-204)`
+		};
+	// ⭐ L17b6 round 3 — ~~`const { span, value } = objects[0]!;`~~ ~~`return { ok: true, before: text.slice(0, span.start), answer: text.slice(span.start,
+	// span.end), after: text.slice(span.end), value };`~~: the object's own bounds.
+	const { start, end, value } = objects[0]!;
+	return { ok: true, before: text.slice(0, start), answer: text.slice(start, end), after: text.slice(end), value };
+}
+
+/**
+ * ⭐⭐ D73 + ruling 19 — READ THE HISTORIAN'S ANSWER (see the header): `{ ok: false, why }` where ~~the text does not parse as JSON~~ ⭐ (L17b6, D94;
+ * `REG-D-204`) the text, its last message, holds no JSON object or more than one (`theOneJsonObjectIn`) ⭐ — or (L17b6 round 3, rule H) words whose
+ * brackets do not close, or its object inside brackets of its words; otherwise the declared judgement as
+ * `coerceJudgement` reads it, byte for byte the declared reader's, and the two fields — ⭐ with the object's text as it stood (`answerText`) and the
+ * words around it (`aroundAnswer`), recorded beside it.
  */
 export function readHistorianAnswer(
 	text: string,
 	given: { readonly criteria: readonly AssessmentCriterion[]; readonly givenRecordIds: ReadonlySet<string> }
-): { readonly ok: true; readonly answer: HistorianAnswer } | { readonly ok: false; readonly why: string } {
-	let value: unknown;
-	try {
-		value = JSON.parse(extractJson(text));
-	} catch (e) {
-		return { ok: false, why: `the answer does not parse as JSON: ${e instanceof Error ? e.message : asText(e)}` };
-	}
+):
+	| { readonly ok: true; readonly answer: HistorianAnswer; readonly answerText: string; readonly aroundAnswer: { readonly before: string; readonly after: string } }
+	| { readonly ok: false; readonly why: string } {
+	// ⭐ L17b6 (D94; `REG-D-204`) — ~~`value = JSON.parse(extractJson(text));`~~ and its catch, ~~`the answer does not parse as JSON: …`~~: `extractJson`
+	// took the span from the first `{` to the last `}` of the whole reply, and got 4 of 9 forms wrong (`REG-F-690`, as corrected).
+	const one = theOneJsonObjectIn(text);
+	if (!one.ok) return { ok: false, why: one.why };
+	const value = one.value;
 	const judgement = coerceJudgement(value, { criteria: given.criteria });
-	const o = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+	const o = value;
 	const findings: string[] = [];
 	const recurrence = recurrenceOf(o.recurrence, given.givenRecordIds, findings);
-	return { ok: true, answer: { judgement, recurrence, recommendedControlAction: recommendationOf(o.recommendedControlAction), findings } };
+	return {
+		ok: true,
+		answer: { judgement, recurrence, recommendedControlAction: recommendationOf(o.recommendedControlAction), findings },
+		answerText: one.answer,
+		aroundAnswer: { before: one.before, after: one.after }
+	};
 }

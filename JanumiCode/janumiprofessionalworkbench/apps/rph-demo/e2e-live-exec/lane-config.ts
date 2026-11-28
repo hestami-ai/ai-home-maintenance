@@ -641,16 +641,27 @@ export const PHASE7_STAGE_HELPER_TURNS = 2;
  * (`devinPrint`, D46), the Historian's `devin --version` read (its own 30 s bound, `devin-historian.ts`), ~~and the act's own page work~~ ⭐ and the act's
  * page work past the margin, which is an allowance, as Record Assurance's is.
  */
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b6 — design D94 (the lead's §39, Q4, Q15) — THE HISTORIAN'S WAITS AFTER ITS BOUND, A NAMED TERM: at its bound, its
+ * call waits for its turn's end after `session/cancel`, then for `session/delete`, then out each of its three stops — restated here with its source
+ * (`src/lib/server/tools/devin-historian.ts`, `HISTORIAN_CANCEL_GRACE_MS`, `HISTORIAN_DELETE_WAIT_MS`, `HISTORIAN_STOP_WAIT_MS`: 10 s, 5 s and 2 s), since
+ * this module imports nothing, and held to it by `verif/live-exec-lane-config.test.ts`. So a call can run past `JPWB_HISTORIAN_CALL_MS` by at most this.
+ */
+export const PHASE7_HISTORIAN_AFTER_BOUND_MS = 10_000 + 5_000 + 3 * 2_000;
+
+// ⭐ L17b6 (§39, Q15) — ~~`LANE_BUDGET.reviewerCallMs + historianCallMs + PHASE7_STAGE_HELPER_TURNS * LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS`~~:
+// and the Historian's waits after its bound, beside its setting.
 export const phase7AssuranceStageMs = (historianCallMs: number): number =>
-	LANE_BUDGET.reviewerCallMs + historianCallMs + PHASE7_STAGE_HELPER_TURNS * LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS;
+	LANE_BUDGET.reviewerCallMs + historianCallMs + PHASE7_HISTORIAN_AFTER_BOUND_MS + PHASE7_STAGE_HELPER_TURNS * LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS;
 
 /**
  * ⭐⭐ L17b2 (D82; §18, as the lead's §27 reading 5 amends it) — THE HISTORIAN ASKED AGAIN'S PRESS BOUND: the Historian's; the Unsticking Agent's turn, which
  * a re-ask that records a recurrence brings (`LANE_BUDGET.executorCallMs`); and the lane's page margin, read as a sign-off act's own bound
  * (`PHASE7_SIGN_OFF_MS`), which Record Assurance's bound adds beside its reviews (`phase7RecordAssuranceMs`).
  */
+// ⭐ L17b6 (§39, Q15) — ~~`historianCallMs + LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS`~~: and the Historian's waits after its bound.
 export const phase7HistorianAgainMs = (historianCallMs: number): number =>
-	historianCallMs + LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS;
+	historianCallMs + PHASE7_HISTORIAN_AFTER_BOUND_MS + LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS;
 
 /**
  * ⭐⭐ L17b2 — D82 (`REG-D-166` (5); the lead's ruling 15) — THE RUN PLAN'S WORKHORSE, BY THIS PWA'S TYPE: where the way back the page offers is the

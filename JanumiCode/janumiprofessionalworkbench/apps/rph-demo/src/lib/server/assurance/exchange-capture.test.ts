@@ -537,3 +537,32 @@ describe('⭐⭐ P7-6 I2 — a reply no answer span can be located in, KEPT for 
 		expect(rec.observedToolCalls).toEqual(CAPTURE_FACTS.observedToolCalls);
 	});
 });
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b6 round 5 — the lead's §47.7, item 8 (design D94; §39, Q2's named departure), ITS CONTROL — A SPAN A CALLER HANDS IN
+// IS USED ONLY WHERE ITS THREE PARTS REBUILD THE OUTPUT EXACTLY (`spanOf`; `REG-F-339`'s identity); else the split is `splitAnswerSpan`'s, as for every
+// other caller. The stage's span always rebuilds the Historian's reply (`spanInReply`), so no stage test can reach this.
+describe('⭐⭐ L17b6 round 5 (the lead’s §47.7, item 8; §39, Q2) — the answer span a caller hands in', () => {
+	it('⭑ CONTROL — L17b6 round 5 (the lead’s §47.7, item 8; §39, Q2): a span handed in whose parts do not rebuild the output exactly is not used — the split is splitAnswerSpan’s', async () => {
+		const { store, sink } = harness();
+		const RAW = 'I checked {the index}. Here it is: {"verdict":"ok"}';
+		// The caller's span, one character short at its start: its three parts do not rebuild the output.
+		const off = { prefix: ' checked {the index}. Here it is: ', answer: '{"verdict":"ok"}', suffix: '' };
+		expect(off.prefix + off.answer + off.suffix === RAW, 'arrangement: the span rebuilds the output').toBe(false);
+		const rec = await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-span-off',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			prompt: 'P',
+			rawOutput: RAW,
+			disposition: 'accepted',
+			answerSpan: off
+		});
+		// `splitAnswerSpan`'s split: the first `{` to the last `}` is the answer, the rest the reasoning.
+		expect(await store.get(rec.answerSpanRef.storageKey ?? ''), 'a span that does not rebuild the output was used').toBe('{the index}. Here it is: {"verdict":"ok"}');
+		expect.soft(await store.get(rec.volunteeredReasoningRef.storageKey ?? ''), 'the reasoning is not splitAnswerSpan’s').toBe('I checked ');
+	});
+});

@@ -9,7 +9,9 @@
 // folder's two configurations~~ ⭐ (L17b4, D93), the folder's configuration (absent, the Historian's own); `files/`, planted in the folder; and
 // `probe.json` — its bound in milliseconds, and whether the children of its call are to be listed after it. ⭐ A definition that holds `user-config.json`
 // is refused, naming the file, before any folder is made (the lead's L4-Q6): no user configuration is passed, so it would mean nothing.
-// ⭑ ITS CALL: through `devinHistorianCall`, as the Historian's, so devin's version is read first and the folder removed after; checked at its seam as a
+// ⭑ ITS CALL: ~~through `devinHistorianCall`, as the Historian's~~ ⭐ (L17b6, design D94; the lead's §39, Q8 (b)) D93's print-mode call, a call of the probes'
+// own (`probePrintCall`): the Historian speaks devin's ACP server now, and the writer and every reviewer call still run print mode, so a print-mode probe
+// still measures them. So devin's version is read first and the folder removed after; checked at its seam as a
 // role's is; its answer and its export kept with it, never in the copy. A probe that lists its call's children lists them by the call's process id,
 // and stops none of them.
 // ⛔ AT MOST SIX: a seventh is refused before anything of it is made, and again at its call (the lead's rulings r2, `D84R-A02`)~~: of the probes shown,
@@ -25,15 +27,20 @@ import { dirname, join } from 'node:path';
 // ⭐ L17b4 (D93; `REG-D-197`) — ~~`HISTORIAN_USER_CONFIG`~~ no longer imported: no user configuration is passed.
 // ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`import { devinHistorianCall, HISTORIAN_PROJECT_CONFIG, type HistorianVersionOf } from
 // '../tools/devin-historian.js';`~~: and devin's version reply by its parts, read once and shown once (`devinVersionParts`, `devinVersionShown`).
+// ⭐ L17b6 (D94; §39, Q8 (b)) — ~~`devinHistorianCall,`~~: the probes' own print-mode call (`probePrintCall`), with the version rule, its bound and the
+// measured version it holds the reply to, and the reviewer's record of a failed call.
+// ⭐ L17b6 round 3 (the lead's §43.5) — ~~`DEVIN_HISTORIAN_MEASURED_VERSION,`~~ ~~`DEVIN_VERSION_BOUND_MS,`~~ and, from `devin-reviewer.js`,
+// ~~`devinFailureKindAndNames,`~~: the version read's failure is the Historian's one definition (`historianVersionReadFailure`), which holds all three.
 import {
-	devinHistorianCall,
 	devinVersionParts,
 	devinVersionShown,
 	HISTORIAN_PROJECT_CONFIG,
+	historianVersionReadFailure,
+	historianVersionRefusal,
 	type DevinVersionParts,
 	type HistorianVersionOf
 } from '../tools/devin-historian.js';
-import type { DevinExec } from '../tools/devin-reviewer.js';
+import { DEVIN_BIN_OVERRIDE, devinFailureRecord, type DevinExec } from '../tools/devin-reviewer.js';
 import {
 	approvalRefusal,
 	attemptRefusal,
@@ -237,6 +244,78 @@ function probeFolderFrom(definition: string): ProbeFolder | { readonly refusedBe
 	}
 }
 
+/** ⭐ L17b6 (D94; §39, Q8 (b)) — devin's program, as the probes' print-mode call names it. */
+const DEVIN_BIN = DEVIN_BIN_OVERRIDE ?? 'devin';
+
+/** ⭐ L17b6 — what a probe's print-mode call came to: the Historian's print-mode outcome as it stood at L17b5 (`devin-historian.ts`, struck there). */
+type ProbeOutcome =
+	| { readonly ran: false; readonly why: string }
+	| { readonly ran: true; readonly failure: string; readonly sessionExport?: string }
+	| { readonly ran: true; readonly failure?: undefined; readonly stdout: string; readonly sessionExport?: string };
+
+/** A file's text, or undefined where it cannot be read. */
+function textOrUndefined(path: string): string | undefined {
+	try {
+		return readFileSync(path, 'utf8');
+	} catch {
+		return undefined;
+	}
+}
+
+/** The probe's print-mode call itself, never throwing: the version first, then `devin --print` in the folder. */
+async function probeCallIn(
+	call: { readonly folder: ProbeFolder; readonly model: string; readonly boundMs: number },
+	given: { readonly exec: DevinExec; readonly versionOf: HistorianVersionOf }
+): Promise<ProbeOutcome> {
+	const { folder } = call;
+	let reported: string;
+	try {
+		reported = await given.versionOf();
+	} catch (e) {
+		// ⭐ L17b6 round 3 (the lead's §43.5; paired writers share one definition) — ~~`why: \`devin's version could not be read (devin --version:
+		// ${devinFailureKindAndNames(e, DEVIN_VERSION_BOUND_MS)}; devin's own words are not recorded, REG-F-685), and the Historian's two tool lists are true
+		// of the version they \` + \`were measured at, ${DEVIN_HISTORIAN_MEASURED_VERSION}: so it is not run (L17b2 ruling 2 (A))\``~~, a copy of the
+		// Historian's sentence: its one definition, the same words.
+		return { ran: false, why: historianVersionReadFailure(e) };
+	}
+	const versionRefused = historianVersionRefusal(reported);
+	if (versionRefused !== undefined) return { ran: false, why: versionRefused };
+	try {
+		const { stdout } = await given.exec(
+			DEVIN_BIN,
+			['--print', '--model', call.model, '--prompt-file', folder.promptPath, '--export', folder.exportPath, '--respect-workspace-trust', 'false'],
+			{ cwd: folder.folder, timeout: call.boundMs, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
+		);
+		const sessionExport = textOrUndefined(folder.exportPath);
+		return { ran: true, stdout: String(stdout), ...(sessionExport === undefined ? {} : { sessionExport }) };
+	} catch (e) {
+		const failure = devinFailureRecord(e, call.boundMs);
+		const sessionExport = textOrUndefined(folder.exportPath);
+		return { ran: true, failure, ...(sessionExport === undefined ? {} : { sessionExport }) };
+	}
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b6 — design D94 (the lead's §39, Q8 (b)) — D93'S PRINT-MODE PROBES, A CALL OF THEIR OWN: the Historian's print-mode
+ * call as it stood at L17b5 (`devin-historian.ts`'s `callIn` and `devinHistorianCall`, struck there) — devin's version read and held to the one
+ * measured; then `devin --print` in the folder, its prompt and export named and no `--config`, at the probe's bound; its export read, on success and
+ * on failure; a failure recorded by its kind alone (`devinFailureRecord`); and the folder and its host removed after, whatever came of it. ⛔ Never
+ * throws.
+ */
+async function probePrintCall(
+	call: { readonly folder: ProbeFolder; readonly model: string; readonly boundMs: number },
+	given: { readonly exec: DevinExec; readonly versionOf: HistorianVersionOf }
+): Promise<ProbeOutcome> {
+	const outcome = await probeCallIn(call, given);
+	for (const dir of [call.folder.folder, call.folder.host])
+		try {
+			rmSync(dir, { recursive: true, force: true });
+		} catch {
+			// Kept: a folder that cannot be removed is no part of a probe's record.
+		}
+	return outcome;
+}
+
 /** What the probes need of the host: devin's version, its model, and — for a probe that lists its call's children — a lister by parent process id. */
 export interface ProbeHost {
 	readonly devinVersion: HistorianVersionOf;
@@ -265,7 +344,8 @@ export async function prepareProbe(folder: string, name: string, host: Pick<Prob
 	// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`let version = '';`~~ ~~`versionOf: async () => (version = await host.devinVersion()),`~~: the reply
 	// read by its parts alone, and handed whole to the Historian's own version check, which reads it and keeps none of it.
 	let version = devinVersionParts('');
-	const outcome = await devinHistorianCall(
+	// ⭐ L17b6 (D94; §39, Q8 (b)) — ~~`devinHistorianCall(`~~: the probes’ own print-mode call.
+	const outcome = await probePrintCall(
 		{ folder: made, model: said.model ?? host.model, boundMs: said.boundMs },
 		{
 			versionOf: async () => {
@@ -280,7 +360,8 @@ export async function prepareProbe(folder: string, name: string, host: Pick<Prob
 		}
 	);
 	if (!outcome.ran) return { refusedBecause: outcome.why };
-	if (files === undefined) return { refusedBecause: 'devinHistorianCall ran no program, so there is no folder to show' };
+	// ⭐ L17b6 — ~~`'devinHistorianCall ran no program, so there is no folder to show'`~~
+	if (files === undefined) return { refusedBecause: 'the probe’s print-mode call ran no program, so there is no folder to show' };
 	// ⭐ L17b4 round 4 (§18; `REG-F-685`) — ~~`{ path: 'devin-version.txt', bytes: Buffer.from(version, 'utf8') }`~~, devin's reply whole: its parts alone.
 	const all = [...files, { path: 'devin-version.txt', bytes: devinVersionShown(version) }];
 	for (const f of all) {
@@ -351,7 +432,8 @@ function checkedProbeExec(approved: Manifest, exec: ProbeExec, seen: ProbeSeen):
 /** A probe call's record: what came of it, as the Historian's call reports it, its seam's refusal in place of the program's failure where there is one. */
 function probeRecordOf(
 	r: { readonly probe: string; readonly approvedManifestSha256: string; readonly startedAt: string; readonly answer: string | undefined },
-	outcome: Awaited<ReturnType<typeof devinHistorianCall>>,
+	// ⭐ L17b6 — ~~`outcome: Awaited<ReturnType<typeof devinHistorianCall>>,`~~
+	outcome: ProbeOutcome,
 	seen: ProbeSeen,
 	childrenAfter: ProbeCallRecord['childrenAfter']
 ): ProbeCallRecord {
@@ -425,7 +507,8 @@ export async function callProbe(
 	// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`const seen: ProbeSeen = { version: '' };`~~ ~~`{ versionOf: async () => (seen.version = await
 	// host.devinVersion()), exec: checkedProbeExec(approved, exec, seen) }`~~: the call's version read kept by its parts alone, for its seam.
 	const seen: ProbeSeen = { version: devinVersionParts('') };
-	const outcome = await devinHistorianCall(
+	// ⭐ L17b6 (D94; §39, Q8 (b)) — ~~`devinHistorianCall(`~~: the probes’ own print-mode call.
+	const outcome = await probePrintCall(
 		{ folder: made, model: said.model ?? host.model, boundMs: said.boundMs },
 		{
 			versionOf: async () => {

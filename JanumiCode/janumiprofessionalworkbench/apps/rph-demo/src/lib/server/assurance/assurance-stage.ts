@@ -63,7 +63,8 @@ import { HISTORIAN_POLICY_ID, KNOWN_FAILURE_RECURRENCE, NARRATIVE_WRITER_INVOKER
 import { recordFilePath, recordRowsOf, renderUnitConversation, unitConversationOf } from '../execution/earlier-attempt-record.js';
 // ⭐⭐ Package L17b2 — design D73, D86 — the Historian's part, third in the stage (`historian-part.ts`); its seams' types; and the round's rule (D73's).
 import { historianPart, type HistorianPartContext, type HistorianPartOutcome } from './historian-part.js';
-import type { HistorianExec, HistorianVersionOf } from '../tools/devin-historian.js';
+// ⭐ L17b6 (D94) — ~~`import type { HistorianExec, HistorianVersionOf } from '../tools/devin-historian.js';`~~: the Historian's program is its ACP child's.
+import type { HistorianSpawn, HistorianVersionOf } from '../tools/devin-historian.js';
 import { wayBackOffer, type StageReaders } from '../execution/loop-rule.js';
 
 // ⭐ L17b2 — `HISTORIAN_POLICY_ID`, `KNOWN_FAILURE_RECURRENCE` and `REPLAY_RUNS_NO_STAGE` moved, their words as they were, to the leaf
@@ -121,10 +122,11 @@ export interface AssuranceStageDeps {
 	readonly writerPrint?: (prompt: string) => Promise<string | ToolInvocationResult>;
 	readonly openPi?: (context: ProducerSessionContext, modelId: string, place: ExecutorSessionPlace) => Promise<ProducerSession>;
 	/**
-	 * ⭐ L17b2 (the lead's ruling 6) — the Historian's program and devin's version, as a test's seam: a stand-in of `DevinExec`, in `writerPrint`'s form —
-	 * never over a refused selection or a replay (`historian-part.ts`).
+	 * ⭐ L17b2 (the lead's ruling 6) — the Historian's program and devin's version, as a test's seam: a stand-in of ~~`DevinExec`~~ ⭐ (L17b6, D94) its ACP
+	 * child's spawn (`HistorianSpawn`), in `writerPrint`'s form — never over a refused selection or a replay (`historian-part.ts`). ⭐ L17b6 —
+	 * ~~`readonly historianExec?: HistorianExec;`~~
 	 */
-	readonly historianExec?: HistorianExec;
+	readonly historianSpawn?: HistorianSpawn;
 	readonly historianVersionOf?: HistorianVersionOf;
 	/** ⭐ L17b2 — the batch the Historian's assessment is issued in, under the reviewer's credential, where the page hands one; else `runSteps`. */
 	readonly runReviewerSteps?: (steps: readonly StageStep[]) => string | null;

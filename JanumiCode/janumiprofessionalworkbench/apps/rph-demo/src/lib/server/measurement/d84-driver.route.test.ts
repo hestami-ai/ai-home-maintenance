@@ -166,7 +166,11 @@ import type { ExecutorSessionPlace, ProducerSession, ProducerSessionContext } fr
 import { RERUN_REJECTED_WORK } from '../execution/rejected-rerun.js';
 import { actingActor } from '../identity.js';
 import { devinPrint, type DevinExec } from '../tools/devin-reviewer.js';
-import type { HistorianExec } from '../tools/devin-historian.js';
+// ⭐ L17b6 (D94) — ~~`import type { HistorianExec } from '../tools/devin-historian.js';`~~: the Historian's seam is its ACP child's spawn, and
+// devin's ACP server is the fake (`assurance/devin-acp-fake.testing.ts`).
+import type { HistorianLaunch, HistorianSpawn } from '../tools/devin-historian.js';
+import { HISTORIAN_PERMISSION_RULE } from '../tools/devin-historian.js';
+import { fakeAcp } from '../assurance/devin-acp-fake.testing.js';
 import { createProcessRunObserver } from '../tools/process-run-observer.js';
 import { dispatch, dispatchBatch, getArtifactStore, getEngine, mintUiId, resetEngine, uiSession } from '../workbench.js';
 import { caseCheck, COMPARED_POLICY_FIELDS, POLICY_PREPARATION_RATIONALE, preparePolicy, seedPolicyForm } from './d84-case.js';
@@ -524,6 +528,8 @@ interface DevinSent {
 	readonly folder: Map<string, Buffer>;
 	// ⭐ L17b4 (D93) — ~~`readonly userConfig?: Buffer;`~~
 	readonly historian: boolean;
+	/** ⭐ L17b6 (D94) — the Historian's launch, as `launch.json` shows it, where the call is the Historian's. */
+	readonly launch?: unknown;
 }
 /**
  * What devin is sent at a call: the writer's, its folder held; the Historian's, its host and its folder held ~~, and its user configuration~~.
@@ -540,6 +546,27 @@ function devinSent(file: string, args: readonly string[], options: { readonly cw
 		folder: tree(folder),
 		// ⭐ L17b4 (D93) — ~~`...(historian ? { userConfig: readFileSync(flagOf(args, '--config')) } : {})`~~
 		historian
+	};
+}
+/**
+ * ⭐ L17b6 (D94; the lead's §39, Q6) — what the Historian's call sends, read by this test (`sentByHistorian`): its folder's files, and its launch as `launch.json` shows it —
+ * the folder held as `<folder>`, the prompt held as `<folder>/prompt.txt` where it is that file's text — restated here, never the driver's.
+ */
+function sentByHistorian(launch: HistorianLaunch): DevinSent {
+	const folder = launch.cwd;
+	const files = tree(folder);
+	const prompt = files.get('prompt.txt')?.toString('utf8');
+	const held = (v: unknown): unknown => {
+		if (typeof v === 'string') return v === prompt ? '<folder>/prompt.txt' : v.split(folder).join('<folder>');
+		if (Array.isArray(v)) return v.map(held);
+		if (typeof v === 'object' && v !== null) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, held(x)]));
+		return v;
+	};
+	return {
+		argv: { program: launch.file, args: launch.args.map((a) => a.split(folder).join('<folder>')), timeout: launch.boundMs, maxBuffer: 0, windowsHide: launch.windowsHide },
+		folder: files,
+		historian: true,
+		launch: { program: launch.file, args: launch.args.map((a) => a.split(folder).join('<folder>')), cwd: '<folder>', windowsHide: launch.windowsHide, boundMs: launch.boundMs, messages: launch.messages.map((m) => ({ method: m.method, params: held(m.params) })), permissionRule: launch.permissionRule }
 	};
 }
 /** What Pi is sent at a turn, read by this test: the copy it is opened in, the turn's text, its model and its session's place. */
@@ -600,6 +627,12 @@ function fakeTransports(o: { readonly historian: () => string; readonly diagnosi
 		devinVersion: async () => {
 			sent.versions += 1;
 			return VERSION;
+		},
+		// ⭐ L17b6 (D94) — the Historian's devin, over its ACP server: the call kept as this test reads it (`sentByHistorian`), and the case's
+		// Historian its last message.
+		historianSpawn: (launch: HistorianLaunch) => {
+			sent.historian.push(sentByHistorian(launch));
+			return fakeAcp({ turn: [{ message: o.historian() }, { end: 'end_turn' }] }).spawn(launch);
 		}
 	};
 	return { sent, transports, calls: () => sent.writer.length + sent.historian.length + sent.pi.length };
@@ -683,7 +716,11 @@ describe('⭐⭐ D84 (T1) — one definition: what the driver prepares at each r
 	// at that moment, is the bytes the stage sends: the writer’s folder and argv; the Hypothesizer’s copy, task text and executor; the Historian’s
 	// folder, user configuration, argv and devin’s version — each manifest the sha256 of what it shows; ⭑ CONTROL (T9): that press, its Historian
 	// recording a recurrence, runs the Unsticking Agent'~~ — the Historian is given no user configuration (REG-D-197), so none is shown.
-	it('⛔ RED FIRST — at each seam of a press of the stage itself, the driver’s preparation, made at that moment, is the bytes the stage sends: the writer’s folder and argv; the Hypothesizer’s copy, task text and executor; the Historian’s folder, argv and devin’s version, and no user configuration — each manifest the sha256 of what it shows; ⭑ CONTROL (T9): that press, its Historian recording a recurrence, runs the Unsticking Agent', async () => {
+	// ⭐ RESTATED (L17b6, design D94; the lead's §39, Q6): ~~'⛔ RED FIRST — at each seam of a press of the stage itself, the driver’s preparation, made
+	// at that moment, is the bytes the stage sends: the writer’s folder and argv; the Hypothesizer’s copy, task text and executor; the Historian’s
+	// folder, argv and devin’s version, and no user configuration — each manifest the sha256 of what it shows; ⭑ CONTROL (T9): that press, its
+	// Historian recording a recurrence, runs the Unsticking Agent'~~ — the Historian runs `devin acp` now, and is shown by its launch in its ACP form.
+	it('⛔ RED FIRST — at each seam of a press of the stage itself, the driver’s preparation, made at that moment, is the bytes the stage sends: the writer’s folder and argv; the Hypothesizer’s copy, task text and executor; the Historian’s folder, its launch in its ACP form and devin’s version, and no user configuration — each manifest the sha256 of what it shows; ⭑ CONTROL (T9): that press, its Historian recording a recurrence, runs the Unsticking Agent', async () => {
 		const c = await ninthRunCase();
 		const offer = assuranceStageOffer(getEngine(), c.ids.verification);
 		if ('refusedBecause' in offer) throw new Error(`arrangement: the stage is offered — ${offer.refusedBecause}`);
@@ -699,11 +736,16 @@ describe('⭐⭐ D84 (T1) — one definition: what the driver prepares at each r
 			return { prepared: await prepareRoleInto(role, deps, at, into, version), shown: tree(into) };
 		};
 		const pi = scriptedPi(diagnosisNaming(c.ids.source), pis, requests);
-		const historianExec: HistorianExec = async (file, args, options) => {
-			const sent = devinSent(file, args, options);
-			seen.historian = { ...(await preparedAt('historian')), sent };
-			writeFileSync(flagOf(args, '--export'), JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [] }));
-			return { stdout: recurringHistorian(at.roundId) };
+		// ⭐ L17b6 (D94) — ~~`const historianExec: HistorianExec = async (file, args, options) => { const sent = devinSent(file, args, options); …
+		// writeFileSync(flagOf(args, '--export'), …); return { stdout: recurringHistorian(at.roundId) }; };`~~: the Historian's spawn, its launch read
+		// by this test, the driver's preparation made at that moment; devin's ACP server, the fake, answering it.
+		let historianShownAt: Promise<void> | undefined;
+		const historianSpawn: HistorianSpawn = (launch) => {
+			const sent = sentByHistorian(launch);
+			historianShownAt = preparedAt('historian').then((p) => {
+				seen.historian = { ...p, sent };
+			});
+			return fakeAcp({ turn: [{ message: recurringHistorian(at.roundId) }, { end: 'end_turn' }] }).spawn(launch);
 		};
 		const deps: AssuranceStageDeps = driverDeps({
 			writerPrint: (prompt: string) =>
@@ -727,11 +769,14 @@ describe('⭐⭐ D84 (T1) — one definition: what the driver prepares at each r
 					}
 				};
 			},
-			historianExec,
+			// ⭐ L17b6 — ~~`historianExec,`~~
+			historianSpawn,
 			historianVersionOf: version
 		}).deps;
 
 		const done = await runAssuranceStage(c.ids.verification, deps);
+		// ⭐ L17b6 — the showing made at the Historian's spawn, which a spawn cannot wait for, done.
+		await historianShownAt;
 
 		expect.soft('parts' in done && done.parts.map((p) => [p.part, p.status]), '⭑ CONTROL (T9): the stage’s own press did not run its parts, the Unsticking Agent brought by the Historian’s recurrence last').toEqual([
 			[STAGE_PART.CHAPTER, 'recorded'],
@@ -776,7 +821,10 @@ describe('⭐⭐ D84 (T1) — one definition: what the driver prepares at each r
 		// configuration is not the one the stage’s devin is given').toBe(historianSent.userConfig?.toString('hex'));`~~ — it is given none, and none is shown.
 		expect.soft(historian.shown.has('host/config.json'), 'the Historian is shown a user configuration').toBe(false);
 		expect.soft(historianSent.argv.args, 'the stage’s devin is named a --config file').not.toContain('--config');
-		expect(JSON.parse(historian.shown.get('argv.json')?.toString('utf8') ?? 'null'), 'the Historian’s shown argv is not the stage’s').toEqual(historianSent.argv);
+		// ⭐ L17b6 (D94; §39, Q6) — ~~`expect(JSON.parse(historian.shown.get('argv.json')?.toString('utf8') ?? 'null'), 'the Historian’s shown argv is not the
+		// stage’s').toEqual(historianSent.argv);`~~: its launch in its ACP form, and no argv.json.
+		expect(JSON.parse(historian.shown.get('launch.json')?.toString('utf8') ?? 'null'), 'the Historian’s shown launch is not the stage’s').toEqual(historianSent.launch);
+		expect.soft(historian.shown.has('argv.json'), 'the Historian is shown an argv').toBe(false);
 		// ⭐ RESTATED (L17b4 round 4, the lead's §18 on `l17b4-facts.md`; `L4D-01`): ~~`expect(historian.shown.get('devin-version.txt')?.toString('utf8'), 'the
 		// Historian’s shown version is not the one devin reported').toBe(VERSION);`~~ — devin's version reply is shown by its parts alone, never its words.
 		expect(historian.shown.get('devin-version.txt')?.toString('utf8'), 'the Historian’s shown version is not the one devin reported, by its parts alone').toBe(
@@ -830,7 +878,9 @@ describe('⭐⭐ D84 (T2, T13, T9, T10) — the driver’s steps over the ninth 
 		// the user configuration it showed').toBe(fake.sent.historian[0]!.userConfig?.toString('hex'));`~~ — none is shown, and none is sent.
 		expect.soft(historianShown.has('host/config.json'), 'T2: the Historian is shown a user configuration').toBe(false);
 		expect.soft(fake.sent.historian[0]!.argv.args, 'T2: the Historian’s call names a --config file').not.toContain('--config');
-		expect(JSON.parse(historianShown.get('argv.json')!.toString('utf8')), 'T2: the Historian’s call did not send the argv it showed').toEqual(fake.sent.historian[0]!.argv);
+		// ⭐ L17b6 (D94; §39, Q6) — ~~`expect(JSON.parse(historianShown.get('argv.json')!.toString('utf8')), 'T2: the Historian’s call did not send the argv it
+		// showed').toEqual(fake.sent.historian[0]!.argv);`~~: its launch in its ACP form.
+		expect(JSON.parse(historianShown.get('launch.json')?.toString('utf8') ?? 'null'), 'T2: the Historian’s call did not send the launch it showed').toEqual(fake.sent.historian[0]!.launch);
 		expect(
 			[...historianShown.entries()].some(([p, b]) => p.startsWith('folder/records/') && b.includes('Source’s reader treats a pipe as a file.')),
 			'T13: the Historian was not shown the Hypothesizer’s recorded diagnosis'
@@ -1057,7 +1107,8 @@ describe('⭐⭐ D84 (T5) — the case check: the ninth run’s shape admitted, 
 		const { deps } = driverDeps({
 			writerPrint: (prompt: string) => devinPrint(prompt, fake.transports.devinExec),
 			openPi: fake.transports.openPi,
-			historianExec: fake.transports.devinExec,
+			// ⭐ L17b6 (D94) — ~~`historianExec: fake.transports.devinExec,`~~
+			historianSpawn: fake.transports.historianSpawn,
 			historianVersionOf: fake.transports.devinVersion
 		});
 		const done = await runAssuranceStage(c.ids.verification, deps);
@@ -1465,5 +1516,50 @@ describe('⭐⭐ L17b4 (round 4; L4D-01) — devin’s version reply in D84’s 
 		expect
 			.soft([record.checkedAtSeam, record.seamRefusal?.startsWith("D84 refused the call at its transport (the Historian's folder)")], 'the call record does not say the seam refused')
 			.toEqual([false, true]);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L17b6 — design D94 (the lead's §39, Q6) — T13: THE HISTORIAN'S SHOWING IN ITS ACP FORM (`launch.json`), and the check
+// at its call that what it would send is what was shown.
+describe('⭐⭐ L17b6 (D94; the lead’s §39, Q6) — D84 shows the Historian’s launch in its ACP form, and holds its call to it', () => {
+	const paid = { JPWB_D84_PAID: '1' };
+	it('⛔ RED FIRST — L17b6 (D94): D84 shows the Historian’s launch in its ACP form — launch.json, its command, its messages, its session’s mode and the workbench’s permission rule — and at its call the seam holds what it would send to what was shown, a difference refused before devin starts', async () => {
+		const c = await ninthRunCase();
+		const { deps } = driverDeps();
+		const folder = measurementFolderFor(c.ids.verification);
+		const fake = fakeTransports({ historian: () => recurringHistorian('none'), diagnosis: diagnosisNaming(c.ids.source) });
+		const step = stepper(folder, hostOver(deps, fake.transports));
+		expect((await step('case')).ok && (await step('policy')).ok, 'arrangement: the case and the policy').toBe(true);
+		await prepareApproveCall(step, folder, 'writer');
+		await prepareApproveCall(step, folder, 'hypothesizer');
+		expect((await step('prepare', { JPWB_D84_ROLE: 'historian' })).ok, 'arrangement: the Historian is shown').toBe(true);
+		const shownAt = join(roleFolderOf(folder, 'historian'), D84_LAYOUT.shown);
+		expect(existsSync(join(shownAt, 'launch.json')), 'the Historian is not shown launch.json').toBe(true);
+		const launch = JSON.parse(readFileSync(join(shownAt, 'launch.json'), 'utf8')) as {
+			readonly program?: unknown;
+			readonly args?: unknown;
+			readonly cwd?: unknown;
+			readonly messages?: readonly { readonly method?: unknown; readonly params?: unknown }[];
+			readonly permissionRule?: unknown;
+		};
+		expect.soft([launch.program, launch.args, launch.cwd], 'its command, in its folder held').toEqual(['devin', ['acp', '--model', 'fixture-assurance-model'], '<folder>']);
+		expect.soft((launch.messages ?? []).map((m) => m.method), 'its messages, in order').toEqual(['initialize', 'session/new', 'session/set_mode', 'session/prompt', 'session/delete']);
+		expect.soft(launch.messages?.[1]?.params, 'its session is not made in its folder, held, with no MCP server').toEqual({ cwd: '<folder>', mcpServers: [] });
+		expect.soft(launch.messages?.[2]?.params, 'its session’s mode is not ask').toEqual({ sessionId: '<session>', modeId: 'ask' });
+		expect.soft(launch.messages?.[3]?.params, 'its prompt is not held as the folder’s prompt.txt').toEqual({ sessionId: '<session>', prompt: [{ type: 'text', text: '<folder>/prompt.txt' }] });
+		expect.soft(launch.permissionRule, 'the workbench’s permission rule is not shown').toBe(HISTORIAN_PERMISSION_RULE);
+		expect.soft(existsSync(join(shownAt, 'argv.json')), 'the Historian is shown an argv').toBe(false);
+		// At its call, another model selected since its approval: what it would send is not what was shown, and nothing starts.
+		expect(
+			(await step('approve', { JPWB_D84_ROLE: 'historian', JPWB_D84_MANIFEST_SHA256: shownOf(folder, 'historian').sha256, JPWB_D84_WORDS: 'Approved as shown.' })).ok,
+			'arrangement: the Historian approved'
+		).toBe(true);
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'another-model');
+		const roundId = readJson<{ reading: { roundId: string } }>(join(folder, D84_LAYOUT.case))!.reading.roundId;
+		const refused = await callRole('historian', deps, { folder, unitId: c.ids.verification, roundId }, fake.transports, paid);
+		expect.soft('refusedBecause' in refused ? refused.refusedBecause : 'it was not refused', 'a launch that differs from what was shown was not refused').toMatch(
+			/^the historian prepared again differs from what was approved, so it is not called: launch\.json: its bytes differ from what was approved/
+		);
+		expect.soft(fake.sent.historian.length, 'devin started though its launch differs from what was shown').toBe(0);
 	});
 });

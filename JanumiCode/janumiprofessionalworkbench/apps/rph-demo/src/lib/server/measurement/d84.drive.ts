@@ -17,7 +17,9 @@ import { promisify } from 'node:util';
 import { expect, it } from 'vitest';
 import { stageDepsOf } from '../stage-deps.js';
 // ⭐ L17b4 — design D93 (the lead's §13.3 (a)) — the version read's one time bound, which the Historian's read and its failure's record use too.
-import { DEVIN_VERSION_BOUND_MS } from '../tools/devin-historian.js';
+// ⭐ L17b6 (D94) — ~~`import { DEVIN_VERSION_BOUND_MS } from '../tools/devin-historian.js';`~~: and the Historian's real child, `devin acp` (its stderr
+// never read).
+import { DEVIN_VERSION_BOUND_MS, historianAcpSpawn } from '../tools/devin-historian.js';
 import { DEVIN_BIN_OVERRIDE, type DevinExec } from '../tools/devin-reviewer.js';
 import { D84_LAYOUT } from './d84-files.js';
 import { nodeMeasurementHost } from './d84-folder.js';
@@ -53,6 +55,8 @@ const host: StepHost = {
 	deps: () => stageDepsOf(false),
 	transports: {
 		devinExec: run as unknown as DevinExec,
+		// ⭐ L17b6 (D94) — the Historian's devin, over its ACP server.
+		historianSpawn: historianAcpSpawn,
 		openPi: async (context, modelId, place) => (await import('../tools/pi-executor.js')).openPiExecutionSession(context, modelId, place),
 		// As the Historian's own check reads it (`devin-historian.ts`, `devinVersion`): `devin --version`, run with no session and no model.
 		// ⭐ L17b4 (§13.3 (a)) — ~~`{ timeout: 30_000, windowsHide: true }`~~: the same 30 s, named once (`DEVIN_VERSION_BOUND_MS`).

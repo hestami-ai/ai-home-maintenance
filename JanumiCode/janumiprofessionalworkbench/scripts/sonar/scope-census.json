@@ -41,9 +41,9 @@
 		".tsx"
 	],
 	"counts": {
-		"files": 508,
+		"files": 509,
 		"byRoot": {
-			"apps": 218,
+			"apps": 219,
 			"packages": 141,
 			"scripts": 119,
 			"verif": 30
@@ -52,7 +52,7 @@
 			".cjs": 2,
 			".js": 17,
 			".mjs": 2,
-			".ts": 487
+			".ts": 488
 		},
 		"leftOut": {
 			".svelte (no analyzer)": 11,
@@ -177,6 +177,7 @@
 		"apps/rph-demo/src/lib/server/assurance/declared-policy-review.ts",
 		"apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
 		"apps/rph-demo/src/lib/server/assurance/demo-policy.ts",
+		"apps/rph-demo/src/lib/server/assurance/devin-acp-fake.testing.ts",
 		"apps/rph-demo/src/lib/server/assurance/exchange-capture.ts",
 		"apps/rph-demo/src/lib/server/assurance/exchange-recorder.ts",
 		"apps/rph-demo/src/lib/server/assurance/fence-skeleton-table.ts",

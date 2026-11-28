@@ -11,7 +11,10 @@
 //   · the Historian — its whole folder (`folder/`: `prompt.txt`, `.devin/config.json`, `records/` with its index, `workspace/`), ~~the user configuration
 //     (`host/config.json`),~~ the argv and devin's version, made by `writeHistorianFolder` and `devinHistorianCall` themselves, with a program that copies.
 //     ⭐ L17b4 — design D93 (`REG-F-684`; `REG-D-197`): the Historian is launched with no `--config`, so no user configuration is shown; the host folder
-//     holds the export alone, which devin writes after the call, and the argv names it by its placeholder.
+//     holds the export alone, which devin writes after the call, and the argv names it by its placeholder. ⭐ L17b6 — design D94 (the lead's §39, Q6):
+//     ~~the argv~~ its launch in its ACP form (`launch.json`): its command, its five messages — the folder and the session held, the prompt held as
+//     `<folder>/prompt.txt` where it is that file's text — its session's mode and the workbench's permission rule; and its call's seam holds the launch it
+//     is handed to what was shown, refusing before any process starts (`checkedHistorianSpawn`).
 // ⭑ THE CALL (§3.6): refused without `JPWB_D84_PAID=1`, without an approval of the manifest shown, out of the stage's order, or a second time; then the
 // role prepared again into `check/` and every byte held to what was approved; then the part run with the transport checked once more at its seam —
 // the prompt file, the copy, the turn's text, the folder — a difference there thrown inside the part, which the stage records failing (Q10).
@@ -39,12 +42,16 @@ import { verifiedBytes } from '../execution/verified-bytes.js';
 import { isToolInvocationResult } from '../tools/backing-tool.js';
 // ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`import { devinHistorianCall, writeHistorianFolder, type HistorianVersionOf } from
 // '../tools/devin-historian.js';`~~: and devin's version reply by its parts, read once and shown once (`devinVersionParts`, `devinVersionShown`).
+// ⭐ L17b6 (D94) — and the Historian's launch and its child, which its showing records and its seam checks.
 import {
 	devinHistorianCall,
 	devinVersionParts,
 	devinVersionShown,
 	writeHistorianFolder,
 	type DevinVersionParts,
+	type HistorianAcpChild,
+	type HistorianLaunch,
+	type HistorianSpawn,
 	type HistorianVersionOf
 } from '../tools/devin-historian.js';
 import { devinPrint, type DevinExec } from '../tools/devin-reviewer.js';
@@ -70,7 +77,10 @@ import {
 
 /** ⭐ D84 — the programs a call runs: devin's (the writer's and the Historian's), Pi's opener (the Hypothesizer's) and `devin --version`. */
 export interface D84Transports {
+	/** The writer's devin, in print mode (`devinPrint`). */
 	readonly devinExec: DevinExec;
+	/** ⭐ L17b6 (D94) — the Historian's devin: its ACP child's spawn (`historianAcpSpawn`, in `d84.drive.ts`). */
+	readonly historianSpawn: HistorianSpawn;
 	readonly openPi: (context: ProducerSessionContext, modelId: string, place: ExecutorSessionPlace) => Promise<ProducerSession>;
 	readonly devinVersion: HistorianVersionOf;
 }
@@ -114,20 +124,62 @@ function writerFiles(program: string, args: readonly string[], options: Paramete
  * ⭐ L17b4 round 4 (the lead's §18; `L4D-01`; `REG-F-685`) — ~~`version: string`~~ and ~~`{ path: 'devin-version.txt', bytes: Buffer.from(version,
  * 'utf8') }`~~, devin's reply whole: devin's version by its parts alone (`devinVersionShown`), as shown and as checked, never its words.
  */
-function historianFiles(
-	program: string,
-	args: readonly string[],
-	options: Parameters<DevinExec>[2],
-	version: DevinVersionParts
-): { readonly path: string; readonly bytes: Buffer }[] {
-	const folder = options.cwd;
-	const host = `${folder}.host`;
+function historianFiles(launch: HistorianLaunch, version: DevinVersionParts): { readonly path: string; readonly bytes: Buffer }[] {
+	// ⭐ L17b6 (D94; §39, Q6) — ~~`program, args, options`~~ and ~~`{ path: 'argv.json', bytes: Buffer.from(argvShown(program, args, options, [[host,
+	// '<host>'], [folder, '<folder>']]), 'utf8') },`~~: the Historian runs `devin acp` now, and is shown by its launch.
+	const folder = launch.cwd;
 	return [
 		...treeEntries(folder).map((e) => ({ path: `folder/${e.path}`, bytes: readFileSync(join(folder, e.path)) })),
-		{ path: 'argv.json', bytes: Buffer.from(argvShown(program, args, options, [[host, '<host>'], [folder, '<folder>']]), 'utf8') },
+		{ path: 'launch.json', bytes: Buffer.from(launchShown(launch), 'utf8') },
 		{ path: 'devin-version.txt', bytes: devinVersionShown(version) }
 	];
 }
+
+/** A file's text, or undefined where it cannot be read. */
+function textOf(path: string): string | undefined {
+	try {
+		return readFileSync(path, 'utf8');
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L17b6 — design D94 (the lead's §39, Q6) — THE HISTORIAN'S LAUNCH AS D84 SHOWS IT (`launch.json`): its program, its args,
+ * its folder held as `<folder>`, its bound, its five messages — the session's id already held by the launch, the folder held, and the prompt held as
+ * `<folder>/prompt.txt` where it is that file's text, so a prompt sent that is not the file's shows whole, and differs — and the workbench's permission
+ * rule in words. Shown at the showing, and made again at the call's seam from the launch it is handed.
+ */
+function launchShown(launch: HistorianLaunch): string {
+	const folder = launch.cwd;
+	const prompt = textOf(join(folder, 'prompt.txt'));
+	const held = (v: unknown): unknown => {
+		if (typeof v === 'string') return prompt !== undefined && v === prompt ? '<folder>/prompt.txt' : v.split(folder).join('<folder>');
+		if (Array.isArray(v)) return v.map(held);
+		if (typeof v === 'object' && v !== null) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, held(x)]));
+		return v;
+	};
+	return json({
+		program: launch.file,
+		args: launch.args.map((a) => a.split(folder).join('<folder>')),
+		cwd: '<folder>',
+		windowsHide: launch.windowsHide,
+		boundMs: launch.boundMs,
+		messages: launch.messages.map((m) => ({ method: m.method, params: held(m.params) })),
+		permissionRule: launch.permissionRule
+	});
+}
+
+/** ⭐ L17b6 (D94) — a child that runs nothing and ends at once: the showing's, which only records the launch it is handed. */
+const endedChild = (): HistorianAcpChild => ({
+	pid: undefined,
+	write: () => undefined,
+	onLine: () => undefined,
+	exited: Promise.resolve({ code: 0, signal: null }),
+	closeStdin: () => undefined,
+	terminate: () => undefined,
+	kill: () => undefined
+});
 
 /** The manifest of files read in memory, as `treeEntries` would list them written. */
 const manifestOfFiles = (files: readonly { readonly path: string; readonly bytes: Buffer }[]): Manifest =>
@@ -214,9 +266,11 @@ async function prepareHistorian(round: RoundContext, into: string, devinVersion:
 				version = devinVersionParts(reply);
 				return reply;
 			},
-			exec: async (file, args, options) => {
-				files = historianFiles(file, args, options, version);
-				return { stdout: '' };
+			// ⭐ L17b6 (D94) — ~~`exec: async (file, args, options) => { files = historianFiles(file, args, options, version); return { stdout: '' }; }`~~: the
+			// launch the call would start, recorded, and a child that ends at once.
+			spawn: (launch) => {
+				files = historianFiles(launch, version);
+				return endedChild();
 			}
 		}
 	);
@@ -318,14 +372,23 @@ function checkedWriterExec(approved: Manifest, exec: DevinExec, seen: SeamSeen):
 	};
 }
 
-/** ⭐ D84 — the Historian's program, checked at its seam: its folder, ~~its user configuration,~~ its argv and devin's version, then devin run (L17b4, D93). */
-function checkedHistorianExec(approved: Manifest, exec: DevinExec, seen: SeamSeen): DevinExec {
-	return async (file, args, options) => {
+/**
+ * ⭐ D84 — the Historian's program, checked at its seam: its folder, ~~its user configuration,~~ ~~its argv~~ ⭐ (L17b6, D94) its launch and devin's
+ * version, then devin started (L17b4, D93). ⭐ L17b6 — ~~`function checkedHistorianExec(approved: Manifest, exec: DevinExec, seen: SeamSeen): DevinExec`~~:
+ * the spawn is handed the whole launch, so a difference is refused before any process starts; the call's time is the child's, to its end.
+ */
+function checkedHistorianSpawn(approved: Manifest, spawnOf: HistorianSpawn, seen: SeamSeen): HistorianSpawn {
+	return (launch) => {
 		// ⭐ L17b4 round 4 (§18) — ~~`seen.version ?? ''`~~: the parts the call's version read gave, compared as they were shown.
-		const differences = manifestDifferences(approved, manifestOfFiles(historianFiles(file, args, options, seen.version ?? devinVersionParts(''))));
+		const differences = manifestDifferences(approved, manifestOfFiles(historianFiles(launch, seen.version ?? devinVersionParts(''))));
 		if (differences.length > 0) throw new Error((seen.refusedBecause = seamRefusal("the Historian's folder", differences)));
 		seen.checked = true;
-		return timed(seen, () => exec(file, args, options));
+		const started = performance.now();
+		const child = spawnOf(launch);
+		void child.exited.then(() => {
+			seen.callMs = Math.round(performance.now() - started);
+		});
+		return child;
 	};
 }
 
@@ -446,7 +509,8 @@ export function seamedDeps(role: D84Role, deps: AssuranceStageDeps, approved: Ma
 	if (role === 'hypothesizer') return { ...deps, openPi: checkedOpener(approved, transports.openPi, seen) };
 	return {
 		...deps,
-		historianExec: checkedHistorianExec(approved, transports.devinExec, seen),
+		// ⭐ L17b6 (D94) — ~~`historianExec: checkedHistorianExec(approved, transports.devinExec, seen),`~~
+		historianSpawn: checkedHistorianSpawn(approved, transports.historianSpawn, seen),
 		// ⭐ L17b4 round 4 (the lead's §18; `L4D-01`) — ~~`historianVersionOf: async () => (seen.version = await transports.devinVersion())`~~: the call's
 		// version read kept by its parts alone, for its seam and its record; the reply handed whole to the Historian's own version check alone.
 		historianVersionOf: async () => {

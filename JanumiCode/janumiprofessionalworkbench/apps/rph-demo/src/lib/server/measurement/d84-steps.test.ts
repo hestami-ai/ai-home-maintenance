@@ -34,6 +34,10 @@ function hostWith(gate: Promise<void> = Promise.resolve()): StepHost {
 			devinExec: async () => {
 				throw new Error('arrangement: no program here');
 			},
+			// ⭐ L17b6 (D94) — the Historian’s seam.
+			historianSpawn: () => {
+				throw new Error('arrangement: no program here');
+			},
 			openPi: async () => {
 				throw new Error('arrangement: no program here');
 			},

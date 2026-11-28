@@ -50,7 +50,7 @@ const seam = vi.hoisted(() => ({
 	 */
 	historian: undefined as
 		| undefined
-		| ((call: { readonly prompt: string }) => { readonly stdout?: string; readonly export?: string; readonly fails?: string }),
+		| ((call: { readonly prompt: string }) => { readonly stdout?: string; readonly toolCalls?: readonly Record<string, unknown>[]; readonly turn?: readonly unknown[]; readonly fails?: string; readonly rejects?: unknown }),
 	/**
 	 * ⭐ L17b2 (D86) — each call devin was given as the Historian: its argv, its working folder and its bound, and what its folder ~~and its user configuration~~
 	 * held at the call. ⭐ L17b4 (design D93; `REG-D-197`; the lead's §15.5 (f) sweep) — no user configuration is passed, so `userConfig` reads none.
@@ -64,7 +64,7 @@ const seam = vi.hoisted(() => ({
 	}[],
 	/** ⭐ L17b2 (ruling 2 (A)) — what `devin --version` answers the Historian's check: the version whose tools were measured, unless a case says another. */
 	historianVersion: 'devin 3000.11.234 (92c83011d113)',
-	/** ⭐ L17b2 (ruling 6) — set, the Historian's call is given the seams the stage handed it (`historianExec`), not this file's program. */
+	/** ⭐ L17b2 (ruling 6) — set, the Historian's call is given the seams the stage handed it (~~`historianExec`~~ ⭐ `historianSpawn`, L17b6), not this file's program. */
 	historianPassThrough: false,
 	/** What the declared reviewer answers a policy's review: set in `beforeEach`, every criterion MET. */
 	answer: (() => {
@@ -173,13 +173,15 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 // `devin --version` answered by the case (`seam.historianVersion`), and the session by the case's answer (`seam.historian`), its export written where
 // the argv names it; what the folder ~~and the user configuration~~ held at the call kept (`seam.historianCalls`; ⭐ L17b4, D93, the §15.5 (f) sweep:
 // no user configuration is passed, so none is held). Where a case hands the stage a seam of
-// its own (`historianExec`, ruling 6), the call is given that seam (`seam.historianPassThrough`). ⚠ The module is package L17b2's: until it exists
+// its own (~~`historianExec`~~ ⭐ `historianSpawn`, L17b6; ruling 6), the call is given that seam (`seam.historianPassThrough`). ⚠ The module is package L17b2's: until it exists
 // nothing imports it, so this factory never runs (vitest gives a mock of an absent module its unresolved id).
 // ⭐ L17b2 (ruling 3; the lead's §13) — `assurance-stage.route.test.ts`'s mock, copied byte for byte, so that the three route files' arrangements are one.
 vi.mock('../tools/devin-historian.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../tools/devin-historian.js')>();
 	const fs = await import('node:fs');
 	const path = await import('node:path');
+	// ⭐ L17b6 (D94) — the fake of devin’s ACP server, the Historian’s program now.
+	const acpFake = await import('../assurance/devin-acp-fake.testing.js');
 	/** Every file under `root`, by its path relative to it, `/`-separated, with its text. */
 	const tree = (root: string): Record<string, string> => {
 		const out: Record<string, string> = {};
@@ -209,19 +211,18 @@ vi.mock('../tools/devin-historian.js', async (importOriginal) => {
 					? actual.devinHistorianCall(call, given)
 					: actual.devinHistorianCall(call, {
 							versionOf: async () => seam.historianVersion,
-							exec: async (_file: string, args: readonly string[], options: { readonly cwd: string; readonly timeout: number }) => {
-								const after = (flag: string): string => args[args.indexOf(flag) + 1] ?? '';
-								seam.historianCalls.push({
-									args: [...args],
-									cwd: options.cwd,
-									timeout: options.timeout,
-									files: tree(options.cwd),
-									userConfig: fs.existsSync(after('--config')) ? fs.readFileSync(after('--config'), 'utf8') : ''
-								});
-								const answered = seam.historian?.({ prompt: fs.readFileSync(after('--prompt-file'), 'utf8') }) ?? {};
-								if (answered.fails !== undefined) throw new Error(answered.fails);
-								fs.writeFileSync(after('--export'), answered.export ?? JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [] }));
-								return { stdout: answered.stdout ?? clean };
+							// ⭐ L17b6 (D94) — ~~`exec: async (_file, args, options) => { … the argv’s prompt file read, the call kept, its export written, `{ stdout }` … }`~~:
+							// devin’s ACP server, the fake (`assurance/devin-acp-fake.testing.ts`): the call kept from its launch; the case’s whole turn where it gives
+							// one, else its tool-call notices, then its answer as the last message, then `end_turn`; a case that fails, an exit before its answer; a
+							// case’s rejection thrown by the spawn as it is.
+							spawn: (launch: import('../tools/devin-historian.js').HistorianLaunch) => {
+								seam.historianCalls.push({ args: [...launch.args], cwd: launch.cwd, timeout: launch.boundMs, files: tree(launch.cwd), userConfig: '' });
+								const answered = seam.historian?.({ prompt: fs.readFileSync(path.join(launch.cwd, 'prompt.txt'), 'utf8') }) ?? {};
+								if (answered.rejects !== undefined) throw answered.rejects;
+								const notices = (answered.toolCalls ?? []).map((notice) => ({ notice }));
+								const ending = answered.fails === undefined ? [{ message: answered.stdout ?? clean }, { end: 'end_turn' }] : [{ exit: 1 }];
+								const turn = (answered.turn ?? [...notices, ...ending]) as import('../assurance/devin-acp-fake.testing.js').FakeAcpEvent[];
+								return acpFake.fakeAcp({ turn }).spawn(launch);
 							}
 						})
 		)

@@ -79,6 +79,8 @@ import {
 	TEST_TIMEOUT_MS,
 	WIRED_EXECUTORS,
 	laneKeysRefusal,
+	// ⭐ L17b6 (D94; §39, Q15) — the Historian's waits after its bound, a named term of both bounds.
+	PHASE7_HISTORIAN_AFTER_BOUND_MS,
 	phase7AssuranceStageMs,
 	phase7DeclaredRerunMs,
 	phase7HistorianAgainMs,
@@ -91,6 +93,8 @@ import {
 	wiredReviewer
 } from '../apps/rph-demo/e2e-live-exec/lane-config.js';
 import { DECISION_MODEL_BOUNDS } from '../apps/rph-demo/src/lib/server/assurance/decision-model-client.js';
+// ⭐ L17b6 (D94; §39, Q15) — the product's three waits, which the lane's named term restates.
+import { HISTORIAN_DEFAULT_WAITS } from '../apps/rph-demo/src/lib/server/tools/devin-historian.js';
 import {
 	INTROSPECT_MS as OPERATOR_INTROSPECT_MS,
 	PHASE7_SIGN_OFF_MS as OPERATOR_SIGN_OFF_MS,
@@ -1050,17 +1054,25 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	//   · the Historian asked again — the Historian's; the Unsticking Agent's turn, which a re-ask that records a recurrence brings (§27 reading 5); and
 	//     the lane's page margin, a sign-off act's own bound (`PHASE7_SIGN_OFF_MS`), as Record Assurance's bound counts its act beside its reviews;
 	//   · the send-back calls no model, and is waited for as a sign-off act is (`PHASE7_SIGN_OFF_MS`; the live spec's bounds list holds it).
-	it('⛔ RED FIRST — L17b2 (D82; §18) — the round’s stage and the Historian’s re-ask are waited for bounds computed from the Historian’s own setting: the writer’s call, the Historian’s and two helper turns ⭐ and the page’s margin (§31 (1)); the Historian’s, one helper turn and the page’s margin — each read by reference, no number stated', () => {
+	// ⭐ RESTATED (L17b6, design D94; the lead's §39, Q15): ~~'⛔ RED FIRST — L17b2 (D82; §18) — the round’s stage and the Historian’s re-ask are waited for bounds computed from the Historian’s own setting: the writer’s call, the Historian’s and two helper turns ⭐ and the page’s margin (§31 (1)); the Historian’s, one helper turn and the page’s margin — each read by reference, no number stated'~~ — each bound counts the
+	// Historian's waits after its bound, a named term.
+	it('⛔ RED FIRST — L17b2 (D82; §18) — the round’s stage and the Historian’s re-ask are waited for bounds computed from the Historian’s own setting: the writer’s call, the Historian’s, its waits after its bound and two helper turns ⭐ and the page’s margin (§31 (1)); the Historian’s, its waits after its bound, one helper turn and the page’s margin — each read by reference, no number stated', () => {
 		const H = 600_000;
 		expect([phase7AssuranceStageMs(H), phase7HistorianAgainMs(H)], 'a bound is not the sum of its terms').toEqual([
 			// ~~LANE_BUDGET.reviewerCallMs + H + PHASE7_STAGE_HELPER_TURNS * LANE_BUDGET.executorCallMs~~ ⭐ §31 (1): and the page's margin.
-			LANE_BUDGET.reviewerCallMs + H + PHASE7_STAGE_HELPER_TURNS * LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS,
-			H + LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS
+			// ⭐ L17b6 (§39, Q15) — ~~without `PHASE7_HISTORIAN_AFTER_BOUND_MS`~~: and the Historian's waits after its bound, in each.
+			LANE_BUDGET.reviewerCallMs + H + PHASE7_HISTORIAN_AFTER_BOUND_MS + PHASE7_STAGE_HELPER_TURNS * LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS,
+			H + PHASE7_HISTORIAN_AFTER_BOUND_MS + LANE_BUDGET.executorCallMs + PHASE7_SIGN_OFF_MS
 		]);
 		// The figures, at a bound of 600 s: ~~480 s + 600 s + 2 × 240 s = 1,560 s~~ ⭐ 480 s + 600 s + 2 × 240 s + 300 s = 1,860 s (§31 (1)); 600 s + 240 s +
 		// 300 s = 1,140 s — the two helper turns, the Hypothesizer's and the Unsticking Agent's.
 		// ~~`toEqual([1_560_000, 1_140_000, 2])`~~ ⭐ §31 (1): the stage's 1,860 s.
-		expect([phase7AssuranceStageMs(H), phase7HistorianAgainMs(H), PHASE7_STAGE_HELPER_TURNS]).toEqual([1_860_000, 1_140_000, 2]);
+		// ⭐ L17b6 (§39, Q15) — ~~`toEqual([1_860_000, 1_140_000, 2])`~~: each 21 s more, the Historian's waits after its bound (10 s + 5 s + 3 × 2 s).
+		expect([phase7AssuranceStageMs(H), phase7HistorianAgainMs(H), PHASE7_STAGE_HELPER_TURNS]).toEqual([1_881_000, 1_161_000, 2]);
+		// ⭐ L17b6 — the term is the product's three waits, restated: the cancel's grace, the delete's wait, and three stops' waits.
+		expect(PHASE7_HISTORIAN_AFTER_BOUND_MS, 'the lane’s term is not the product’s waits after the bound').toBe(
+			HISTORIAN_DEFAULT_WAITS.cancelGraceMs + HISTORIAN_DEFAULT_WAITS.deleteWaitMs + 3 * HISTORIAN_DEFAULT_WAITS.stopWaitMs
+		);
 		// The Historian's setting is counted once in each, as itself: a millisecond more is a millisecond more.
 		expect([phase7AssuranceStageMs(H + 1) - phase7AssuranceStageMs(H), phase7HistorianAgainMs(H + 1) - phase7HistorianAgainMs(H)]).toEqual([1, 1]);
 		// ⛔ BY REFERENCE: each reads the budget's own figures and the setting it is handed, and states no number.
@@ -1068,10 +1080,12 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		expect([madeOf(sf, 'phase7AssuranceStageMs'), madeOf(sf, 'phase7HistorianAgainMs')]).toEqual([
 			{
 				// ~~…, 'LANE_BUDGET.executorCallMs'],~~ ⭐ §31 (1): and the page's margin, last, by reference.
-				reads: ['historianCallMs', 'LANE_BUDGET.reviewerCallMs', 'historianCallMs', 'PHASE7_STAGE_HELPER_TURNS', 'LANE_BUDGET.executorCallMs', 'PHASE7_SIGN_OFF_MS'],
+				// ⭐ L17b6 — ~~without 'PHASE7_HISTORIAN_AFTER_BOUND_MS'~~
+				reads: ['historianCallMs', 'LANE_BUDGET.reviewerCallMs', 'historianCallMs', 'PHASE7_HISTORIAN_AFTER_BOUND_MS', 'PHASE7_STAGE_HELPER_TURNS', 'LANE_BUDGET.executorCallMs', 'PHASE7_SIGN_OFF_MS'],
 				numbers: []
 			},
-			{ reads: ['historianCallMs', 'historianCallMs', 'LANE_BUDGET.executorCallMs', 'PHASE7_SIGN_OFF_MS'], numbers: [] }
+			// ⭐ L17b6 — ~~`{ reads: ['historianCallMs', 'historianCallMs', 'LANE_BUDGET.executorCallMs', 'PHASE7_SIGN_OFF_MS'], numbers: [] }`~~
+			{ reads: ['historianCallMs', 'historianCallMs', 'PHASE7_HISTORIAN_AFTER_BOUND_MS', 'LANE_BUDGET.executorCallMs', 'PHASE7_SIGN_OFF_MS'], numbers: [] }
 		]);
 	});
 

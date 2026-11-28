@@ -11,6 +11,8 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 // ⭐ L17b4 (design D93; the lead's L4-Q1) — ~~`import { HISTORIAN_PROJECT_CONFIG, HISTORIAN_USER_CONFIG } from '../tools/devin-historian.js';`~~: the
 // Historian, and so each probe, is given no user configuration (REG-D-197).
 import { HISTORIAN_PROJECT_CONFIG } from '../tools/devin-historian.js';
+// ⭐ L17b6 round 3 (the lead's §43.5) — and the module whole, for the version read's failure worded once (`historianVersionReadFailure`).
+import * as historianTool from '../tools/devin-historian.js';
 import { D84_LAYOUT, readJson, recordApproval, writeOnce, type Manifest } from './d84-files.js';
 import { callProbe, prepareProbe, type ProbeCallRecord, type ProbeExec, type ProbeHost } from './d84-probes.js';
 import { gatherReport } from './d84-report.js';
@@ -92,12 +94,19 @@ function fakeDevin(answer: string) {
 	return { exec, sent };
 }
 
-describe('⭐⭐ D84 (T12; `REG-D-189` (3)) — a probe, prepared and shown, approved, then called once through devin as the Historian’s call runs, counted apart', () => {
+// ⭐ RESTATED (L17b6, design D94; the lead's §39, Q8 (b)): ~~'⭐⭐ D84 (T12; `REG-D-189` (3)) — a probe, prepared and shown, approved, then called once
+// through devin as the Historian’s call runs, counted apart'~~ — the Historian speaks devin's ACP server now; a probe keeps D93's print-mode call, a call
+// of the probes' own (`probePrintCall`), as the writer and every reviewer still run.
+describe('⭐⭐ D84 (T12; `REG-D-189` (3)) — a probe, prepared and shown, approved, then called once through devin in D93’s print-mode form, counted apart', () => {
 	// ⭐ RESTATED (L17b4, design D93; the lead's L4-Q10): ~~'⛔ RED FIRST — shown as the Historian’s call would be made: its folder (the prompt, its
 	// configurations, its planted files), its user configuration, its argv and devin’s version, with their manifest; approved; called once through the
 	// program, its answer and export kept beside it, its call’s children listed; counted apart from the roles’ calls'~~ — the Historian's launch passes
 	// no user configuration (REG-D-197), so a probe in its form is shown none.
-	it('⛔ RED FIRST — shown as the Historian’s call would be made: its folder (the prompt, its project configuration, its planted files), its argv, which names no user configuration, and devin’s version, with their manifest; approved; called once through the program, its answer and export kept beside it, its call’s children listed; counted apart from the roles’ calls', async () => {
+	// ⭐ RESTATED (L17b6, design D94; §39, Q8 (b)): ~~'⛔ RED FIRST — shown as the Historian’s call would be made: its folder (the prompt, its project
+	// configuration, its planted files), its argv, which names no user configuration, and devin’s version, with their manifest; approved; called once
+	// through the program, its answer and export kept beside it, its call’s children listed; counted apart from the roles’ calls'~~ — a probe's call is
+	// D93's print-mode call now, no longer the Historian's.
+	it('⛔ RED FIRST — shown as D93’s print-mode call would be made: its folder (the prompt, its project configuration, its planted files), its argv, which names no user configuration, and devin’s version, with their manifest; approved; called once through the program, its answer and export kept beside it, its call’s children listed; counted apart from the roles’ calls', async () => {
 		const folder = fresh('probe');
 		defined(folder, '01-tilde', { prompt: 'Read ~/notes.txt and say what it holds.', listChildren: true, planted: { 'notes.txt': 'planted' } });
 		const shown = await prepareProbe(folder, '01-tilde', hostOf());
@@ -634,5 +643,40 @@ describe('⭐⭐ D84 (T12; `REG-D-189` (3)) — a probe, prepared and shown, app
 		expect.soft(text, 'its call record holds execFile’s words').not.toContain('Command failed');
 		expect.soft(text, 'its call record holds the home folder').not.toContain(JSON.stringify(home).slice(1, -1));
 		expect.soft(text, 'its call record holds an e-mail address').not.toMatch(email);
+	});
+
+	// ⭐⭐ L17b6 round 3 — the lead's §43.5 (finding 3; paired writers share one definition) — A PROBE'S VERSION READ THAT FAILS IS WORDED AS THE
+	// HISTORIAN'S IS: by the one definition (`historianVersionReadFailure`, `tools/devin-historian.ts`), at its showing and at its call. Before, the probes'
+	// call (`probeCallIn`) held a copy of the Historian's sentence.
+	it('⛔ RED FIRST — L17b6 round 3 (the lead’s §43.5): a probe whose devin --version throws is worded by the Historian’s one definition (historianVersionReadFailure), in the lead’s words byte for byte — not shown at its showing, and not run at its call, its record saying why, devin never run', async () => {
+		const thrown = new Error('spawn devin ENOENT');
+		const unread: ProbeHost = {
+			...hostOf(),
+			devinVersion: async () => {
+				throw thrown;
+			}
+		};
+		const folder = fresh('unread');
+		defined(folder, '01-unread');
+		expect(await prepareProbe(folder, '01-unread', unread), 'a probe whose version could not be read is not refused in the one definition’s words').toEqual({
+			refusedBecause: historianTool.historianVersionReadFailure(thrown)
+		});
+		// ⭑ Its words, byte for byte the lead's (§13.3 (a)) for an Error of no kind, as the Historian's call words them (`devin-historian.test.ts`).
+		expect.soft(historianTool.historianVersionReadFailure(thrown), 'the one definition is not in the lead’s words').toBe(
+			"devin's version could not be read (devin --version: failed with no exit code, signal or error code; devin's own words are not recorded, REG-F-685), " +
+				"and the Historian's two tool lists are true of the version they were measured at, 3000.11.234: so it is not run (L17b2 ruling 2 (A))"
+		);
+		defined(folder, '02-unread');
+		const shown = await prepareProbe(folder, '02-unread', hostOf());
+		if ('refusedBecause' in shown) throw new Error(`arrangement: ${shown.refusedBecause}`);
+		const at = join(folder, D84_LAYOUT.probes, '02-unread');
+		recordApproval(at, { manifestSha256: shown.shown.sha256, words: 'Approved.', approvedAt: 'now' });
+		const devin = fakeDevin('never');
+		const called = await callProbe(folder, '02-unread', unread, devin.exec, { JPWB_D84_PAID: '1' });
+		if ('refusedBecause' in called) throw new Error(`the probe was refused before its call: ${called.refusedBecause}`);
+		expect.soft([readJson<ProbeCallRecord>(join(at, D84_LAYOUT.call))?.outcome, devin.sent.length], 'its call’s record does not say why in the one definition’s words, or devin ran').toEqual([
+			{ ran: false, why: historianTool.historianVersionReadFailure(thrown) },
+			0
+		]);
 	});
 });
